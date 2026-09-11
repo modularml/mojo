@@ -24,7 +24,6 @@ from max.engine import InferenceSession, Model
 from max.graph import BufferValue, Graph, TensorValue
 from max.nn.kv_cache import (
     KVCacheInputs,
-    KVCacheParams,
     MultiKVCacheInputs,
     MultiKVCacheParams,
 )
@@ -40,6 +39,7 @@ from typing_extensions import override
 
 from ..qwen3_5.model import _SCALE_SUFFIXES, Qwen3_5Model
 from ..qwen3_5.model_config import Qwen3_5Config
+from ..qwen3_5.state_cache import attn_cache
 from .unified_mtp_qwen3_5 import UnifiedMTPQwen3_5
 
 logger = logging.getLogger("max.pipelines")
@@ -67,9 +67,10 @@ class UnifiedMTPQwen3_5Inputs(UnifiedSpecDecodeInputs):
     data_parallel_splits: Buffer
     signal_buffers: list[Buffer]
     batch_context_lengths: list[Buffer]
-    slot_idx: list[Buffer]
     live_conv_pools: list[Buffer]
     live_recurrent_pools: list[Buffer]
+    live_conv_row_ids: list[Buffer]
+    live_recurrent_row_ids: list[Buffer]
     shadow_conv_pools: list[Buffer]
     shadow_recurrent_pools: list[Buffer]
 
@@ -90,9 +91,10 @@ class UnifiedMTPQwen3_5Inputs(UnifiedSpecDecodeInputs):
             prefix
             + self._spec_decode_tail_buffers(include_in_thinking_phase=True)
             + (
-                *self.slot_idx,
                 *self.live_conv_pools,
                 *self.live_recurrent_pools,
+                *self.live_conv_row_ids,
+                *self.live_recurrent_row_ids,
                 *self.shadow_conv_pools,
                 *self.shadow_recurrent_pools,
             )
@@ -172,12 +174,11 @@ class UnifiedMTPQwen3_5Model(_UnifiedSpecDecodeModelMixin, Qwen3_5Model):
         # and never called.
         config.vision_config = None
 
-        assert isinstance(self.kv_params, KVCacheParams)
+        # Attention only: this graph declares its own state pools in
+        # ``input_types``.
+        attn = attn_cache(self.kv_params)
         self.kv_params = MultiKVCacheParams.from_params(
-            {
-                "target": self.kv_params,
-                "draft": replace(self.kv_params, num_layers=1),
-            }
+            {"target": attn, "draft": replace(attn, num_layers=1)}
         )
         return config
 
@@ -225,7 +226,6 @@ class UnifiedMTPQwen3_5Model(_UnifiedSpecDecodeModelMixin, Qwen3_5Model):
         kv_params = self.kv_params
         assert isinstance(kv_params, MultiKVCacheParams)
         num_devices = len(self.devices)
-        num_pools = num_devices * nn_model.num_linear_layers
 
         with Graph(
             GRAPH_NAME, input_types=nn_model.input_types(kv_params)
@@ -270,17 +270,19 @@ class UnifiedMTPQwen3_5Model(_UnifiedSpecDecodeModelMixin, Qwen3_5Model):
                 wait_payload = next(it).buffer
                 device_bitmask_scratch = next(it).buffer
 
-            slot_idx = [next(it).tensor for _ in range(num_devices)]
-            pools = [
-                [next(it).buffer for _ in range(num_pools)] for _ in range(4)
-            ]
+            # The state tail, in the order ``input_types`` declares it.
+            def per_device_buffers() -> list[BufferValue]:
+                return [next(it).buffer for _ in range(num_devices)]
 
-            def by_device(flat: list[BufferValue]) -> list[list[BufferValue]]:
-                width = nn_model.num_linear_layers
-                return [
-                    flat[d * width : (d + 1) * width]
-                    for d in range(num_devices)
-                ]
+            def per_device_tensors() -> list[TensorValue]:
+                return [next(it).tensor for _ in range(num_devices)]
+
+            live_conv_pools = per_device_buffers()
+            live_recurrent_pools = per_device_buffers()
+            live_conv_row_ids = per_device_tensors()
+            live_recurrent_row_ids = per_device_tensors()
+            shadow_conv_pools = per_device_buffers()
+            shadow_recurrent_pools = per_device_buffers()
 
             outputs = nn_model(
                 tokens=tokens.tensor,
@@ -299,11 +301,12 @@ class UnifiedMTPQwen3_5Model(_UnifiedSpecDecodeModelMixin, Qwen3_5Model):
                 top_p=top_p,
                 min_top_p=min_top_p,
                 in_thinking_phase=in_thinking_phase,
-                slot_idx=slot_idx,
-                live_conv_pools=by_device(pools[0]),
-                live_recurrent_pools=by_device(pools[1]),
-                shadow_conv_pools=by_device(pools[2]),
-                shadow_recurrent_pools=by_device(pools[3]),
+                live_conv_pools=live_conv_pools,
+                live_recurrent_pools=live_recurrent_pools,
+                live_conv_row_ids=live_conv_row_ids,
+                live_recurrent_row_ids=live_recurrent_row_ids,
+                shadow_conv_pools=shadow_conv_pools,
+                shadow_recurrent_pools=shadow_recurrent_pools,
                 pinned_bitmask=pinned_bitmask,
                 wait_payload=wait_payload,
                 device_bitmask_scratch=device_bitmask_scratch,

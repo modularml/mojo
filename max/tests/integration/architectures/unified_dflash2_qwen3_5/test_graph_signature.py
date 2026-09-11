@@ -29,6 +29,7 @@ from max.graph import BufferType, DeviceRef, TensorType
 from max.nn.kv_cache import MHAKVCacheParams, MultiKVCacheParams
 from max.pipelines.architectures.llama3.model_config import Llama3Config
 from max.pipelines.architectures.qwen3_5.model_config import Qwen3_5Config
+from max.pipelines.architectures.qwen3_5.state_cache import attn_cache
 from max.pipelines.architectures.unified_dflash2_qwen3_5.model_config import (
     DRAFT_SLIDING_WINDOW,
     UnifiedDflash2Qwen3_5Config,
@@ -160,14 +161,17 @@ def _signature(
 
 
 def test_slot_count_matches_the_declared_formula() -> None:
-    """``16 + 15D + 4DL`` at ``D = 1``, ``L = 3`` linear layers.
+    """``15 + 21D`` at ``D = 1``.
 
     The same formula the Qwen3.5 MTP graph satisfies: five ragged/host inputs,
     signals, two 6-slot KV leaves, batch_context_lengths, the eight-entry
-    sampling tail, the bitmask triple, then slot_idx and the four pool sets.
+    sampling tail, the bitmask triple, then three slots for each of the two
+    state leaves -- its pool, the rows addressing it, and its shadow pool.
+    The layer count no longer enters: a leaf is one pool however many layers
+    index it.
     """
     types = _signature()
-    assert len(types) == 16 + 15 * 1 + 4 * 1 * NUM_LINEAR
+    assert len(types) == 15 + 21 * 1
 
 
 def test_the_prefix_and_sampling_tail_are_the_canonical_ones() -> None:
@@ -253,7 +257,7 @@ def test_a_quantized_target_leaf_does_not_quantize_the_draft_leaf() -> None:
     """
     config = _fused_config()
     config.target.kv_params = replace(
-        config.target.kv_params, dtype=DType.float8_e4m3fn
+        attn_cache(config.target.kv_params), dtype=DType.float8_e4m3fn
     )
     tree = config.get_kv_params()
     assert isinstance(tree, MultiKVCacheParams)
@@ -265,16 +269,15 @@ def test_a_quantized_target_leaf_does_not_quantize_the_draft_leaf() -> None:
 
 
 def test_the_state_pool_tail_matches_the_mtp_graphs() -> None:
-    """slot_idx, then live conv / live recurrent / shadow conv / shadow
-    recurrent -- the order Mach's Qwen slot layout already binds."""
+    """Each state leaf's live pool, the rows addressing it, then its shadow
+    pool -- the order Mach's Qwen slot layout already binds."""
     config = _fused_config()
-    fused = UnifiedDflash2Qwen3_5(
-        config, enable_structured_output=True
-    ).input_types(config.get_kv_params())
+    module = UnifiedDflash2Qwen3_5(config, enable_structured_output=True)
+    fused = module.input_types(config.get_kv_params())
     mtp_kv = MultiKVCacheParams.from_params(
         {
             "target": config.target.kv_params,
-            "draft": replace(config.target.kv_params, num_layers=1),
+            "draft": replace(attn_cache(config.target.kv_params), num_layers=1),
         }
     )
     mtp = UnifiedMTPQwen3_5(
@@ -287,7 +290,9 @@ def test_the_state_pool_tail_matches_the_mtp_graphs() -> None:
         "the two graphs must present the same slot count, so Mach's Qwen"
         " layout binds both"
     )
-    tail_start = len(fused) - (1 + 4 * NUM_LINEAR)
+    # A leaf contributes its pool, its rows and its shadow pool, per device,
+    # so the tail is sized by the state leaves rather than by the layers.
+    tail_start = len(fused) - 3 * len(module.state_regions)
     for a, b in zip(fused[tail_start:], mtp[tail_start:], strict=True):
         assert a.dtype == b.dtype
         assert [str(d) for d in a.shape] == [str(d) for d in b.shape]

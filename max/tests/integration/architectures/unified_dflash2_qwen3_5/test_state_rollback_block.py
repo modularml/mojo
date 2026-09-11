@@ -141,11 +141,14 @@ def _run(
         )
 
         batch_scalar = ops.shape_to_tensor([slots_v.shape[0]])[0]
+        # One linear layer here, so a block's rows are the block itself and
+        # the span the snapshot fills is just the batch.
+        live_rows = ops.unsqueeze(slots_v, -1)
         snapshot_state_pools(
-            [[live_conv]], [[shadow_conv]], [slots_v], batch_scalar
+            [live_conv], [shadow_conv], [live_rows], batch_scalar
         )
         snapshot_state_pools(
-            [[live_rec]], [[shadow_rec]], [slots_v], batch_scalar
+            [live_rec], [shadow_rec], [live_rows], batch_scalar
         )
         shadow_slots = ops.range(
             start=0,
@@ -190,9 +193,10 @@ def _run(
             replay_offsets = offsets_v.cast(DType.int64)
         replay_state_pools(
             [[GatedDeltaReplayInputs(qkv_v, conv_w, decay_v, beta_v)]],
-            [[live_conv]],
-            [[live_rec]],
-            [slots_v],
+            [live_conv],
+            [live_rec],
+            [live_rows],
+            [live_rows],
             rows,
             replay_offsets,
             [],

@@ -44,6 +44,7 @@ from typing_extensions import Self
 
 from ..llama3.model_config import Llama3Config
 from ..qwen3_5.model_config import Qwen3_5Config
+from ..qwen3_5.state_cache import attn_cache
 from ..unified_dflash_llama3.model_config import parse_dflash_draft_hf_config
 
 __all__ = [
@@ -449,7 +450,7 @@ class UnifiedDflash2Qwen3_5Config(ArchConfigWithKVCache):
         # ``draft.kv_params`` while the KV manager reads ``draft_kv_params``,
         # and the two silently diverging is a wrong-shaped cache.
         draft_config.kv_params = construct_dflash2_draft_kv_params(
-            pipeline_config, draft_config, target_config.kv_params
+            pipeline_config, draft_config, attn_cache(target_config.kv_params)
         )
 
         return cls(

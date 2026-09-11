@@ -24,9 +24,6 @@ passed into the model graph as mutable ``BufferType`` inputs:
   ``slot_idx[batch_item]`` — the kernel reads initial state from
   ``ssm_pool[slot]`` and writes the updated final state back to the same slot
   directly (no graph-side gather/scatter_nd/buffer_store whole-pool RMW).
-
-This mirrors :class:`GatedDeltaNetStateCache` (qwen3_5); both pools are now
-fully in-place slot-indexed.
 """
 
 from __future__ import annotations

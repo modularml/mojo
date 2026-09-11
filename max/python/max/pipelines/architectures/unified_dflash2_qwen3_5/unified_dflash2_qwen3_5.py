@@ -47,7 +47,12 @@ from max.graph import (
     TensorValue,
     ops,
 )
-from max.nn.kv_cache import KVCacheParamInterface, PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheParamInterface,
+    PagedCacheValues,
+    RecurrentLeafInputs,
+    RecurrentStateInputsPerDevice,
+)
 from max.nn.layer import Module
 from max.nn.sampling.rejection_sampler import AcceptanceSampler
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
@@ -72,9 +77,15 @@ from max.pipelines.speculative.unified_graph_ops import (
 from ..dflash2_qwen3_5 import DFlash2Qwen3_5
 from ..qwen3_5.layers.gated_deltanet import GatedDeltaReplayInputs
 from ..qwen3_5.qwen3_5 import Qwen3_5, Qwen3_5LinearAttentionBlock
+from ..qwen3_5.state_cache import (
+    CONV_LEAF_ID,
+    RECURRENT_LEAF_ID,
+    linear_state_regions,
+)
 from ..unified_mtp_qwen3_5.state_rollback import (
     accepted_row_plan,
     replay_state_pools,
+    shadow_row_ids,
     snapshot_state_pools,
 )
 from .model_config import UnifiedDflash2Qwen3_5Config
@@ -161,6 +172,18 @@ class UnifiedDflash2Qwen3_5(Module):
         )
         self.merger = RaggedTokenMerger(config.target.devices[0])
         self.num_linear_layers = len(self.target.linear_layer_indices)
+        # The same geometry the cache declares, so a shadow row is shaped
+        # like the live row it holds a copy of.
+        self.state_regions = linear_state_regions(
+            num_linear_layers=self.num_linear_layers,
+            key_head_dim=config.target.linear_key_head_dim,
+            num_key_heads=config.target.linear_num_key_heads,
+            value_head_dim=config.target.linear_value_head_dim,
+            num_value_heads=config.target.linear_num_value_heads,
+            conv_kernel_dim=config.target.linear_conv_kernel_dim,
+            dtype=config.target.state_dtype,
+            num_devices=len(config.target.devices),
+        )
 
     def __call__(
         self,
@@ -180,11 +203,12 @@ class UnifiedDflash2Qwen3_5(Module):
         top_p: TensorValue,
         min_top_p: TensorValue,
         in_thinking_phase: TensorValue,
-        slot_idx: list[TensorValue],
-        live_conv_pools: list[list[BufferValue]],
-        live_recurrent_pools: list[list[BufferValue]],
-        shadow_conv_pools: list[list[BufferValue]],
-        shadow_recurrent_pools: list[list[BufferValue]],
+        live_conv_pools: list[BufferValue],
+        live_recurrent_pools: list[BufferValue],
+        live_conv_row_ids: list[TensorValue],
+        live_recurrent_row_ids: list[TensorValue],
+        shadow_conv_pools: list[BufferValue],
+        shadow_recurrent_pools: list[BufferValue],
         pinned_bitmask: TensorValue | None = None,
         wait_payload: BufferValue | None = None,
         device_bitmask_scratch: BufferValue | None = None,
@@ -212,23 +236,40 @@ class UnifiedDflash2Qwen3_5(Module):
 
         # -- Snapshot: the verify runs on the shadow pools, so the live ones
         # still hold the pre-verify state when the accepted length is known.
-        batch_scalar = ops.shape_to_tensor([slot_idx[0].shape[0]])[0]
+        num_layers = self.num_linear_layers
+        batch_dim = live_conv_row_ids[0].shape[0]
+        shadow_span = ops.shape_to_tensor([batch_dim])[0] * num_layers
         snapshot_state_pools(
-            live_conv_pools, shadow_conv_pools, slot_idx, batch_scalar
+            live_conv_pools, shadow_conv_pools, live_conv_row_ids, shadow_span
         )
         snapshot_state_pools(
             live_recurrent_pools,
             shadow_recurrent_pools,
-            slot_idx,
-            batch_scalar,
+            live_recurrent_row_ids,
+            shadow_span,
         )
-        shadow_slot_idx = [
-            ops.range(
-                start=0,
-                stop=slot_idx[i].shape[0],
-                out_dim="batch_size",
-                device=devices[i],
-                dtype=DType.uint32,
+        # The shadow's layout is this graph's own, so its rows are built here.
+        regions = {region.leaf_id: region for region in self.state_regions}
+
+        def shadow_leaf(
+            leaf_id: str, pool: BufferValue, device: DeviceRef
+        ) -> RecurrentLeafInputs[TensorValue, BufferValue]:
+            return RecurrentLeafInputs(
+                region=regions[leaf_id],
+                pool=pool,
+                # The snapshot has already put the pre-verify state here, and
+                # the verify reads and writes it in place.
+                live_row_ids=shadow_row_ids(num_layers, device),
+            )
+
+        shadow_state = [
+            RecurrentStateInputsPerDevice(
+                leaves=(
+                    shadow_leaf(CONV_LEAF_ID, shadow_conv_pools[i], devices[i]),
+                    shadow_leaf(
+                        RECURRENT_LEAF_ID, shadow_recurrent_pools[i], devices[i]
+                    ),
+                ),
             )
             for i in range(n_devs)
         ]
@@ -248,9 +289,7 @@ class UnifiedDflash2Qwen3_5(Module):
             return_n_logits,
             merged_offsets,
             signal_buffers,
-            shadow_slot_idx,
-            shadow_conv_pools,
-            shadow_recurrent_pools,
+            shadow_state,
         )
         for layer_idx in self.target.linear_layer_indices:
             layer = self.target.layers[layer_idx]
@@ -340,7 +379,8 @@ class UnifiedDflash2Qwen3_5(Module):
             captures,
             live_conv_pools,
             live_recurrent_pools,
-            slot_idx,
+            live_conv_row_ids,
+            live_recurrent_row_ids,
             row_indices,
             replay_offsets,
             signal_buffers,
@@ -527,10 +567,10 @@ class UnifiedDflash2Qwen3_5(Module):
     ) -> tuple[TensorType | BufferType, ...]:
         """Canonical spec-decode signature plus the Qwen state-pool tail.
 
-        Byte-for-byte the Qwen3.5 MTP graph's signature: the tail is
-        ``slot_idx``, then the live conv and recurrent pools, then their
-        shadows, every block device-major. Only the draft KV leaf's shapes
-        differ (five drafter layers of 8 x 128 rather than one target-shaped
+        Byte-for-byte the Qwen3.5 MTP graph's signature: the tail is the
+        live pools, then the rows addressing them, then the shadow pools,
+        every block device-major. Only the draft KV leaf's shapes differ
+        (five drafter layers of 8 x 128 rather than one target-shaped
         layer), so Mach's Qwen slot layout carries over unchanged.
         """
         config = self.config.target
@@ -546,39 +586,33 @@ class UnifiedDflash2Qwen3_5(Module):
             kv_params=kv_params,
         )
 
-        num_devices = len(devices)
-        conv_dim = self.target._conv_dim // num_devices
-        num_v_heads = self.target._num_v_heads // num_devices
-        conv_span = self.target._conv_kernel_size - 1
-        recurrent_shape = [
-            num_v_heads,
-            self.target._key_head_dim,
-            self.target._value_head_dim,
-        ]
-        state_dtype = config.state_dtype
-
-        tail: list[TensorType | BufferType] = [
-            TensorType(DType.uint32, shape=["batch_size"], device=device)
-            for device in devices
-        ]
-        for slots in ("max_slots", "max_shadow_slots"):
+        tail: list[TensorType | BufferType] = []
+        for region in self.state_regions:
             tail.extend(
                 BufferType(
-                    state_dtype,
-                    shape=[slots, conv_dim, conv_span],
+                    region.dtype,
+                    shape=[region.rows_dim, *region.row_shape],
                     device=device,
                 )
                 for device in devices
-                for _ in range(self.num_linear_layers)
             )
+        for region in self.state_regions:
             tail.extend(
-                BufferType(
-                    state_dtype,
-                    shape=[slots, *recurrent_shape],
+                TensorType(
+                    DType.uint32,
+                    shape=["batch_size", region.num_layers],
                     device=device,
                 )
                 for device in devices
-                for _ in range(self.num_linear_layers)
+            )
+        for region in self.state_regions:
+            tail.extend(
+                BufferType(
+                    region.dtype,
+                    shape=[f"shadow_{region.rows_dim}", *region.row_shape],
+                    device=device,
+                )
+                for device in devices
             )
 
         return (*spec_types, *tail)

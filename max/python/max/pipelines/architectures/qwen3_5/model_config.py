@@ -23,7 +23,13 @@ from max.driver import Device
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import (
+    KVCacheParamInterface,
+    KVCacheParams,
+    MultiKVCacheParams,
+    RecurrentStateParams,
+    RecurrentStateRegion,
+)
 from max.nn.quant_config import QuantConfig
 from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
@@ -37,6 +43,18 @@ from ..llama3.model_config import Llama3Config
 from ..qwen3vl_moe.model_config import VisionConfig
 from ..qwen3vl_moe.nn.data_processing import QWEN3VL_MAX_PIXELS
 from .quantization import Qwen3_5QuantScheme, parse_quant_scheme
+from .state_cache import (
+    ATTN_CACHE_KEY,
+    STATE_CACHE_KEY,
+    attn_cache,
+    linear_state_regions,
+)
+
+_POOL_DTYPE_MAP = {
+    "bfloat16": DType.bfloat16,
+    "float32": DType.float32,
+}
+"""Storage dtypes a state pool may be declared at."""
 
 __all__ = ["Qwen3_5Config", "VisionConfig"]
 
@@ -91,6 +109,15 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         "float8_e4m3fn",
         "float4_e2m1fnx2",
     }
+
+    # TODO(SERVOPT-1607): Llama3Config narrows the KV contract to
+    # KVCacheParams, which MultiKVCacheParams cannot satisfy. Both
+    # suppressions here go when that contract widens.
+    kv_params: KVCacheParamInterface  # type: ignore[assignment]
+    """The cache tree: an attention child beside a recurrent-state one.
+
+    :attr:`attn_kv_params` is the leaf the attention layers take.
+    """
 
     # Hybrid attention parameters
     layer_types: list[str] = field(default_factory=list)
@@ -192,14 +219,28 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
     def state_dtype(self) -> DType:
         """Storage dtype of the linear-attention state pools.
 
-        Every declarer of a pool buffer — the base graph, the fused
-        speculative graph, and the serving-side state cache — must read this
-        one property: the two graphs share one pool allocation at serve time,
-        so a disagreement is an unserveable artifact pair.
+        Every declarer of a pool buffer reads this one property, since the
+        base and fused speculative graphs share one allocation at serve time.
+        Never the KV cache's dtype.
         """
         if self.state_pool_dtype is not None:
             return self.state_pool_dtype
         return self.compute_dtype
+
+    @staticmethod
+    def declared_state_dtype(
+        text_config: AutoConfig, kv_cache_config: KVCacheConfig
+    ) -> DType:
+        """Returns :attr:`state_dtype` as far as it is knowable pre-``finalize``.
+
+        The state leaves are declared before a quantization scheme resolves.
+        ``cache_dtype`` is not a stand-in: ``--kv-cache-format`` may put the
+        KV in fp8 while the state stays bf16.
+        """
+        override = kv_cache_config.state_pool_dtype
+        if override is not None:
+            return _POOL_DTYPE_MAP[override]
+        return _declared_dtype(text_config) or DType.bfloat16
 
     @override
     def _parse_quant_config(
@@ -317,8 +358,13 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
             for i in range(num_layers)
         ]
 
+    @property
+    def attn_kv_params(self) -> KVCacheParams:
+        """The attention child of :attr:`kv_params`."""
+        return attn_cache(self.kv_params)
+
     @staticmethod
-    def construct_kv_params(
+    def _attn_kv_params(
         huggingface_config: AutoConfig,
         pipeline_config: PipelineConfig,
         devices: list[DeviceRef],
@@ -327,10 +373,8 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         *,
         allow_kv_head_replication: bool = False,
     ) -> KVCacheParams:
-        """Construct KV cache parameters for full attention layers only.
+        """Returns one leaf over the full-attention layers.
 
-        Only allocates KV cache entries for full-attention layers; linear
-        attention layers use separate conv/recurrent state buffers instead.
         The forward pass maps each full-attention layer to a sequential KV
         cache index (0, 1, 2, ...) independent of the absolute layer index.
         """
@@ -349,7 +393,7 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         page_size = kv_cache_config.kv_cache_page_size
         if text_config.head_dim > 128:
             page_size = max(page_size, text_config.head_dim)
-        return kv_cache_config.to_params(
+        params = kv_cache_config.to_params(
             allow_kv_head_replication=allow_kv_head_replication,
             dtype=cache_dtype,
             n_kv_heads=text_config.num_key_value_heads,
@@ -358,6 +402,79 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
             devices=devices,
             data_parallel_degree=data_parallel_degree,
             page_size=page_size,
+        )
+        return params
+
+    @staticmethod
+    def _state_regions(
+        text_config: AutoConfig,
+        *,
+        num_linear_layers: int,
+        dtype: DType,
+        num_devices: int,
+    ) -> tuple[RecurrentStateRegion, ...]:
+        """Returns the state leaves this checkpoint's linear layers keep.
+
+        The fallbacks are the published Qwen3.5 geometry, left implicit by a
+        config predating these fields.
+        """
+        return linear_state_regions(
+            num_linear_layers=num_linear_layers,
+            key_head_dim=getattr(text_config, "linear_key_head_dim", 128),
+            num_key_heads=getattr(text_config, "linear_num_key_heads", 16),
+            value_head_dim=getattr(text_config, "linear_value_head_dim", 128),
+            num_value_heads=getattr(text_config, "linear_num_value_heads", 48),
+            conv_kernel_dim=getattr(text_config, "linear_conv_kernel_dim", 4),
+            dtype=dtype,
+            num_devices=num_devices,
+        )
+
+    @classmethod
+    def construct_kv_params(  # type: ignore[override]  # TODO(SERVOPT-1607)
+        cls,
+        huggingface_config: AutoConfig,
+        pipeline_config: PipelineConfig,
+        devices: list[DeviceRef],
+        kv_cache_config: KVCacheConfig,
+        cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
+    ) -> KVCacheParamInterface:
+        """Returns the attention leaf beside the recurrent state.
+
+        The graph's input types are built from these params, so a state
+        derived any later cannot appear among them. A model with no
+        linear-attention layers gets the attention leaf alone.
+        """
+        attn = Qwen3_5Config._attn_kv_params(
+            huggingface_config=huggingface_config,
+            pipeline_config=pipeline_config,
+            devices=devices,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+        )
+        text_config = Qwen3_5Config._get_text_config(huggingface_config)
+        layer_types = Qwen3_5Config._get_layer_types(text_config)
+        num_linear_layers = sum(
+            1 for lt in layer_types if lt == "linear_attention"
+        )
+        if num_linear_layers == 0:
+            # A leaf of zero bytes would be a page the pool cannot tile.
+            return attn
+        state = RecurrentStateParams(
+            regions=Qwen3_5Config._state_regions(
+                text_config,
+                num_linear_layers=num_linear_layers,
+                dtype=Qwen3_5Config.declared_state_dtype(
+                    text_config, kv_cache_config
+                ),
+                num_devices=len(devices),
+            ),
+            devices=attn.devices,
+            data_parallel_degree=attn.data_parallel_degree,
+        )
+        return MultiKVCacheParams.from_params(
+            {ATTN_CACHE_KEY: attn, STATE_CACHE_KEY: state}
         )
 
     @staticmethod
@@ -378,39 +495,30 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         return text_config.num_hidden_layers
 
     def _per_request_state_bytes(self) -> int:
-        """Return GPU bytes for one request's linear-attention state (all linear layers).
+        """Returns GPU bytes one request's linear-attention state occupies.
 
-        Each linear-attention layer stores two state arrays per active request:
-        - Conv state:       `(1, conv_dim, kernel-1)` :attr:`state_dtype`
-        - Recurrent state:  `(1, nv, kd, vd)`         :attr:`state_dtype`
-
-        Computation is promoted to float32 inside GatedDeltaNet.__call__().
-        These buffers are NOT included in the KV-cache budget.
+        Summed over every device, and derived from the same geometry the cache
+        declares its leaves from, so a shape cannot be right in one and wrong
+        in the other.
         """
         num_linear = sum(
             1 for lt in self.layer_types if lt == "linear_attention"
         )
         if num_linear == 0:
             return 0
-        conv_dim = (
-            2 * self.linear_key_head_dim * self.linear_num_key_heads
-            + self.linear_value_head_dim * self.linear_num_value_heads
+        return sum(
+            region.bytes_per_state
+            for region in linear_state_regions(
+                num_linear_layers=num_linear,
+                key_head_dim=self.linear_key_head_dim,
+                num_key_heads=self.linear_num_key_heads,
+                value_head_dim=self.linear_value_head_dim,
+                num_value_heads=self.linear_num_value_heads,
+                conv_kernel_dim=self.linear_conv_kernel_dim,
+                dtype=self.state_dtype,
+                num_devices=1,
+            )
         )
-        # `state_dtype` is the one property every pool declarer reads, so the
-        # cost this feeds to `infer_optimal_batch_size` tracks the override
-        # too -- a float32 pool is 2x a bf16 one, and 4x what the encoding's
-        # `uint8` storage dtype would have implied.
-        dtype_bytes = self.state_dtype.size_in_bytes
-        bytes_per_layer = (
-            # conv state: (conv_dim * (kernel-1)) elements
-            conv_dim * (self.linear_conv_kernel_dim - 1) * dtype_bytes
-            # recurrent state: (nv * kd * vd) elements
-            + self.linear_num_value_heads
-            * self.linear_key_head_dim
-            * self.linear_value_head_dim
-            * dtype_bytes
-        )
-        return num_linear * bytes_per_layer
 
     def infer_optimal_batch_size(
         self,
@@ -422,15 +530,10 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
     ) -> int:
         """Return a memory-safe default `max_batch_size` for this architecture.
 
-        Qwen3.5 stores GatedDeltaNet conv and recurrent state in a single
-        ``max_batch x per_req`` pool that the slot-indexed SSM kernels
-        mutate in place. There are no working copies, so peak footprint is
-        ``max_batch x per_req`` bytes.
-
-        We split the post-weights utilization budget evenly: the state pool
-        gets up to half, the KV cache absorbs the rest. This uses the same
-        ``device_memory_utilization`` headroom factor as the rest of the
-        pipeline, and matches the ``estimate_activation_memory()`` reservation.
+        The states get up to half the post-weights utilization budget and the
+        KV absorbs the rest, under the same ``device_memory_utilization``
+        headroom factor as the rest of the pipeline. The halving bounds
+        concurrency; it allocates nothing.
 
         Falls back to 32—safe for the 27B model on H100/A100 (80 GB)—when
         the device query fails.
@@ -457,7 +560,6 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         budget = int(free_bytes * device_memory_utilization) - weights_size
         if budget <= 0:
             return 1
-        # Single in-place pool: divide half the budget by per_req.
         max_batch = max(1, (budget // 2) // per_req)
         return min(512, max_batch)
 
@@ -587,16 +689,12 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         state_pool_dtype: DType | None = None
         state_pool_dtype_str = model_config.kv_cache.state_pool_dtype
         if state_pool_dtype_str is not None:
-            _pool_dtype_map = {
-                "bfloat16": DType.bfloat16,
-                "float32": DType.float32,
-            }
-            if state_pool_dtype_str not in _pool_dtype_map:
+            if state_pool_dtype_str not in _POOL_DTYPE_MAP:
                 raise ValueError(
                     "state_pool_dtype must be 'bfloat16' or 'float32', got"
                     f" {state_pool_dtype_str!r}"
                 )
-            state_pool_dtype = _pool_dtype_map[state_pool_dtype_str]
+            state_pool_dtype = _POOL_DTYPE_MAP[state_pool_dtype_str]
 
         # Handle tie_word_embeddings from top-level config
         tie_word_embeddings = getattr(

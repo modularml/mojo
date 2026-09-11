@@ -35,10 +35,23 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph
 from max.nn.comm.allreduce import Signals
-from max.nn.kv_cache import KVCacheInputs, MHAKVCacheParams
+from max.nn.kv_cache import (
+    KVCacheInputs,
+    MHAKVCacheParams,
+    MultiKVCacheInputs,
+    MultiKVCacheParams,
+    RecurrentStateInputs,
+    RecurrentStateParams,
+)
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.architectures.qwen3_5.model_config import Qwen3_5Config
 from max.pipelines.architectures.qwen3_5.qwen3_5 import Qwen3_5
+from max.pipelines.architectures.qwen3_5.state_cache import (
+    ATTN_CACHE_KEY,
+    STATE_CACHE_KEY,
+    attn_cache,
+    linear_state_regions,
+)
 from max.pipelines.kv_cache import PagedKVCacheManager
 from test_common.context_utils import create_text_context
 
@@ -107,13 +120,47 @@ def _config(target_layer_ids: list[int] | None) -> Qwen3_5Config:
     return config
 
 
+def _with_state_regions(config: Qwen3_5Config) -> Qwen3_5Config:
+    """Wraps the leaf ``kv_params`` in the tree ``construct_kv_params`` builds.
+
+    The base graph reads its pools off the state child, so a hand-built
+    ``kv_params`` needs one or there are no pools to bind.
+    """
+    attn = config.kv_params
+    assert isinstance(attn, MHAKVCacheParams)
+    config.kv_params = MultiKVCacheParams.from_params(
+        {
+            ATTN_CACHE_KEY: attn,
+            STATE_CACHE_KEY: RecurrentStateParams(
+                devices=attn.devices,
+                data_parallel_degree=attn.data_parallel_degree,
+                regions=linear_state_regions(
+                    num_linear_layers=sum(
+                        1
+                        for lt in config.layer_types
+                        if lt == "linear_attention"
+                    ),
+                    key_head_dim=config.linear_key_head_dim,
+                    num_key_heads=config.linear_num_key_heads,
+                    value_head_dim=config.linear_value_head_dim,
+                    num_value_heads=config.linear_num_value_heads,
+                    conv_kernel_dim=config.linear_conv_kernel_dim,
+                    dtype=config.state_dtype,
+                    num_devices=len(config.devices),
+                ),
+            ),
+        }
+    )
+    return config
+
+
 def _run(
     target_layer_ids: list[int] | None,
     *,
     return_all_hidden_states: bool = False,
 ) -> list[np.ndarray]:
     """Runs a tiny Qwen3.5 with fixed weights and returns its tap outputs."""
-    config = _config(target_layer_ids)
+    config = _with_state_regions(_config(target_layer_ids))
     model = Qwen3_5(config)
     model.return_logits = ReturnLogits.LAST_TOKEN
     if return_all_hidden_states:
@@ -143,25 +190,26 @@ def _run(
 
     device = Accelerator()
     session = InferenceSession(devices=[device])
-    with Graph(
-        "qwen3_5_taps", input_types=model.input_types(config.kv_params)
-    ) as graph:
+    # The state travels in the cache tree now, so the graph takes the tree
+    # rather than the attention leaf with a hand-built pool tail.
+    kv_tree = config.kv_params
+    with Graph("qwen3_5_taps", input_types=model.input_types(kv_tree)) as graph:
         tokens, row_offsets, return_n_logits, *rest = graph.inputs
         it = iter(rest)
         signal_buffers = [next(it).buffer]
-        leaf = config.kv_params.unflatten_kv_inputs(it)
+        tree = kv_tree.unflatten_kv_inputs(it)
+        assert isinstance(tree, MultiKVCacheInputs)
+        leaf = tree.children[ATTN_CACHE_KEY]
         assert isinstance(leaf, KVCacheInputs)
-        slot_idx = [next(it).tensor]
-        pools = [[next(it).buffer for _ in range(NUM_LINEAR)] for _ in range(2)]
+        state = tree.children[STATE_CACHE_KEY]
+        assert isinstance(state, RecurrentStateInputs)
         outputs = model(
             tokens.tensor,
             list(leaf.inputs),
             return_n_logits.tensor,
             row_offsets.tensor,
             signal_buffers,
-            slot_idx,
-            [pools[0]],
-            [pools[1]],
+            list(state.inputs),
         )
         graph.output(*outputs)
 
@@ -171,7 +219,7 @@ def _run(
         return Buffer.from_numpy(np.ascontiguousarray(x)).to(device)
 
     kv_manager = PagedKVCacheManager(
-        params=config.kv_params,
+        params=attn_cache(config.kv_params),
         total_num_pages=8,
         session=session,
         max_batch_size=2,
@@ -191,20 +239,26 @@ def _run(
         Buffer.from_numpy(np.array([1], dtype=np.int64)),
         *Signals.allocate([device]),
         *kv_inputs,
-        buf(np.array([0], dtype=np.uint32)),
-        *[
-            buf(np.zeros((2, CONV_DIM, CONV_KERNEL - 1), dtype=np.float32))
-            for _ in range(NUM_LINEAR)
-        ],
-        *[
-            buf(
-                np.zeros(
-                    (2, LINEAR_VALUE_HEADS, LINEAR_KEY_DIM, LINEAR_VALUE_DIM),
-                    dtype=np.float32,
-                )
+        # One pool per leaf, a block's layers being consecutive rows, then
+        # the rows each layer reads.
+        buf(
+            np.zeros(
+                (2 * NUM_LINEAR, CONV_DIM, CONV_KERNEL - 1), dtype=np.float32
             )
-            for _ in range(NUM_LINEAR)
-        ],
+        ),
+        buf(
+            np.zeros(
+                (
+                    2 * NUM_LINEAR,
+                    LINEAR_VALUE_HEADS,
+                    LINEAR_KEY_DIM,
+                    LINEAR_VALUE_DIM,
+                ),
+                dtype=np.float32,
+            )
+        ),
+        buf(np.arange(NUM_LINEAR, dtype=np.uint32).reshape(1, NUM_LINEAR)),
+        buf(np.arange(NUM_LINEAR, dtype=np.uint32).reshape(1, NUM_LINEAR)),
     )
     # LAST_TOKEN logits, then one capture per tapped layer.
     return [np.array(r.to(CPU()).to_numpy()) for r in results[1:]]

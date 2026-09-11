@@ -462,13 +462,6 @@ def _batcher_without_mrope() -> Qwen3_5BatchProcessor:
             model=SimpleNamespace(data_parallel_degree=1)
         ),
     )
-    batcher._state_cache = SimpleNamespace(
-        claim=lambda request_id: None,
-        slot_idx_for=lambda request_ids, prealloc: prealloc,
-        conv_pools=[],
-        rec_pools=[],
-    )
-    batcher._slot_idx_prealloc = []
     batcher._mrope_enabled = False
     return batcher
 

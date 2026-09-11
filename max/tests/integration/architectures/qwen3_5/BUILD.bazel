@@ -162,19 +162,6 @@ modular_py_test(
 )
 
 modular_py_test(
-    name = "test_state_warmup",
-    srcs = ["test_state_warmup.py"],
-    deps = [
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/pipelines/architectures/qwen3_5",
-        "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
-        requirement("numpy"),
-    ],
-)
-
-modular_py_test(
     name = "test_tokenizer",
     srcs = ["test_tokenizer.py"],
     tags = [

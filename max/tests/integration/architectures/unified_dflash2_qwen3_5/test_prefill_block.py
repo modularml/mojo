@@ -216,8 +216,11 @@ def _build() -> Step:
             next(it).tensor for _ in range(7)
         )
         pin = wait = scratch = None
-        slot_idx = [next(it).tensor]
-        pools = [[next(it).buffer for _ in range(NUM_LINEAR)] for _ in range(4)]
+        # One pool per device per leaf, then the rows addressing them, then
+        # the shadows -- the order `input_types` lays the tail out in.
+        live_conv, live_rec = next(it).buffer, next(it).buffer
+        conv_rows, rec_rows = next(it).tensor, next(it).tensor
+        shadow_conv, shadow_rec = next(it).buffer, next(it).buffer
         out = nn(
             tokens=tokens.tensor,
             input_row_offsets=row_offsets.tensor,
@@ -235,11 +238,12 @@ def _build() -> Step:
             top_p=tp,
             min_top_p=mtp_,
             in_thinking_phase=think,
-            slot_idx=slot_idx,
-            live_conv_pools=[pools[0]],
-            live_recurrent_pools=[pools[1]],
-            shadow_conv_pools=[pools[2]],
-            shadow_recurrent_pools=[pools[3]],
+            live_conv_pools=[live_conv],
+            live_recurrent_pools=[live_rec],
+            live_conv_row_ids=[conv_rows],
+            live_recurrent_row_ids=[rec_rows],
+            shadow_conv_pools=[shadow_conv],
+            shadow_recurrent_pools=[shadow_rec],
             pinned_bitmask=pin,
             wait_payload=wait,
             device_bitmask_scratch=scratch,
@@ -317,21 +321,29 @@ def _build() -> Step:
             b(np.ones(batch, np.float32)),
             h(np.array(1.0, np.float32).reshape(())),
             b(np.zeros(batch, np.bool_)),
-            b(np.zeros(batch, np.uint32)),
         ]
-        for _ in range(2):
-            args += [
-                Buffer.from_numpy(
-                    np.zeros((SLOTS, CONV_DIM, CONV_KERNEL - 1), np.float32)
-                ).to(dev)
-                for _ in range(NUM_LINEAR)
-            ]
-            args += [
-                Buffer.from_numpy(
-                    np.zeros((SLOTS, LV, LKD, LVD), np.float32)
-                ).to(dev)
-                for _ in range(NUM_LINEAR)
-            ]
+
+        def conv_pool() -> Buffer:
+            # One pool per leaf now: a block's layers are consecutive rows,
+            # so the row count is pages times layers.
+            return Buffer.from_numpy(
+                np.zeros(
+                    (SLOTS * NUM_LINEAR, CONV_DIM, CONV_KERNEL - 1), np.float32
+                )
+            ).to(dev)
+
+        def rec_pool() -> Buffer:
+            return Buffer.from_numpy(
+                np.zeros((SLOTS * NUM_LINEAR, LV, LKD, LVD), np.float32)
+            ).to(dev)
+
+        # Request i holds block i, whose layers are rows i*L..i*L+L-1.
+        rows = b(
+            np.arange(batch * NUM_LINEAR, dtype=np.uint32).reshape(
+                batch, NUM_LINEAR
+            )
+        )
+        args += [conv_pool(), rec_pool(), rows, rows, conv_pool(), rec_pool()]
         o = model.execute(*args)
         return [np.array(x.to(CPU()).to_numpy()) for x in o]
 

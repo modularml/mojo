@@ -43,7 +43,7 @@ from max.engine import InferenceSession
 from max.graph import BufferValue, DeviceRef, Graph, TensorType, TensorValue
 from max.nn.comm import Signals
 from max.nn.embedding import VocabParallelEmbedding
-from max.nn.kv_cache import MHAKVCacheParams
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from max.nn.norm import RMSNorm
 from max.nn.rotary_embedding import Llama3RotaryEmbedding
 from max.pipelines.architectures.qwen3_5.model_config import Qwen3_5Config
@@ -173,7 +173,10 @@ def compiled():  # noqa: ANN201
     head = _head(config, device)
     _load_weights(head, np.random.default_rng(7))
 
+    # The head is exercised on its own, so the config carries the attention
+    # leaf rather than the whole tree.
     kv_params = config.kv_params
+    assert isinstance(kv_params, KVCacheParams)
     kv_manager = PagedKVCacheManager(
         params=kv_params,
         total_num_pages=8,

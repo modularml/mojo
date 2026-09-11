@@ -111,6 +111,7 @@ from max.nn.kv_cache import (
     KVCacheInputsInterface,
     KVCacheInputsPerDevice,
     MultiKVCacheInputs,
+    RecurrentStateInputs,
     spec_decode_cache_slack,
 )
 from max.nn.transformer import ReturnLogits
@@ -707,13 +708,11 @@ class _SupportsModelCapture(Protocol):
 
 @runtime_checkable
 class SupportsSSMStateWarmup(Protocol):
-    """Protocol for pipeline models with SSM/conv state pools.
+    """Protocol for pipeline models holding state slots of their own.
 
-    Models (e.g. Nemotron-H, Qwen3.5, LFM2) that allocate per-request state
-    pool slots outside the KV cache must implement
-    :meth:`release_warmup_state` so that graph-capture warmup can release
-    those slots after each ``(batch_size, cache_length)`` probe.  Without it,
-    warmup would exhaust the state pool before reaching steady serving.
+    A model whose per-request SSM/conv state is a slot pool outside the KV
+    cache must implement :meth:`release_warmup_state`; nothing else frees
+    those slots. A model whose state lives in KV pages needs none of this.
 
     The overlap pipeline's ``_warmup_model_inputs`` context manager calls
     ``release_warmup_state`` after each probe's capture completes, with the
@@ -1624,6 +1623,9 @@ class RealizeFutureTokenProcessor:
             elif isinstance(kv, MultiKVCacheInputs):
                 for child in kv.children.values():
                     _recurse_kv_tree(child, kv_collections)
+            elif isinstance(kv, RecurrentStateInputs):
+                # No cache length and no page for the scatter to address.
+                pass
             else:
                 raise ValueError(f"Unexpected KV cache input type: {type(kv)}")
 
@@ -2488,10 +2490,8 @@ class OverlapTextGenerationPipeline(
         try:
             yield model_inputs
         finally:
-            # Models that maintain per-request SSM / conv state pools
-            # outside the KV cache (e.g. Nemotron-H, Qwen3.5, LFM2) must
-            # release their warmup slots here; otherwise the pool is
-            # exhausted before serving begins.
+            # State slots a model owns itself; KV pages go with the release
+            # below.
             if isinstance(self._pipeline_model, SupportsSSMStateWarmup):
                 self._pipeline_model.release_warmup_state(warmup_request_ids)
             for replica in replica_batches:
