@@ -2742,11 +2742,13 @@ comptime _MoggTransposeStrideTypes[
 def mogg_tensor_create_transpose[
     dtype: DType,
     rank: Int,
+    perm_type: DType,
     //,
     output_static_shape: IntTuple,
     static_permutations: IntTuple,
 ](
     input: ManagedTensorSlice[dtype=dtype, rank=rank, ...],
+    permutations: ManagedTensorSlice[dtype=perm_type, rank=1, ...],
 ) -> ManagedTensorSlice[
     io_spec=input.io_spec,
     static_spec=input.static_spec.with_tile_layout[
@@ -2762,30 +2764,44 @@ def mogg_tensor_create_transpose[
     ](),
 ]:
     """Backing primitive for `mogg._tensor.create.transpose`: a zero-copy
-    reindexed view of `input` that reorders its dimensions according to
-    `static_permutations` -- the view's dimension `i` comes from `input`'s
-    dimension `static_permutations[i]`. Preserves whatever static
-    shape/stride information is known at compile time, mirroring
+    reindexed view of `input` that reorders its dimensions -- the view's
+    dimension `i` comes from `input`'s dimension `perm[i]`. `perm` is known
+    per dimension either at compile time (an entry of `static_permutations`)
+    or, where that entry is `UNKNOWN_VALUE`, at runtime (the matching entry
+    of the `permutations` operand). Preserves whatever static shape/stride
+    information is known at compile time, mirroring
     `Transpose.update_input_view`/`_TransposeStrideTypes`.
 
     Parameters:
         dtype: The element type of `input`.
         rank: The rank of `input` (and of the returned view -- transpose
             never changes rank).
-        output_static_shape: The view's shape.
+        perm_type: The element type of `permutations`.
+        output_static_shape: The view's shape, where known at compile time.
         static_permutations: The permutation applied to `input`'s
-            dimensions to produce the view (transpose's `perm` is always a
-            compile-time constant by the time this primitive is called; see
-            MOToMAP's lowering of `mo.transpose`).
+            dimensions to produce the view, where known at compile time
+            (`UNKNOWN_VALUE` for a dimension whose source is only known at
+            runtime, e.g. the eager interpreter's one-graph-per-op transpose).
 
     Args:
         input: The tensor to transpose.
+        permutations: One-dimensional tensor giving `input`'s source
+            dimension for each view dimension. Read only for the dimensions
+            `static_permutations` leaves dynamic; the `comptime if` below
+            elides the read entirely when every source is static, so a
+            fully-static transpose never touches this operand.
     """
     var new_shape = IndexList[rank]()
     var new_strides = IndexList[rank]()
     comptime for i in range(rank):
-        new_shape[i] = Int(output_static_shape[i])
-        new_strides[i] = input.stride_length[Int(static_permutations[i])]()
+        comptime if Int(static_permutations[i]) == UNKNOWN_VALUE:
+            var src = Int(permutations[i])
+            new_shape[i] = input.dim_size(src)
+            new_strides[i] = input.stride_length(src)
+        else:
+            comptime src = Int(static_permutations[i])
+            new_shape[i] = input.dim_size[src]()
+            new_strides[i] = input.stride_length[src]()
     return {input.unsafe_ptr(), new_shape, new_strides}
 
 
