@@ -29,7 +29,6 @@ which also writes the per-token scale output.
 import numpy as np
 import pytest
 import torch
-from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -92,9 +91,6 @@ def test_relu_producer_fuses_into_static_fp8_quant(
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
-@xfail_under_adv_fusion(
-    "correctness: the new fusion system fuses this differently than asserted"
-)
 def test_rms_norm_producer_fuses_into_dynamic_fp8_quant(
     session: InferenceSession,
 ) -> None:
