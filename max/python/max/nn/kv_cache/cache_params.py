@@ -44,6 +44,7 @@ from .input_types import (
     KVCacheInputsInterface,
     KVCacheInputsPerDevice,
     MultiKVCacheInputs,
+    RecurrentStateRegion,
 )
 from .utils import (
     AttnKeyInterface,
@@ -80,9 +81,13 @@ class KVCacheGroupId:
 
     Caches behind the same attention pattern share a prefix-cache hit and an
     external tier namespace, so this doubles as the key for both.
+
+    ``recurrent`` names a cache whose entry is a state rather than a span of
+    tokens. It shares the page pool, the prefix cache and the eviction order
+    with the attention caches.
     """
 
-    type: Literal["full", "sliding_window"]
+    type: Literal["full", "sliding_window", "recurrent"]
     window_size: int = -1
 
     def __post_init__(self):
@@ -94,6 +99,9 @@ class KVCacheGroupId:
                 raise ValueError(
                     "Window size must be positive for sliding window groups."
                 )
+        elif self.type == "recurrent":
+            if self.window_size != -1:
+                raise ValueError("Window size must be -1 for recurrent groups.")
 
     def is_sliding_window(self) -> bool:
         return self.type == "sliding_window"
@@ -106,15 +114,24 @@ class KVCacheGroupId:
             return -1
         return ceildiv(self.window_size - 1, page_size)
 
+    def is_recurrent(self) -> bool:
+        return self.type == "recurrent"
+
     @classmethod
     def full(cls) -> KVCacheGroupId:
         return cls(type="full")
+
+    @classmethod
+    def recurrent(cls) -> KVCacheGroupId:
+        return cls(type="recurrent")
 
     def __repr__(self) -> str:
         if self.type == "full":
             return "full_group"
         elif self.type == "sliding_window":
             return f"sliding_window_group({self.window_size})"
+        elif self.type == "recurrent":
+            return "recurrent_group"
 
 
 class KVConnectorType(str, Enum):
@@ -636,6 +653,16 @@ class KVLeafRegion:
         """
         return {}
 
+    def bound_row_span(self, block: int) -> Mapping[str, range]:
+        """Returns the rows one block occupies, per bound input.
+
+        Empty for the same leaves :meth:`bound_row_copies` is empty for.
+
+        Args:
+            block: The block whose rows to name.
+        """
+        return {}
+
 
 @dataclass(frozen=True)
 class PagedKVLeafRegion(KVLeafRegion):
@@ -671,6 +698,53 @@ class PagedKVLeafRegion(KVLeafRegion):
         table.fill(0)
         for batch_idx, blocks in enumerate(plans):
             table[batch_idx, : len(blocks)] = blocks
+
+
+@dataclass(frozen=True)
+class RecurrentKVLeafRegion(KVLeafRegion):
+    """A leaf addressed by row: one block holds one request's whole state."""
+
+    region: RecurrentStateRegion
+
+    def blocks_to_reserve(self, num_blocks: int) -> int:
+        """Returns two: the live block, and at most one checkpoint behind it."""
+        return 2
+
+    def staged_input_shapes(
+        self, batch_size: int, num_blocks: int
+    ) -> Mapping[str, tuple[tuple[int, ...], DType]]:
+        """Returns the row tensor each layer indexes.
+
+        ``num_blocks`` is unused: a state is addressed by row, not by block.
+        """
+        rows = (batch_size, self.region.num_layers)
+        return {self.region.leaf_id: (rows, DType.uint32)}
+
+    def write_staged_inputs(
+        self,
+        plans: Sequence[Sequence[int]],
+        into: Mapping[str, np.ndarray],
+    ) -> None:
+        """Folds each request's block into the rows its layers index."""
+        live = into[self.region.leaf_id]
+        for batch_idx, blocks in enumerate(plans):
+            (block,) = blocks
+            live[batch_idx] = self.region.rows_of(block)
+
+    def bound_row_copies(
+        self, src: int, dst: int
+    ) -> Mapping[str, tuple[range, range]]:
+        """Returns the state rows to copy, keyed where the pool is bound."""
+        return {
+            self.region.pool_key: (
+                self.region.rows_of(src),
+                self.region.rows_of(dst),
+            )
+        }
+
+    def bound_row_span(self, block: int) -> Mapping[str, range]:
+        """Returns the rows one block's layers occupy."""
+        return {self.region.pool_key: self.region.rows_of(block)}
 
 
 @runtime_checkable

@@ -32,6 +32,7 @@ from .cache_params import (
     MultiKVCacheParams,
     NullKVConnectorConfig,
     PagedKVLeafRegion,
+    RecurrentKVLeafRegion,
     compute_max_seq_len_fitting_in_cache,
     compute_num_device_blocks,
     estimated_memory_size,
@@ -43,6 +44,10 @@ from .input_types import (
     KVCacheInputsPerDevice,
     MultiKVCacheInputs,
     PagedCacheValues,
+    RecurrentLeafInputs,
+    RecurrentStateInputs,
+    RecurrentStateInputsPerDevice,
+    RecurrentStateRegion,
 )
 from .metrics import KVCacheMetrics
 from .utils import (
@@ -87,6 +92,11 @@ __all__ = [
     "NullKVConnectorConfig",
     "PagedCacheValues",
     "PagedKVLeafRegion",
+    "RecurrentKVLeafRegion",
+    "RecurrentLeafInputs",
+    "RecurrentStateInputs",
+    "RecurrentStateInputsPerDevice",
+    "RecurrentStateRegion",
     "build_max_lengths_tensors",
     "compute_max_seq_len_fitting_in_cache",
     "compute_num_device_blocks",
