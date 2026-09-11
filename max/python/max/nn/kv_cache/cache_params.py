@@ -19,7 +19,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, TypeGuard, runtime_checkable
 
 import numpy as np
 from max._kv_cache_ops import (
@@ -44,6 +44,9 @@ from .input_types import (
     KVCacheInputsInterface,
     KVCacheInputsPerDevice,
     MultiKVCacheInputs,
+    RecurrentLeafInputs,
+    RecurrentStateInputs,
+    RecurrentStateInputsPerDevice,
     RecurrentStateRegion,
 )
 from .utils import (
@@ -589,7 +592,15 @@ class KVCacheAssignments:
     """
 
     cache_lengths_by_device: list[Buffer]
-    lookup_table_by_device: list[dict[str, Buffer]]
+
+    staged_by_device: list[dict[str, Buffer]]
+    """Each leaf's own inputs, per device.
+
+    A leaf's own key holds the table its ops index the pool by. A leaf
+    wanting more than one keys them under itself, the way quantized
+    attention keys ``<leaf>/scales``.
+    """
+
     max_prompt_length: Buffer
     max_cache_length: Buffer
     batch_characteristics: BatchCharacteristics
@@ -748,20 +759,106 @@ class RecurrentKVLeafRegion(KVLeafRegion):
 
 
 @runtime_checkable
-class KVCacheParamInterface(Protocol):
-    """Interface for KV cache parameters."""
+class CacheLeafParamInterface(Protocol):
+    """What every child of a cache tree contributes: leaves, inputs, cost.
 
-    page_size: int
+    How the pool itself is configured belongs to
+    :class:`KVCacheParamInterface`; a child of this type draws from a pool
+    rather than describing one.
+    """
+
     data_parallel_degree: int
     devices: Sequence[DeviceRef]
-    kv_connector_config: KVConnectorConfigInterface
-    speculative_method: SpeculativeMethod | None = None
-    num_draft_tokens: int = 0
 
     @property
     def n_devices(self) -> int:
         """Returns the total number of devices."""
         ...
+
+    def get_symbolic_inputs(
+        self, namespace: str = ""
+    ) -> KVCacheInputsInterface[TensorType, BufferType]:
+        """Returns the symbolic inputs for this cache.
+
+        Args:
+            namespace: Prefix that disambiguates this cache's page-pool
+                symbolic dim from sibling caches in a multi-group tree. Empty
+                for a single-group cache, leaving its names unchanged.
+        """
+        ...
+
+    def flattened_kv_inputs(self) -> list[TensorType | BufferType]:
+        """Flattens the symbolic inputs for this cache."""
+        return self.get_symbolic_inputs().flatten()
+
+    def unflatten_kv_inputs(
+        self, it: Iterator[Any]
+    ) -> KVCacheInputsInterface[TensorValue, BufferValue]:
+        """Unflattens the symbolic inputs for this cache."""
+        ...
+
+    def build_runtime_inputs(
+        self,
+        assignments: Sequence[KVCacheAssignments],
+        buffers: Sequence[KVCacheBufferInterface],
+        _prefix: str = "",
+    ) -> KVCacheInputsInterface[Buffer, Buffer]:
+        """Builds the runtime cache inputs spanning all replicas.
+
+        ``assignments`` and ``buffers`` are indexed by data-parallel replica.
+        Returns a single :class:`KVCacheInputs` leaf (or a
+        :class:`MultiKVCacheInputs` tree) whose leaves each hold every
+        ``(replica, TP shard)`` device's inputs."""
+        ...
+
+    def leaves(self, _prefix: str = "") -> Mapping[str, KVLeafRegion]:
+        """Returns the leaves this cache contributes to the pool."""
+        ...
+
+    @property
+    def bytes_per_block(self) -> int:
+        """Number of bytes per cache block.
+
+        Zero for a cache whose entry is not a span of tokens.
+        """
+        ...
+
+    def allocate_buffers(
+        self, total_num_pages: int
+    ) -> Sequence[KVCacheBufferInterface]:
+        """Allocates the buffers for the cache, one per replica.
+
+        Empty for a cache with no buffer an op indexes.
+        """
+        ...
+
+    def slab_to_bound_views(
+        self, slabs: Sequence[Buffer]
+    ) -> Mapping[str, list[Buffer]]:
+        """Returns the views this cache binds once and never restages.
+
+        Keyed the way its leaves read them back. Empty for a cache whose
+        pages the graph reaches through a per-forward table.
+
+        Args:
+            slabs: One replica's slab per device.
+        """
+        ...
+
+
+@runtime_checkable
+class KVCacheParamInterface(CacheLeafParamInterface, Protocol):
+    """A cache leaf a model reads through an attention op.
+
+    It resolves a dispatch shape, names the cache lengths worth probing at
+    graph capture, and hands out the paged buffers the op indexes. It also
+    defines the pool: its page size, external tier, and block hash.
+    """
+
+    page_size: int
+    kv_connector_config: KVConnectorConfigInterface
+    speculative_method: SpeculativeMethod | None = None
+    num_draft_tokens: int = 0
 
     @property
     def enable_prefix_caching(self) -> bool:
@@ -794,30 +891,13 @@ class KVCacheParamInterface(Protocol):
             )
 
     @property
-    def bytes_per_block(self) -> int:
-        """Number of bytes per cache block."""
+    def kv_hash_algo(self) -> KVHashAlgo:
+        """Hash algorithm used for KV-cache block identity."""
         ...
 
-    def get_symbolic_inputs(
-        self, namespace: str = ""
-    ) -> KVCacheInputsInterface[TensorType, BufferType]:
-        """Returns the symbolic inputs for the KV cache.
-
-        Args:
-            namespace: Prefix that disambiguates this cache's page-pool
-                symbolic dim from sibling caches in a multi-group tree. Empty
-                for a single-group cache, leaving its names unchanged.
-        """
-        ...
-
-    def flattened_kv_inputs(self) -> list[TensorType | BufferType]:
-        """Flattens the symbolic inputs for the KV cache."""
-        return self.get_symbolic_inputs().flatten()
-
-    def unflatten_kv_inputs(
-        self, it: Iterator[Any]
-    ) -> KVCacheInputsInterface[TensorValue, BufferValue]:
-        """Unflattens the symbolic inputs for the KV cache."""
+    @property
+    def kv_hash_seed(self) -> bytes | None:
+        """Resolved 32-byte cluster seed for sha256/sha256_64. None for ahash64."""
         ...
 
     @property
@@ -849,36 +929,6 @@ class KVCacheParamInterface(Protocol):
         """Returns the cache lengths to probe during decode graph capture."""
         ...
 
-    @property
-    def kv_hash_algo(self) -> KVHashAlgo:
-        """Hash algorithm used for KV-cache block identity."""
-        ...
-
-    @property
-    def kv_hash_seed(self) -> bytes | None:
-        """Resolved 32-byte cluster seed for sha256/sha256_64. None for ahash64."""
-        ...
-
-    def allocate_buffers(
-        self, total_num_pages: int
-    ) -> Sequence[KVCacheBufferInterface]:
-        """Allocates the buffers for the KV cache."""
-        ...
-
-    def build_runtime_inputs(
-        self,
-        assignments: Sequence[KVCacheAssignments],
-        buffers: Sequence[KVCacheBufferInterface],
-        _prefix: str = "",
-    ) -> KVCacheInputsInterface[Buffer, Buffer]:
-        """Builds the runtime KV-cache inputs spanning all replicas.
-
-        ``assignments`` and ``buffers`` are indexed by data-parallel replica.
-        Returns a single :class:`KVCacheInputs` leaf (or a
-        :class:`MultiKVCacheInputs` tree) whose leaves each hold every
-        ``(replica, TP shard)`` device's inputs."""
-        ...
-
     def unflatten_basic_kv_tree(
         self, it: Iterator[Any]
     ) -> tuple[list[KVCacheInputsPerDevice[TensorValue, BufferValue]], ...]:
@@ -887,10 +937,6 @@ class KVCacheParamInterface(Protocol):
         Requires that the model is a basic height-1 tree. This method does not work
         on nested trees.
         """
-        ...
-
-    def leaves(self, _prefix: str = "") -> Mapping[str, KVLeafRegion]:
-        """Returns the leaves of the KV cache."""
         ...
 
     def slab_to_buffer_views(
@@ -1449,7 +1495,7 @@ class KVCacheParams(KVCacheParamInterface):
             for i, (cl, luts, blocks) in enumerate(
                 zip(
                     assignment.cache_lengths_by_device,
-                    assignment.lookup_table_by_device,
+                    assignment.staged_by_device,
                     buffer.values,
                     strict=True,
                 )
@@ -1536,6 +1582,12 @@ class KVCacheParams(KVCacheParamInterface):
             )
 
         return leaves
+
+    def slab_to_bound_views(
+        self, slabs: Sequence[Buffer]
+    ) -> Mapping[str, list[Buffer]]:
+        """Returns nothing: these pages are addressed by the lookup table."""
+        return {}
 
     def slab_to_buffer_views(
         self, buffers: Sequence[Buffer]
@@ -2037,20 +2089,228 @@ class MSAKVCacheParams(MHAKVCacheParams):
         return TensorType(DType.int64, shape=[1], device=DeviceRef.CPU())
 
 
+@dataclass
+class RecurrentStateParams(CacheLeafParamInterface):
+    """A cache leaf whose entry is a state rather than a span of tokens.
+
+    One fixed-size value carrying every token before it, drawn from the same
+    slab, prefix index and eviction order as the attention caches. It
+    declares none of that pool's configuration.
+
+    A model declares exactly one however many attention caches it has, since
+    a state belongs to the request. Being unique, its regions name the pool's
+    state leaves without a prefix.
+    """
+
+    regions: tuple[RecurrentStateRegion, ...]
+    """The state leaves one request occupies, in flatten order."""
+
+    devices: Sequence[DeviceRef]
+
+    data_parallel_degree: int = 1
+
+    def __post_init__(self) -> None:
+        if not self.regions:
+            raise ValueError("RecurrentStateParams needs at least one region")
+        leaf_ids = [region.leaf_id for region in self.regions]
+        if len(set(leaf_ids)) != len(leaf_ids):
+            raise ValueError(f"Region leaf ids must be unique, got: {leaf_ids}")
+        self.regions = tuple(self.regions)
+
+    @property
+    def n_devices(self) -> int:
+        return len(self.devices)
+
+    @cached_property
+    def devices_per_replica(self) -> Sequence[Sequence[DeviceRef]]:
+        return split_into_groups(self.devices, self.data_parallel_degree)
+
+    @property
+    def bytes_per_state(self) -> int:
+        """Bytes one request's state occupies on one device, every layer."""
+        return sum(region.bytes_per_state for region in self.regions)
+
+    def slab_to_row_views(
+        self, slabs: Sequence[Buffer]
+    ) -> dict[str, list[Buffer]]:
+        """Converts one replica's slabs into the rows its kernels index.
+
+        Args:
+            slabs: That replica's ``[num_huge_blocks, huge_page_bytes]``
+                uint8 slab, one per device.
+
+        Returns:
+            One entry per leaf, holding a view per device in the order
+            ``slabs`` came in.
+        """
+        views: dict[str, list[Buffer]] = {}
+        for region in self.regions:
+            row_bytes = region.row_elements * region.dtype.size_in_bytes
+            views[region.leaf_id] = []
+            for slab in slabs:
+                num_rows, remainder = divmod(slab.num_elements, row_bytes)
+                # A page is a whole number of rows, so the flat view a
+                # kernel indexes is uniformly strided.
+                assert remainder == 0, (
+                    f"leaf {region.leaf_id!r} has {row_bytes} B rows, which"
+                    f" do not tile a {slab.num_elements} B slab"
+                )
+                views[region.leaf_id].append(
+                    slab.view(region.dtype, [num_rows, *region.row_shape])
+                )
+        return views
+
+    def slab_to_bound_views(
+        self, slabs: Sequence[Buffer]
+    ) -> Mapping[str, list[Buffer]]:
+        """Returns each leaf's rows, keyed where its layers read them."""
+        rows = self.slab_to_row_views(slabs)
+        return {
+            region.pool_key: rows[region.leaf_id] for region in self.regions
+        }
+
+    @property
+    def bytes_per_block(self) -> int:
+        """Zero: a state's page is a per-request cost, not a cost per token."""
+        return 0
+
+    def allocate_buffers(
+        self, total_num_pages: int
+    ) -> list[KVCacheBufferInterface]:
+        """Returns nothing: a state is addressed by row rather than by page."""
+        return []
+
+    def get_symbolic_inputs(
+        self, namespace: str = ""
+    ) -> RecurrentStateInputs[TensorType, BufferType]:
+        """Returns the symbolic inputs for the state leaves.
+
+        ``namespace`` is unused: the region ids are already distinct.
+        """
+        return RecurrentStateInputs.symbolic(
+            self.regions, self.devices_per_replica
+        )
+
+    def unflatten_kv_inputs(
+        self, it: Iterator[Any]
+    ) -> RecurrentStateInputs[TensorValue, BufferValue]:
+        return self.get_symbolic_inputs().unflatten(it)
+
+    def build_runtime_inputs(
+        self,
+        assignments: Sequence[KVCacheAssignments],
+        buffers: Sequence[KVCacheBufferInterface],
+        _prefix: str = "",
+    ) -> RecurrentStateInputs[Buffer, Buffer]:
+        """Gathers this forward's state rows, replica-major.
+
+        ``buffers`` is unused: a state's pool is staged in the assignment
+        alongside the rows that address it.
+        """
+        inputs: list[RecurrentStateInputsPerDevice[Buffer, Buffer]] = []
+        for replica_idx, assignment in enumerate(assignments):
+            for staged in assignment.staged_by_device:
+                leaves: list[RecurrentLeafInputs[Buffer, Buffer]] = []
+                for region in self.regions:
+                    missing = [
+                        key
+                        for key in (region.leaf_id, region.pool_key)
+                        if key not in staged
+                    ]
+                    if missing:
+                        raise ValueError(
+                            f"Replica {replica_idx} staged no {missing} for"
+                            f" state leaf {region.leaf_id!r}"
+                        )
+                    leaves.append(
+                        RecurrentLeafInputs(
+                            region=region,
+                            pool=staged[region.pool_key],
+                            live_row_ids=staged[region.leaf_id],
+                        )
+                    )
+                inputs.append(
+                    RecurrentStateInputsPerDevice(leaves=tuple(leaves))
+                )
+        return RecurrentStateInputs(inputs=inputs)
+
+    def leaves(self, _prefix: str = "") -> Mapping[str, KVLeafRegion]:
+        """Returns one pool leaf per state leaf, each one state wide.
+
+        ``_prefix`` is unused, so the pool key and the name a layer asks for
+        stay the same string.
+        """
+        return {
+            region.leaf_id: RecurrentKVLeafRegion(
+                leaf_id=region.leaf_id,
+                group_id=KVCacheGroupId.recurrent(),
+                bytes_per_page=region.bytes_per_state,
+                region=region,
+            )
+            for region in self.regions
+        }
+
+
+def recurrent_leaf(
+    params: CacheLeafParamInterface,
+) -> RecurrentStateParams | None:
+    """Returns the one state a cache keeps, or ``None`` if it keeps none."""
+    if isinstance(params, RecurrentStateParams):
+        return params
+    if isinstance(params, MultiKVCacheParams):
+        for child in params.children.values():
+            state = recurrent_leaf(child)
+            if state is not None:
+                return state
+    return None
+
+
+def _is_attention(
+    child: CacheLeafParamInterface,
+) -> TypeGuard[KVCacheParamInterface]:
+    """Returns whether an attention op reads this child of a cache tree.
+
+    A structural test, so it answers for any implementation.
+
+    TODO(brodriguez): this separates the two kinds of leaf a cache can hold
+    today. A third kind would need a marker of its own, since a structural
+    test only sees the members a class happens to have.
+    """
+    return isinstance(child, KVCacheParamInterface)
+
+
+def _pool_defining_child(
+    children: Mapping[str, CacheLeafParamInterface],
+) -> KVCacheParamInterface:
+    """Returns the child a tree reads the pool's configuration off."""
+    for child in children.values():
+        if _is_attention(child):
+            return child
+    raise ValueError(
+        "MultiKVCacheParams requires at least one attention cache: the page"
+        " size and pool configuration are read off it."
+    )
+
+
 @dataclass(frozen=True)
 class MultiKVCacheParams(KVCacheParamInterface):
-    """Aggregates multiple KV cache parameter sets into a recursive tree.
+    """Aggregates multiple cache parameter sets into a recursive tree.
 
     Children may be leaf :class:`KVCacheParams` instances or nested
     :class:`MultiKVCacheParams` subtrees, so arbitrarily deep hierarchies
     are supported (e.g. ``{target: {sliding, mla}, draft: mha}``). The
     whole tree is consumed through the :class:`KVCacheParamInterface` —
-    callers never need to know the num_blocks.
+    callers never need to know how many blocks that is.
+
+    A :class:`RecurrentStateParams` is a child like any other, but answers
+    fewer questions, so attention-only aggregates run over
+    :attr:`_attention_children`.
     """
 
-    children: dict[str, KVCacheParamInterface]
-    """KV cache parameter sets to aggregate. Values may be leaf
-    :class:`KVCacheParams` or nested :class:`MultiKVCacheParams` trees."""
+    children: dict[str, CacheLeafParamInterface]
+    """Cache parameter sets to aggregate. Values may be leaf
+    :class:`KVCacheParams` or :class:`RecurrentStateParams` instances, or
+    nested :class:`MultiKVCacheParams` trees."""
 
     page_size: int
     data_parallel_degree: int
@@ -2061,11 +2321,13 @@ class MultiKVCacheParams(KVCacheParamInterface):
 
     @classmethod
     def from_params(
-        cls, params: Mapping[str, KVCacheParamInterface]
+        cls,
+        params: Mapping[str, CacheLeafParamInterface],
     ) -> MultiKVCacheParams:
         """Creates a :class:`MultiKVCacheParams` from one or more param sets.
 
-        Children may be leaf :class:`KVCacheParams` instances or nested
+        Children may be leaf :class:`KVCacheParams` instances, one
+        :class:`RecurrentStateParams`, or nested
         :class:`MultiKVCacheParams` trees, enabling arbitrarily deep KV
         cache hierarchies (e.g. ``{target: {sliding, mla}, draft: mha}``).
         All children must share the same ``page_size``,
@@ -2073,18 +2335,21 @@ class MultiKVCacheParams(KVCacheParamInterface):
         ``kv_connector_config`` values.
 
         Args:
-            params: Named mapping of :class:`KVCacheParamInterface` instances
-                to aggregate.
+            params: Named mapping of :class:`CacheLeafParamInterface`
+                instances to aggregate. At least one must be a cache an
+                attention op reads, since the pool's configuration is read
+                off one.
 
         Returns:
             A new :class:`MultiKVCacheParams` aggregating all provided params.
 
         Raises:
-            ValueError: If no params are provided.
+            ValueError: If no params are provided, or if none of them is a
+                cache an attention op reads.
         """
         if len(params) == 0:
             raise ValueError("MultiKVCacheParams requires at least one param.")
-        first = next(iter(params.values()))
+        first = _pool_defining_child(params)
         return cls(
             children=dict(params),
             page_size=first.page_size,
@@ -2102,7 +2367,32 @@ class MultiKVCacheParams(KVCacheParamInterface):
                 "MultiKVCacheParams requires at least one param set."
             )
 
-        params = list(self.children.values())
+        states = [
+            key
+            for key, child in self.children.items()
+            if isinstance(child, RecurrentStateParams)
+        ]
+        if len(states) > 1:
+            raise ValueError(
+                f"Found {sorted(states)} recurrent states but only 0 or 1 is"
+                " allowed."
+            )
+        nested = [
+            key
+            for key, child in self.children.items()
+            if key not in states and recurrent_leaf(child) is not None
+        ]
+        if nested:
+            raise ValueError(
+                f"Subtrees {sorted(nested)} declare a recurrent state; it must"
+                " be declared on the root cache."
+            )
+
+        # Only the caches that define the pool have to agree on it.
+        first = _pool_defining_child(self.children)
+        params: list[KVCacheParamInterface] = list(
+            self._attention_children.values()
+        )
         page_sizes = {p.page_size for p in params}
         if len(page_sizes) > 1:
             raise ValueError(
@@ -2141,9 +2431,8 @@ class MultiKVCacheParams(KVCacheParamInterface):
 
         # ``KVConnectorConfig`` is not hashable, so compare by equality against
         # the first rather than collapsing into a set.
-        first_kv_connector_config = params[0].kv_connector_config
         if any(
-            p.kv_connector_config != first_kv_connector_config for p in params
+            p.kv_connector_config != first.kv_connector_config for p in params
         ):
             raise ValueError(
                 "All params must use the same kv_connector_config, got:"
@@ -2176,10 +2465,22 @@ class MultiKVCacheParams(KVCacheParamInterface):
                 f"All params must use the same kv_hash_seed, got: {kv_hash_seeds}"
             )
 
+    @cached_property
+    def _attention_children(self) -> dict[str, KVCacheParamInterface]:
+        """The children an attention op reads."""
+        return {
+            key: child
+            for key, child in self.children.items()
+            if _is_attention(child)
+        }
+
     @property
     def _first(self) -> KVCacheParamInterface:
-        """Returns the first child param set."""
-        return next(iter(self.children.values()))
+        """Returns the child the pool's configuration is read off.
+
+        An attention child, so the answer does not fall to dict order.
+        """
+        return _pool_defining_child(self.children)
 
     @property
     def n_devices(self) -> int:
@@ -2228,7 +2529,7 @@ class MultiKVCacheParams(KVCacheParamInterface):
             children={
                 k: p.get_symbolic_inputs(namespace=f"{namespace}{k}_")
                 for k, p in self.children.items()
-            }
+            },
         )
 
     def unflatten_kv_inputs(
@@ -2244,11 +2545,14 @@ class MultiKVCacheParams(KVCacheParamInterface):
 
         Requires that the model is a basic height-1 tree. This method does not work
         on nested trees.
+
+        Returns one entry per attention child, in declaration order.
         """
         tree = self.unflatten_kv_inputs(it)
         assert isinstance(tree, MultiKVCacheInputs)
         out: list[list[KVCacheInputsPerDevice[TensorValue, BufferValue]]] = []
-        for child in tree.children.values():
+        for key in self._attention_children:
+            child = tree.children[key]
             if not isinstance(child, KVCacheInputs):
                 raise ValueError("Unable to flatten nested KV tree")
             out.append(list(child.inputs))
@@ -2270,13 +2574,13 @@ class MultiKVCacheParams(KVCacheParamInterface):
         max_prompt_length: int,
         max_cache_valid_length: int,
     ) -> AttnKeyInterface:
-        """Resolves the dispatch shape tree mirroring the cache tree."""
+        """Resolves the dispatch shape tree mirroring the attention caches."""
         return MultiAttnKey.from_dict(
             {
                 k: p.resolve_attn_key(
                     batch_size, max_prompt_length, max_cache_valid_length
                 )
-                for k, p in self.children.items()
+                for k, p in self._attention_children.items()
             }
         )
 
@@ -2285,7 +2589,7 @@ class MultiKVCacheParams(KVCacheParamInterface):
     ) -> list[int]:
         """Returns the union of probe cache lengths across all child caches."""
         lengths: set[int] = set()
-        for p in self.children.values():
+        for p in self._attention_children.values():
             lengths.update(
                 p.graph_capture_probe_cache_lengths(
                     max_cache_length, q_max_seq_len
@@ -2300,7 +2604,7 @@ class MultiKVCacheParams(KVCacheParamInterface):
 
         Returns one :class:`MultiKVCacheBuffer` per data-parallel replica,
         each holding that replica's :class:`KVCacheBuffer` for every child
-        cache.
+        that allocates one.
         """
         per_key = {
             k: p.allocate_buffers(total_num_pages)
@@ -2308,7 +2612,11 @@ class MultiKVCacheParams(KVCacheParamInterface):
         }
         return [
             MultiKVCacheBuffer(
-                children={k: per_key[k][replica_idx] for k in self.children}
+                children={
+                    k: buffers[replica_idx]
+                    for k, buffers in per_key.items()
+                    if buffers
+                }
             )
             for replica_idx in range(self.data_parallel_degree)
         ]
@@ -2321,10 +2629,12 @@ class MultiKVCacheParams(KVCacheParamInterface):
     ) -> KVCacheInputsInterface[Buffer, Buffer]:
         """Builds the runtime KV-cache tree spanning all replicas.
 
-        Each child leaf is built from every replica's assignment plus that
-        replica's child buffer; the per-replica assignment (cache lengths /
-        lookup table / dispatch shape) is shared across child caches since
-        they all map the same sequence.
+        Each child builds itself from every replica's assignment plus that
+        replica's child buffer, if it allocated one; the per-replica
+        assignment (cache lengths / lookup table / dispatch shape / state
+        rows) is shared across child caches since they all map the same
+        sequence. The tree comes out in the order the graph declared its
+        inputs.
         """
         multi_buffers: list[MultiKVCacheBuffer] = []
         for buffer in buffers:
@@ -2334,28 +2644,50 @@ class MultiKVCacheParams(KVCacheParamInterface):
             children={
                 k: p.build_runtime_inputs(
                     assignments,
-                    [b.children[k] for b in multi_buffers],
+                    [b.children[k] for b in multi_buffers if k in b.children],
                     _prefix=_prefix + k + ".",
                 )
                 for k, p in self.children.items()
-            }
+            },
         )
 
     def leaves(self, _prefix: str = "") -> Mapping[str, KVLeafRegion]:
-        """Returns the leaves of the KV cache."""
+        """Returns the leaves of every child, prefixed by the child's name."""
+        contributions = [
+            v.leaves(_prefix + k + ".") for k, v in self.children.items()
+        ]
+
         leaves: dict[str, KVLeafRegion] = {}
-        for k, v in self.children.items():
-            leaves.update(v.leaves(_prefix + k + "."))
+        for contribution in contributions:
+            for leaf_id, leaf in contribution.items():
+                if leaf_id in leaves:
+                    raise ValueError(f"Duplicate cache leaf {leaf_id!r}")
+                leaves[leaf_id] = leaf
         return leaves
+
+    def slab_to_bound_views(
+        self, slabs: Sequence[Buffer]
+    ) -> Mapping[str, list[Buffer]]:
+        """Returns whatever the children bind, in one mapping.
+
+        Keys come from the leaves, which are unique across the tree.
+        """
+        bound: dict[str, list[Buffer]] = {}
+        for child in self.children.values():
+            bound.update(child.slab_to_bound_views(slabs))
+        return bound
 
     def slab_to_buffer_views(
         self, buffers: Sequence[Buffer]
     ) -> KVCacheBufferInterface:
-        """Converts a slab of memory into a buffer view."""
+        """Converts a slab of memory into a buffer view.
+
+        Only the attention children have pages to view.
+        """
         return MultiKVCacheBuffer(
             children={
                 child_id: child.slab_to_buffer_views(buffers)
-                for child_id, child in self.children.items()
+                for child_id, child in self._attention_children.items()
             },
         )
 

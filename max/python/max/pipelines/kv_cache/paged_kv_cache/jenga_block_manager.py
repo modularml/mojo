@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from bisect import bisect_left
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from max.driver import Buffer, batch_inplace_copy
 from max.nn.kv_cache import KVCacheGroupId, KVLeafRegion
@@ -51,6 +51,9 @@ from .kv_group_coordinator import (
     FullKVGroupCoordinator,
     KVGroupCoordinatorInterface,
     SlidingWindowKVGroupCoordinator,
+)
+from .recurrent_coordinator import (
+    RecurrentKVGroupCoordinator,
 )
 
 logger = logging.getLogger("max.pipelines")
@@ -84,24 +87,16 @@ class _PageCopy:
     src_replica: int
 
 
-def create_kv_group_coordinator(
-    pools: Sequence[JengaBlockPool],
-    leaf_ids: Sequence[str],
-    group_id: KVCacheGroupId,
-    page_size: int,
-) -> KVGroupCoordinatorInterface:
-    """Returns the coordinator matching the group's attention pattern."""
-    if group_id.is_sliding_window():
-        return SlidingWindowKVGroupCoordinator(
-            pools=pools,
-            leaf_ids=leaf_ids,
-            group_id=group_id,
-            page_size=page_size,
-            window_size=group_id.window_size,
-        )
-    return FullKVGroupCoordinator(
-        pools=pools, leaf_ids=leaf_ids, group_id=group_id
-    )
+def create_pools(
+    leaf_infos: Mapping[str, KVLeafInfo],
+    num_huge_blocks: int,
+    num_replicas: int = 1,
+) -> list[JengaBlockPool]:
+    """Returns one pool per replica, each tiling the same huge blocks."""
+    ratios = {leaf_id: leaf.ratio for leaf_id, leaf in leaf_infos.items()}
+    return [
+        JengaBlockPool(num_huge_blocks, ratios) for _ in range(num_replicas)
+    ]
 
 
 def _leaf_ids_by_group_id(
@@ -123,6 +118,62 @@ def _leaf_ids_by_group_id(
     }
 
 
+def create_groups(
+    leaf_infos: Mapping[str, KVLeafInfo],
+    pools: Sequence[JengaBlockPool],
+    page_size: int,
+) -> dict[KVCacheGroupId, KVGroupCoordinatorInterface]:
+    """Returns a coordinator per group the leaves fall into."""
+    return {
+        group_id: create_kv_group_coordinator(
+            pools, group_leaves, group_id, page_size
+        )
+        for group_id, group_leaves in _leaf_ids_by_group_id(leaf_infos).items()
+    }
+
+
+def create_kv_group_coordinator(
+    pools: Sequence[JengaBlockPool],
+    leaf_ids: Sequence[str],
+    group_id: KVCacheGroupId,
+    page_size: int,
+) -> KVGroupCoordinatorInterface:
+    """Returns the group implementation matching the leaves' access pattern."""
+    if group_id.is_sliding_window():
+        return SlidingWindowKVGroupCoordinator(
+            pools=pools,
+            leaf_ids=leaf_ids,
+            group_id=group_id,
+            page_size=page_size,
+            window_size=group_id.window_size,
+        )
+    if group_id.is_full():
+        return FullKVGroupCoordinator(
+            pools=pools, leaf_ids=leaf_ids, group_id=group_id
+        )
+    if group_id.is_recurrent():
+        return RecurrentKVGroupCoordinator(
+            pools=pools,
+            leaf_ids=leaf_ids,
+            group_id=group_id,
+            page_size=page_size,
+        )
+    raise ValueError(f"no coordinator holds a {group_id} group")
+
+
+@dataclass
+class RequestCacheState:
+    """Everything the manager tracks for one live request."""
+
+    replica_idx: int
+
+    hashes: list[bytes] = field(default_factory=list)
+    """The chained key of each full block of the request's tokens."""
+
+    committed_idx: int = 0
+    """How far the published prefix reaches, in tokens."""
+
+
 @dataclass(frozen=True)
 class KVLeafInfo:
     """How one cache tiles a huge block, and which group it belongs to.
@@ -139,11 +190,9 @@ class JengaBlockManager:
 
     def __init__(
         self,
-        leaf_infos: Mapping[str, KVLeafInfo],
-        num_huge_blocks: int,
+        pools: Sequence[JengaBlockPool],
         block_size: int,
         enable_prefix_caching: bool = True,
-        num_replicas: int = 1,
         kv_hash_algo: KVHashAlgo = "ahash64",
         kv_hash_seed: bytes | None = None,
         max_num_input_tokens: int | None = None,
@@ -153,12 +202,14 @@ class JengaBlockManager:
         replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]] | None = None,
         enable_dp_cross_replica_prefix_copy: bool = True,
         *,
+        groups: Mapping[KVCacheGroupId, KVGroupCoordinatorInterface],
         leaves: Mapping[str, KVLeafRegion],
     ) -> None:
-        """Assigns blocks out of pools sized from ``leaf_infos``.
+        """Assigns blocks out of ``pools``, one per replica.
 
-        ``leaves`` says what a block of each cache costs and how many of them
-        a request draws; ``block_size`` is in tokens.
+        ``groups`` decides which blocks a request holds; ``leaves`` says what
+        each one costs and how the graph reaches it. ``block_size`` is in
+        tokens.
         """
         self._block_size = block_size
         self._enable_prefix_caching = enable_prefix_caching
@@ -171,47 +222,44 @@ class JengaBlockManager:
         self._num_draft_tokens = num_draft_tokens
         self._num_draft_tokens_per_step = num_draft_tokens_per_step
         self._metrics = KVCacheMetrics()
-        self._num_replicas = num_replicas
+
+        self.pools = list(pools)
+        self._num_replicas = len(self.pools)
 
         # Per-replica device memory, keyed by leaf, used to copy committed
         # prefix blocks between replicas. None when the caller has no buffers.
         self._replica_kv_memory = replica_kv_memory
         self._cross_replica_copy_enabled = (
             enable_dp_cross_replica_prefix_copy
-            and num_replicas > 1
+            and self._num_replicas > 1
             and replica_kv_memory is not None
         )
 
-        ratios = {leaf_id: leaf.ratio for leaf_id, leaf in leaf_infos.items()}
-        self.pools = [
-            JengaBlockPool(num_huge_blocks, ratios) for _ in range(num_replicas)
-        ]
-
-        self._leaves = dict(leaves)
-        self._leaf_ids = list(leaf_infos)
-
-        self._groups: dict[KVCacheGroupId, KVGroupCoordinatorInterface] = {
-            group_id: create_kv_group_coordinator(
-                self.pools, group_leaves, group_id, self._block_size
+        for group_id, group in groups.items():
+            assert list(group.pools) == self.pools, (
+                f"group {group_id} draws from other pools than this"
+                " manager's; both come from the same slabs or neither does"
             )
-            for group_id, group_leaves in _leaf_ids_by_group_id(
-                leaf_infos
-            ).items()
-        }
-
-        self._req_to_hashes: dict[RequestID, list[bytes]] = {}
-        self._req_to_committed_idx: dict[RequestID, int] = {}
-        self._req_to_replica: dict[RequestID, int] = {}
+        self._groups: dict[KVCacheGroupId, KVGroupCoordinatorInterface] = dict(
+            groups
+        )
+        self._leaves = dict(leaves)
+        self._leaf_ids = [
+            leaf_id
+            for group in self._groups.values()
+            for leaf_id in group.leaf_ids
+        ]
+        self._requests: dict[RequestID, RequestCacheState] = {}
 
         # State for the KVConnector.
         self._connector = connector
 
         self._pending_transfers: list[list[_PendingTransfer]] = [
-            [] for _ in range(num_replicas)
+            [] for _ in range(self._num_replicas)
         ]
         # Runs of newly committed hashes awaiting an `offload` call.
         self._pending_offloads: list[list[list[bytes]]] = [
-            [] for _ in range(num_replicas)
+            [] for _ in range(self._num_replicas)
         ]
 
     # ============================================================================
@@ -222,14 +270,13 @@ class JengaBlockManager:
     def claim(self, ctx: TextContext, replica_idx: int = 0) -> None:
         """Pins a request to one replica, which owns it until it is released."""
         req_id = ctx.request_id
-        existing = self._req_to_replica.get(req_id)
+        existing = self._requests.get(req_id)
         if existing is not None:
             raise ValueError(
-                f"Request is already claimed, on replica {existing}: {req_id}"
+                f"Request is already claimed, on replica "
+                f"{existing.replica_idx}: {req_id}"
             )
-        self._req_to_replica[req_id] = replica_idx
-        self._req_to_hashes[req_id] = []
-        self._req_to_committed_idx[req_id] = 0
+        self._requests[req_id] = RequestCacheState(replica_idx=replica_idx)
         for group in self._groups.values():
             group.claim(req_id)
 
@@ -240,7 +287,7 @@ class JengaBlockManager:
 
     def contains(self, ctx: TextContext) -> bool:
         """Returns whether the request is registered with the block manager."""
-        return ctx.request_id in self._req_to_replica
+        return ctx.request_id in self._requests
 
     @traced
     def release(self, ctx: TextContext) -> None:
@@ -251,9 +298,7 @@ class JengaBlockManager:
         for group in self._groups.values():
             group.release(req_id, replica_idx)
 
-        del self._req_to_replica[req_id]
-        del self._req_to_hashes[req_id]
-        del self._req_to_committed_idx[req_id]
+        del self._requests[req_id]
 
     # ============================================================================
     # Allocation & Reuse APIs
@@ -480,8 +525,6 @@ class JengaBlockManager:
 
         pool = self.pools[replica_idx]
 
-        # Only try to load from connector if we have enough device blocks to
-        # hold the desired hashes.
         num_blocks_needed = {
             leaf_id: group.num_blocks_needed_for_connector_load(len(desired))
             for group in self._groups.values()
@@ -702,15 +745,19 @@ class JengaBlockManager:
     # Internal
     # ============================================================================
 
-    def _replica_of(self, ctx: TextContext) -> int:
-        """Returns the replica the request was claimed on."""
-        replica_idx = self._req_to_replica.get(ctx.request_id)
-        if replica_idx is None:
+    def _state_of(self, ctx: TextContext) -> RequestCacheState:
+        """Returns the request's tracked state, or raises if it is unclaimed."""
+        state = self._requests.get(ctx.request_id)
+        if state is None:
             raise ValueError(
                 f"Request is not claimed, so it holds no pages to work with: "
                 f"{ctx.request_id}"
             )
-        return replica_idx
+        return state
+
+    def _replica_of(self, ctx: TextContext) -> int:
+        """Returns the replica the request was claimed on."""
+        return self._state_of(ctx).replica_idx
 
     def _num_required_blocks(self, ctx: TextContext) -> int:
         """Returns how far into a request's row the next forward reaches."""
@@ -741,8 +788,16 @@ class JengaBlockManager:
     @traced
     def _compute_hashes_for_request(self, ctx: TextContext) -> list[bytes]:
         """Extends the request's hash chain to cover its newest full blocks."""
-        hashes = self._req_to_hashes[ctx.request_id]
-        hashes.extend(self._compute_block_hashes(ctx, hashes))
+        hashes = self._state_of(ctx).hashes
+        hashes.extend(
+            compute_block_hashes(
+                ctx,
+                hashes,
+                self._block_size,
+                self._kv_hash_algo,
+                self._kv_hash_seed,
+            )
+        )
         return hashes
 
     def _find_longest_device_prefix_cache_hit(
@@ -781,7 +836,11 @@ class JengaBlockManager:
             The caller splices the pages onto the request.
         """
         if self._only_use_kv_connector_last_level_cache:
-            return {leaf_id: [] for leaf_id in self._leaf_ids}, 0
+            return {
+                leaf_id: []
+                for group in self._groups.values()
+                for leaf_id in group.leaf_ids
+            }, 0
 
         num_hit_blocks = self._find_longest_device_prefix_cache_hit(
             desired_hashes, replica_idx, self._cross_replica_copy_enabled
@@ -801,13 +860,7 @@ class JengaBlockManager:
         hit_hashes = desired_hashes[:num_hit_blocks]
         hit_blocks: dict[str, list[LittleKVCacheBlock]] = {}
         for group in self._groups.values():
-            hit_blocks.update(
-                group.claim_hit_blocks(
-                    hit_hashes,
-                    replica_idx,
-                )
-            )
-
+            hit_blocks.update(group.claim_hit_blocks(hit_hashes, replica_idx))
         return hit_blocks, num_hit_blocks
 
     def _copy_prefix_from_peers(
@@ -926,10 +979,8 @@ class JengaBlockManager:
 
         self._compute_hashes_for_request(ctx)
 
-        committed_blocks = (
-            self._req_to_committed_idx[ctx.request_id] // self._block_size
-        )
-        desired_hashes = self._req_to_hashes[ctx.request_id][committed_blocks:]
+        committed_blocks = self._state_of(ctx).committed_idx // self._block_size
+        desired_hashes = self._state_of(ctx).hashes[committed_blocks:]
 
         hit_blocks, num_hit_blocks = self._lookup_device_prefix_cache_hit(
             desired_hashes, replica_idx
@@ -960,10 +1011,9 @@ class JengaBlockManager:
             group.extend(ctx.request_id, hit_blocks, loaded_blocks, replica_idx)
 
         committed_idx = (
-            self._req_to_committed_idx[ctx.request_id]
-            + num_reused * self._block_size
+            self._state_of(ctx).committed_idx + num_reused * self._block_size
         )
-        self._req_to_committed_idx[ctx.request_id] = committed_idx
+        self._state_of(ctx).committed_idx = committed_idx
 
         skip_amount = committed_idx - ctx.tokens.processed_length
         ctx.tokens.skip_processing(skip_amount)
@@ -978,7 +1028,7 @@ class JengaBlockManager:
         self, ctx: TextContext, replica_idx: int
     ) -> None:
         """Drops the blocks past the committed index, in every cache."""
-        committed_idx = self._req_to_committed_idx[ctx.request_id]
+        committed_idx = self._state_of(ctx).committed_idx
         num_committed_blocks = committed_idx // self._block_size
 
         for group in self._groups.values():
@@ -997,18 +1047,14 @@ class JengaBlockManager:
     ) -> None:
         """Publishes the request's newly filled blocks into the prefix caches."""
         req_hashes = self._compute_hashes_for_request(ctx)
-        first_block = (
-            self._req_to_committed_idx[ctx.request_id] // self._block_size
-        )
+        first_block = self._state_of(ctx).committed_idx // self._block_size
 
         last_block = min(self._num_filled_blocks(ctx), len(req_hashes))
 
         for group in self._groups.values():
             group.commit(ctx.request_id, req_hashes, last_block, replica_idx)
 
-        self._req_to_committed_idx[ctx.request_id] = (
-            last_block * self._block_size
-        )
+        self._state_of(ctx).committed_idx = last_block * self._block_size
 
         # Queue the newly committed run for the next `offload`. Every leaf
         # commits the same hashes in lockstep, so one run covers them all.

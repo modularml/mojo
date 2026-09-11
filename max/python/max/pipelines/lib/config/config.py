@@ -828,6 +828,33 @@ def _required_argument_changes(
     return changes
 
 
+def _validate_recurrent_state_prefix_caching(
+    architecture: Any,
+    models: dict[str, MAXModelConfig],
+    runtime: PipelineRuntimeConfig,
+) -> None:
+    """Refuses prefix caching a recurrent architecture cannot safely resume.
+
+    Raises:
+        ValueError: If the architecture carries recurrent state and prefix
+            caching is on, but nothing in the running configuration would
+            checkpoint it.
+    """
+    if not getattr(architecture, "checkpoints_recurrent_state", False):
+        return
+    main = models.get("main")
+    if main is None or not main.kv_cache.enable_prefix_caching:
+        return
+
+    if runtime.enable_overlap_scheduler:
+        raise ValueError(
+            f"'{architecture.name}' carries recurrent state, which the "
+            "overlap scheduler does not checkpoint. Pass "
+            "--no-enable-overlap-scheduler --force, or "
+            "--no-enable-prefix-caching."
+        )
+
+
 def _apply_required_arguments(
     architecture: Any,
     models: dict[str, MAXModelConfig],
@@ -1589,6 +1616,7 @@ class PipelineConfig(ConfigFileModel):
             runtime, sampling = _resolved_runtime_and_sampling(
                 runtime, sampling, lora, models["main"], arch
             )
+            _validate_recurrent_state_prefix_caching(arch, models, runtime)
         elif runtime.device_graph_capture is None:
             # Overlap/DGC resolution is arch-gated; configs without a
             # registered architecture still end with a concrete bool.

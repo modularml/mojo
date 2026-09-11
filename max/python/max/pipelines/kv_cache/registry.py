@@ -21,7 +21,11 @@ from unittest.mock import MagicMock, Mock
 
 from max.driver import is_virtual_device_mode
 from max.engine import InferenceSession
-from max.nn.kv_cache import KVCacheParamInterface, compute_num_device_blocks
+from max.nn.kv_cache import (
+    KVCacheParamInterface,
+    compute_num_device_blocks,
+    recurrent_leaf,
+)
 
 from .paged_kv_cache import PagedKVCacheManager
 from .paged_kv_cache.cache_manager_interface import PagedKVCacheManagerInterface
@@ -100,6 +104,9 @@ def load_kv_manager(
     (multiple caches).  The returned manager natively handles all caches
     with a single ``BlockManager`` and ``KVConnector``.
 
+    Only the Jenga manager can serve a state leaf, so a cache declaring one
+    selects it whatever the cutover heuristic says.
+
     TODO: remove `is_di_enabled` once Jenga supports DI.
     """
     if isinstance(params, MagicMock):
@@ -132,7 +139,13 @@ def load_kv_manager(
             "Page size must be a multiple of 128 and at least 128."
         )
 
-    if _use_jenga_kv_cache(params, is_di_enabled, model_name):
+    holds_state = recurrent_leaf(params) is not None
+    if _use_jenga_kv_cache(params, is_di_enabled, model_name) or holds_state:
+        if holds_state:
+            logger.info(
+                "Using Jenga KV cache: this model keeps recurrent state, whose"
+                " pages share the KV budget and eviction order with its KV."
+            )
         return JengaKVCacheManager.create(
             params=params,
             available_bytes=available_cache_memory,

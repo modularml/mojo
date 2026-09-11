@@ -202,6 +202,12 @@ class SupportedArchitecture:
     )
     """A dictionary specifying required values for PipelineConfig options."""
 
+    checkpoints_recurrent_state: bool = False
+    """Whether this architecture carries recurrent state a prefix hit must resume.
+
+    A prefix hit is safe only where the state that consumed exactly that
+    prefix is restored with it."""
+
     context_validators: list[
         Callable[[TextContext | TextAndVisionContext | PixelContext], None]
     ] = field(default_factory=list)

@@ -31,17 +31,25 @@ from max.driver import Buffer, Device, Usage
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.nn.kv_cache import (
+    KVCacheGroupId,
     KVCacheInputs,
     KVCacheInputsInterface,
+    KVCacheParams,
     MHAKVCacheParams,
+    MultiKVCacheInputs,
     MultiKVCacheParams,
+    RecurrentStateInputs,
+    RecurrentStateParams,
 )
 from max.nn.kv_cache.cache_params import (
     KVCacheParamInterface,
+    KVConnectorType,
     SpeculativeMethod,
 )
+from max.nn.kv_cache.input_types import RecurrentStateRegion
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
+from max.pipelines.kv_cache.config import KVConnectorConfig
 from max.pipelines.kv_cache.paged_kv_cache import (
     jenga_cache_manager as jenga_mod,
 )
@@ -155,15 +163,7 @@ def get_lut(
 
 
 def test_runtime_inputs_boundary_matches_real_allocated_blocks() -> None:
-    """The insufficient-blocks check must use the request's real per-leaf
-    block count, not something derived from the leaf-id dict's keys.
-
-    Regression test for a bug where ``min(len(bs) for bs in
-    get_req_blocks_per_leaf(ctx))`` iterated dict *keys* (leaf-id strings)
-    instead of ``.values()``, so the boundary was a bogus constant
-    (``len("full_attention.full_group")``) instead of the request's actual
-    block count.
-    """
+    """Exactly what alloc gave must pass; one token past it must not."""
     mgr = make_multi_leaf_manager(num_huge_blocks=10)
     ctx = make_ctx(num_tokens=3)
     mgr.claim(ctx)
@@ -198,7 +198,8 @@ def test_runtime_inputs_lut_and_cache_lengths() -> None:
     kv_inputs = mgr.runtime_inputs([[ctx_a, ctx_b]])
     assert isinstance(kv_inputs, KVCacheInputs)
 
-    (leaf_id,) = mgr._leaf_infos
+    # A single-leaf manager, so its one leaf names itself in the rows.
+    (leaf_id,) = mgr.get_req_blocks_per_leaf(ctx_a)
     assert get_lut(kv_inputs) == [
         mgr.get_req_blocks_per_leaf(ctx_a)[leaf_id],
         mgr.get_req_blocks_per_leaf(ctx_b)[leaf_id],
@@ -273,7 +274,8 @@ def test_each_replica_gets_its_own_runtime_inputs() -> None:
 
     kv_inputs = mgr.runtime_inputs([[ctx_a], [ctx_b]])
 
-    (leaf_id,) = mgr._leaf_infos
+    # A single-leaf manager, so its one leaf names itself in the rows.
+    (leaf_id,) = mgr.get_req_blocks_per_leaf(ctx_a)
     assert get_lut(kv_inputs, device_idx=0) == [
         mgr.get_req_blocks_per_leaf(ctx_a)[leaf_id]
     ]
@@ -373,6 +375,162 @@ def test_alloc_reserves_the_draft_positions_runtime_inputs_will_ask_for() -> (
     # Not raising is the assertion: the boundary check reads the live
     # ``num_draft_tokens`` and must find the pages alloc already drew.
     mgr.runtime_inputs([[ctx]])
+
+
+STATE_LEAF = "lin/conv"
+
+
+def make_recurrent_manager(
+    num_huge_blocks: int,
+    max_batch_size: int = 4,
+    page_size: int = 4,
+    num_layers: int = 1,
+) -> JengaKVCacheManager:
+    """An attention leaf beside a state, as a hybrid model declares it."""
+    attn = make_leaf(n_kv_heads=1, page_size=page_size)
+    attn.enable_prefix_caching = True
+    state = RecurrentStateParams(
+        devices=attn.devices,
+        data_parallel_degree=attn.data_parallel_degree,
+        regions=(
+            RecurrentStateRegion(
+                leaf_id=STATE_LEAF,
+                num_layers=num_layers,
+                row_shape=(4,),
+                dtype=DType.float32,
+            ),
+        ),
+    )
+    params = MultiKVCacheParams.from_params({"attn": attn, "state": state})
+    return create_manager(params, num_huge_blocks, max_batch_size)
+
+
+def test_a_forward_is_handed_state_rows_cut_to_its_own_batch() -> None:
+    """The row buffers are allocated once and viewed per step."""
+    mgr = make_recurrent_manager(num_huge_blocks=400, num_layers=3)
+    ctx = make_ctx(4)
+    mgr.claim(ctx)
+    mgr.alloc(ctx)
+
+    inputs = mgr.runtime_inputs([[ctx]])
+    assert isinstance(inputs, MultiKVCacheInputs)
+    state = inputs.children["state"]
+    assert isinstance(state, RecurrentStateInputs)
+    (device,) = state.inputs
+    leaf = device.by_leaf(STATE_LEAF)
+
+    assert leaf.live_row_ids.shape == (1, 3), "one request, every layer"
+    assert leaf.pool.shape[0] > 3, "the whole slab, in rows"
+
+
+def test_a_batch_past_the_staged_capacity_is_refused() -> None:
+    """One check covers every buffer a step binds, the state rows included."""
+    mgr = make_recurrent_manager(num_huge_blocks=400, max_batch_size=1)
+    batch = [make_ctx(4), make_ctx(4)]
+    for ctx in batch:
+        mgr.claim(ctx)
+        mgr.alloc(ctx)
+
+    with pytest.raises(ValueError, match="exceeds preallocated"):
+        mgr.runtime_inputs([batch])
+
+
+def test_a_connector_beside_a_state_is_refused() -> None:
+    """A connector cannot extend a hit past the state's published num_blocks."""
+    attn = make_leaf(n_kv_heads=1, page_size=4)
+    attn.enable_prefix_caching = True
+    attn.kv_connector_config = KVConnectorConfig(
+        type=KVConnectorType.tiered, host_offload_max_gb=1.0
+    )
+    state = RecurrentStateParams(
+        devices=attn.devices,
+        data_parallel_degree=attn.data_parallel_degree,
+        regions=(
+            RecurrentStateRegion(
+                leaf_id="lin/conv",
+                num_layers=1,
+                row_shape=(4,),
+                dtype=DType.float32,
+            ),
+        ),
+    )
+    params = MultiKVCacheParams.from_params({"attn": attn, "state": state})
+
+    with pytest.raises(ValueError, match="incompatible with KVConnector"):
+        create_manager(params, num_huge_blocks=16, max_batch_size=4)
+
+
+def _run_once(mgr: JengaKVCacheManager, ctx: TextContext) -> None:
+    """Drives one request through a forward, so its blocks commit."""
+    mgr.claim(ctx)
+    mgr.alloc(ctx)
+    mgr.runtime_inputs([[ctx]])
+    ctx.update(42)
+    mgr.step(ctx)
+
+
+def _run_until_committed(
+    mgr: JengaKVCacheManager, ctx: TextContext, steps: int = 4
+) -> None:
+    """Drives a request until a checkpoint's boundary can be committed.
+
+    A checkpoint stands at the boundary its forward ended on, whose own last
+    token that forward produced, so the chain reaches it a step or more
+    later.
+    """
+    mgr.claim(ctx)
+    for _ in range(steps):
+        mgr.alloc(ctx)
+        mgr.runtime_inputs([[ctx]])
+        ctx.update(42)
+        mgr.step(ctx)
+
+
+def test_a_hybrid_tree_still_serves_a_prefix_hit() -> None:
+    """The state child must not cost the attention children their reuse.
+
+    A tree that publishes no checkpoint silently serves 0%: correct output,
+    no reuse, and nothing in a correctness eval to show for it.
+    """
+    mgr = make_recurrent_manager(num_huge_blocks=400)
+    assert KVCacheGroupId.recurrent() in mgr.groups
+
+    first = make_ctx(33)
+    _run_until_committed(mgr, first)
+
+    second = make_ctx(33)
+    mgr.claim(second)
+    mgr.alloc(second)
+    assert second.tokens.processed_length > 0, (
+        "the second request reused nothing; a hybrid cache published no"
+        " state checkpoint, so every prefix hit was capped to zero"
+    )
+
+
+def test_the_state_does_not_change_what_attention_reuses() -> None:
+    """Same prompt, with and without a state, reuses the same tokens."""
+    plain = MultiKVCacheParams.from_params(
+        {"attn": make_leaf(n_kv_heads=1, page_size=4)}
+    )
+    for child in plain.children.values():
+        assert isinstance(child, KVCacheParams)
+        child.enable_prefix_caching = True
+
+    reused: list[int] = []
+    for mgr in (
+        create_manager(plain, num_huge_blocks=400, max_batch_size=4),
+        make_recurrent_manager(num_huge_blocks=400),
+    ):
+        _run_until_committed(mgr, make_ctx(33))
+        follower = make_ctx(33)
+        mgr.claim(follower)
+        mgr.alloc(follower)
+        reused.append(follower.tokens.processed_length)
+
+    assert reused[0] == reused[1] > 0, (
+        f"attention-only reused {reused[0]} tokens but the hybrid tree reused"
+        f" {reused[1]}"
+    )
 
 
 # ===--------------------------------------------------------------------=== #

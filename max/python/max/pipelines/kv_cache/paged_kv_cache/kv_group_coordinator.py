@@ -187,7 +187,10 @@ class KVGroupCoordinatorInterface:
         """
         row = self.rows[req_id]
         for leaf_id in self.leaf_ids:
-            row[leaf_id].extend([*hit_blocks[leaf_id], *loaded_blocks[leaf_id]])
+            # A leaf read by row has nothing an external tier can onload.
+            row[leaf_id].extend(
+                [*hit_blocks[leaf_id], *loaded_blocks.get(leaf_id, ())]
+            )
 
     def grow_with_padding(
         self, req_id: RequestID, num_required_blocks: int, replica_idx: int
@@ -547,7 +550,7 @@ class SlidingWindowKVGroupCoordinator(KVGroupCoordinatorInterface):
         row = self.rows[req_id]
         for leaf_id in self.leaf_ids:
             hit = list(hit_blocks[leaf_id])
-            loaded = loaded_blocks[leaf_id]
+            loaded = loaded_blocks.get(leaf_id, ())
             if loaded and loaded[0].is_null:
                 for block in hit:
                     pool.free_block(block)

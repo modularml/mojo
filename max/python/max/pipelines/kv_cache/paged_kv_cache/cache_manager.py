@@ -679,7 +679,7 @@ class PagedKVCacheManager(PagedKVCacheManagerInterface):
 
         return KVCacheAssignments(
             cache_lengths_by_device=cache_lengths_by_device,
-            lookup_table_by_device=lut_table_by_device_by_leaf,
+            staged_by_device=lut_table_by_device_by_leaf,
             max_prompt_length=max_prompt_length_host,
             max_cache_length=max_cache_length_host,
             batch_characteristics=BatchCharacteristics(

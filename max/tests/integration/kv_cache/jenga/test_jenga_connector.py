@@ -38,6 +38,8 @@ from max.pipelines.kv_cache.kv_connector import (
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
+    create_groups,
+    create_pools,
 )
 from max.pipelines.request.base import RequestID
 
@@ -201,16 +203,10 @@ def make_manager(
     leaf_infos = leaf_infos or {
         leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves
     }
+    pools = create_pools(leaf_infos, num_huge_blocks)
     return JengaBlockManager(
-        leaf_infos,
-        num_huge_blocks=num_huge_blocks,
-        block_size=1,
-        enable_prefix_caching=True,
-        num_replicas=1,
-        max_num_input_tokens=None,
-        num_draft_tokens=0,
-        num_draft_tokens_per_step=0,
-        connector=connector,
+        pools=pools,
+        groups=create_groups(leaf_infos, pools, 1),
         leaves={
             leaf_id: PagedKVLeafRegion(
                 leaf_id=leaf_id,
@@ -219,7 +215,14 @@ def make_manager(
                 page_size=1,
             )
             for leaf_id, info in leaf_infos.items()
+            if not info.group_id.is_recurrent()
         },
+        block_size=1,
+        enable_prefix_caching=True,
+        max_num_input_tokens=None,
+        num_draft_tokens=0,
+        num_draft_tokens_per_step=0,
+        connector=connector,
     )
 
 

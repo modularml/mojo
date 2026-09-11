@@ -36,7 +36,8 @@ BLOCK_SIZE = 4
 
 VALUES = "attn/values"
 SCALES = "attn/scales"
-RATIOS = {VALUES: 8, SCALES: 32}
+STATE = "recurrent"
+RATIOS = {VALUES: 8, SCALES: 32, STATE: 2}
 
 # Deliberately not a multiple of the block size: the window a model asks for
 # rarely lands on a block boundary.

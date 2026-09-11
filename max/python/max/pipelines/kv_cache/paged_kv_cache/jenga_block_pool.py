@@ -15,8 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from functools import reduce
-from math import gcd
+from math import lcm
 
 from max.support.human_readable_formatter import to_human_readable_bytes
 from max.support.math import ceildiv
@@ -28,11 +27,6 @@ from .block_utils import (
     InsufficientBlocksError,
     LittleKVCacheBlock,
 )
-
-
-def lcm(*numbers: int) -> int:
-    """Returns the least common multiple of ``numbers``."""
-    return reduce(lambda x, y: x * y // gcd(x, y), numbers)
 
 
 def compute_jenga_ratios(
@@ -119,9 +113,9 @@ class JengaBlockPool:
       global  (x4)   | N| .| .| .| 4| 5| 6| 7| 8| 9|10|11|12|13|14|15|
       sliding (x2)   |  N  |  .  |  2  |  3  |  4  |  5  |  6  |  7  |
 
-    A little block's ``bid`` is thus the page index the kernel cache lookup
-    table holds. ``num_huge_blocks`` counts huge block 0, so a pool needs at
-    least two of them to hand anything out.
+    A little block's ``bid`` is thus its index in its own cache's id space.
+    ``num_huge_blocks`` counts huge block 0, so a pool needs at least two of
+    them to hand anything out.
 
     Those views alias, so a huge block serves one cache at a time -- its
     ``little_block_type`` -- and at most one row of each column exists. Here
@@ -179,6 +173,7 @@ class JengaBlockPool:
             )
 
         self.cache_ratios = cache_ratios
+        self.num_huge_blocks = num_huge_blocks
         # Huge block 0 is the null block, so the allocatable ones start at 1.
         self.huge_blocks: list[HugeKVCacheBlock] = [
             HugeKVCacheBlock(idx) for idx in range(1, num_huge_blocks)

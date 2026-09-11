@@ -33,9 +33,8 @@ from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
     _PageCopy,
-)
-from max.pipelines.kv_cache.paged_kv_cache.kv_group_coordinator import (
-    KVGroupCoordinatorInterface,
+    create_groups,
+    create_pools,
 )
 from max.pipelines.request.base import RequestID
 
@@ -71,12 +70,12 @@ def make_manager(
     replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]] | None = None,
     enable_dp_cross_replica_prefix_copy: bool = True,
 ) -> JengaBlockManager:
+    pools = create_pools(leaf_infos, num_huge_blocks, num_replicas)
     return JengaBlockManager(
-        dict(leaf_infos),
-        num_huge_blocks=num_huge_blocks,
+        pools=pools,
+        groups=create_groups(leaf_infos, pools, block_size),
         block_size=block_size,
         enable_prefix_caching=enable_prefix_caching,
-        num_replicas=num_replicas,
         max_num_input_tokens=max_num_input_tokens,
         num_draft_tokens=num_draft_tokens,
         num_draft_tokens_per_step=num_draft_tokens_per_step,
@@ -1482,10 +1481,8 @@ def test_a_dummy_points_at_its_own_replica_null_page() -> None:
     dummy = make_ctx(num_tokens=1)
     bm.alloc_dummy(dummy, replica_idx=1)
 
-    # Identity, not the id: every replica's null page has the same id.
-    group = bm.groups[KVCacheGroupId.full()]
-    assert isinstance(group, KVGroupCoordinatorInterface)
-    row = group.blocks_of(dummy.request_id)
+    # Every replica's null page has the same id, so compare by identity.
+    row = bm.groups[KVCacheGroupId.full()].blocks_of(dummy.request_id)
     assert row[FULL][0] is bm.pools[1].null_little_blocks[FULL]
 
 

@@ -13,6 +13,7 @@
 
 from .cache_params import (
     BatchCharacteristics,
+    CacheLeafParamInterface,
     KVCacheAssignments,
     KVCacheBuffer,
     KVCacheBufferInterface,
@@ -33,9 +34,11 @@ from .cache_params import (
     NullKVConnectorConfig,
     PagedKVLeafRegion,
     RecurrentKVLeafRegion,
+    RecurrentStateParams,
     compute_max_seq_len_fitting_in_cache,
     compute_num_device_blocks,
     estimated_memory_size,
+    recurrent_leaf,
     spec_decode_cache_slack,
 )
 from .input_types import (
@@ -64,6 +67,7 @@ __all__ = [
     "AttnKey",
     "AttnKeyInterface",
     "BatchCharacteristics",
+    "CacheLeafParamInterface",
     "KVCacheAssignments",
     "KVCacheBuffer",
     "KVCacheBufferInterface",
@@ -96,11 +100,13 @@ __all__ = [
     "RecurrentLeafInputs",
     "RecurrentStateInputs",
     "RecurrentStateInputsPerDevice",
+    "RecurrentStateParams",
     "RecurrentStateRegion",
     "build_max_lengths_tensors",
     "compute_max_seq_len_fitting_in_cache",
     "compute_num_device_blocks",
     "estimated_memory_size",
     "padded_lut_cols",
+    "recurrent_leaf",
     "spec_decode_cache_slack",
 ]
