@@ -18,6 +18,7 @@ Printing, formatting, JSON/YAML persistence, and related utilities.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
@@ -27,6 +28,7 @@ import re
 import statistics
 from collections.abc import Sequence
 from datetime import datetime
+from io import BytesIO
 from typing import NamedTuple
 
 import numpy as np
@@ -41,6 +43,7 @@ from max.benchmark.benchmark_shared.datasets.chat_judge import (
 )
 from max.benchmark.benchmark_shared.datasets.types import (
     ChatSamples,
+    OpenAIImage,
     RequestSamples,
     Samples,
 )
@@ -59,6 +62,7 @@ from max.benchmark.benchmark_shared.percentile_metrics import (
 )
 from max.benchmark.benchmark_shared.server_metrics import print_server_metrics
 from max.benchmark.benchmark_shared.utils import print_section
+from PIL import Image, UnidentifiedImageError
 from tabulate import tabulate
 
 logger = logging.getLogger(__name__)
@@ -152,6 +156,55 @@ def _format_distribution_table(
     return f"  {label}:\n{header}\n{row}"
 
 
+def _image_dimensions(image: OpenAIImage) -> tuple[int, int] | None:
+    """Decode a data-URI image's (width, height), or None if not decodable."""
+    url = image["image_url"]["url"]
+    if not url.startswith("data:"):
+        return None
+    try:
+        _, b64_data = url.split(",", 1)
+        with Image.open(BytesIO(base64.b64decode(b64_data))) as img:
+            return img.size
+    except (ValueError, UnidentifiedImageError, OSError):
+        return None
+
+
+def _image_long_side(image: OpenAIImage) -> int | None:
+    """Decode a data-URI image's longer side in pixels, or None if not decodable."""
+    dimensions = _image_dimensions(image)
+    return None if dimensions is None else max(dimensions)
+
+
+def _print_image_stats(
+    images_per_item: Sequence[int],
+    all_images: Sequence[OpenAIImage],
+    label: str,
+) -> None:
+    """Print image-count and (when decodable) shape distributions."""
+    if sum(images_per_item) == 0:
+        return
+    print()
+    print(_format_distribution_table(images_per_item, f"Image count ({label})"))
+    # One decode per image feeds both tables; long side alone cannot show
+    # what shapes a sampled --image-aspect-ratio actually produced.
+    dimensions = [
+        d for img in all_images if (d := _image_dimensions(img)) is not None
+    ]
+    if dimensions:
+        print()
+        print(
+            _format_distribution_table(
+                [max(d) for d in dimensions], "Image long side (px)"
+            )
+        )
+        print()
+        print(
+            _format_distribution_table(
+                [w / h for w, h in dimensions], "Image aspect ratio (w/h)"
+            )
+        )
+
+
 def print_workload_stats(samples: Samples) -> None:
     """Print workload distribution statistics and exit.
 
@@ -176,6 +229,11 @@ def print_workload_stats(samples: Samples) -> None:
         else:
             print()
             print("  Output length:  not specified (server-determined)")
+        _print_image_stats(
+            [len(r.encoded_images) for r in samples.requests],
+            [img for r in samples.requests for img in r.encoded_images],
+            "per request",
+        )
 
     elif isinstance(samples, ChatSamples):
         sessions = samples.chat_sessions
@@ -261,6 +319,18 @@ def print_workload_stats(samples: Samples) -> None:
         else:
             print()
             print("  Delay until next msg:  none configured")
+
+        images_per_session = [
+            sum(len(msg.images) for msg in session.messages)
+            for session in sessions
+        ]
+        all_images = [
+            img
+            for session in sessions
+            for msg in session.messages
+            for img in msg.images
+        ]
+        _print_image_stats(images_per_session, all_images, "per session")
 
     print("=" * 50)
 
