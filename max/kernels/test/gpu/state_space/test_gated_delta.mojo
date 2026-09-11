@@ -230,6 +230,7 @@ def run_slot_indexed_gpu[
             pool_tt.LayoutType,
             slot_idx_tt.LayoutType,
             offsets_tt.LayoutType,
+            recur_out_tt.Engine,
         ]
     ]()
 

@@ -227,6 +227,7 @@ def run_mamba_split_conv1d_scan_combined[
         rmsnorm_weight_h.LayoutType,
         outproj_weight_h.LayoutType,
         outproj_bias_h.LayoutType,
+        zxbcdt_h.Engine,
     ](
         batch,
         seqlen,

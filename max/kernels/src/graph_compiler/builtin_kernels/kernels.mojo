@@ -3449,6 +3449,7 @@ struct GatedDeltaConv1dFwd:
                     slot_idx_tt.LayoutType,
                     input_row_offsets_tt.LayoutType,
                     conv_output_ragged_tt.LayoutType,
+                    qkv_input_ragged_tt.Engine,
                 ]
             ](
                 Int32(batch_size),
@@ -3697,6 +3698,7 @@ struct GatedDeltaRecurrenceFwd:
                     recurrent_state_tt.LayoutType,
                     slot_idx_tt.LayoutType,
                     input_row_offsets_tt.LayoutType,
+                    recurrence_output_tt.Engine,
                 ]
             ](
                 Int32(batch_size),

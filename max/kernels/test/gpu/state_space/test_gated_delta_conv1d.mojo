@@ -200,6 +200,7 @@ def run_slot_indexed_gpu[
             slot_idx_tt.LayoutType,
             input_row_offsets_tt.LayoutType,
             conv_output_tt.LayoutType,
+            qkv_input_tt.Engine,
         ]
     ]()
 

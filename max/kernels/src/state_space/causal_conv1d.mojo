@@ -1003,17 +1003,22 @@ def causal_conv1d_channel_first_fwd_gpu_no_bias[
     x_LT: TensorLayout,
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, C, L)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, C, L)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, C, L)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -1051,6 +1056,9 @@ def causal_conv1d_channel_first_fwd_gpu_no_bias[
         x_LT: TensorLayout of the input tensor `x`.
         weight_LT: TensorLayout of the weight tensor `weight`.
         output_LT: TensorLayout of the output tensor `output`.
+        x_engine: Engine of the input tensor `x`.
+        weight_engine: Engine of the weight tensor `weight`.
+        output_engine: Engine of the output tensor `output`.
 
     Args:
         batch: Batch size.
@@ -1284,20 +1292,26 @@ def causal_conv1d_channel_last_fwd_gpu[
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
     bias_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    bias_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, L, C)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, L, C)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, L, C)
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],  # Shape (C,), stride = 1
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -1357,10 +1371,10 @@ def causal_conv1d_channel_last_fwd_gpu[
 
     # Safety check for null pointers
     if (
-        Int(x._storage) == 0
-        or Int(output._storage) == 0
-        or Int(weight._storage) == 0
-        or Int(bias._storage) == 0
+        Int(x.ptr) == 0
+        or Int(output.ptr) == 0
+        or Int(weight.ptr) == 0
+        or Int(bias.ptr) == 0
     ):
         return
 
@@ -1381,9 +1395,7 @@ def causal_conv1d_channel_last_fwd_gpu[
         var cur_bias: Scalar[output_dtype] = Scalar[output_dtype](
             bias.raw_load(c_idx)
         )
-        var W = (weight._storage + c_idx * Int(weight_c_stride)).load[
-            width=kWidth
-        ]()
+        var W = weight.raw_load[width=kWidth](c_idx * Int(weight_c_stride))
         var prev_chunk_col: Int = (seq_start - 1) // kNElts
         var prev_input_chunk: SIMD[x_dtype, kNElts] = 0
         if prev_chunk_col >= 0 and prev_chunk_col * kNElts < nSeqLen:
@@ -1503,17 +1515,22 @@ def causal_conv1d_channel_last_fwd_gpu_no_bias[
     x_LT: TensorLayout,
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, L, C)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, L, C)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, L, C)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -1572,9 +1589,7 @@ def causal_conv1d_channel_last_fwd_gpu_no_bias[
         if c_idx >= nChannels:
             break
 
-        var W = (weight._storage + c_idx * Int(weight_c_stride)).load[
-            width=kWidth
-        ]()
+        var W = weight.raw_load[width=kWidth](c_idx * Int(weight_c_stride))
         var prev_chunk_col: Int = (seq_start - 1) // kNElts
         var prev_input_chunk: SIMD[x_dtype, kNElts] = 0
         if prev_chunk_col >= 0 and prev_chunk_col * kNElts < nSeqLen:
@@ -1703,23 +1718,30 @@ def causal_conv1d_channel_last_fwd_gpu_with_seq_idx[
     output_LT: TensorLayout,
     bias_LT: TensorLayout,
     seq_idx_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    seq_idx_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, L, C)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, L, C)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, L, C)
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],  # Shape (C,), stride = 1
     seq_idx: TileTensor[
-        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin
+        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin, Engine=seq_idx_engine
     ],  # Shape (B, L)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -1762,6 +1784,11 @@ def causal_conv1d_channel_last_fwd_gpu_with_seq_idx[
         output_LT: TensorLayout of the output tensor `output`.
         bias_LT: TensorLayout of the bias tensor `bias`.
         seq_idx_LT: TensorLayout of the `seq_idx` tensor.
+        x_engine: Engine of the input tensor `x`.
+        weight_engine: Engine of the weight tensor `weight`.
+        output_engine: Engine of the output tensor `output`.
+        bias_engine: Engine of the bias tensor `bias`.
+        seq_idx_engine: Engine of the `seq_idx` tensor.
 
     Args:
         batch: Batch size.
@@ -1828,10 +1855,10 @@ def causal_conv1d_channel_last_fwd_gpu_with_seq_idx[
 
     # Safety check for null pointers
     if (
-        Int(x._storage) == 0
-        or Int(output._storage) == 0
-        or Int(weight._storage) == 0
-        or Int(bias._storage) == 0
+        Int(x.ptr) == 0
+        or Int(output.ptr) == 0
+        or Int(weight.ptr) == 0
+        or Int(bias.ptr) == 0
     ):
         return
 
@@ -2140,20 +2167,26 @@ def causal_conv1d_channel_last_fwd_gpu_no_bias_with_seq_idx[
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
     seq_idx_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    seq_idx_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, L, C)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, L, C)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, L, C)
     seq_idx: TileTensor[
-        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin
+        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin, Engine=seq_idx_engine
     ],  # Shape (B, L)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -2505,23 +2538,30 @@ def causal_conv1d_channel_first_fwd_gpu_with_seq_idx[
     output_LT: TensorLayout,
     bias_LT: TensorLayout,
     seq_idx_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    seq_idx_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, C, L)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, C, L)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, C, L)
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],  # Shape (C,), stride = 1
     seq_idx: TileTensor[
-        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin
+        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin, Engine=seq_idx_engine
     ],  # Shape (B, L)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -2575,10 +2615,10 @@ def causal_conv1d_channel_first_fwd_gpu_with_seq_idx[
 
     # Safety check for null pointers
     if (
-        Int(x._storage) == 0
-        or Int(output._storage) == 0
-        or Int(weight._storage) == 0
-        or Int(bias._storage) == 0
+        Int(x.ptr) == 0
+        or Int(output.ptr) == 0
+        or Int(weight.ptr) == 0
+        or Int(bias.ptr) == 0
     ):
         return
 
@@ -2883,20 +2923,26 @@ def causal_conv1d_channel_first_fwd_gpu_no_bias_with_seq_idx[
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
     seq_idx_LT: TensorLayout,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    seq_idx_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin],  # Shape (B, C, L)
+    x: TileTensor[
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
+    ],  # Shape (B, C, L)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, C, L)
     seq_idx: TileTensor[
-        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin
+        seq_idx_dtype, seq_idx_LT, MutUntrackedOrigin, Engine=seq_idx_engine
     ],  # Shape (B, L)
     x_batch_stride: UInt32,
     x_c_stride: UInt32,

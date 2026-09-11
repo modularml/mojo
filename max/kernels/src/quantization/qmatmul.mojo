@@ -22,7 +22,7 @@ from max.algorithm import sync_parallelize
 from max.gpu.host import DeviceContext
 from layout import (
     TileTensor,
-    DefaultEngine,
+    TensorEngine,
     TensorLayout,
     RowMajorLayout,
     ComptimeInt,
@@ -58,19 +58,22 @@ comptime K_BATCH_SIZE = 512
 
 
 def matmul_qint4_pack_b[
-    group_size: Int
+    Engine: TensorEngine,
+    //,
+    group_size: Int,
 ](
     b: TileTensor[
-        mut=False, .uint8, address_space=.GENERIC, Engine=DefaultEngine[], ...
+        mut=False, .uint8, address_space=.GENERIC, Engine=Engine, ...
     ],
     b_rot: TileTensor[
-        mut=True, .uint8, address_space=.GENERIC, Engine=DefaultEngine[], ...
+        mut=True, .uint8, address_space=.GENERIC, Engine=Engine, ...
     ],
 ) raises:
     """Repacks block-wise quantized int4 weights into the tiled layout
     expected by the `matmul_qint4` kernels.
 
     Parameters:
+        Engine: Engine shared by both tile operands (inferred).
         group_size: Number of elements per quantization group.
 
     Args:
@@ -94,8 +97,8 @@ def matmul_qint4_pack_b[
 
     var k_groups = ceildiv(K, group_size)
 
-    var src_ptr = b._storage
-    var dst_ptr = b_rot._storage
+    var src_ptr = b.ptr
+    var dst_ptr = b_rot.ptr
 
     for _ in range(0, N, n_groups):
         for nn in range(n_groups):

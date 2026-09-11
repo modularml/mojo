@@ -187,6 +187,7 @@ def run_ssd_combined[
         z_h.LayoutType,
         delta_bias_h.LayoutType,
         gamma_h.LayoutType,
+        output_h.Engine,
     ](
         batch,
         dim,

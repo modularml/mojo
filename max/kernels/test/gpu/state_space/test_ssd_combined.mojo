@@ -281,6 +281,7 @@ def run_ssd_combined_gpu[
         z_cpu_lt.LayoutType,
         delta_bias_cpu_lt.LayoutType,
         gamma_cpu_lt.LayoutType,
+        output_cpu_lt.Engine,
     ](
         batch,
         dim,
