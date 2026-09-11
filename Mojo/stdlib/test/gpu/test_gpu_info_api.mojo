@@ -48,7 +48,7 @@ def test_api_identifies_the_vendor() raises:
     the independent arch-string classifier.
     """
     comptime for i in range(len(_all_targets)):
-        comptime arch = rebind[StaticString](_all_targets[i])
+        comptime arch: StaticString = _all_targets[i]
 
         # "cuda" is the generic NVIDIA target: it resolves through runtime GPU
         # detection, so what it names depends on the build's accelerator flag.

@@ -29,6 +29,8 @@ from std.sys.info import (
     _TargetType,
 )
 
+from std._plugin._overlay import ADDITIONAL_TARGETS
+
 
 @always_inline
 def get_gpu_target[
@@ -55,6 +57,116 @@ def _get_gpu_target[
         target_arch != ""
     ), "target_arch must be a valid GPU architecture."
     return GPUInfo.from_name[target_arch]()._mlir_target()
+
+
+# ===----------------------------------------------------------------------=== #
+# Additional Vendor Target Extensions
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: Combine this with GPUInfo?
+@fieldwise_init
+struct VendorTargetInfo:
+    var gpu_info: GPUInfo
+    var product_name: String
+
+
+trait VendorTargetCollection:
+    comptime vendor_name: String
+
+    comptime EXTRA_TARGETS: List[VendorTargetInfo]
+
+    @staticmethod
+    def normalize_target_arch(target_arch0: StaticString) -> String:
+        ...
+
+    @staticmethod
+    def _get_mlir_target_from_name(name: StaticString) -> _TargetType:
+        """Returns the MLIR target for a registered target name.
+
+        `name` must match the `gpu_info.name` of an entry in
+        `Self.EXTRA_TARGETS`. Callers must verify membership with
+        `_provides_mlir_target_for_name()` before calling.
+
+        Args:
+            name: The target name to resolve.
+
+        Returns:
+            The MLIR target corresponding to `name`.
+        """
+        ...
+
+
+struct EmptyVendorTargetCollection(VendorTargetCollection):
+    comptime vendor_name: String = "<empty>"
+
+    comptime EXTRA_TARGETS = List[VendorTargetInfo]()
+
+    @staticmethod
+    def normalize_target_arch(target_arch0: StaticString) -> String:
+        return target_arch0
+
+    @staticmethod
+    def _get_mlir_target_from_name(name: StaticString) -> _TargetType:
+        __mlir_op.`llvm.intr.trap`()
+        while True:
+            pass
+
+
+def _provides_mlir_target_for_name[
+    C: VendorTargetCollection
+](name: StaticString) -> Bool:
+    comptime for idx in range(len(C.EXTRA_TARGETS)):
+        comptime entry = C.EXTRA_TARGETS[idx]
+        if name == entry.gpu_info.name:
+            return True
+    return False
+
+
+def _lookup_info_from_target_arch[
+    C: VendorTargetCollection, normalized_target_arch: StaticString
+]() -> Optional[GPUInfo]:
+    comptime for idx in range(len(C.EXTRA_TARGETS)):
+        comptime entry = C.EXTRA_TARGETS[idx]
+        comptime if entry.gpu_info.arch_name == normalized_target_arch:
+            return materialize[entry.gpu_info]()
+
+    return None
+
+
+def _additional_normalized_targets[
+    C: VendorTargetCollection
+]() -> List[StaticString]:
+    var list = List[StaticString]()
+
+    comptime for idx in range(len(C.EXTRA_TARGETS)):
+        comptime entry = C.EXTRA_TARGETS[idx]
+
+        list.append(comptime (entry.gpu_info.arch_name))
+
+    return list^
+
+
+def _unsupported_arch_error_additions[C: VendorTargetCollection]() -> String:
+    var string = String(t"{C.vendor_name}: ")
+
+    comptime for idx in range(len(C.EXTRA_TARGETS)):
+        comptime if idx != 0:
+            string.write(", ")
+
+        comptime entry = C.EXTRA_TARGETS[idx]
+
+        comptime arch_name = entry.gpu_info.arch_name
+        comptime product_name = entry.product_name
+
+        string.write(t"{arch_name} ({product_name})")
+
+    return string^
+
+
+# ===----------------------------------------------------------------------=== #
+# Builtin Target Info
+# ===----------------------------------------------------------------------=== #
 
 
 comptime _KB = 1024
@@ -1873,6 +1985,11 @@ struct GPUInfo(Copyable, Equatable, Movable, RegisterPassable, Writable):
 
         if self.name == "":
             return _get_empty_target()
+
+        if _provides_mlir_target_for_name[ADDITIONAL_TARGETS](self.name):
+            return ADDITIONAL_TARGETS._get_mlir_target_from_name(self.name)
+
+        # TODO: Don't return a default, instead issue an error.
         return _get_a100_target()
 
     @staticmethod
@@ -2051,7 +2168,9 @@ def _build_unsupported_arch_error[target_arch: StaticString]() -> String:
         (
             "\n  See:"
             " https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf"
+            "\n\n"
         ),
+        comptime (_unsupported_arch_error_additions[ADDITIONAL_TARGETS]()),
     )
 
 
@@ -2066,55 +2185,59 @@ def _build_unsupported_arch_error[target_arch: StaticString]() -> String:
 #
 # SYNC: This list must stay in sync with the TargetTraits accelerator tables
 #       in Mojo/lib/Target/. Run the following test to verify:
-#       bazel test //Mojo/test/mojo-tool:build/verify_supported_accelerators_sync.mojo.test
-comptime _all_targets = (
-    StaticString("sm_52"),
-    StaticString("sm_60"),
-    StaticString("sm_61"),
-    StaticString("sm_75"),
-    StaticString("sm_80"),
-    StaticString("sm_86"),
-    StaticString("sm_87"),
-    StaticString("sm_89"),
-    StaticString("sm_90"),
-    StaticString("sm_90a"),
-    StaticString("sm_100"),
-    StaticString("sm_100a"),
-    StaticString("sm_103"),
-    StaticString("sm_103a"),
-    StaticString("sm_110"),
-    StaticString("sm_110a"),
-    StaticString("sm_120"),
-    StaticString("sm_120a"),
-    StaticString("sm_121"),
-    StaticString("sm_121a"),
-    StaticString("gfx90a"),
-    StaticString("gfx942"),
-    StaticString("mi300a"),
-    StaticString("gfx950"),
-    StaticString("gfx1030"),
-    StaticString("gfx1033"),
-    StaticString("gfx1100"),
-    StaticString("gfx1101"),
-    StaticString("gfx1102"),
-    StaticString("gfx1103"),
-    StaticString("gfx1150"),
-    StaticString("gfx1151"),
-    StaticString("gfx1152"),
-    StaticString("gfx1200"),
-    StaticString("gfx1201"),
-    StaticString("apple-m1"),
-    StaticString("apple-m1-metal4"),
-    StaticString("apple-m2"),
-    StaticString("apple-m2-metal4"),
-    StaticString("apple-m3"),
-    StaticString("apple-m3-metal4"),
-    StaticString("apple-m4"),
-    StaticString("apple-m4-metal4"),
-    StaticString("apple-m5"),
-    StaticString("apple-m5-metal4"),
-    StaticString("cuda"),
-)
+#       bazel test //Mojo/test/mojo-tool:build/internal/verify_supported_accelerators_sync.mojo.test
+comptime _all_targets: List[
+    StaticString
+] = _builtin_targets + _additional_normalized_targets[ADDITIONAL_TARGETS]()
+
+comptime _builtin_targets: List[StaticString] = [
+    "sm_52",
+    "sm_60",
+    "sm_61",
+    "sm_75",
+    "sm_80",
+    "sm_86",
+    "sm_87",
+    "sm_89",
+    "sm_90",
+    "sm_90a",
+    "sm_100",
+    "sm_100a",
+    "sm_103",
+    "sm_103a",
+    "sm_110",
+    "sm_110a",
+    "sm_120",
+    "sm_120a",
+    "sm_121",
+    "sm_121a",
+    "gfx90a",
+    "gfx942",
+    "mi300a",
+    "gfx950",
+    "gfx1030",
+    "gfx1033",
+    "gfx1100",
+    "gfx1101",
+    "gfx1102",
+    "gfx1103",
+    "gfx1150",
+    "gfx1151",
+    "gfx1152",
+    "gfx1200",
+    "gfx1201",
+    "apple-m1",
+    "apple-m1-metal4",
+    "apple-m2",
+    "apple-m2-metal4",
+    "apple-m3",
+    "apple-m3-metal4",
+    "apple-m4",
+    "apple-m4-metal4",
+    "apple-m5",
+    "apple-m5-metal4",
+    "cuda",
+]
 
 
 @always_inline
@@ -2137,7 +2260,7 @@ def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
     # Every rule below must leave each `_all_targets` entry unchanged: these are
     # substring replacements, so a pattern that is a prefix of an already
     # canonical name corrupts it.
-    comptime target_arch = (
+    comptime target_arch1 = (
         target_arch0
         # NVIDIA normalization
         .replace("nvidia:sm_", "sm_")
@@ -2145,8 +2268,9 @@ def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
         .replace("nvidia:", "sm_")
         .replace("sm", "sm_")
         .replace("sm__", "sm_")
-        # AMD normalization. Both "amdgpu:" (LLVM/ROCm target prefix) and "amd:"
-        # (vendor name) are accepted, mirroring the "nvidia:" prefix above.
+        # AMD normalization. Both "amdgpu:" (LLVM/ROCm target prefix) and
+        # "amd:" (vendor name) are accepted, mirroring the "nvidia:" prefix
+        # above.
         .replace("mi250x", "gfx90a")
         .replace("mi300x", "gfx942")
         .replace("mi355x", "gfx950")
@@ -2154,6 +2278,9 @@ def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
         .replace("amd:", "")
         # Apple normalization, general "metal:" → "apple-m" replacement.
         .replace("metal:", "apple-m")
+    )
+    comptime target_arch = ADDITIONAL_TARGETS.normalize_target_arch(
+        target_arch1
     )
 
     comptime assert (
@@ -2253,7 +2380,13 @@ def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
     elif _accelerator_arch() == "":
         return materialize[NoGPU]()
     else:
-        return _get_info_from_target[_accelerator_arch()]()
+        comptime vendor_info = _lookup_info_from_target_arch[
+            ADDITIONAL_TARGETS, target_arch
+        ]()
+        comptime if vendor_info:
+            return materialize[vendor_info.value()]()
+        else:
+            return _get_info_from_target[_accelerator_arch()]()
 
 
 # ===-----------------------------------------------------------------------===#
