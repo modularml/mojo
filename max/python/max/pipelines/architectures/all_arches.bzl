@@ -55,6 +55,7 @@ ALL_ARCHITECTURES = [
     "//max/python/max/pipelines/architectures/mistral",
     "//max/python/max/pipelines/architectures/mistral3",
     "//max/python/max/pipelines/architectures/mistral3_modulev3",
+    "//max/python/max/pipelines/architectures/modernbert",
     "//max/python/max/pipelines/architectures/mpnet",
     "//max/python/max/pipelines/architectures/mpnet_modulev3",
     "//max/python/max/pipelines/architectures/olmo",
