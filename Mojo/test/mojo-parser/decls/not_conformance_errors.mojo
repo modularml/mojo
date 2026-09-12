@@ -137,6 +137,52 @@ struct NotAValue(
 
 
 # ===========================================================================
+# Malformed `else "<reason>"` on a `not` entry
+# ===========================================================================
+# The reason is parsed by the same code as a `where ... else` message, so it
+# carries the same restriction to string literals.
+
+
+struct NotElseNonLiteral(
+    # expected-error @below {{the message in a 'not' conformance must be a string literal}}
+    not Marker else 42,
+):
+    var x: Int
+
+
+struct NotElseMissingMessage(
+    # expected-error @below {{expected a string literal message after 'else'}}
+    not Marker else,
+):
+    var x: Int
+
+
+# A reason needs something to explain. Without a `where` clause or a `not`,
+# the entry is an unconditional conformance that cannot fail.
+struct ElseWithoutCondition(
+    # expected-error @below {{a conformance message requires a 'where' clause or a 'not' conformance}}
+    Marker else "Marker is required",
+):
+    var x: Int
+
+
+# ===========================================================================
+# A reason on `not Deinitable` competes with `@explicit_destroy`
+# ===========================================================================
+# Both name the message for abandoning the linear type the opt-out creates,
+# so writing both is ambiguous rather than redundant.
+
+
+# expected-error @below {{@explicit_destroy and the 'Deinitable' opt-out both give a message; keep only one}}
+@explicit_destroy("use consume()")
+struct DoubleLinearMessage(
+    # expected-note @below {{opt-out message written here}}
+    not Deinitable else "use release()",
+):
+    var x: Int
+
+
+# ===========================================================================
 # `not` is a conformance condition, so it is struct-only
 # ===========================================================================
 
@@ -152,4 +198,11 @@ struct Extended:
 
 # expected-error @below {{'not' conformances are only supported on structs}}
 __extension Extended(not Marker):
+    pass
+
+
+# A reason is a conformance condition too, so it is rejected before the entry
+# gets far enough to be a `not`.
+# expected-error @below {{conformance messages are only supported on structs}}
+trait MessageOnRefinement(Marker else "Marker is required"):
     pass

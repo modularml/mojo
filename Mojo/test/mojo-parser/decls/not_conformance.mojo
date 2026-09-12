@@ -107,6 +107,53 @@ struct NotDerivedKeepsAncestor(not Refines, Base):
 
 
 ##===----------------------------------------------------------------------===##
+# `else "<reason>"` records why the trait is opted out
+##===----------------------------------------------------------------------===##
+# The reason lands on the synthesized `Trait where False` constraint, and both
+# spellings again print the same canonical trait.
+# CHECK-LABEL: lit.struct.decl @NotSpellingWithReason
+# CHECK-SAME: (!AnyType_Deinitable)
+struct NotSpellingWithReason(not Movable else "a Handle is pinned to its port"):
+    var x: Int
+
+
+# CHECK-LABEL: lit.struct.decl @WhereFalseSpellingWithReason
+# CHECK-SAME: (!AnyType_Deinitable)
+struct WhereFalseSpellingWithReason(
+    Movable where False else "a Handle is pinned to its port"
+):
+    var x: Int
+
+
+# A parenthesized reason wraps across lines, as a `where ... else` message does.
+# CHECK-LABEL: lit.struct.decl @NotWrappedReason
+# CHECK-SAME: (!AnyType_Deinitable)
+struct NotWrappedReason(
+    not Movable else (
+        "a Handle is pinned to the port it was opened on "
+        "and cannot be moved between them"
+    )
+):
+    var x: Int
+
+
+# The reason applies to every symbol of a composition, as the opt-out does.
+# CHECK-LABEL: lit.struct.decl @NotCompositionWithReason
+# CHECK-SAME: (!AnyType_Deinitable_Movable)
+struct NotCompositionWithReason(not (Base & Other) else "not a plain payload"):
+    var x: Int
+
+
+# Opting out of `Deinitable` makes the struct linear, and the reason becomes
+# the message for abandoning one -- the replacement for `@explicit_destroy`.
+# See `explicit_destroy_errors.mojo` for the diagnostic it reaches.
+# CHECK-LABEL: lit.struct.decl @NotDeinitableWithReason
+# CHECK-SAME: call `close()` instead
+struct NotDeinitableWithReason(not Deinitable else "call `close()` instead"):
+    var x: Int
+
+
+##===----------------------------------------------------------------------===##
 # `not` on a trailing-`where` struct
 ##===----------------------------------------------------------------------===##
 # The opt-out is independent of the struct's own clause; neither erases the

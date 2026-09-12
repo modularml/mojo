@@ -81,29 +81,35 @@ enum class CaptureConvention : uint8_t {
 /// cannot have a destructor!
 struct ParsedConstraint {
   SMLoc loc;
-  ExprNode *propExpr;
+  /// The condition. Null when the condition is implied rather than written,
+  /// as it is for a `not Trait` conformance entry: the clause exists only to
+  /// carry its `message`.
+  ExprNode *propExpr = nullptr;
   /// Optional user-provided failure message, from either the
   /// `where (condition, "message")` or the `where condition else "message"`
   /// form. Null if no message was written.
   StringAttr message;
 
-  ParseResult parse(ParserBase &p,
-                    std::optional<size_t> stmtIndent = std::nullopt);
+  /// Parse a `where` clause's condition and its optional message.
+  ParseResult parse(ParserBase &p, std::optional<size_t> stmtIndent);
 
   /// Split the already-parsed `where` expression into `propExpr` (the
-  /// condition) and `message`, then consume an optional `else "message"`
-  /// suffix. `parsed` carries a message when it has the shape
-  /// `(condition, "message")` -- a parenthesized two-element tuple whose
+  /// condition) and `message`. `parsed` carries a message when it has the
+  /// shape `(condition, "message")` -- a parenthesized two-element tuple whose
   /// second element is a string literal; any other expression is the bare
   /// condition. A tuple whose second element is not a string literal is a
   /// targeted error (only string-literal messages are supported).
-  ParseResult
-  parseOptionalMessage(ParserBase &p, ExprNode *parsed,
-                       std::optional<size_t> stmtIndent = std::nullopt);
+  ///
+  /// The other spelling, `where condition else "message"`, is left to
+  /// `parseElseMessage`: the `else` suffix is shared with the `not Trait`
+  /// conformance opt-out, so the two are parsed separately.
+  ParseResult extractParenthesizedMessage(ParserBase &p, ExprNode *parsed);
 
-  /// Consume an optional `else "message"` suffix following the condition.
-  /// Writing a message in both forms on one clause is an error.
-  ParseResult parseElseMessage(ParserBase &p, std::optional<size_t> stmtIndent);
+  /// Consume an optional `else "message"` suffix into `message`. An already
+  /// set `message` means a parenthesized message was written too, which is an
+  /// error. `what` names the construct carrying the message, for diagnostics.
+  ParseResult parseElseMessage(ParserBase &p, std::optional<size_t> stmtIndent,
+                               StringRef what = "a 'where' clause");
 
   /// Print the constraint for debugging.
   void print(mlir::raw_indented_ostream &os) const;
@@ -195,8 +201,9 @@ public:
   /// constraint         ::= expression ["else" message]
   ///                      | "(" expression "," message ")"
   /// message            ::= string_literal+ | "(" string_literal+ ")"
-  ParseResult parseTrailingConstraintsIfPresent(
-      ParserBase &p, std::optional<size_t> stmtIndent = std::nullopt);
+  ParseResult
+  parseTrailingConstraintsIfPresent(ParserBase &p,
+                                    std::optional<size_t> stmtIndent);
 };
 
 /// This contains the result state from type checking a parameter signature.

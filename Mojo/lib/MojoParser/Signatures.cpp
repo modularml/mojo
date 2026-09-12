@@ -1302,8 +1302,8 @@ ParseResult ParsedConstraint::parse(ParserBase &p,
                                     std::optional<size_t> stmtIndent) {
   loc = p.getToken().getLoc();
 
-  // Parse the constraint expression into a local; `parseOptionalMessage`
-  // splits it into the final `propExpr` (the condition) and `message`.
+  // Parse the constraint expression into a local; the two message spellings
+  // below split it into the final `propExpr` (the condition) and `message`.
   ExprNode *parsed;
   if (p.parseExpression(parsed, stmtIndent))
     return failure();
@@ -1311,26 +1311,26 @@ ParseResult ParsedConstraint::parse(ParserBase &p,
   // A message is written either `where (condition, "message")` -- which the
   // expression parser produces as a parenthesized two-element tuple -- or
   // `where condition else "message"`, whose `else` is left for us to consume.
-  return parseOptionalMessage(p, parsed, stmtIndent);
+  if (extractParenthesizedMessage(p, parsed))
+    return failure();
+  return parseElseMessage(p, stmtIndent);
 }
 
-ParseResult
-ParsedConstraint::parseOptionalMessage(ParserBase &p, ExprNode *parsed,
-                                       std::optional<size_t> stmtIndent) {
+ParseResult ParsedConstraint::extractParenthesizedMessage(ParserBase &p,
+                                                          ExprNode *parsed) {
   // A message clause has the shape `where (condition, "message")`. The
   // expression parser produces a ParenNode wrapping a two-element TupleNode
   // for this. Anything else (a bare condition, or a parenthesized condition
-  // like `where (a and b)`) is the condition itself, possibly followed by an
-  // `else` message.
+  // like `where (a and b)`) is the condition itself.
   auto *paren = dyn_cast<ParenNode>(parsed);
   if (!paren) {
     propExpr = parsed;
-    return parseElseMessage(p, stmtIndent);
+    return success();
   }
   auto *tuple = dyn_cast<TupleNode>(paren->subExpr);
   if (!tuple) {
     propExpr = parsed;
-    return parseElseMessage(p, stmtIndent);
+    return success();
   }
 
   // A tuple with the wrong arity can only be a mistyped message clause: a
@@ -1356,14 +1356,12 @@ ParsedConstraint::parseOptionalMessage(ParserBase &p, ExprNode *parsed,
   // `getValue()` already handles adjacent string-literal concatenation.
   message = StringAttr::get(p.getContext(), strLit->getValue());
   propExpr = tuple->exprs[0];
-
-  // Catch a message written twice, `where (condition, "a") else "b"`.
-  return parseElseMessage(p, stmtIndent);
+  return success();
 }
 
-ParseResult
-ParsedConstraint::parseElseMessage(ParserBase &p,
-                                   std::optional<size_t> stmtIndent) {
+ParseResult ParsedConstraint::parseElseMessage(ParserBase &p,
+                                               std::optional<size_t> stmtIndent,
+                                               StringRef what) {
   // Watch out for an `else` dedented onto its own line.
   SMLoc elseLoc = p.getToken().getLoc();
   if (!p.isTokenInCurrentStatement(stmtIndent) || !p.consumeIf(Token::kw_else))
@@ -1396,8 +1394,7 @@ ParsedConstraint::parseElseMessage(ParserBase &p,
   auto *strLit = dyn_cast_if_present<StringLiteralNode>(msgExpr);
   if (!strLit)
     return p.emitError(msgExpr ? msgExpr->getLoc() : elseLoc,
-                       "the message in a 'where' clause must be a string "
-                       "literal");
+                       "the message in " + what + " must be a string literal");
 
   message = StringAttr::get(p.getContext(), strLit->getValue());
   return success();

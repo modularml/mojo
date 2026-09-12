@@ -99,3 +99,55 @@ def test_not_entry_with_magic_trailing_comma_explodes():
         "    pass\n"
     )
     assert_mojo_format(source, expected)
+
+
+# ============================ #
+# `else "<reason>"` on the opt-out
+# ============================ #
+
+
+def test_not_entry_with_reason():
+    source = 'struct Opaque(not Movable else "a Handle is pinned"):\n    pass\n'
+    assert_mojo_format(source, source)
+
+
+def test_not_composition_with_reason():
+    source = (
+        'struct Opaque(not (Readable & Writable) else "opaque bytes"):\n'
+        "    pass\n"
+    )
+    assert_mojo_format(source, source)
+
+
+def test_reason_does_not_block_sorting():
+    """The sort key skips past both the `not` and the trailing reason."""
+    source = 'struct Pair(not Movable else "pinned", Boolable): pass'
+    expected = 'struct Pair(Boolable, not Movable else "pinned"):\n    pass\n'
+    assert_mojo_format(source, expected)
+
+
+def test_long_list_with_reason_splits():
+    """A reason lengthens the entry, so the list wraps and still sorts."""
+    source = (
+        'struct VeryLongStructNameHere(not Movable else "a Handle is pinned to'
+        ' its port", Writable, Boolable): pass'
+    )
+    expected = (
+        "struct VeryLongStructNameHere(\n"
+        '    Boolable, not Movable else "a Handle is pinned to its port",'
+        " Writable\n"
+        "):\n"
+        "    pass\n"
+    )
+    assert_mojo_format(source, expected)
+
+
+def test_reason_alongside_a_where_message():
+    source = (
+        "struct Wrapper[T: Movable](\n"
+        '    Copyable where conforms_to(T, Copyable) else "T must copy",\n'
+        '    not Movable else "pinned",\n'
+        "):\n"
+        "    pass\n"
+    )
+    assert_mojo_format(source, source)

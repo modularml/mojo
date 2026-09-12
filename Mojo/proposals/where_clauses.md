@@ -199,6 +199,17 @@ The reverse is not an error. `False` implies anything, so opting out of a
 *derived* trait while keeping its ancestor is consistent — `not Copyable,
 Movable` is a struct that moves but does not copy.
 
+An opt-out takes a reason with the same `else` spelling a `where` clause uses,
+and under the same string-literal restriction:
+
+```mojo
+struct Handle(not Movable else "a Handle is pinned to the port it opened"):
+    ...
+```
+
+The reason is recorded as the message on the `Trait where False` constraint the
+opt-out lowers to.
+
 ### Constraints in the type system
 
 A parameterized entity (struct, function, or comptime expression) that has not

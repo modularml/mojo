@@ -34,6 +34,14 @@ This version is still a work in progress.
       ...
   ```
 
+  An opt-out can record why, with the same `else "<message>"` spelling a
+  `where` clause uses:
+
+  ```mojo
+  struct Handle(not Movable else "a Handle is pinned to the port it opened"):
+      ...
+  ```
+
 ## Language changes
 
 ## Library stabilizations

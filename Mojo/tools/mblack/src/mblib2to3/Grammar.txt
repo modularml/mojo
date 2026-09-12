@@ -276,7 +276,7 @@ arglist: argument (',' argument)* [',']
 # Illegal combinations and orderings are blocked in ast.c:
 # multiple (test comp_for) arguments are blocked; keyword unpackings
 # that precede iterable unpackings are blocked; etc.
-argument: ( test [comp_for] (where_clause)* |
+argument: ( test [comp_for] (where_clause)* ['else' test] |
             test ':=' test [comp_for] |
             test 'as' test |
             test '=' asexpr_test |

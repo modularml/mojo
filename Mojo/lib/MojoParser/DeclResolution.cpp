@@ -3275,7 +3275,8 @@ static LogicalResult buildTraitConstraintsMap(
 /// without resolving the trait types or emitting constraints.
 ///
 /// conformance_list ::= conformance ("," conformance)* [","]
-/// conformance      ::= ["not"] type_expression ["where" constraint]
+/// conformance      ::= type_expression ["where" constraint]
+///                    | "not" type_expression ["else" message]
 ///
 /// Set `allowConformanceConstraints` to `false` for declarations that don't
 /// support conditional conformance (traits and extensions). Both `where` and
@@ -3301,6 +3302,8 @@ static ParseResult parseOptionalConformanceListSyntax(
                            "'not' must not be repeated in a conformance "
                            "entry");
       conformance.isNegated = true;
+      conformance.constraint.emplace();
+      conformance.constraint->loc = conformance.loc;
     }
 
     if (p.parseExpression(conformance.typeExpr, stmtIndent))
@@ -3324,12 +3327,26 @@ static ParseResult parseOptionalConformanceListSyntax(
       ExprNode *parsed;
       if (p.parseExpression(parsed, stmtIndent))
         return failure();
-      // A message is written `where (condition, "message")` or
-      // `where condition else "message"`. Neither collides with the comma
-      // that separates the next conformance entry, So  no lookahead is needed.
-      if (constraint.parseOptionalMessage(p, parsed, stmtIndent))
+      // Only the `where (condition, "message")` version is handled here.
+      // The `else` version is shared with the `not` case below.
+      if (constraint.extractParenthesizedMessage(p, parsed))
         return failure();
       conformance.constraint = constraint;
+    }
+
+    // Read any "else" message that follows the conformance.
+    SMLoc elseLoc = p.getToken().getLoc();
+    if (p.getToken().is(Token::kw_else)) {
+      if (!allowConformanceConstraints)
+        return p.emitError(
+            elseLoc, "conformance messages are only supported on structs");
+      if (!conformance.constraint)
+        return p.emitError(elseLoc, "a conformance message requires a 'where' "
+                                    "clause or a 'not' conformance");
+      StringRef what =
+          conformance.isNegated ? "a 'not' conformance" : "a 'where' clause";
+      if (conformance.constraint->parseElseMessage(p, stmtIndent, what))
+        return failure();
     }
 
     parsedConformances.push_back(conformance);
@@ -3424,11 +3441,12 @@ static ParseResult resolveConformanceList(
                   /*message=*/StringAttr())
             : ConstraintAttr();
     if (traitConstraints && conformance.isNegated) {
-      // For now, record a `not Trait` as `Trait where False`.
+      // For now, record a `not Trait` as `Trait where False`, carrying any
+      // `else` reason as the constraint's message.
       constraint = ConstraintAttr::get(
           SIMDAttr::getScalarBool(shared.getContext(), false),
           shared.diags.translateLocation(conformance.loc),
-          /*message=*/StringAttr());
+          conformance.constraint->message);
     } else if (traitConstraints && conformance.constraint) {
       IREmitter constraintEmitter(declScope, EC_Requires);
       RValue prop = constraintEmitter.emitExprScalarBool(
@@ -3904,9 +3922,34 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
       }
     }
   }
-  if (linearTypeErrorMsg && !std::get<0>(*linearTypeErrorMsg).empty()) {
+  bool hasDecoratorMessage =
+      linearTypeErrorMsg && !std::get<0>(*linearTypeErrorMsg).empty();
+  if (hasDecoratorMessage) {
     structOp.setLinearTypeErrorMsg(
         std::make_optional(llvm::StringRef(std::get<0>(*linearTypeErrorMsg))));
+  }
+
+  // An always-false `Deinitable` conformance makes the struct linear, so its
+  // reason, if any, is recorded here.
+  if (implicitDelDecl) {
+    auto it = traitConstraints.find(
+        TraitSymbolAttr::get(implicitDelDecl->getSymbolRef()));
+    StringAttr reason =
+        it != traitConstraints.end() && isTriviallyFalseConstraint(it->second)
+            ? it->second.getMessage()
+            : StringAttr();
+    if (reason) {
+      if (hasDecoratorMessage) {
+        MojoInflightDiag diag =
+            shared.emitError(std::get<1>(*linearTypeErrorMsg));
+        diag << "@explicit_destroy and the 'Deinitable' opt-out both give a "
+                "message; keep only one";
+        diag.attachNote(it->second.getLoc()) << "opt-out message written here";
+        decl.setErroneous();
+        return failure();
+      }
+      structOp.setLinearTypeErrorMsg(reason.getValue());
+    }
   }
 
   // Build canonical trait with constraints for conditional conformance.
