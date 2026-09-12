@@ -237,10 +237,12 @@ struct ResizeNearest:
 
     @staticmethod
     def execute[
-        coordinate_transform_mode: Int,
-        round_mode: Int,
         rank: Int,
         dtype: DType,
+        target: StaticString,
+        //,
+        coordinate_transform_mode: Int,
+        round_mode: Int,
     ](
         output: OutputTensor[dtype=dtype, rank=rank, ...],
         input: InputTensor[dtype=dtype, rank=rank, ...],
@@ -250,6 +252,7 @@ struct ResizeNearest:
         resize_nearest_neighbor[
             CoordinateTransformationMode(coordinate_transform_mode),
             RoundMode(round_mode),
+            target=target,
         ](
             input.to_tile_tensor[.int64](),
             output.to_tile_tensor[.int64](),

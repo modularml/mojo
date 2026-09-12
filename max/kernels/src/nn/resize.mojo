@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements tensor resize (upsample/downsample) with nearest, bilinear, and other interpolation modes."""
 
-from std.math import ceil, floor
+from std.math import ceil, clamp, floor
 
 
 from max.algorithm.functional import elementwise
@@ -161,9 +161,11 @@ struct Interpolator[mode: InterpolationMode](
 
 
 def resize_nearest_neighbor[
+    dtype: DType,
+    //,
     coordinate_transformation_mode: CoordinateTransformationMode,
     round_mode: RoundMode,
-    dtype: DType,
+    target: StaticString = "cpu",
 ](
     input: TileTensor[mut=False, dtype, ...],
     output: TileTensor[mut=True, dtype, ...],
@@ -172,9 +174,10 @@ def resize_nearest_neighbor[
     """Resizes input to output shape using nearest-neighbor interpolation.
 
     Parameters:
+        dtype: Type of input and output.
         coordinate_transformation_mode: How to map a coordinate in output to a coordinate in input.
         round_mode: How to round fractional input coordinates to integer indices.
-        dtype: Type of input and output.
+        target: Device target used to execute the elementwise kernel.
 
     Args:
         input: The input to be resized.
@@ -210,7 +213,7 @@ def resize_nearest_neighbor[
         var in_coords = IndexList[input.rank](0)
 
         comptime for i in range(input.rank):
-            in_coords[i] = min(
+            in_coords[i] = clamp(
                 Int(
                     round(
                         coord_transform[coordinate_transformation_mode](
@@ -221,6 +224,7 @@ def resize_nearest_neighbor[
                         )
                     )
                 ),
+                0,
                 Int(input.dim(i)) - 1,
             )
 
@@ -230,7 +234,9 @@ def resize_nearest_neighbor[
         output.raw_store(out_idx, input.ptr[in_idx])
 
     # TODO (#21439): can use unsafe_memcpy when scale on inner dimension is 1
-    elementwise[1](nn_interpolate, output.layout.shape_coord(), ctx)
+    elementwise[1, target=target](
+        nn_interpolate, output.layout.shape_coord(), ctx
+    )
 
 
 @inline(.always)
