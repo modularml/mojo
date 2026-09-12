@@ -21,7 +21,7 @@ from std.sys import simd_width_of, size_of
 
 from max.gpu import lane_id, WARP_SIZE
 from max.gpu.intrinsics import cvt_pk_fp8_f32_raw
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.coord import Coord, ComptimeInt, Idx
 from layout.swizzle import Swizzle
 from layout.tile_layout import (
@@ -40,7 +40,7 @@ from .utils import get_warp_coords
 import std.itertools
 
 
-@always_inline
+@inline(.always)
 def _cast_f32_to_fp8_raw[
     src_dtype: DType,
     size: SIMDLength,
@@ -159,10 +159,16 @@ struct QRegisterBuffer[
     comptime _q_thread_rows = Self.thread_rows
     comptime _q_thread_cols = Self.thread_cols
 
-    @always_inline
+    @inline(.always)
     def __init__[
-        q_tile_layout: TensorLayout
-    ](out self, q_tile: TileTensor[Self.dtype, q_tile_layout, ImmutAnyOrigin],):
+        q_tile_layout: TensorLayout,
+        q_tile_engine: TensorEngine,
+    ](
+        out self,
+        q_tile: TileTensor[
+            Self.dtype, q_tile_layout, ImmutAnyOrigin, Engine=q_tile_engine
+        ],
+    ):
         """Load Q tile from DRAM into registers via buffer_load intrinsics.
 
         Each warp loads its [WM, depth] sub-tile using col-major thread
@@ -172,6 +178,7 @@ struct QRegisterBuffer[
         Parameters:
             q_tile_layout: Compile-time `TensorLayout` of the input `q_tile`
                 DRAM tile.
+            q_tile_engine: `TensorEngine` of the input `q_tile` DRAM tile.
 
         Args:
             q_tile: The full Q tile as a DRAM TileTensor.
@@ -238,7 +245,7 @@ struct QRegisterBuffer[
                 .fill(0)
             )
 
-    @always_inline
+    @inline(.always)
     def mma_tile[
         tile_idx: Int, k_idx: Int
     ](self) -> TileTensor[
@@ -267,7 +274,7 @@ struct QRegisterBuffer[
             ).tile[Self.num_mmas, Self.input_frag_size](k_idx, 0)
         )
 
-    @always_inline
+    @inline(.always)
     def scale[accum_type: DType](self, scale_factor: Scalar[accum_type]):
         """Scale all Q register elements in-place.
 
@@ -294,7 +301,7 @@ struct QRegisterBuffer[
                     q_f32 *= scale_factor
                     vec[row, 0] = q_f32.cast[Self.dtype]()
 
-    @always_inline
+    @inline(.always)
     def zero(self):
         _ = self.reg_tile.fill(0)
 
@@ -338,13 +345,13 @@ struct OutputRegisterBuffer[
     ]
     var reg_tile: Self.RegType
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.reg_tile = stack_allocation[Self.dtype, address_space=.LOCAL](
             Self.reg_layout
         )
 
-    @always_inline
+    @inline(.always)
     def apply_softmax_denominator[
         layout_type: TensorLayout, //
     ](self, rowsum: TileTensor[Self.dtype, layout_type, ...]):
@@ -356,7 +363,7 @@ struct OutputRegisterBuffer[
             comptime for n_mma in range(Self.num_n_mmas):
                 reg_vec[n_mma * Self.num_m_mmas + m_mma, 0] *= rowsum_inv
 
-    @always_inline
+    @inline(.always)
     def zero(self):
         _ = self.reg_tile.fill(0)
 
@@ -500,19 +507,19 @@ struct PRegisterBuffer[
         address_space=.SHARED,
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, smem_tile: Self.SmemTileType):
         self.reg_tile = stack_allocation[
             Self.accum_type_, address_space=.LOCAL
         ](Self.reg_layout)
         self.smem_tile = smem_tile
 
-    @always_inline
+    @inline(.always)
     def _block_smem(self, block_idx: Int) -> Self.BlockSmemType:
         """TileTensor view of the `block_idx`-th blocked SMEM slice."""
         return self.smem_tile.tile[Self.BM, Self.BK](block_idx, 0)
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile_shared[
         tile_idx: Int, k_idx: Int
     ](self) -> Self.MmaTileType:
@@ -631,7 +638,7 @@ struct PRegisterBuffer[
 
         return result
 
-    @always_inline
+    @inline(.always)
     def stage_tile[stage: Int = 0](self) -> Self.StageTileType:
         """Return the TileTensor sub-tile for the given pipeline stage.
 
@@ -658,7 +665,7 @@ struct PRegisterBuffer[
         address_space=.LOCAL,
     ]
 
-    @always_inline
+    @inline(.always)
     def mma_tile[
         tile_idx: Int, k_idx: Int, stage: Int = 0
     ](self) -> Self.MmaTileType:
@@ -800,11 +807,11 @@ struct PRegisterBuffer[
 
         return result
 
-    @always_inline
+    @inline(.always)
     def zero[stage: Int](self):
         _ = self.stage_tile[stage]().fill(0)
 
-    @always_inline
+    @inline(.always)
     def _store_mma_tile[
         reg_idx: Int
     ](
@@ -888,7 +895,7 @@ struct PRegisterBuffer[
         else:
             dst_frag.raw_store[width=frag_w](0, reg_val)
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared(self):
         # When P is not SMEM-backed there is no P SMEM region and `mma_tile`
         # reads P from registers. `mla_decode` and `mha_decode_streaming` still

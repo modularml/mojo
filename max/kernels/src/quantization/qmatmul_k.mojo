@@ -100,7 +100,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
         [ b3 b2 b1 b0 a3 a2 a1 a0 ]
     """
 
-    @always_inline
+    @inline(.always)
     def _pack_int4(mut self, var src_ptr: UnsafePointer[UInt8, ...]):
         comptime assert Self.bit_width == 4
         comptime assert (Self.block_m % (2 * Self._tuple_width)) == 0
@@ -126,7 +126,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
 
             src_ptr += Self._packed_stride
 
-    @always_inline
+    @inline(.always)
     def _unpack_int4(self, var dst_ptr: UnsafePointer[mut=True, UInt8, _]):
         comptime assert Self.bit_width == 4
         comptime assert (Self.block_m % (2 * Self._tuple_width)) == 0
@@ -154,7 +154,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
     #     [ d3 d2 b5 b4 b3 b2 b1 b0 ]
     #     [ d5 d6 c5 c4 c3 c2 c1 c0 ]
 
-    @always_inline
+    @inline(.always)
     def _pack_int6(mut self, var src_ptr: UnsafePointer[UInt8, ...]):
         comptime assert Self.bit_width == 6
         comptime assert (Self.block_m % (4 * Self._tuple_width)) == 0
@@ -186,7 +186,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
 
             src_ptr += Self._packed_stride * 4
 
-    @always_inline
+    @inline(.always)
     def _unpack_int6[
         zero_point: UInt8
     ](self, var dst_ptr: UnsafePointer[mut=True, UInt8, _]):
@@ -221,7 +221,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
 
             dst_ptr += Self._packed_stride * 4
 
-    @always_inline
+    @inline(.always)
     def pack(mut self, var src_ptr: UnsafePointer[UInt8, ...]):
         """Packs the supplied external buffer to local storage."""
         comptime assert (Self._packed_stride % Self._simd_width) == 0
@@ -233,7 +233,7 @@ struct _packed_bit_array[bit_width: Int, block_m: Int, block_n: Int]:
         else:
             comptime assert False, "unsupported bit width"
 
-    @always_inline
+    @inline(.always)
     def unpack[
         *, zero_point: UInt8 = 0
     ](self, var dst_ptr: UnsafePointer[mut=True, UInt8, _]):
@@ -296,7 +296,7 @@ def _quantize_a_Q8_K[
     for ko in range(0, K, quantized_k):
         var am_ptr = a.ptr + ko
 
-        @always_inline
+        @inline(.always)
         def process_rows[tile_m: Int](m: Int) {mut am_ptr, mut packed_ptr, imm}:
             comptime assert (
                 size_of[_block_Q8_K_packed[group_size]]() * tile_m
@@ -640,7 +640,7 @@ def matmul_Q6_K_pack_b(
         src_ptr += 1
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_stream_x86[
     tile_m: Int,
     tile_n: Int,
@@ -685,7 +685,7 @@ def _matmul_group_stream_x86[
                     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_stream_neon_dotprod[
     tile_m: Int,
     tile_n: Int,
@@ -729,7 +729,7 @@ def _matmul_group_stream_neon_dotprod[
                         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_stream[
     tile_m: Int,
     tile_n: Int,
@@ -762,7 +762,7 @@ def _matmul_group_stream[
         comptime assert False, "unsupported architecture"
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_unpacked[
     tile_m: Int,
     tile_n: Int,
@@ -790,7 +790,7 @@ def _matmul_group_unpacked[
     )
 
 
-@always_inline
+@inline(.always)
 def _apply_base_scales[
     tile_m: Int, tile_n: Int, simd_width: Int
 ](
@@ -812,7 +812,7 @@ def _apply_base_scales[
             )
 
 
-@always_inline
+@inline(.always)
 def _apply_zero_point_correction[
     group_count: Int, tile_m: Int, tile_n: Int, simd_width: Int
 ](
@@ -912,7 +912,7 @@ def _apply_zero_point_correction[
             )
 
 
-@always_inline
+@inline(.always)
 def _apply_a_scales[
     tile_m: Int, tile_n: Int, simd_width: Int
 ](
@@ -937,7 +937,7 @@ def _apply_a_scales[
                 c_float[row, col] *= a_scale
 
 
-@always_inline
+@inline(.always)
 def _accumulate_and_store[
     tile_m: Int,
     tile_n: Int,
@@ -979,7 +979,7 @@ def _accumulate_and_store[
                     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_packed_Q4_K[
     tile_m: Int,
     tile_n: Int,
@@ -1013,7 +1013,7 @@ def _matmul_group_packed_Q4_K[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_Q4_K_tile[
     tile_m: Int,
     tile_n: Int,
@@ -1172,7 +1172,7 @@ def _matmul_Q4_K_columns[
     ]()
     b_tile_ptr[].q_bits.unpack(b_q_bits)
 
-    @always_inline
+    @inline(.always)
     def process_rows[
         tile_m: Int
     ](m: Int) {
@@ -1212,7 +1212,7 @@ def _matmul_Q4_K_columns[
     tile[[4, 2, 1]](0, M, process_rows)
 
 
-@always_inline
+@inline(.always)
 def _matmul_group_packed_Q6_K[
     tile_m: Int,
     tile_n: Int,
@@ -1254,7 +1254,7 @@ def _matmul_group_packed_Q6_K[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_Q6_K_tile[
     tile_m: Int,
     tile_n: Int,
@@ -1417,7 +1417,7 @@ def _matmul_Q6_K_columns[
     ]()
     b_tile_ptr[].q_bits.unpack[zero_point=UInt8(b_zero_point)](b_q_bits)
 
-    @always_inline
+    @inline(.always)
     def process_rows[
         tile_m: Int
     ](m: Int) {var b_q_bits, mut a_ptr, mut c_ptr, imm}:
@@ -1450,7 +1450,7 @@ def _matmul_Q6_K_columns[
     tile[[4, 2, 1]](0, M, process_rows)
 
 
-@always_inline
+@inline(.always)
 def _matmul_Qb_K[
     group_size: Int,
     b_type: AnyType,
@@ -1528,7 +1528,7 @@ def _matmul_Qb_K[
             # only run epilogue for the last iter of K loop
             var is_last_k_iter = k_block == k_blocks - 1
 
-            @always_inline
+            @inline(.always)
             def process_cols[
                 tile_n: Int
             ](n_idx: Int) {

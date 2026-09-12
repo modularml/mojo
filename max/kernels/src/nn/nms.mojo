@@ -106,7 +106,7 @@ struct BoundingBox[dtype: DType](ImplicitlyCopyable):
         return (self.se[0] - self.nw[0]) * (self.se[1] - self.nw[1])
 
 
-@always_inline
+@inline(.always)
 def _get_bounding_box[
     dtype: DType
 ](
@@ -174,7 +174,7 @@ def non_max_suppression[
 
     var pred_count = 0
 
-    @always_inline
+    @inline(.always)
     def store_to_outputs(
         batch_idx: Int64, class_idx: Int64, box_idx: Int64
     ) {output, mut pred_count}:
@@ -227,7 +227,7 @@ def non_max_suppression_shape_func[
 
     var box_pred_count: Int64 = 0
 
-    @always_inline
+    @inline(.always)
     def incr_pred_count(
         batch_idx: Int64, class_idx: Int64, box_idx: Int64
     ) {mut box_pred_count}:
@@ -326,7 +326,7 @@ def non_max_suppression[
             # Initialize box indices [0, 1, 2, ..., num_boxes-1]
             iota(box_idxs)
 
-            @always_inline
+            @inline(.always)
             def _greater_than(
                 lhs: Int64, rhs: Int64
             ) {per_class_scores} -> Bool:
@@ -383,7 +383,7 @@ def non_max_suppression[
                     _greater_than,
                 )
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def sorted() -> Bool:
                 for i in range(len(box_idxs) - 1):

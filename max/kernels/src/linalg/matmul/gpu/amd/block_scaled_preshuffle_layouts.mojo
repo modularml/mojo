@@ -95,13 +95,13 @@ struct Shuffler[E: Int]:
     comptime B_STRIDE_K0: Int = Self.MFMA_K_LANES * Self.B_STRIDE_K_LANE  # 1024
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def num_planes[lane_bytes: Int]() -> Int:
         """Number of power-of-two planes a lane fragment splits into."""
         return ceildiv(lane_bytes, Self.MFMA_LANE_BYTES)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def plane_bytes[lane_bytes: Int, plane: Int]() -> Int:
         """Width in bytes of `plane`, at most `MFMA_LANE_BYTES`."""
         return min(
@@ -109,7 +109,7 @@ struct Shuffler[E: Int]:
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def b_plane_byte_off[
         N: Int, K_BYTES: Int, lane_bytes: Int, plane: Int
     ](e: Int, n: Int, k_byte: Int) -> Int:
@@ -236,7 +236,7 @@ struct Shuffler[E: Int]:
     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def scale_4d_byte_off[
         K_SCALES: Int, packed_mode: Bool = False
     ](mn: Int, k_scale: Int) -> Int:
@@ -299,7 +299,7 @@ struct Shuffler[E: Int]:
             return packed_byte_off + tile_byte_off + atom_byte_off
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def scale_4d_slot_byte_off[
         K_SCALES: Int, packed_mode: Bool = False
     ](expert_slot: Int, mn: Int, k_scale: Int, max_padded_M: Int) -> Int:
@@ -345,7 +345,7 @@ struct Shuffler[E: Int]:
     # ---- Helpers ----
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def scale_padded_mn(MN: Int) -> Int:
         """Padded MN dim used by the 4D scale layout: MN rounded up to 32.
 

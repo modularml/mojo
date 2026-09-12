@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.sys import align_of, get_defined_int, get_defined_string, simd_width_of
-from std.sys.info import _TargetType
+from std.sys.info import CompilationTarget
 
 from max.algorithm.backend.gpu.reduction import reduce_launch
 from max.benchmark import bencher_iter_custom
@@ -25,7 +25,7 @@ from std.benchmark import (
 )
 from layout import Layout, LayoutTensor, RuntimeLayout
 from max.gpu.host import DeviceContext, get_gpu_target
-from std.memory import dealloc
+from std.memory import Layout as AllocLayout, dealloc
 from internal_utils import (
     CacheBustingBuffer,
     get_defined_shape,
@@ -36,7 +36,7 @@ from std.testing import assert_equal
 from std.utils import IndexList, StaticTuple
 
 
-def align_of_simd[dtype: DType, simd_target: _TargetType]() -> Int:
+def align_of_simd[dtype: DType, simd_target: CompilationTarget]() -> Int:
     # TODO: move this utility function to a module.
     comptime pack_size = simd_width_of[dtype, target=simd_target]()
     return align_of[SIMD[dtype, pack_size]]()
@@ -66,8 +66,8 @@ def run_reduce[
     var cb_in = CacheBustingBuffer[dtype](in_size, align, ctx, cache_busting)
 
     # Allocate & initialize host data
-    var expected_vals_alloc = alloc[Scalar[dtype]](
-        {count = out_size, alignment = align}
+    var expected_vals_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[align]()](count=out_size)
     ).into_managed()
     var expected_vals = expected_vals_alloc.unsafe_ptr()
 
@@ -89,7 +89,7 @@ def run_reduce[
 
     ctx.enqueue_copy(cb_in.device_buffer(), in_host)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_wrapper[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -139,7 +139,7 @@ def run_reduce[
             reduce_dim=axis,
         ](shape, StaticTuple[_, num_reductions](init), ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

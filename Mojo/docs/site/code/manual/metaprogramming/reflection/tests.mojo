@@ -18,7 +18,7 @@
 #        "no runtime cost" and "resolves at compile time" (codegen claims),
 #        "name-based lookup requires a concrete type" (needs a
 #        compile-failure test, not a runtime one),
-#        the claim that a non-`@always_inline` caller reports its own line
+#        the claim that a non-`@inline(.always)` caller reports its own line
 #        (does not reproduce: a plain `def` also reports the call site, so
 #        the behavior is optimizer-dependent and not safe to pin),
 #        "print cleanly, without extra code" (compiling `Sensor` with a
@@ -441,7 +441,7 @@ def test_source_location_ignores_call_site() raises:
     assert_equal(first, second)
 
 
-@always_inline
+@inline(.always)
 def get_caller_line() -> Int:
     return call_location().line()
 
@@ -467,22 +467,22 @@ def test_call_location_tracks_each_call_site() raises:
     assert_equal(second, first + 1)
 
 
-@always_inline
+@inline(.always)
 def one_level_caller_line() -> Int:
     return call_location().line()
 
 
-@always_inline
+@inline(.always)
 def wrap_one_level() -> Int:
     return one_level_caller_line()
 
 
-@always_inline
+@inline(.always)
 def two_level_caller_line() -> Int:
     return call_location[inline_count=2]().line()
 
 
-@always_inline
+@inline(.always)
 def wrap_two_levels() -> Int:
     return two_level_caller_line()
 
@@ -502,7 +502,7 @@ def test_inline_count_two_skips_a_level() raises:
     assert_equal(line, here + 1)
 
 
-@always_inline
+@inline(.always)
 def require(cond: Bool, msg: String = "requirement failed") raises:
     if not cond:
         raise Error(call_location().prefix(msg))

@@ -23,6 +23,8 @@ the constructed :class:`KVCacheParams` without mutating the shared
 
 The declared dtype is the one every unquantized tensor is built at, and it
 reaches the config as a ``torch.dtype`` rather than the string in the JSON.
+The cache also declares the recurrent state, and those cases pin its dtype,
+which is not the KV's.
 """
 
 from types import SimpleNamespace
@@ -31,7 +33,12 @@ from unittest.mock import Mock
 import torch
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import (
+    KVCacheParamInterface,
+    KVCacheParams,
+    MultiKVCacheParams,
+    recurrent_leaf,
+)
 from max.pipelines.architectures.qwen3_5.model_config import (
     Qwen3_5Config,
     _declared_dtype,
@@ -44,6 +51,7 @@ def _text_config(head_dim: int) -> SimpleNamespace:
         head_dim=head_dim,
         num_key_value_heads=8,
         num_hidden_layers=8,
+        dtype="bfloat16",
         layer_types=[
             "full_attention" if (i + 1) % 4 == 0 else "linear_attention"
             for i in range(8)
@@ -60,7 +68,7 @@ def _pipeline_config() -> Mock:
 def _construct_kv_params(
     head_dim: int, kv_cache_config: KVCacheConfig
 ) -> KVCacheParams:
-    return Qwen3_5Config.construct_kv_params(
+    return Qwen3_5Config._attn_kv_params(
         huggingface_config=_text_config(head_dim),
         pipeline_config=_pipeline_config(),
         devices=[DeviceRef.CPU()],
@@ -133,3 +141,39 @@ def test_vision_cache_row_spec_follows_the_torch_dtype() -> None:
         2048,
         DType.float16,
     )
+
+
+def _state_dtypes(
+    kv_cache_config: KVCacheConfig, cache_dtype: DType = DType.bfloat16
+) -> set[DType]:
+    """Returns the dtypes the cache declares its state leaves at."""
+    params: KVCacheParamInterface = Qwen3_5Config.construct_kv_params(
+        huggingface_config=_text_config(128),
+        pipeline_config=_pipeline_config(),
+        devices=[DeviceRef.CPU()],
+        kv_cache_config=kv_cache_config,
+        cache_dtype=cache_dtype,
+    )
+    assert isinstance(params, MultiKVCacheParams)
+    state = recurrent_leaf(params)
+    assert state is not None
+    return {region.dtype for region in state.regions}
+
+
+def test_the_state_is_declared_at_the_checkpoint_dtype() -> None:
+    assert _state_dtypes(KVCacheConfig()) == {DType.bfloat16}
+
+
+def test_an_fp8_kv_cache_leaves_the_state_alone() -> None:
+    # Typing the regions from the KV dtype disagrees with what memory
+    # planning budgeted, which fails the check at load.
+    assert _state_dtypes(KVCacheConfig(), cache_dtype=DType.float8_e4m3fn) == {
+        DType.bfloat16
+    }
+
+
+def test_the_state_pool_dtype_knob_still_wins() -> None:
+    assert _state_dtypes(
+        KVCacheConfig(state_pool_dtype="float32"),
+        cache_dtype=DType.float8_e4m3fn,
+    ) == {DType.float32}

@@ -628,14 +628,14 @@ def _gemv_partial_norm_unfused_with_scratch[
 
     _matmul_gpu[transpose_b=transpose_b](y, act, weight, ctx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(y)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[c_type, width]:
         var idx = y.layout(coords)
         return y.ptr.unsafe_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(normed_output)
     @__parameter
     def output_fn[

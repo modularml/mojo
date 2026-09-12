@@ -36,6 +36,7 @@ from collections.abc import Sequence
 import numpy as np
 from max.driver import Buffer
 from max.nn.kv_cache import (
+    PACKED_PAGE_STRIDE,
     KVCacheInputsPerDevice,
     KVCacheParams,
     MLAAttnKey,
@@ -186,6 +187,15 @@ def paged_kv_cache_inputs(
         ),
         max_cache_length=Buffer.from_numpy(
             np.array([max_cache_length], np.uint32)
+        ),
+        # These buffers are packed, so the kernels take the sentinel.
+        page_stride_input=Buffer.from_numpy(
+            np.array([PACKED_PAGE_STRIDE], np.int64)
+        ),
+        scales_page_stride_input=(
+            Buffer.from_numpy(np.array([PACKED_PAGE_STRIDE], np.int64))
+            if kv_scales is not None
+            else None
         ),
         kv_scales=kv_scales,
         attention_dispatch_metadata=attn_key.pack_into_buffer(

@@ -24,7 +24,7 @@ struct Collection:
     def __init__(out self, size: Int):
         self.size = size
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, idx: Int) -> Int:
         check_bounds(idx, self.size)
         return 0

@@ -95,7 +95,7 @@ struct Config(ImplicitlyCopyable, Writable):
             writer.write("_to_device")
 
 
-@no_inline
+@inline(.never)
 def bench_memcpy(
     mut b: Bench,
     length_in_bytes: Int,
@@ -125,9 +125,9 @@ def bench_memcpy(
         length_in_elements if config.direction == Config.DToD else 0
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             if config.direction == Config.DToH:
                 context.enqueue_copy(mem_host, mem_device)
@@ -164,7 +164,7 @@ def bench_memcpy(
     _ = mem2_device
 
 
-@no_inline
+@inline(.never)
 def bench_p2p(
     mut b: Bench,
     length_in_bytes: Int,
@@ -189,9 +189,9 @@ def bench_p2p(
     ctx1.enqueue_copy(src_buf, host_ptr)
     ctx1.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             ctx2.enqueue_copy(dst_buf, src_buf)
 

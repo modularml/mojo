@@ -110,7 +110,7 @@ from linalg.matmul.gpu.sm100.block_scaled_matmul import (
 comptime logger = Logger()
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_scaled_fp4fp8[
     out_dtype: DType,
     scales_dtype: DType,
@@ -410,7 +410,7 @@ def quantize_dynamic_scaled_fp4fp8_kernel[
                         )
 
 
-@always_inline
+@inline(.always)
 def block_scales_interleave_fp4[
     scales_dtype: DType,
     //,
@@ -1426,6 +1426,7 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
     expert_ids_layout: TensorLayout,
     sf_layout: TensorLayout,
     num_threads: Int = 128,
+    k_tiles_per_block: Int = 1,
 ](
     output_tensor: TileTensor[output_dtype, output_layout, MutAnyOrigin],
     scales_tma_op: TMATensorTile[
@@ -1441,7 +1442,7 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
 ):
     """GPU kernel that quantizes per-expert BF16 activation tiles to NVFP4/MXFP4/MXFP8 with TMA-based scale-factor stores.
 
-    Each block locates its assigned expert via binary search on
+    Each block locates its assigned expert with a warp-parallel search over
     `row_offsets` and `scales_offsets`, then quantizes the expert's
     activation tile and writes scale factors back through TMA async
     stores.
@@ -1475,6 +1476,9 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
             scale factor tensor (inferred).
         num_threads: Number of threads per block in the launch grid
             (defaults to 128).
+        k_tiles_per_block: Column tiles handled by one block. Batching them
+            amortizes the per-block expert search and shrinks the grid, which
+            dominates at decode where a block's payload is one routed row.
     Args:
         output_tensor: Output quantized tensor of packed FP4 `uint8`
             or `float8_e4m3fn` for MXFP8.
@@ -1503,28 +1507,67 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
     comptime SF_VECTOR_SIZE = 16 if scales_dtype == NVFP4_SF_DTYPE else 32
     comptime SF_K_GROUP_SIZE = SF_VECTOR_SIZE * SF_ATOM_K
 
-    # Each block process a SF_MN_GROUP_SIZE x SF_K_GROUP_SIZE tile
     var scale_tile_idx = block_idx.x
-    var k_idx = block_idx.y
 
-    # Finds expert id for current block through bisect search
+    # Finds the expert id for the current block.
     # row_offsets is of size num_experts + 1, scales_offsets is of size num_experts
     # For a given expert_idx, it's corresponding scales tiles start at:
     # row_offsets[expert_idx] // SF_MN_GROUP_SIZE + scales_offsets[expert_idx]
     # and there will be ceildiv(row_offsets[expert_idx + 1] -
     # row_offsets[expert_idx], SF_MN_GROUP_SIZE) scales tiles for this expert.
-    var low = 0
-    var high = num_experts
-    while low + 1 != high:
-        var mid = ufloordiv(low + high, 2)
-        var mid_start = ufloordiv(
-            Int(row_offsets[mid]), SF_MN_GROUP_SIZE
-        ) + Int(scales_offsets[mid])
-        if scale_tile_idx >= mid_start:
-            low = mid
-        else:
-            high = mid
-    var expert_idx = low
+    #
+    # The result is the same for every thread in the block, so one warp
+    # computes it and the rest read it from shared memory. The warp probes 32
+    # evenly spaced entries at once, then refines within the chosen span. Tile
+    # starts are non-decreasing, so the answer is the largest probed expert
+    # whose first tile is at or before this one.
+    comptime probe_stride = uceildiv(num_experts, WARP_SIZE)
+    # Refinement gives one lane to each entry of a probe stride. A stride
+    # wider than the warp leaves part of every span unsearched and returns a
+    # too-small expert, whose tile is then never written.
+    comptime assert probe_stride <= WARP_SIZE, (
+        "expert count exceeds what a two-round warp search covers; add a"
+        " round or widen the stride handling"
+    )
+    # A separate allocation from the scale tiles below, and given its own
+    # alignment so the two cannot share a 16-byte region. The read of this
+    # slot is not barrier-separated from the scale-tile zero-fill, so an
+    # overlap would hand a late-arriving thread a zeroed expert index.
+    var search_smem = unsafe_stack_allocation[
+        1, Int32, alignment=16, address_space=.SHARED
+    ]()
+    if thread_idx.x < WARP_SIZE:
+        var lane = Int(thread_idx.x)
+        var target = Int(scale_tile_idx)
+
+        var coarse = lane * probe_stride
+        # Expert 0 always qualifies. Seeding lane 0 with it keeps the span
+        # non-negative for an offset table that does not start at zero; a
+        # negative span would index the offset arrays out of bounds.
+        var best = 0 if lane == 0 else -1
+        if coarse < num_experts:
+            if (
+                ufloordiv(Int(row_offsets[coarse]), SF_MN_GROUP_SIZE)
+                + Int(scales_offsets[coarse])
+            ) <= target:
+                best = coarse
+        var span = Int(lane_group_max[WARP_SIZE](Int32(best)))
+
+        comptime if probe_stride > 1:
+            var fine = span + lane
+            var refined = span
+            if lane < probe_stride and fine < num_experts:
+                if (
+                    ufloordiv(Int(row_offsets[fine]), SF_MN_GROUP_SIZE)
+                    + Int(scales_offsets[fine])
+                ) <= target:
+                    refined = fine
+            span = Int(lane_group_max[WARP_SIZE](Int32(refined)))
+
+        if thread_idx.x == 0:
+            search_smem.store(0, Int32(span))
+    barrier()
+    var expert_idx = Int(search_smem.load(0))
 
     var curr_expert_start = Int(row_offsets[expert_idx])
     var curr_expert_end = Int(row_offsets[expert_idx + 1])
@@ -1551,27 +1594,53 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
         Int(Coord(scales_tile_shape).product()), 128
     )
     var smem_ptr = unsafe_stack_allocation[
-        scales_smem_tile_size,
+        scales_smem_tile_size * k_tiles_per_block,
         Scalar[scales_dtype],
         alignment=128,
         address_space=.SHARED,
     ]()
-
-    var scales_smem = TileTensor(
-        smem_ptr,
-        row_major(Coord(scales_tile_shape)),
-    )
 
     with PDL():
         comptime ELEMENTS_PER_THREAD = 8
         comptime NUM_THREADS_PER_SF = SF_VECTOR_SIZE // ELEMENTS_PER_THREAD
         comptime OUTPUT_WIDTH = 4 if output_dtype == DType.uint8 else 8
         comptime num_threads_per_row = SF_K_GROUP_SIZE // ELEMENTS_PER_THREAD
-        comptime rows_per_iter = num_threads // num_threads_per_row
-        comptime num_iters = SF_MN_GROUP_SIZE // rows_per_iter
 
-        var row_in_iter, col_thread_idx = udivmod(
-            thread_idx.x, num_threads_per_row
+        # Threads span the block's column tiles as well as its rows. A row is
+        # num_threads_per_row threads wide, so a decode tile holding one routed
+        # row occupies eight threads of the 128 on its own.
+        comptime slots_per_iter = num_threads // num_threads_per_row
+        comptime rows_per_iter = slots_per_iter // k_tiles_per_block
+        comptime num_iters = SF_MN_GROUP_SIZE // rows_per_iter
+        # Both divisions truncate. A block covering a non-integral number of
+        # rows per pass leaves the remainder of every tile at its stale scale
+        # factor, with no runtime failure.
+        comptime assert (
+            slots_per_iter % k_tiles_per_block == 0
+            and rows_per_iter >= 1
+            and SF_MN_GROUP_SIZE % rows_per_iter == 0
+        ), (
+            "block threads, column tiles per block and the 128-row scale tile"
+            " must divide evenly, or rows are left unquantized"
+        )
+
+        # The shuffle masks below reach only bits within col_thread_idx, so a
+        # lane and its partner share a slot, and with it a column tile and a
+        # row. The reduction therefore stays inside one scale group.
+        var slot, col_thread_idx = udivmod(thread_idx.x, num_threads_per_row)
+        # This divisor order gives a warp one row and all its column tiles,
+        # so its global accesses cover one contiguous 512B span. The tiles sit
+        # a multiple of the bank count apart, so the scale store at the bottom
+        # of the loop serializes 4 ways, a few cycles against that load.
+        var row_in_iter, kt_local = udivmod(Int(slot), k_tiles_per_block)
+
+        var num_cols = input_tensor.dim(1)
+        var num_k_tiles = uceildiv(Int(num_cols), SF_K_GROUP_SIZE)
+        var k_idx = Int(block_idx.y) * k_tiles_per_block + kt_local
+
+        var scales_smem = TileTensor(
+            smem_ptr.unsafe_offset(kt_local * scales_smem_tile_size),
+            row_major(Coord(scales_tile_shape)),
         )
         var input_col = (
             k_idx * SF_K_GROUP_SIZE + col_thread_idx * ELEMENTS_PER_THREAD
@@ -1579,16 +1648,40 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
         var output_col = (
             ufloordiv(input_col, 2) if output_dtype == .uint8 else input_col
         )
-
-        # The k_idx grid covers whole SF_K_GROUP_SIZE column blocks, so when
-        # num_cols is not a multiple of SF_K_GROUP_SIZE the last block extends
-        # past the input. Lanes in that tail must not touch the payload
-        # tensors; they contribute a zero group max so their scale lanes store
-        # a clean zero.
-        var num_cols = input_tensor.dim(1)
+        # A column tile beyond num_k_tiles starts at or after num_cols, so
+        # this single test also excludes tiles the input does not have. An
+        # invalid lane contributes a zero group max and skips its stores,
+        # leaving its scale slot at the zero written below.
         var col_is_valid = Int(input_col) < Int(num_cols)
 
-        comptime for iter_idx in range(num_iters):
+        # Padding rows must carry a zero scale factor, or the tensor cores
+        # read garbage from them. At decode nearly every row of a tile is
+        # padding, so the block clears every tile it owns in one contiguous
+        # pass over the whole region.
+        comptime assert (
+            scales_smem_tile_size * k_tiles_per_block
+        ) % num_threads == 0, (
+            "scale tile elements must divide evenly across the block, or the"
+            " tail of the region keeps stale scale factors"
+        )
+        comptime zeros_per_thread = (
+            scales_smem_tile_size * k_tiles_per_block
+        ) // num_threads
+        comptime assert (
+            zeros_per_thread & (zeros_per_thread - 1) == 0
+        ), "zero-fill store width must be a power of two"
+        smem_ptr.store(
+            Int(thread_idx.x) * zeros_per_thread,
+            SIMD[scales_dtype, zeros_per_thread](0),
+        )
+        barrier()
+
+        # num_tokens is uniform across the block, so the trip count is uniform
+        # and the shuffle reduction below keeps the full participation its
+        # member mask claims. At decode a tile holds one routed token and 127
+        # padding rows, so one iteration of num_iters runs.
+        var active_iters = min(num_iters, uceildiv(num_tokens, rows_per_iter))
+        for iter_idx in range(active_iters):
             var local_row = iter_idx * rows_per_iter + row_in_iter
             var is_valid = local_row < num_tokens and col_is_valid
 
@@ -1646,14 +1739,21 @@ def grouped_quantize_dynamic_scaled_fp4_async_kernel[
 
         barrier()
 
+        # Every tile this block owns is in shared memory, so their stores go
+        # out as one group under a single wait.
         if thread_idx.x == 0:
             fence_async_view_proxy()
-            scales_tma_op.async_store(
-                scales_smem,
-                StaticTuple[UInt32, 4](
-                    0, 0, UInt32(k_idx), UInt32(scale_tile_idx)
-                ),
-            )
+            for kt in range(k_tiles_per_block):
+                var store_k_idx = Int(block_idx.y) * k_tiles_per_block + kt
+                if store_k_idx >= num_k_tiles:
+                    break
+                scales_tma_op.async_store_4d(
+                    TileTensor(
+                        smem_ptr.unsafe_offset(kt * scales_smem_tile_size),
+                        row_major(Coord(scales_tile_shape)),
+                    ),
+                    (0, 0, store_k_idx, Int(scale_tile_idx)),
+                )
             scales_tma_op.commit_group()
             scales_tma_op.wait_group[0]()
 
@@ -1717,6 +1817,18 @@ def grouped_quantize_dynamic_scaled_fp4_async[
         "num_cols must be a multiple of ELEMENTS_PER_THREAD (8 for NVFP4)",
     )
 
+    # Blocks write only the column tiles implied by num_cols, so a scales
+    # tensor wider than that keeps stale factors in its trailing tiles.
+    comptime _SF_VECTOR_SIZE = 16 if scales_dtype == NVFP4_SF_DTYPE else 32
+    debug_assert(
+        Int(scales_tensor.dim[1]())
+        == uceildiv(Int(input_tensor.dim(1)), _SF_VECTOR_SIZE * SF_ATOM_K),
+        (
+            "scales column-tile count must match the column count the kernel"
+            " infers, or trailing tiles keep stale scale factors"
+        ),
+    )
+
     var scales_tensor_lt = scales_tensor.to_layout_tensor()
     comptime scales_lt_layout = scales_tensor_lt.layout
 
@@ -1749,38 +1861,70 @@ def grouped_quantize_dynamic_scaled_fp4_async[
         swizzle_mode=TensorMapSwizzle.SWIZZLE_NONE,
     ](ctx, scales_4d_tensor)
 
-    comptime kernel = grouped_quantize_dynamic_scaled_fp4_async_kernel[
-        output_dtype,
-        scales_dtype,
-        input_dtype,
-        scales_tma_op.rank,
-        scales_tma_op.tile_shape,
-        scales_tma_op.desc_shape,
-        TensorMapSwizzle.SWIZZLE_NONE,
-        output_tensor.LayoutType,
-        input_tensor.LayoutType,
-        row_offsets.LayoutType,
-        scales_offsets.LayoutType,
-        expert_ids.LayoutType,
-        sf_tensor.LayoutType,
-    ]
-
-    ctx.enqueue_function[kernel](
-        output_tensor,
-        scales_tma_op,
-        input_tensor,
-        row_offsets,
-        scales_offsets,
-        expert_ids,
-        sf_tensor,
-        grid_dim=(
-            scales_tensor.dim[0](),
-            scales_tensor.dim[1](),
-            1,
-        ),
-        block_dim=(128,),
-        attributes=pdl_launch_attributes(PDLLevel.ON),
+    # 64 threads leave too little work per block to hide latency, and 256
+    # leave most of the block idle on a decode tile that holds one row.
+    comptime BLOCK_THREADS = 128
+    # Batching column tiles amortizes the per-block expert search but divides
+    # the grid, so it pays only once the unbatched grid already fills the
+    # machine. 4 measures fastest across the decode and prefill shapes, and
+    # both 2 and 8 are slower on either side of it.
+    #
+    # The threshold counts allocated scale tiles, which is a worst case bound
+    # on the tiles an expert layout actually occupies. A layout parking its
+    # rows on a handful of experts clears the threshold on the bound alone and
+    # gets batched into a grid too small to fill the machine, costing up to
+    # 1.4x. Tightening this needs the row offsets on the host, so the sparse
+    # layouts keep the penalty.
+    comptime hw_info = ctx.default_device_info
+    comptime blocks_per_sm = max(
+        1, hw_info.threads_per_multiprocessor // BLOCK_THREADS
     )
+    var resident_blocks = hw_info.sm_count * blocks_per_sm
+    var unbatched_blocks = Int(scales_tensor.dim[0]()) * Int(
+        scales_tensor.dim[1]()
+    )
+
+    @__parameter
+    def launch_quant_fp4_kernel[k_tiles_per_block: Int]() raises:
+        comptime kernel = grouped_quantize_dynamic_scaled_fp4_async_kernel[
+            output_dtype,
+            scales_dtype,
+            input_dtype,
+            scales_tma_op.rank,
+            scales_tma_op.tile_shape,
+            scales_tma_op.desc_shape,
+            TensorMapSwizzle.SWIZZLE_NONE,
+            output_tensor.LayoutType,
+            input_tensor.LayoutType,
+            row_offsets.LayoutType,
+            scales_offsets.LayoutType,
+            expert_ids.LayoutType,
+            sf_tensor.LayoutType,
+            num_threads=BLOCK_THREADS,
+            k_tiles_per_block=k_tiles_per_block,
+        ]
+
+        ctx.enqueue_function[kernel](
+            output_tensor,
+            scales_tma_op,
+            input_tensor,
+            row_offsets,
+            scales_offsets,
+            expert_ids,
+            sf_tensor,
+            grid_dim=(
+                Int(scales_tensor.dim[0]()),
+                uceildiv(Int(scales_tensor.dim[1]()), k_tiles_per_block),
+                1,
+            ),
+            block_dim=(BLOCK_THREADS,),
+            attributes=pdl_launch_attributes(PDLLevel.ON),
+        )
+
+    if unbatched_blocks >= resident_blocks:
+        launch_quant_fp4_kernel[k_tiles_per_block=4]()
+    else:
+        launch_quant_fp4_kernel[k_tiles_per_block=1]()
 
 
 ########################################################
@@ -1887,7 +2031,7 @@ def block_scaled_matmul_with_epilogue[
     if m == 0 or n == 0:
         return
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -1959,7 +2103,7 @@ def block_scaled_matmul_with_epilogue[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def block_scaled_matmul[
     c_type: DType,
     a_type: DType,
@@ -2116,7 +2260,7 @@ def block_scaled_matmul[
 
     # vendor block scaled matmul kernels don't support compute lambda, so we wrap it around an epilogue lambda instead.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c)
     def compute_lambda_wrapper[
         _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
@@ -2202,7 +2346,7 @@ def block_scaled_matmul[
         else:
             raise Error("Heuristic and outliers dispatch failed")
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -2287,7 +2431,7 @@ def block_scaled_matmul[
         )
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_block_scaled[
     out_dtype: DType,
     scales_dtype: DType,
@@ -2452,7 +2596,7 @@ def quantize_dynamic_block_scaled[
         )
 
 
-@always_inline
+@inline(.always)
 def block_scales_interleave[
     scales_dtype: DType,
     //,
@@ -2515,7 +2659,7 @@ def block_scales_interleave[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def quantize_mxfp8_lane_group[
     in_dtype: DType,
     width: Int,
@@ -2663,7 +2807,7 @@ def _quantize_mx_amd_kernel[
                 scales.store(Coord(global_row_idx, scale_col), e8m0_scale)
 
 
-@always_inline
+@inline(.always)
 def quantize_mx_amd[
     out_dtype: DType = .uint8,
     scales_dtype: DType = .float8_e8m0fnu,
@@ -2796,7 +2940,7 @@ def quantize_dynamic_block_scaled_mxfp4_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_block_scaled_mxfp4[
     in_dtype: DType
 ](
@@ -2850,7 +2994,7 @@ def quantize_dynamic_block_scaled_mxfp4[
         )
 
 
-@always_inline
+@inline(.always)
 def _mxfp4_dotprod[
     out_dtype: DType,
     //,
@@ -2863,7 +3007,7 @@ def _mxfp4_dotprod[
     b_scales_ptr: UnsafePointer[Float8_e8m0fnu, ImmutAnyOrigin],
     K: Int,
 ):
-    @always_inline
+    @inline(.always)
     def cast_fp2em1x2_to_bf16x2[
         byte_select: Int
     ](packed: Int32, scale: Float32) -> SIMD[.bfloat16, 2]:
@@ -2871,7 +3015,7 @@ def _mxfp4_dotprod[
             "llvm.amdgcn.cvt.scalef32.pk.bf16.fp4", SIMD[.bfloat16, 2]
         ](packed, scale, Int32(byte_select))
 
-    @always_inline
+    @inline(.always)
     def dotprod_bf16x2(
         a: SIMD[.bfloat16, 2], b: SIMD[.bfloat16, 2], c: Float32
     ) -> Float32:
@@ -2924,7 +3068,7 @@ def _mxfp4_dotprod[
     c_ptr.store(accum.cast[out_dtype]())
 
 
-@always_inline
+@inline(.always)
 def _mxfp4_dotprod_block_size(static_N: Int) -> Int:
     comptime target_block_size = 16
     return target_block_size if (static_N % target_block_size) == 0 else 1
@@ -2964,7 +3108,7 @@ def matmul_dynamic_block_scaled_amd_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def matmul_dynamic_block_scaled_amd[
     out_dtype: DType
 ](
@@ -3075,7 +3219,7 @@ def grouped_matmul_block_scaled_amd_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul_block_scaled_amd[
     out_dtype: DType,
 ](

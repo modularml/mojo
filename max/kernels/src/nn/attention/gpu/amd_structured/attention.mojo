@@ -489,24 +489,24 @@ struct Attention[
     # --- Config delegation (static methods) ---
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_head_idx() -> Int:
         return Self.amd_structured_config.q_head_idx()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_tile_idx() -> Int:
         return Self.amd_structured_config.q_tile_idx()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def kv_head_idx() -> Int:
         return Self.amd_structured_config.kv_head_idx()
 
     # --- KV tile factory ---
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def make_kv_tile[
         operand_t: MHAOperand,
         //,
@@ -516,7 +516,12 @@ struct Attention[
         start_tok_idx: UInt32,
         head_idx: UInt32,
         kv_tile_num_rows: UInt32,
-    ) -> TileTensor[operand_t.dtype, Self.KvTileLayout, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        operand_t.dtype,
+        Self.KvTileLayout,
+        ImmutAnyOrigin,
+        Engine=operand_t.Engine,
+    ]:
         return operand.block_paged_tile[Int(Self.BN)](
             batch_idx,
             start_tok_idx,
@@ -532,7 +537,7 @@ struct Attention[
 
     # --- Constructor ---
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         output_ptr: UnsafePointer[Scalar[Self.output_type], MutAnyOrigin],
@@ -732,16 +737,16 @@ struct Attention[
 
     # --- Buffer operations ---
 
-    @always_inline
+    @inline(.always)
     def zero_p_buffer[stage: Int = 0](self):
         self.p_reg_buffer.zero[stage]()
 
-    @always_inline
+    @inline(.always)
     def scale_q_buffer(self):
         """Pre-scale Q registers by scale factor (scale * log2e)."""
         self.q_buffer.scale[Self.accum_type](self.scale)
 
-    @always_inline
+    @inline(.always)
     def scale_p_reg[stage: Int = 0](self):
         var p_vec = self.p_reg_buffer.stage_tile[stage]().vectorize[
             1, Self.output_frag_size
@@ -754,7 +759,7 @@ struct Attention[
 
     # --- Mask operations ---
 
-    @always_inline
+    @inline(.always)
     def mask_status(
         self,
         kv_tile_start_row: UInt32,
@@ -786,17 +791,17 @@ struct Attention[
                 Index[dtype=DType.uint32](Self.BM, Self.BN),
             )
 
-    @always_inline
+    @inline(.always)
     def mask_advance(mut self):
         # Decode: no-op (kv_tile_start_row added directly in MaskTileOp.apply).
         comptime if not Self.token_gen:
             self.mask_warp_col += UInt32(Self.BN)
 
-    @always_inline
+    @inline(.always)
     def mask_skip_tile(self, status: TileMaskStatus) -> Bool:
         return status == TileMaskStatus.FULL_MASK
 
-    @always_inline
+    @inline(.always)
     def mask_skip_and_advance(
         mut self,
         kv_tile_start_row: UInt32,
@@ -808,7 +813,7 @@ struct Attention[
                 return True
         return False
 
-    @always_inline
+    @inline(.always)
     def mask_apply[
         stage: Int = 0
     ](
@@ -817,7 +822,7 @@ struct Attention[
         kv_tile_num_rows: UInt32,
         not_last_iter: Bool,
     ):
-        @always_inline
+        @inline(.always)
         @__parameter
         def _mask_apply_impl(masked: Bool):
             MaskTileOp[
@@ -865,7 +870,7 @@ struct Attention[
             _mask_apply_impl(masked=True)
         self.mask_advance()
 
-    @always_inline
+    @inline(.always)
     def get_num_rows(self) -> UInt32:
         var end = min(
             self.kv_start_row + UInt32(Self.BN), UInt32(self.num_keys)
@@ -875,7 +880,7 @@ struct Attention[
         )
         return UInt32(num_rows)
 
-    @always_inline
+    @inline(.always)
     def apply_mask[
         stage: Int, scale: Bool = True
     ](mut self, not_last_iter: Bool = False):
@@ -887,7 +892,7 @@ struct Attention[
 
     # --- Softmax ---
 
-    @always_inline
+    @inline(.always)
     def warp_scratch_tile(self) -> Self._WarpScratchTileType:
         """Warp-reduction scratch tile (decode only)."""
         return Self._WarpScratchTileType(
@@ -895,7 +900,7 @@ struct Attention[
             Self._warp_scratch_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def online_softmax[stage: Int = 0](mut self):
         var warp_scratch = self.warp_scratch_tile().tile[
             2 * Int(Self.num_warps_n), Int(Self.WM)
@@ -909,7 +914,7 @@ struct Attention[
 
     # --- Split online softmax (for MLA double-buffered kernel) ---
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_0[stage: Int, mask: Bool = True](mut self):
         """Step 0: mask + max + exp(even tiles).
 
@@ -927,7 +932,7 @@ struct Attention[
         self.softmax.calculate_qk_max(score_tile, warp_scratch)
         self.softmax.exp[start=0, stride=2](score_tile)
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_1[stage: Int](mut self):
         """Step 1: exp(odd tiles) + sum + correction + update max/sum.
 
@@ -944,7 +949,7 @@ struct Attention[
         self.softmax.update_max()
         self.softmax.update_sum()
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_0_fma[stage: Int, mask: Bool = True](mut self):
         """Step 0 with deferred scaling: mask (no scale), max, exp_scaled.
 
@@ -968,7 +973,7 @@ struct Attention[
         self.softmax.calculate_qk_max(score_tile, warp_scratch)
         self.softmax.exp_scaled[start=0, stride=2](score_tile, self.scale)
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_1_fma[stage: Int](mut self):
         """Step 1 with deferred scaling for odd-indexed tiles.
 
@@ -990,7 +995,7 @@ struct Attention[
         self.softmax.update_max()
         self.softmax.update_sum()
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_0_pkfma[stage: Int, mask: Bool = True](mut self):
         """Step 0 deferred-scale variant that emits `v_pk_fma_f32`.
 
@@ -1014,7 +1019,7 @@ struct Attention[
         self.softmax.calculate_qk_max(score_tile, warp_scratch)
         self.softmax.exp_pkfma[start=0, stride=2](score_tile, self.scale)
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_1_pkfma[stage: Int](mut self):
         """Step 1 pkfma counterpart of `_fma` step 1.
 
@@ -1032,7 +1037,7 @@ struct Attention[
         self.softmax.update_max()
         self.softmax.update_sum()
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_0_prescaled[
         stage: Int, mask: Bool = True
     ](mut self):
@@ -1055,7 +1060,7 @@ struct Attention[
         self.softmax.calculate_qk_max(score_tile, warp_scratch)
         self.softmax.exp[start=0, stride=2](score_tile)
 
-    @always_inline
+    @inline(.always)
     def online_softmax_step_1_prescaled[stage: Int](mut self):
         """Softmax step 1 for pre-scaled Q: no scale needed on scores.
 
@@ -1072,14 +1077,14 @@ struct Attention[
         self.softmax.update_max()
         self.softmax.update_sum()
 
-    @always_inline
+    @inline(.always)
     def online_softmax_update_output(mut self):
         """Apply correction to output accumulator."""
         self.softmax.update_output(self.out_reg_buffer.reg_tile)
 
     # --- Output store ---
 
-    @always_inline
+    @inline(.always)
     def store_output(self):
         var output_warp_tile = self.output_tile.tile[
             Self.WM, Self.output_depth // Self.num_warps_n
@@ -1164,14 +1169,14 @@ struct Attention[
 
     # --- Decode-specific methods ---
 
-    @always_inline
+    @inline(.always)
     def copy_fragment_to_smem(self):
         """Copy P scores from registers to shared memory (decode only)."""
         comptime if not Self.token_gen:
             return
         self.p_reg_buffer.copy_to_shared()
 
-    @always_inline
+    @inline(.always)
     def store_partition_info(
         self,
         num_partitions: Int,

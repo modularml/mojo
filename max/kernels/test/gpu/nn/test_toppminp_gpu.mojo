@@ -65,9 +65,9 @@ def time_kernel[](
     kernel_name: String,
     func: Some[def(DeviceContext) raises -> None],
 ) raises:
-    @always_inline
+    @inline(.always)
     def bench_func(mut m: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             func(ctx)
 
@@ -359,7 +359,7 @@ def test_case_sampling(
 
     comptime if DEBUG_BENCH:
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {var}:
             if is_top_p:
                 top_p_sampling_gpu(

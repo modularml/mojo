@@ -69,7 +69,7 @@ comptime _TILE: Int = _PTOPK_TOTAL
 comptime _V4_ALIGN: Int = align_of[SIMD[.float32, _PTOPK_ITEMS]]()
 
 
-@always_inline
+@inline(.always)
 def _load4_scores(
     in_scores: UnsafePointer[Float32, ImmutAnyOrigin],
     base: Int,
@@ -111,7 +111,7 @@ def _load4_scores(
     return (vv, ii)
 
 
-@always_inline
+@inline(.always)
 def _halfclean4[
     cv_origin: MutOrigin,
     sv_origin: MutOrigin,
@@ -145,7 +145,7 @@ def _halfclean4[
     return (take.select(bv, cv), take.select(bi, ci))
 
 
-@always_inline
+@inline(.always)
 def _ranks_below[
     tiebreak: Bool
 ](v0: Float32, i0: Int32, v1: Float32, i1: Int32,) -> Bool:
@@ -162,7 +162,7 @@ def _ranks_below[
         return v0 < v1
 
 
-@always_inline
+@inline(.always)
 def _select_lane_after_xor[
     tiebreak: Bool = False
 ](
@@ -183,7 +183,7 @@ def _select_lane_after_xor[
     return (v, i)
 
 
-@always_inline
+@inline(.always)
 def _swap_pair_if[
     tiebreak: Bool = False
 ](
@@ -208,7 +208,7 @@ def _swap_pair_if[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _bitonic_sort_desc[
     sv_origin: MutOrigin,
     si_origin: MutOrigin,
@@ -374,7 +374,7 @@ def _bitonic_sort_desc[
 # the final rank cost.
 
 
-@always_inline
+@inline(.always)
 def _pack_key(phi: UInt32, rcol: UInt32) -> UInt64:
     """The select's key as one word: `phi` above, `~column` below.
 
@@ -386,13 +386,13 @@ def _pack_key(phi: UInt32, rcol: UInt32) -> UInt64:
     return (UInt64(phi) << UInt64(32)) | UInt64(rcol)
 
 
-@always_inline
+@inline(.always)
 def _key_column(key: UInt64) -> Int32:
     """The column a packed key came from."""
     return Int32(~UInt32(key & UInt64(0xFFFFFFFF)))
 
 
-@always_inline
+@inline(.always)
 def _bitonic_merge_desc[
     sv_origin: MutOrigin,
     si_origin: MutOrigin,
@@ -537,7 +537,7 @@ def _persistent_topk_2048_bounded_kernel(
     )
 
 
-@always_inline
+@inline(.always)
 def _persistent_topk_2048_impl(
     in_scores: UnsafePointer[Float32, ImmutAnyOrigin],
     out_idxs: UnsafePointer[Int32, MutAnyOrigin],
@@ -773,19 +773,19 @@ comptime _HSEL_BINS: Int = 1 << _HSEL_BITS
 comptime _HSEL_SEL_CAP: Int = 2 * _PTOPK_TOTAL
 
 
-@always_inline
+@inline(.always)
 def _hsel_half_rounds[tail_bits: Int]() -> Int:
     """Rounds needed to resolve a 32-bit key half at these digit widths."""
     return 1 + ceildiv(32 - _HSEL_BITS, tail_bits)
 
 
-@always_inline
+@inline(.always)
 def _hsel_w_in[tail_bits: Int, r: Int]() -> Int:
     """Bits of the key half still unresolved when round `r` starts."""
     return 32 - _HSEL_BITS * min(r, 1) - tail_bits * (r - min(r, 1))
 
 
-@always_inline
+@inline(.always)
 def _hsel_w_out[tail_bits: Int, r: Int]() -> Int:
     """Bits left unresolved after round `r` takes its digit."""
     return max(
@@ -859,7 +859,7 @@ comptime _HSEL_RES_MAX_WIDE: Int = (
 comptime HSEL_TRACE_EVENTS: Int = 32
 
 
-@always_inline
+@inline(.always)
 def _phi(v: Float32) -> UInt32:
     """The monotone float-to-uint32 bijection: flip the sign bit of a positive,
     every bit of a negative. Comparing the results as unsigned orders the
@@ -869,7 +869,7 @@ def _phi(v: Float32) -> UInt32:
     return bits ^ ((-(bits >> 31)) | UInt32(0x80000000))
 
 
-@always_inline
+@inline(.always)
 def _phi_group(
     v: SIMD[.float32, _HSEL_SCAN_ITEMS]
 ) -> SIMD[.uint32, _HSEL_SCAN_ITEMS]:
@@ -878,7 +878,7 @@ def _phi_group(
     return bits ^ ((-(bits >> 31)) | UInt32(0x80000000))
 
 
-@always_inline
+@inline(.always)
 def _load_scan_group(
     in_scores: UnsafePointer[Float32, ImmutAnyOrigin],
     off: Int,
@@ -904,7 +904,7 @@ def _load_scan_group(
     return bitcast[.float32, _HSEL_SCAN_ITEMS](bits)
 
 
-@always_inline
+@inline(.always)
 def _phi4(
     in_scores: UnsafePointer[Float32, ImmutAnyOrigin],
     off: Int,
@@ -934,7 +934,7 @@ def _phi4(
     return bits ^ ((-(bits >> 31)) | UInt32(0x80000000))
 
 
-@always_inline
+@inline(.always)
 def _warp_sum_u32(val: UInt32) -> UInt32:
     """Warp-wide sum of `val`, broadcast to every lane.
 
@@ -953,7 +953,7 @@ def _warp_sum_u32(val: UInt32) -> UInt32:
     return warp.sum(val)
 
 
-@always_inline
+@inline(.always)
 def _hsel_block_scan[
     block_size: Int, mut_origin: MutOrigin
 ](
@@ -986,7 +986,7 @@ def _hsel_block_scan[
     return inc + _warp_sum_u32(mine if lane < wid else UInt32(0))
 
 
-@always_inline
+@inline(.always)
 def _hsel_split_scan[
     block_size: Int, one_barrier: Bool, mut_origin: MutOrigin
 ](
@@ -1013,7 +1013,7 @@ def _hsel_split_scan[
     return block.prefix_sum[block_size=block_size](val)
 
 
-@always_inline
+@inline(.always)
 def _hsel_contested[
     half: Int
 ](phi: UInt32, rcol: UInt32, lo: UInt32, hi: UInt32, t_phi: UInt32) -> Bool:
@@ -1029,7 +1029,7 @@ def _hsel_contested[
         return phi == t_phi and rcol >= lo and rcol <= hi
 
 
-@always_inline
+@inline(.always)
 def _hsel_digit[
     half: Int, w_out: Int, nbins: Int
 ](phi: UInt32, rcol: UInt32) -> Int:
@@ -1040,7 +1040,7 @@ def _hsel_digit[
         return Int((rcol >> UInt32(w_out)) & UInt32(nbins - 1))
 
 
-@always_inline
+@inline(.always)
 def _hsel_selected(
     phi: UInt32, rcol: UInt32, t_phi: UInt32, t_rcol: UInt32
 ) -> Bool:
@@ -1122,7 +1122,7 @@ def _histsel_topk_bounded_kernel[
     ](in_scores, out_idxs, N, K, min(Int(N), max(0, bound)), trace_buf)
 
 
-@always_inline
+@inline(.always)
 def _histsel_topk_impl[
     TraceBufT: TraceBuf,
     enable_trace: Bool = False,
@@ -1640,7 +1640,7 @@ def _histsel_topk_impl[
 # of one repeated score putting every key in its own bin on the column's bits.
 
 
-@always_inline
+@inline(.always)
 def _hsel_vary_positions[rank_bits: Int](vary: UInt64) -> SIMD[.uint64, 2]:
     """The `rank_bits` most significant set bits of `vary`, as positions.
 
@@ -1670,13 +1670,13 @@ def _hsel_vary_positions[rank_bits: Int](vary: UInt64) -> SIMD[.uint64, 2]:
 comptime _HSEL_COARSE_SHIFT: Int = 64 - _HSEL_BITS
 
 
-@always_inline
+@inline(.always)
 def _hsel_coarse_bin(key: UInt64) -> Int:
     """The select's round-0 digit, recovered from the packed key."""
     return Int((key >> UInt64(_HSEL_COARSE_SHIFT)) & UInt64(_HSEL_BINS - 1))
 
 
-@always_inline
+@inline(.always)
 def _hsel_bin_shifts(nocc: Int, nbins: Int, rank_bits: Int) -> Tuple[Int, Int]:
     """How `nocc` dense bin numbers fit into `nbins` rank bins.
 
@@ -1696,7 +1696,7 @@ def _hsel_bin_shifts(nocc: Int, nbins: Int, rank_bits: Int) -> Tuple[Int, Int]:
     return (l, r)
 
 
-@always_inline
+@inline(.always)
 def _hsel_rank_digit[
     rank_bits: Int
 ](key: UInt64, packed: SIMD[.uint64, 2]) -> Int:
@@ -1711,7 +1711,7 @@ def _hsel_rank_digit[
     return Int(d)
 
 
-@always_inline
+@inline(.always)
 def _hsel_digit_of[
     rank_bits: Int, bin_digit: Bool, d_origin: MutOrigin
 ](
@@ -1741,7 +1741,7 @@ def _hsel_digit_of[
     return Int(d >> UInt32(right))
 
 
-@always_inline
+@inline(.always)
 def _hsel_rank_write[
     TraceBufT: TraceBuf,
     nthreads: Int,
@@ -2137,7 +2137,7 @@ def _histsel_resident_bounded_kernel[
     ](in_scores, out_idxs, N, K, min(Int(N), max(0, bound)), trace_buf)
 
 
-@always_inline
+@inline(.always)
 def _histsel_resident_impl[
     TraceBufT: TraceBuf,
     enable_trace: Bool = False,
@@ -3281,7 +3281,7 @@ def persistent_topk_block(
         )
 
 
-@always_inline
+@inline(.always)
 def _choose_split_factor(rows: Int, num_tiles: Int, sm_count: Int) -> Int:
     """Pick the N-split factor `S` for the streaming top-k.
 
@@ -3373,7 +3373,7 @@ def persistent_topk_block_split[
         # wider the payload the more that is true, which is why the width below is
         # chosen by `N` rather than fixed at the widest that fits.
         @__parameter
-        @always_inline
+        @inline(.always)
         def launch_resident[res_vecs: Int]() raises:
             comptime if not ordered:
                 # With no rank to feed there is no reason to hand over a superset

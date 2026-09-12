@@ -21,6 +21,7 @@
 
 #include "Mojo/MojoParser/ExprDest.h"
 #include "Support/LLVMCompilerForwardDecls.h"
+#include "llvm/ADT/SmallVector.h"
 #include <variant>
 
 namespace mlir {
@@ -47,6 +48,13 @@ class ExprDest;
 /// are never run.
 class ExprNode {
 public:
+  /// A name bound by a match pattern.
+  struct BoundName {
+    llvm::StringRef name;
+    CValue value;
+    PatternDeclKind patternKind;
+  };
+
   // This indicates the subclass.
   enum Kind {
     kSynthetic,            // There is no source corresponding to the IR.
@@ -210,15 +218,23 @@ public:
   ///
   /// On success, returns a boolean CValue that is true when the subject
   /// matches this pattern (and any bindings introduced by the pattern have
-  /// been declared in the current scope). The default implementation rejects
-  /// the expression as an invalid pattern.
+  /// been declared in the current scope). Pattern bindings are also appended
+  /// to `bindings`. The default implementation rejects the expression as an
+  /// invalid pattern.
   ///
   /// `patternKind` is the enclosing `var`/`ref` binding mode for this pattern
   /// (or `kNone` when none applies). Unary `var`/`ref` patterns update it and
   /// pass it down to their subpattern; binding sites such as identifiers
   /// consume it to decide how to declare.
   virtual CValue emitMatch(IREmitter &emitter, CValue subject,
-                           PatternDeclKind patternKind) const;
+                           PatternDeclKind patternKind,
+                           llvm::SmallVectorImpl<BoundName> &bindings) const;
+
+  /// Return true if this expression, used as a match pattern, may introduce
+  /// variable bindings (`var`/`ref`/`as` names, or nested subpatterns that do).
+  /// The base returns true conservatively; pattern nodes that cannot bind
+  /// override this to false or recurse into their subpatterns.
+  virtual bool mayContainBindingPatterns() const { return true; }
 
   /// Emit this expression to MLIR, returning a (possibly null!) AnyValue.  The
   /// ExprDest indicates information about where to emit the expression result

@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from max.driver import Buffer, load_devices
+from max.driver import Buffer, is_virtual_device_mode, load_devices
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import (
@@ -262,6 +262,11 @@ class VaeDecoder(CompiledComponent):
                     "VAE weights.  The checkpoint must contain "
                     "'bn.running_mean' and 'bn.running_var'."
                 )
+            # Virtual devices leave weights uninitialized, so their values
+            # carry no information to check. Compiling for a target we cannot
+            # run on produces no image for bad stats to wash out.
+            if is_virtual_device_mode():
+                continue
             bn_data = state_dict[bn_key]
             # np.from_dlpack doesn't support bfloat16, so cast to float32
             # before validation.

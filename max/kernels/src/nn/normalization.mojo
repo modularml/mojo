@@ -91,7 +91,7 @@ comptime _APPLE_STATIC_SHMEM_MAX_COUNT[
 static shared memory which is 32k."""
 
 
-@always_inline
+@inline(.always)
 def block_reduce[
     dtype: DType, max_warps_per_block: Int
 ](val: Scalar[dtype]) -> Scalar[dtype]:
@@ -129,7 +129,7 @@ def block_reduce[
     return m2_broadcast[0]
 
 
-@always_inline
+@inline(.always)
 def block_reduce_dual_sum[
     dtype: DType, max_warps_per_block: Int
 ](val0: Scalar[dtype], val1: Scalar[dtype]) -> Tuple[
@@ -315,7 +315,7 @@ def welford_block_all_reduce[
     )
 
 
-@always_inline
+@inline(.always)
 def _rms_norm_warp_tiling_subkernel[
     dtype: DType,
     simd_width: SIMDLength,
@@ -579,7 +579,7 @@ def rms_norm_gpu_warp_per_row[
 # not survive the trip to a device, and captured into a `capturing` closure it
 # fails the launch the same way. So the device closures capture the `IndexList`
 # and rebuild the typed `Coord` in-kernel here.
-@always_inline
+@inline(.always)
 def _index_list_to_typed_coord[
     element_types: TypeList[Trait=CoordLike, ...]
 ](witness: Coord[*element_types], il: IndexList[witness.rank]) -> Coord[
@@ -708,7 +708,7 @@ def rms_norm_gpu_warp_tiling[
         comptime for c in range(chunks_per_thread):
             var col = (c * bdim + tid) * simd_width
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _normalize() -> SIMD[dtype, simd_width]:
                 comptime if multiply_before_cast:
@@ -732,7 +732,7 @@ def rms_norm_gpu_warp_tiling[
                     output_fn[simd_width, align](Coord(base), _normalize())
 
 
-@always_inline
+@inline(.always)
 def _rms_norm_gpu_block_subkernel[
     dtype: DType,
     //,
@@ -903,7 +903,7 @@ def rms_norm_gpu[
     # supplies the static dims at comptime, `shape_il` the dynamic leaves.
     @__copy_capture(shape_il)
     @__parameter
-    @always_inline
+    @inline(.always)
     def output_fn_2d[
         simd_width: SIMDLength, alignment: Int
     ](row: Int, col: Int, val: SIMD[dtype, simd_width]) -> None:
@@ -920,7 +920,7 @@ def rms_norm_gpu[
 
     @__copy_capture(shape_il)
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) -> SIMD[dtype, simd_width]:
@@ -961,7 +961,7 @@ def rms_norm_gpu[
     # Single source of truth for both the launcher and the warp-per-row gate
     # below.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _wt_threads_per_block[eff_simd: Int, chunks: Int]() -> Int:
         var threads = ceildiv(ceildiv(cols, eff_simd), chunks)
         return min(
@@ -972,7 +972,7 @@ def rms_norm_gpu[
     # `exact` means every thread is fully active (the block tiles the row with
     # no ragged tail), so the unguarded kernel can be used.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _wt_exact[eff_simd: Int, chunks: Int]() -> Bool:
         return (
             _wt_threads_per_block[eff_simd, chunks]() * eff_simd * chunks
@@ -1021,13 +1021,13 @@ def rms_norm_gpu[
     # fully active, no ragged tail) is decided at runtime and selects the
     # unguarded instantiation.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _launch_warp_tiling[eff_simd: Int, chunks: Int]() raises:
         var threads_per_block = _wt_threads_per_block[eff_simd, chunks]()
         var exact = _wt_exact[eff_simd, chunks]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _enqueue[exact_fit: Bool]() raises:
             comptime kernel = rms_norm_gpu_warp_tiling[
                 mut=gamma.mut,
@@ -1367,7 +1367,7 @@ def rms_norm_cpu[
 
         @__copy_capture(row_idx)
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn_2d[
             simd_width: SIMDLength, alignment: Int
         ](row: Int, col: Int, val: SIMD[dtype, simd_width]) -> None:
@@ -1380,7 +1380,7 @@ def rms_norm_cpu[
 
         @__copy_capture(row_idx)
         @__parameter
-        @always_inline
+        @inline(.always)
         def input_fn_2d[
             simd_width: Int
         ](row: Int, col: Int) -> SIMD[dtype, simd_width]:
@@ -1405,7 +1405,7 @@ def rms_norm_cpu[
     sync_parallelize(task_func, num_workers, ctx)
 
 
-@always_inline
+@inline(.always)
 def _rms_norm_input_alignment[
     dtype: DType, width: Int, target: StaticString
 ]() -> Int:
@@ -1421,7 +1421,7 @@ def _rms_norm_input_alignment[
         return align_of[SIMD[dtype, width]]()
 
 
-@always_inline
+@inline(.always)
 def _rms_norm_impl[
     dtype: DType,
     rank: Int,
@@ -1465,7 +1465,7 @@ def _rms_norm_impl[
         return
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_target[width: Int](coords: Coord) -> SIMD[dtype, width]:
         comptime align = _rms_norm_input_alignment[dtype, width, target]()
         return input_0_fn[width, align](coords)
@@ -1872,7 +1872,7 @@ def apply_qk_rms_norm[
         ctx: Device context (ignored on CPU).
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return trace_arg("qk", Coord(rows, q_cols + k_cols), in_dtype)
 
@@ -2367,7 +2367,7 @@ def group_norm_gpu[
         return
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(spatial, last_dim, num_groups, channels_per_group)
     def input_fn_2d[
         simd_width: Int
@@ -2678,7 +2678,7 @@ def group_norm_cpu[
 
             @__copy_capture(shape, n, c_base, spatial)
             @__parameter
-            @always_inline
+            @inline(.always)
             def indices_for(col: Int) -> DynamicCoord[.int64, rank]:
                 var c_offset, s = divmod(col, spatial)
                 comptime if rank == 4:
@@ -2717,7 +2717,7 @@ def group_norm_cpu[
     sync_parallelize(task_func, num_workers, ctx)
 
 
-@always_inline
+@inline(.always)
 def group_norm[
     dtype: DType,
     rank: Int,
@@ -2755,7 +2755,7 @@ def group_norm[
             " num_groups = {num_groups}"
         )
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return trace_arg("input", shape_il, dtype)
 
@@ -2845,7 +2845,7 @@ def rms_norm[
     ]()
     var axis_size_accum = Scalar[accum](Int(axis_size.value()))
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -2860,7 +2860,7 @@ def rms_norm[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -2871,7 +2871,7 @@ def rms_norm[
         ](row_coords, axis_size, ctx_p, load)
 
         # Reduce: sum of squares -> inv_rms.
-        @always_inline
+        @inline(.always)
         def square[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -2895,7 +2895,7 @@ def rms_norm[
         comptime g_stride = 1 if reduce_dim == rank - 1 else 0
 
         # Emit: per-element normalize, scale by gamma, and store.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {
@@ -3014,7 +3014,7 @@ def rms_norm_rope[
     var half = axis_size_int // 2
     var axis_size_accum = Scalar[accum](axis_size_int)
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3032,7 +3032,7 @@ def rms_norm_rope[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[input_dtype, width]:
@@ -3043,7 +3043,7 @@ def rms_norm_rope[
         ](row_coords, axis_size, ctx_p, load)
 
         # Reduce: sum of squares -> inv_rms.
-        @always_inline
+        @inline(.always)
         def square[
             width: Int
         ](tile: SIMD[input_dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3073,7 +3073,7 @@ def rms_norm_rope[
         # instead of re-loaded from global and re-normalized.
         # `multiply_before_cast` selects accum-multiply (True) vs
         # output-dtype-multiply (False), matching legacy.
-        @always_inline
+        @inline(.always)
         def normed_tile[
             width: Int
         ](tile: SIMD[input_dtype, width], idx: RowCoord[row_rank]) {
@@ -3104,7 +3104,7 @@ def rms_norm_rope[
         # primary loader + the producer that built `normed` — `RowCache`
         # doesn't carry them as fields, so `write` captures them too and
         # re-supplies them to `normed.load`.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](nc: SIMD[output_dtype, width], idx: RowCoord[row_rank]) {
@@ -3206,7 +3206,7 @@ def layer_norm[
         Welford[accum, 1], target, 96, dtype, accum
     ]()
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3220,7 +3220,7 @@ def layer_norm[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -3231,7 +3231,7 @@ def layer_norm[
         ](row_coords, axis_size, ctx_p, load)
 
         # Reduce: mean and variance in one Welford pass.
-        @always_inline
+        @inline(.always)
         def cast_to_accum[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3256,7 +3256,7 @@ def layer_norm[
         comptime g_stride = 1 if reduce_dim == rank - 1 else 0
 
         # Emit: per-element normalize, scale by gamma, shift by beta, store.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {
@@ -3358,7 +3358,7 @@ def layer_norm_rope_ragged[
         rope_dim % simd_width_cand == 0
     ) else 1
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3374,7 +3374,7 @@ def layer_norm_rope_ragged[
     }:
         comptime row_rank = row_coords.rank
 
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[input_dtype, width]:
@@ -3384,7 +3384,7 @@ def layer_norm_rope_ragged[
             params, accum, input_dtype, reduce_dim, row_rank, is_cached=True
         ](row_coords, axis_size, ctx_p, load)
 
-        @always_inline
+        @inline(.always)
         def cast_to_accum[
             width: Int
         ](tile: SIMD[input_dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3415,7 +3415,7 @@ def layer_norm_rope_ragged[
         # Cache: normalize and scale/shift by gamma/beta, staged into shared
         # memory so `write` can be a pure per-tile map (no partner lookups
         # needed -- interleaved RoPE pairs adjacent lanes within one tile).
-        @always_inline
+        @inline(.always)
         def normalize[
             width: Int
         ](tile: SIMD[input_dtype, width], idx: RowCoord[row_rank]) {
@@ -3448,7 +3448,7 @@ def layer_norm_rope_ragged[
         # in-register deinterleave doesn't apply. Read the missing partner
         # straight from the staged row cache instead (mirrors
         # row_rms_norm_rope's rotate-half partner load).
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](nc: SIMD[output_dtype, width], idx: RowCoord[row_rank]) {
@@ -3564,7 +3564,7 @@ def row_mean_of_squares[
     var axis_size = Int(shape[reduce_dim].value())
     var axis_size_accum = Scalar[accum](axis_size)
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3576,7 +3576,7 @@ def row_mean_of_squares[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[in_dtype, width]:
@@ -3589,7 +3589,7 @@ def row_mean_of_squares[
         ](row_coords, Int(axis_size), ctx_p, load)
 
         # Reduce: sum of squares -> mean of squares.
-        @always_inline
+        @inline(.always)
         def square[
             width: Int
         ](tile: SIMD[in_dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3606,7 +3606,7 @@ def row_mean_of_squares[
         )
 
         # Emit: one value per row, at `oc` (reduced axis pinned to 0).
-        @always_inline
+        @inline(.always)
         def write(
             oc: RowCoord[row_rank],
         ) {var mean_sq, var output_fn}:
@@ -3653,7 +3653,7 @@ def row_mean_of_squares_qk[
     if rows == 0:
         return
 
-    @always_inline
+    @inline(.always)
     def q_in[width: Int](idx: Coord) {var query} -> SIMD[in_dtype, width]:
         return query.load[width=width, alignment=1](idx)
 
@@ -3661,7 +3661,7 @@ def row_mean_of_squares_qk[
     # layout, so a `width`-wide batch of adjacent rows can't land in one
     # contiguous vector store; write it back lane by lane instead (`width`
     # is comptime, so this unrolls to `width` scalar stores).
-    @always_inline
+    @inline(.always)
     def q_out[
         width: SIMDLength
     ](oc: Coord, val: SIMD[out_dtype, width]) {var output}:
@@ -3672,11 +3672,11 @@ def row_mean_of_squares_qk[
         q_in, q_out, Coord(rows, q_cols), ctx
     )
 
-    @always_inline
+    @inline(.always)
     def k_in[width: Int](idx: Coord) {var key} -> SIMD[in_dtype, width]:
         return key.load[width=width, alignment=1](idx)
 
-    @always_inline
+    @inline(.always)
     def k_out[
         width: SIMDLength
     ](oc: Coord, val: SIMD[out_dtype, width]) {var output}:
@@ -3751,7 +3751,7 @@ def rms_norm_fused_residual_add[
     var axis_size_int = Int(axis_size.value())
     var axis_size_accum = Scalar[accum](axis_size_int)
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3771,7 +3771,7 @@ def rms_norm_fused_residual_add[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_0_fn} -> SIMD[dtype, width]:
@@ -3785,7 +3785,7 @@ def rms_norm_fused_residual_add[
         # (consecutive), else 0 (one gamma, splatted). Strided load, no branch.
         comptime g_stride = 1 if reduce_dim == rank - 1 else 0
 
-        @always_inline
+        @inline(.always)
         def square[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3805,7 +3805,7 @@ def rms_norm_fused_residual_add[
         # residual add). Emits the residual output on the way through, and is
         # cached once so phase 2 and the terminal read it back from registers
         # instead of recomputing it (and re-loading the residual) twice.
-        @always_inline
+        @inline(.always)
         def intermediate[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {
@@ -3841,7 +3841,7 @@ def rms_norm_fused_residual_add[
 
         var inter = row.cache[dtype](intermediate)
 
-        @always_inline
+        @inline(.always)
         def square_intermediate[
             width: Int
         ](staged_tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3860,7 +3860,7 @@ def rms_norm_fused_residual_add[
         var inv_rms2 = rsqrt(ssq2 / axis_size_accum + epsilon2.cast[accum]())
 
         # Emit: apply the second norm to the (staged) intermediate.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](staged_tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {
@@ -3964,7 +3964,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
     ]()
     var axis_size_accum = Scalar[accum](Int(axis_size.value()))
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -3981,7 +3981,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[in_dtype, width]:
@@ -3998,7 +3998,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
         # Plain non-capturing helper: receives the gamma tensor + weight offset
         # as arguments (captures no runtime value), so the value-closure
         # callbacks below can call it by name while capturing only plain values.
-        @always_inline
+        @inline(.always)
         def gamma_load[
             width: Int
         ](
@@ -4011,7 +4011,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
             ](gamma_tensor.ptr_at_offset(Coord(col)))
             return gamma_raw.cast[accum]() + weight_offset.cast[accum]()
 
-        @always_inline
+        @inline(.always)
         def square[
             width: Int
         ](tile: SIMD[in_dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -4030,7 +4030,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
         # factor is a positive scalar, so max(|gamma*x*inv_rms|) ==
         # max(|gamma*x|)*inv_rms; the FP8 scale is derived from the raw input
         # without staging the normalized row.
-        @always_inline
+        @inline(.always)
         def abs_gamma_x[
             width: Int
         ](tile: SIMD[in_dtype, width], idx: RowCoord[row_rank]) {
@@ -4057,7 +4057,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
 
         # Emit (scale): per-row output, the dynamic FP8 scale (reduced axis
         # pinned to 0).
-        @always_inline
+        @inline(.always)
         def write_scale(
             oc: RowCoord[row_rank],
         ) {var scale_factor, var scale_fn}:
@@ -4070,7 +4070,7 @@ def rms_norm_fused_quantize_dynamic_scaled_fp8[
         row.emit(write_scale)
 
         # Emit (per-element): normalize, scale by gamma, quantize to FP8.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](tile: SIMD[in_dtype, width], idx: RowCoord[row_rank]) {

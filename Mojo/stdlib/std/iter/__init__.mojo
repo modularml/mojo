@@ -218,7 +218,7 @@ trait Iterator(Deinitable, Movable):
             return None
 
 
-@always_inline
+@inline(.always)
 def iter(
     var iterable: Some[IterableOwned],
 ) -> type_of(iterable).IteratorOwnedType:
@@ -233,7 +233,7 @@ def iter(
     return iterable^.__iter__()
 
 
-@always_inline
+@inline(.always)
 def iter[
     IterableType: Iterable
 ](ref iterable: IterableType) -> IterableType.IteratorType[origin_of(iterable)]:
@@ -251,7 +251,7 @@ def iter[
     return iterable.__iter__()
 
 
-@always_inline
+@inline(.always)
 def next[
     IteratorType: Iterator
 ](mut iterator: IteratorType) raises StopIteration -> IteratorType.Element:
@@ -307,7 +307,7 @@ struct _Empty[T: Movable](
         return Tuple(0, Optional(0))
 
 
-@always_inline
+@inline(.always)
 def empty[T: Movable]() -> _Empty[T]:
     """Creates an iterator that yields nothing.
 
@@ -364,7 +364,7 @@ struct _Once[T: Movable & Deinitable](
         return self._inner.bounds()
 
 
-@always_inline
+@inline(.always)
 def once[T: Movable & Deinitable, //](var element: T, /) -> _Once[T]:
     """Creates an iterator that yields an element exactly once.
 
@@ -416,7 +416,7 @@ struct _Enumerate[InnerIteratorType: Iterator](
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -431,7 +431,7 @@ struct _Enumerate[InnerIteratorType: Iterator](
         return self._inner.bounds()
 
 
-@always_inline
+@inline(.always)
 def enumerate[
     IterableType: Iterable
 ](ref iterable: IterableType, *, start: Int = 0) -> _Enumerate[
@@ -461,7 +461,7 @@ def enumerate[
     return _Enumerate(iter(iterable), start=start)
 
 
-@always_inline
+@inline(.always)
 def enumerate(
     var iterable: Some[IterableOwned], *, start: Int = 0
 ) -> _Enumerate[type_of(iterable).IteratorOwnedType]:
@@ -518,7 +518,7 @@ struct _ZipIterator[origin: Origin, *Ts: Iterator](
         *TypeList[Trait=Iterator, Self.Ts.values]().map[Self._mapper]()
     ]
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where conforms_to(
@@ -526,7 +526,7 @@ struct _ZipIterator[origin: Origin, *Ts: Iterator](
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -669,7 +669,7 @@ struct _MapIterator[
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -680,7 +680,7 @@ struct _MapIterator[
         return self._inner.bounds()
 
 
-@always_inline
+@inline(.always)
 def map[
     origin: ImmOrigin,
     IterableType: Iterable,
@@ -727,7 +727,7 @@ def map[
     }
 
 
-@always_inline
+@inline(.always)
 def map[
     IterableType: IterableOwned,
     ResultType: Copyable,
@@ -794,7 +794,7 @@ struct _PeekableIterator[InnerIterator: Iterator](
     ) and conforms_to(Self.InnerIterator.Element, Copyable):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -907,7 +907,7 @@ struct _ChainedIterator[*Ts: Iterator](
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         comptime for i in range(Self._Iterators.__len__()):
             if self._idx <= i:

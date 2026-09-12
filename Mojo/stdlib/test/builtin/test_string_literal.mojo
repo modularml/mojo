@@ -263,7 +263,7 @@ def test_layout() raises:
     # assert_equal(empty[0], 0)
 
     # Test non-empty StringLiteral C string
-    var ptr = "hello".as_c_string_slice().ptr()
+    var ptr = "hello".as_c_string_span().ptr()
     assert_equal(ptr[unsafe_offset=0], Int8(ord("h")))
     assert_equal(ptr[unsafe_offset=1], Int8(ord("e")))
     assert_equal(ptr[unsafe_offset=2], Int8(ord("l")))

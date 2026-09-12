@@ -39,7 +39,7 @@ and a secondary static tile size.
 """
 
 
-@always_inline
+@inline(.always)
 def tile[
     tile_size_list: List[Int]
 ](
@@ -84,7 +84,7 @@ def tile[
             current_offset += tile_size
 
 
-@always_inline
+@inline(.always)
 def tile(
     offset: Int,
     upperbound: Int,
@@ -120,7 +120,7 @@ def tile(
         workgroup_function(work_idx, upperbound - work_idx)
 
 
-@always_inline
+@inline(.always)
 def tile[
     secondary_tile_size_list: List[Int],
     secondary_cleanup_tile: Int,
@@ -180,7 +180,7 @@ The function takes static tile size parameters and offset arguments, i.e.
 """
 
 
-@always_inline
+@inline(.always)
 def tile[
     tile_sizes_x: List[Int],
     tile_sizes_y: List[Int],

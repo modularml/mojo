@@ -80,7 +80,7 @@ def get_amd_bf8_dtype() -> Optional[DType]:
         return DType.float8_e5m2fnuz
 
 
-@always_inline
+@inline(.always)
 def _unsupported_mma_op(d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     # fmt: off
     comptime assert False, String(
@@ -93,24 +93,24 @@ def _unsupported_mma_op(d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     # fmt: on
 
 
-@always_inline
+@inline(.always)
 def _has_type[type: DType](a: DType, b: DType, c: DType, d: DType) -> Bool:
     return _has_type[(type, type, type, type)](a, b, c, d)
 
 
-@always_inline
+@inline(.always)
 def _has_type[
     abcd: Tuple[DType, DType, DType, DType]
 ](a: DType, b: DType, c: DType, d: DType) -> Bool:
     return (a, b, c, d) == abcd
 
 
-@always_inline
+@inline(.always)
 def _has_shape[size: Int](a: Int, b: Int, c: Int, d: Int) -> Bool:
     return _has_shape[(size, size, size, size)](a, b, c, d)
 
 
-@always_inline
+@inline(.always)
 def _has_shape[
     abcd: Tuple[Int, Int, Int, Int]
 ](a: Int, b: Int, c: Int, d: Int) -> Bool:
@@ -190,7 +190,7 @@ def _to_nvvm_layout[s: StaticString]() -> __mlir_type.`!kgen.deferred`:
     ]
 
 
-@always_inline
+@inline(.always)
 def mma[block_size: Int = 1](mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     """Performs warp sync Tensor Core based Matrix-multiply and accumulate (MMA) operation.
 
@@ -237,7 +237,7 @@ def mma[block_size: Int = 1](mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
 # ===------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ld_matrix[
     dtype: DType, //, simd_width: Int, *, transpose: Bool = False
 ](ptr: Pointer[mut=False, Scalar[dtype], ...]) -> SIMD[dtype, simd_width]:
@@ -360,7 +360,7 @@ def ld_matrix[
 # ===------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def st_matrix[
     dtype: DType, //, simd_width: Int, *, transpose: Bool = False
 ](
@@ -496,7 +496,7 @@ struct WGMMADescriptor[dtype: DType](
         """
         self.desc = val
 
-    @always_inline
+    @inline(.always)
     def _insert_bit[start_bit: Int](self, val: Int64) -> Self:
         """Insert bits at specified position in descriptor.
 
@@ -570,7 +570,7 @@ struct WGMMADescriptor[dtype: DType](
 
         return desc
 
-    @always_inline
+    @inline(.always)
     def __iadd__(mut self, offset: Int):
         """Add offset to descriptor's base address in-place.
 
@@ -579,7 +579,7 @@ struct WGMMADescriptor[dtype: DType](
         """
         self.desc += Int64((offset & 0x3FFFF) >> 4)
 
-    @always_inline
+    @inline(.always)
     def __add__(self, offset: Int) -> Self:
         """Add offset to descriptor's base address.
 
@@ -592,7 +592,7 @@ struct WGMMADescriptor[dtype: DType](
         return Self(self.desc + Int64((offset & 0x3FFFF) >> 4))
 
 
-@always_inline
+@inline(.always)
 def wgmma_fence_aligned():
     """Inserts a memory fence for warp group matrix multiply operations.
 
@@ -602,7 +602,7 @@ def wgmma_fence_aligned():
     __mlir_op.`nvvm.wgmma.fence.aligned`[_type=None]()
 
 
-@always_inline
+@inline(.always)
 def wgmma_commit_group_sync():
     """Commits pending warp group matrix multiply operations.
 
@@ -612,7 +612,7 @@ def wgmma_commit_group_sync():
     __mlir_op.`nvvm.wgmma.commit.group.sync.aligned`[_type=None]()
 
 
-@always_inline
+@inline(.always)
 def wgmma_wait_group_sync[group: Int = 0]():
     """Waits for all pending warp group matrix multiply operations to complete.
 
@@ -627,7 +627,7 @@ def wgmma_wait_group_sync[group: Int = 0]():
     ](group)
 
 
-@always_inline
+@inline(.always)
 def wgmma_async[
     m: Int,
     n: Int,
@@ -749,7 +749,7 @@ def wgmma_async[
     return llvm_struct_to_array[c_dtype, width](llvmres)
 
 
-@always_inline
+@inline(.always)
 def wgmma_async[
     m: Int,
     n: Int,
@@ -870,7 +870,7 @@ def wgmma_async[
     return llvm_struct_to_simd[c_dtype, width](llvmres)
 
 
-@always_inline
+@inline(.always)
 def wgmma_async[
     m: Int,
     n: Int,
@@ -1263,14 +1263,14 @@ def wgmma_async[
     # fmt: on
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _str_iota[
     count: Int, *, prefix: String = String(), sep: String = ", "
 ]() -> String:
     return _str_iota_impl[count, prefix=prefix, sep=sep]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _str_iota_impl[
     count: Int, *, prefix: String = String(), sep: String = ", "
 ]() -> String:

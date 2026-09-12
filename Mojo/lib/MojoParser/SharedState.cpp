@@ -25,6 +25,7 @@
 #include "ParserEvaluationContext.h"
 #include "Signatures.h"
 
+#include "Mojo/KGENDialect/KGENUtils.h"
 #include "Mojo/MojoParser/ASTDecl.h"
 #include "Mojo/MojoParser/ASTType.h"
 #include "Mojo/MojoParser/DeclResolver.h"
@@ -2886,14 +2887,16 @@ TypedAttr SharedState::foldInlineBuiltinFunction(ArrayRef<TypedAttr> operands,
   assert(llvm::isa_and_present<FnOp>(calleeDecl->getIfOperation()) &&
          "callee isn't known?");
   auto fnOp = cast_or_null<FnOp>(calleeDecl->getIfOperation());
-  if (fnOp.getInlineLevel() != InlineLevel::AlwaysBuiltin) {
+  if (inlineLevelOrAutomatic(fnOp.getInlineLevel()) !=
+      InlineLevel::AlwaysBuiltin) {
     folder.emitError(callLoc) << "only supports calls to other "
                                  "'@always_inline(\"builtin\")' functions";
     return {};
   }
   if (failed(resolver.resolveBody(*calleeDecl, calleeDecl->getLoc())) ||
       // Double check to ensure body resolution's check succeeded.
-      fnOp.getInlineLevel() != InlineLevel::AlwaysBuiltin) {
+      inlineLevelOrAutomatic(fnOp.getInlineLevel()) !=
+          InlineLevel::AlwaysBuiltin) {
     return {}; // Error already diagnosed.
   }
 

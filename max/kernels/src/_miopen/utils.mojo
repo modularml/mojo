@@ -56,7 +56,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -67,7 +67,7 @@ def _get_dylib_function[
     ]()
 
 
-@always_inline
+@inline(.always)
 def check_error(stat: Status) raises:
     if stat != Status.SUCCESS:
         raise Error("MIOPEN ERROR:", stat)

@@ -32,7 +32,7 @@ from layout import (
 )
 from layout.tile_layout import TensorLayout, row_major
 from std.memory import alloc, dealloc, Allocation
-from std.memory.alloc import Layout as AllocLayout
+from std.memory.alloc import Alignment, Layout as AllocLayout
 from max.runtime.asyncrt import parallelism_level
 
 from std.utils.index import Index, IndexList
@@ -138,7 +138,7 @@ def elementwise_epilogue_c_tile[
         c: Read-only view of the C output tile.
     """
 
-    @always_inline
+    @inline(.always)
     def activation_on_col_chunk[col_chunk_size: Int](idx_n: Int) {imm}:
         var n_coord = idx_n + offset.N
         for idx_m in range(tile_len.M):
@@ -366,7 +366,7 @@ struct TiledMatmul[
             min(sub_tile_n, knm_bounds.N), min(sub_tile_k, knm_bounds.K)
         )
 
-        @always_inline
+        @inline(.always)
         def row_iteration[
             tile_kernel_rows: Int
         ](row_offset: Int) {var sub_tile_n_k, var b_packed_tile, imm}:
@@ -424,7 +424,7 @@ struct TiledMatmul[
         )
         var tile_n: Int = self.tile_n_k[0]
 
-        @always_inline
+        @inline(.always)
         def m_loop[
             secondary_tile_size: Int
         ](col_idx: Int, tile_size_n: Int) {imm}:
@@ -474,7 +474,7 @@ struct TiledMatmul[
         """Iterate on the K dimension of the whole problem space."""
 
         # Each tiled iteration on the k dimension.
-        @always_inline
+        @inline(.always)
         def k_iteration(k_offset: Int, k_tile_size: Int) {imm}:
             var last_k_tile = (
                 k_offset + k_tile_size + self.global_tile_offset.K
@@ -494,7 +494,7 @@ struct TiledMatmul[
         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_cpu_impl[
     config: KernelConfig,
     transpose_b: Bool,
@@ -553,21 +553,29 @@ def _matmul_cpu_impl[
 
         comptime use_i8mm = kernel_id == InnerKernelID.I8MM
         comptime simd_size = config.simd_size
-        comptime alignment = align_of[SIMD[c.dtype, simd_size]]()
+        comptime alignment = Alignment.of[SIMD[c.dtype, simd_size]]()
         var kh = align_up(k, 8)
         var mh = align_up(m, 2)
 
-        var a_packed_alloc: Optional[Allocation[Scalar[a.dtype]]] = None
+        var a_packed_alloc: Optional[
+            Allocation[Scalar[a.dtype], alignment=alignment]
+        ] = None
+
+        def _dealloc_packed(
+            var packed: Allocation[Scalar[a.dtype], alignment=alignment],
+        ):
+            dealloc(packed^)
+
         comptime if use_i8mm:
             # Retire the empty `None` before reassigning: `Optional[Allocation]`
             # is not implicitly deletable, so overwriting it cannot drop the old
             # value implicitly.
-            a_packed_alloc^.deinit_with(dealloc[Scalar[a.dtype]])
+            a_packed_alloc^.deinit_with(_dealloc_packed)
             a_packed_alloc = alloc(
-                AllocLayout[Scalar[a.dtype]](count=mh * kh, alignment=alignment)
+                AllocLayout[Scalar[a.dtype], alignment=alignment](count=mh * kh)
             )
 
-        @always_inline
+        @inline(.always)
         def pack_task_func(
             task_id: Int,
         ) {mut a_packed_alloc, var m, var k, var num_tasks, imm}:
@@ -589,7 +597,7 @@ def _matmul_cpu_impl[
                 t0, t1, k, a.ptr, a_packed_alloc.unsafe_value().unsafe_ptr()
             )
 
-        @always_inline
+        @inline(.always)
         def task_func(
             task_id: Int,
         ) {var m, var k, var num_tasks, var n, var mh, var kh, imm}:
@@ -656,10 +664,10 @@ def _matmul_cpu_impl[
         # to be synchronous in order to keep that state alive
         sync_parallelize(task_func, num_tasks, ctx)
 
-        a_packed_alloc^.deinit_with(dealloc[Scalar[a.dtype]])
+        a_packed_alloc^.deinit_with(_dealloc_packed)
 
 
-@always_inline
+@inline(.always)
 def matmul[
     *,
     transpose_b: Bool = False,
@@ -717,10 +725,12 @@ def matmul[
         var scratch_n = scratch_shape.N
 
         comptime scratch_simd = simd_width_of[scratch_type]()
-        comptime scratch_align = align_of[SIMD[scratch_type, scratch_simd]]()
+        comptime scratch_align = Alignment.of[
+            SIMD[scratch_type, scratch_simd]
+        ]()
         var scratch_alloc = alloc(
-            AllocLayout[Scalar[scratch_type]](
-                count=scratch_m * scratch_n, alignment=scratch_align
+            AllocLayout[Scalar[scratch_type], alignment=scratch_align](
+                count=scratch_m * scratch_n
             )
         ).into_managed()
         var scratch_ptr: UnsafePointer[
@@ -731,7 +741,7 @@ def matmul[
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def cast_epilogue[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](coord: IndexList[2], val: SIMD[dtype, width]):
@@ -755,7 +765,7 @@ def matmul[
 
     comptime kernel_id = select_inner_kernel[a.dtype, b.dtype, c.dtype]()
 
-    @always_inline
+    @inline(.always)
     def dispatch_on_kernel_type[
         kernel_type: Bool
     ]() raises {c, a, b, num_threads, ctx}:

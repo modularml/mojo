@@ -52,7 +52,7 @@ from layout import Coord, CoordLike
 #
 # Shared by the normalization (rms_norm / layer_norm) and concat kernels; lives
 # here rather than in either kernel module so neither has to import the other.
-@always_inline
+@inline(.always)
 def _get_start_indices_of_nth_subvolume_static[
     element_types: TypeList[Trait=CoordLike, ...], //, subvolume_rank: Int = 1
 ](n: Int, shape: Coord[*element_types]) -> IndexList[shape.rank]:
@@ -98,7 +98,7 @@ def _get_start_indices_of_nth_subvolume_static[
     return res
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def get_sliding_window_out_dim[
     ceil_mode: Bool = False,
 ](in_dim: Int, ft_dim: Int, dilation: Int, stride: Int, pad: Int) -> Int:

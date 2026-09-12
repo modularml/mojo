@@ -94,7 +94,7 @@ def _check_span_length(
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def assert_almost_equal[
     dtype: DType,
     //,
@@ -146,7 +146,7 @@ def assert_almost_equal[
     )
 
 
-@always_inline
+@inline(.always)
 def assert_almost_equal[
     dtype: DType,
     //,
@@ -212,7 +212,7 @@ def assert_almost_equal[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def assert_equal[
     dtype: DType,
     //,
@@ -261,7 +261,7 @@ def assert_equal[
         )
 
 
-@always_inline
+@inline(.always)
 def assert_equal[
     dtype: DType,
     //,
@@ -300,7 +300,7 @@ def assert_equal[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def assert_with_measure[
     dtype: DType,
     //,
@@ -373,7 +373,7 @@ def assert_with_measure[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def pytorch_like_tolerances_for[dtype: DType]() -> Tuple[Float64, Float64]:
     """Get PyTorch-like default tolerances for a given dtype.
 
@@ -410,7 +410,7 @@ def pytorch_like_tolerances_for[dtype: DType]() -> Tuple[Float64, Float64]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def test_value_for_gpu_element[
     dtype: DType,

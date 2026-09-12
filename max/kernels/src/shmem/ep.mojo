@@ -43,7 +43,7 @@ from shmem.ep_comm import (
 )
 
 
-@always_inline
+@inline(.always)
 def global_cache_insert(key: String, value: OpaquePointer[mut=True, _]):
     """Inserts a pointer into the process-wide compiler runtime global cache.
 
@@ -63,7 +63,7 @@ def global_cache_insert(key: String, value: OpaquePointer[mut=True, _]):
     )
 
 
-@always_inline
+@inline(.always)
 def _ep_dispatch_wait_grid_dim(
     num_tokens: Int,
     n_local_experts: Int,
@@ -80,7 +80,7 @@ def _ep_dispatch_wait_grid_dim(
     return min(n_local_experts + max(num_tokens, 0) + 1, sm_count)
 
 
-@always_inline
+@inline(.always)
 def _ep_combine_wait_grid_dim(
     num_tokens: Int,
     n_chunks_per_tok: Int,
@@ -99,7 +99,7 @@ def _ep_combine_wait_grid_dim(
     return min(reduce_sms + 1, sm_count)
 
 
-@always_inline
+@inline(.always)
 def pack_ptrs_array[
     ptrs_layout: TensorLayout,
     //,
@@ -137,7 +137,7 @@ def pack_ptrs_array[
     """
     comptime assert _ptrs.flat_rank == 1, "Pointers must be a 1D tensor."
 
-    @always_inline
+    @inline(.always)
     def ptr_arr_init(
         i: Int,
     ) {imm} -> UnsafePointer[Scalar[ptr_type], MutUntrackedOrigin]:
@@ -160,7 +160,7 @@ def pack_ptrs_array[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_dispatch_async_kernel_api[
     token_fmt_type: TokenFormat,
     n_experts: Int,
@@ -251,7 +251,7 @@ def ep_dispatch_async_kernel_api[
         use_shmem=use_shmem,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -317,7 +317,7 @@ def ep_dispatch_async_kernel_api[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_dispatch_wait_kernel_api[
     token_fmt_type: TokenFormat,
     //,
@@ -401,7 +401,7 @@ def ep_dispatch_wait_kernel_api[
         input_scales_wrapper=input_scales_wrapper,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -465,7 +465,7 @@ def ep_dispatch_wait_kernel_api[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_fused_dispatch_kernel_api[
     token_fmt_type: TokenFormat,
     dispatch_dtype: DType,
@@ -589,7 +589,7 @@ def ep_fused_dispatch_kernel_api[
         allreduce_world_size=allreduce_world_size,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -682,7 +682,7 @@ def ep_fused_dispatch_kernel_api[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_combine_async_kernel_api[
     combine_dtype: DType,
     hidden_size: Int,
@@ -771,7 +771,7 @@ def ep_combine_async_kernel_api[
         use_shmem=use_shmem,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -839,7 +839,7 @@ def ep_combine_async_kernel_api[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_combine_wait_kernel_api[
     combine_dtype: DType,
     //,
@@ -930,7 +930,7 @@ def ep_combine_wait_kernel_api[
         elementwise_lambda_fn=epilogue_fn,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -996,7 +996,7 @@ def ep_combine_wait_kernel_api[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ep_fused_combine_kernel_api[
     combine_dtype: DType,
     //,
@@ -1119,7 +1119,7 @@ def ep_fused_combine_kernel_api[
         allreduce_world_size=allreduce_world_size,
     ]
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(

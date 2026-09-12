@@ -25,7 +25,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pytest
-from max.nn.kv_cache import KVCacheGroupId
+from max.nn.kv_cache import KVCacheGroupId, PagedKVLeafRegion
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import InsufficientBlocksError
@@ -38,6 +38,8 @@ from max.pipelines.kv_cache.kv_connector import (
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
+    create_groups,
+    create_pools,
 )
 from max.pipelines.request.base import RequestID
 
@@ -198,13 +200,25 @@ def make_manager(
     num_huge_blocks: int = 16,
     leaf_infos: Mapping[str, KVLeafInfo] | None = None,
 ) -> JengaBlockManager:
+    leaf_infos = leaf_infos or {
+        leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves
+    }
+    pools = create_pools(leaf_infos, num_huge_blocks)
     return JengaBlockManager(
-        leaf_infos
-        or {leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves},
-        num_huge_blocks=num_huge_blocks,
+        pools=pools,
+        groups=create_groups(leaf_infos, pools, 1),
+        leaves={
+            leaf_id: PagedKVLeafRegion(
+                leaf_id=leaf_id,
+                group_id=info.group_id,
+                bytes_per_page=1,
+                page_size=1,
+            )
+            for leaf_id, info in leaf_infos.items()
+            if not info.group_id.is_recurrent()
+        },
         block_size=1,
         enable_prefix_caching=True,
-        num_replicas=1,
         max_num_input_tokens=None,
         num_draft_tokens=0,
         num_draft_tokens_per_step=0,

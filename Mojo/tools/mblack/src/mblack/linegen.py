@@ -549,12 +549,17 @@ class LineGenerator(Visitor[Line]):
         """Sorts the conformance/inheritance list for struct/trait nodes in-place.
 
         Each conformance entry in the arglist is either:
-        - A bare NAME leaf (unconditional conformance), or
-        - An 'argument' node whose first child is a NAME leaf (conditional
-          conformance with a where clause).
+        - A bare NAME leaf (unconditional conformance),
+        - An 'argument' node whose first child is the trait (conditional
+          conformance with a where clause, or an opt-out with an `else`
+          reason), or
+        - A 'not_test' node over a NAME leaf (`not Trait`, the opt-out), which
+          sorts under the trait it names.
 
         We sort the full entries as units keyed by their trait name so that
-        where clauses stay attached to the correct trait.
+        where clauses stay attached to the correct trait. An entry we cannot
+        key -- a trait composition, say -- keeps its slot and the rest sort
+        around it.
         """
 
         for child in node.children:
@@ -567,12 +572,12 @@ class LineGenerator(Visitor[Line]):
 
         def _conformance_name(entry: LN) -> str | None:
             """Return the trait name for a conformance entry, or None."""
+            if isinstance(entry, Node) and entry.type == syms.argument:
+                entry = entry.children[0]
+            if isinstance(entry, Node) and entry.type == syms.not_test:
+                entry = entry.children[1]
             if isinstance(entry, Leaf) and entry.type == token.NAME:
                 return entry.value
-            if isinstance(entry, Node) and entry.type == syms.argument:
-                first = entry.children[0]
-                if isinstance(first, Leaf) and first.type == token.NAME:
-                    return first.value
             return None
 
         # Collect (index, entry) pairs for conformance entries (skip commas).

@@ -84,8 +84,6 @@ from .string_span import (
     GraphemeSliceIter,
     ImmStringSpan,
     ImmStringSlice,
-    MutStringSpan,
-    MutStringSlice,
     StaticString,
     StringSpan,
     StringSlice,

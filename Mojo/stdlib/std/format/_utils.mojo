@@ -23,7 +23,7 @@ from std.reflection.type_info import _unqualified_type_name
 from std.sys import size_of
 from std.sys.info import is_gpu
 from std.sys.defines import get_defined_int
-from std.ffi import CStringSlice
+from std.ffi import CStringSpan
 
 from std.bit import byte_swap
 from std.memory import bitcast, unsafe_memcpy
@@ -48,16 +48,16 @@ struct _SequenceWriter[W: Writer, origin: MutOrigin](Movable, Writer):
         self.at_element_start = True
         self.sep = sep
 
-    @always_inline
+    @inline(.always)
     def next_element(mut self):
         """Mark the start of the next element in the sequence."""
         self.at_element_start = True
 
-    @always_inline
+    @inline(.always)
     def write_string(mut self, string: StringSlice):
         self.write(string)
 
-    @always_inline
+    @inline(.always)
     def write[*Ts: Writable](mut self, *args: *Ts):
         if self.at_element_start:
             if not self.is_first_element:
@@ -69,7 +69,7 @@ struct _SequenceWriter[W: Writer, origin: MutOrigin](Movable, Writer):
             args[i].write_to(self.writer[])
 
 
-@always_inline
+@inline(.always)
 def write_sequence_to[
     W: Writer
 ](
@@ -114,7 +114,7 @@ def write_sequence_to[
     writer.write_string(end)
 
 
-@always_inline
+@inline(.always)
 def write_sequence_to[
     *Ts: Writable,
 ](
@@ -143,7 +143,7 @@ def write_sequence_to[
     args._write_to(writer, start=start, end=end, sep=sep)
 
 
-@always_inline
+@inline(.always)
 def write_sequence_to[
     size: Int,
 ](
@@ -189,7 +189,7 @@ def write_sequence_to[
 struct TypeNames[*Ts: AnyType](ImplicitlyCopyable, Writable):
     """A wrapper type that writes a comma-separated list of type names."""
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         def elements[i: Int](mut writer: Some[Writer]) {}:
             writer.write_string(_unqualified_type_name[Self.Ts[i]]())
@@ -199,13 +199,13 @@ struct TypeNames[*Ts: AnyType](ImplicitlyCopyable, Writable):
         )
 
 
-@always_inline
+@inline(.always)
 def write_repr_to[T: AnyType](t: T, mut writer: Some[Writer]):
     comptime assert conforms_to(T, Writable), "T must be Writable"
     t.write_repr_to(writer)
 
 
-@always_inline
+@inline(.always)
 def write_to[T: AnyType](t: T, mut writer: Some[Writer]):
     comptime assert conforms_to(T, Writable), "T must be Writable"
     t.write_to(writer)
@@ -226,7 +226,7 @@ struct Repr[T: Writable, o: ImmOrigin](ImplicitlyCopyable, Writable):
 
     var _value: Pointer[Self.T, Self.o]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ref[Self.o] value: Self.T):
         """Constructs a `Repr` wrapper around a reference to a value.
 
@@ -235,7 +235,7 @@ struct Repr[T: Writable, o: ImmOrigin](ImplicitlyCopyable, Writable):
         """
         self._value = Pointer(to=value)
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the repr representation of the wrapped value.
 
@@ -263,7 +263,7 @@ struct Named[T: Writable, o: ImmOrigin](ImplicitlyCopyable, Writable):
     var _name: StaticString
     var _value: Pointer[Self.T, Self.o]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, name: StaticString, ref[Self.o] value: Self.T):
         """Constructs a `Named` wrapper for a field.
 
@@ -274,7 +274,7 @@ struct Named[T: Writable, o: ImmOrigin](ImplicitlyCopyable, Writable):
         self._name = name
         self._value = Pointer(to=value)
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the named field in the format `name=value`.
 
@@ -304,7 +304,7 @@ struct FormatStruct[T: Writer, o: MutOrigin](Movable):
 
     var _writer: Pointer[Self.T, Self.o]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ref[Self.o] writer: Self.T, name: StaticString):
         """Constructs a `FormatStruct` and writes the struct name.
 
@@ -315,7 +315,7 @@ struct FormatStruct[T: Writer, o: MutOrigin](Movable):
         writer.write_string(name)
         self._writer = Pointer(to=writer)
 
-    @always_inline
+    @inline(.always)
     def params[*Ts: Writable](self, *args: *Ts) -> ref[self] Self:
         """Writes type parameters in bracket notation `[param1, param2, ...]`.
 
@@ -335,7 +335,7 @@ struct FormatStruct[T: Writer, o: MutOrigin](Movable):
         args._write_to(self._writer[], start="[", end="]")
         return self
 
-    @always_inline
+    @inline(.always)
     def fields[*Ts: Writable](self, *args: *Ts):
         """Writes field values in parentheses `(field1, field2, ...)`.
 
@@ -352,7 +352,7 @@ struct FormatStruct[T: Writer, o: MutOrigin](Movable):
         comptime assert Ts.all_conforms_to[Writable]()  # satisfy where clause.
         args._write_to(self._writer[], start="(", end=")")
 
-    @always_inline
+    @inline(.always)
     def fields(self, fields_fn: Some[def[T: Writer](mut T)]):
         """Writes field values in parentheses using a callback function.
 
@@ -385,11 +385,11 @@ comptime FLUSHING_WRITE_BUFFER_BYTES = get_defined_int[
 """The default capacity of a `_FlushingWriteBuffer`."""
 
 
-@no_inline
+@inline(.never)
 def _fixed_buffer_exceeded() -> Never:
     """Reports a `_FixedWriteBuffer` overflow and aborts.
 
-    Kept separate from its `@always_inline` callers (and shared between them)
+    Kept separate from its `@inline(.always)` callers (and shared between them)
     so this rarely-taken path doesn't duplicate its `_printf`/`abort` sequence
     at every `_FixedWriteBuffer` write site.
     """
@@ -416,7 +416,7 @@ struct _FixedWriteBuffer(Writer):
         self._data = {uninitialized = True}
         self._pos = 0
 
-    @always_inline
+    @inline(.always)
     def write_string(mut self, string: StringSlice):
         var len_bytes = string.byte_length()
         if len_bytes + self._pos > FIXED_WRITE_BUFFER_BYTES:
@@ -430,17 +430,16 @@ struct _FixedWriteBuffer(Writer):
 
     def nul_terminate(
         mut self,
-    ) -> CStringSlice[origin_of(self).unsafe_mut_cast[False]()]:
+    ) -> CStringSpan[origin_of(self)]:
         if self._pos + 1 > FIXED_WRITE_BUFFER_BYTES:
             _fixed_buffer_exceeded()
         self._data.unsafe_ptr()[unsafe_offset=self._pos] = 0
         self._pos += 1
 
-        return CStringSlice(
+        return CStringSpan(
             unsafe_from_ptr=self._data.unsafe_ptr()
             .unsafe_bitcast[Int8]()
-            .as_imm()
-            .unsafe_origin_cast[ImmOrigin(origin_of(self))]()
+            .unsafe_origin_cast[origin_of(self)]()
         )
 
 
@@ -537,7 +536,7 @@ comptime _hex_table = SIMD[.uint8, 16](
 # fmt: on
 
 
-@always_inline
+@inline(.always)
 def _hex_digits_to_hex_chars(
     decimal: Scalar,
 ) -> SIMD[.uint8, size_of[decimal.dtype]() * 2]:
@@ -571,7 +570,7 @@ def _hex_digits_to_hex_chars(
     )
 
 
-@always_inline
+@inline(.always)
 def _write_hex[
     *, amnt_hex_bytes: Int
 ](mut writer: Some[Writer], decimal: Scalar):

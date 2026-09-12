@@ -17,6 +17,18 @@ from __future__ import annotations
 import re
 
 import pytest
+from max.benchmark.benchmark_shared.datasets.image_augmentation import (
+    generate_random_image,
+)
+from max.benchmark.benchmark_shared.datasets.types import (
+    ChatSamples,
+    ChatSession,
+    OpenAIImage,
+    RequestSamples,
+    SampledRequest,
+    SessionMessage,
+    encode_image,
+)
 from max.benchmark.benchmark_shared.metrics import (
     BenchmarkResult,
     PercentileMetrics,
@@ -26,10 +38,13 @@ from max.benchmark.benchmark_shared.metrics import (
 )
 from max.benchmark.benchmark_shared.serving_result_output import (
     PercentileRow,
+    _image_dimensions,
+    _image_long_side,
     elide_data_uris_in_string,
     format_gpu_statistics_title,
     format_percentile_table,
     print_benchmark_summary,
+    print_workload_stats,
 )
 
 
@@ -225,3 +240,95 @@ def test_print_benchmark_summary_tabulates_gpu_stats(
     )
     assert util is not None
     assert float(util.group(1).strip()) == 96.0
+
+
+def _make_request(
+    prompt_len: int = 10, encoded_images: list[OpenAIImage] | None = None
+) -> SampledRequest:
+    return SampledRequest(
+        prompt_formatted="hello",
+        prompt_len=prompt_len,
+        output_len=5,
+        encoded_images=encoded_images or [],
+        ignore_eos=False,
+    )
+
+
+def test_print_workload_stats_request_samples_without_images_omits_section(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    samples = RequestSamples(requests=[_make_request() for _ in range(3)])
+    print_workload_stats(samples)
+    out = capsys.readouterr().out
+    assert "Image count" not in out
+
+
+def test_print_workload_stats_request_samples_with_images_prints_section(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    image = encode_image(generate_random_image(64, 64))
+    samples = RequestSamples(
+        requests=[_make_request(encoded_images=[image]) for _ in range(3)]
+    )
+    print_workload_stats(samples)
+    out = capsys.readouterr().out
+    assert "Image count (per request)" in out
+    assert "Image long side (px)" in out
+
+
+def test_print_workload_stats_chat_samples_with_images_prints_per_session(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    image = encode_image(generate_random_image(32, 32))
+    session = ChatSession(
+        id=0,
+        messages=[
+            SessionMessage(
+                source="user", content="hi", num_tokens=5, images=[image]
+            ),
+            SessionMessage(source="assistant", content="hello", num_tokens=5),
+        ],
+    )
+    samples = ChatSamples(chat_sessions=[session])
+    print_workload_stats(samples)
+    out = capsys.readouterr().out
+    assert "Image count (per session)" in out
+
+
+def test_print_workload_stats_reports_image_aspect_ratio(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Long side alone hides what shape a sampled aspect ratio produced."""
+    image = encode_image(generate_random_image(256, 1024))
+    samples = RequestSamples(
+        requests=[_make_request(encoded_images=[image]) for _ in range(3)]
+    )
+    print_workload_stats(samples)
+    out = capsys.readouterr().out
+    assert "Image aspect ratio (w/h)" in out
+
+
+def test_image_dimensions_decodes_width_and_height() -> None:
+    image = encode_image(generate_random_image(48, 96))
+    assert _image_dimensions(image) == (96, 48)
+
+
+def test_image_long_side_decodes_data_uri() -> None:
+    image = encode_image(generate_random_image(48, 96))
+    assert _image_long_side(image) == 96
+
+
+def test_image_long_side_none_for_non_data_uri() -> None:
+    image: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "https://example.com/x.jpg"},
+    }
+    assert _image_long_side(image) is None
+
+
+def test_image_long_side_none_for_corrupt_data() -> None:
+    image: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,not-valid-base64!!"},
+    }
+    assert _image_long_side(image) is None

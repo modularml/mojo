@@ -32,7 +32,7 @@ from ..mma import _has_type, _has_shape, _unsupported_mma_op
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _load_matrix_a_amd_rdna[
     m: Int, n: Int, k: Int
 ](
@@ -56,7 +56,7 @@ def _load_matrix_a_amd_rdna[
     return a
 
 
-@always_inline
+@inline(.always)
 def _load_matrix_a_amd_rdna[
     m: Int, n: Int, k: Int
 ](
@@ -80,7 +80,7 @@ def _load_matrix_a_amd_rdna[
     return a
 
 
-@always_inline
+@inline(.always)
 def _load_matrix_b_amd_rdna[
     m: Int, n: Int, k: Int
 ](
@@ -104,7 +104,7 @@ def _load_matrix_b_amd_rdna[
     return b
 
 
-@always_inline
+@inline(.always)
 def _load_matrix_b_amd_rdna[
     m: Int, n: Int, k: Int
 ](
@@ -128,7 +128,7 @@ def _load_matrix_b_amd_rdna[
     return b
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a_amd_rdna16x16x16(
     a_ptr: Pointer[Float16, _],
     tile_row: Int,
@@ -158,7 +158,7 @@ def load_matrix_a_amd_rdna16x16x16(
     return _load_matrix_a_amd_rdna[16, 16, 16](a_ptr, tile_row, tile_col, ldm)
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a_amd_rdna16x16x16(
     a_ptr: Pointer[BFloat16, _],
     tile_row: Int,
@@ -188,7 +188,7 @@ def load_matrix_a_amd_rdna16x16x16(
     return _load_matrix_a_amd_rdna[16, 16, 16](a_ptr, tile_row, tile_col, ldm)
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b_amd_rdna16x16x16(
     b_ptr: Pointer[Float16, _],
     tile_row: Int,
@@ -218,7 +218,7 @@ def load_matrix_b_amd_rdna16x16x16(
     return _load_matrix_b_amd_rdna[16, 16, 16](b_ptr, tile_row, tile_col, ldm)
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b_amd_rdna16x16x16(
     b_ptr: Pointer[BFloat16, _],
     tile_row: Int,
@@ -253,7 +253,7 @@ def load_matrix_b_amd_rdna16x16x16(
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _mma_wmma_rdna(mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     """Performs AMD RDNA3+ WMMA (Wave Matrix Multiply-Accumulate) operations.
 

@@ -22,20 +22,20 @@ comptime BLOCK_SIZE = 256
 comptime WARP_SIZE = 32
 
 
-@always_inline
+@inline(.always)
 def max_op(a: Float32, b: Float32) -> Float32:
     if a > b:
         return a
     return b
 
 
-@always_inline
+@inline(.always)
 def sum_op(a: Float32, b: Float32) -> Float32:
     return a + b
 
 
 # Robust Block Reduce using Shared Memory (No Shuffle)
-@always_inline
+@inline(.always)
 def block_reduce[
     op: def(Float32, Float32) thin -> Float32
 ](

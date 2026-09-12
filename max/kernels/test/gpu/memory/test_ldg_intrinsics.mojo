@@ -46,7 +46,7 @@ def register_intrinsics(
     f64.store(tid, ldg(f64))
 
 
-@always_inline
+@inline(.always)
 def _verify_register_intrinsics(asm: StringSlice) raises -> None:
     assert_true("ld.global.nc.b8" in asm)
     assert_true("ld.global.nc.b16" in asm)

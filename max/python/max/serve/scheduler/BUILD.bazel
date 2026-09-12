@@ -6,6 +6,7 @@ modular_py_library(
     name = "scheduler",
     srcs = glob(["**/*.py"]),
     deps = [
+        "//max/python/max:_core",
         "//max/python/max/driver",
         "//max/python/max/nn",
         "//max/python/max/pipelines/audio",

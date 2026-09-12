@@ -84,7 +84,7 @@ comptime RegTile[
 """Type alias for register (local memory) tile tensors."""
 
 
-@always_inline
+@inline(.always)
 def reg_tile_to_tile_tensor[
     dtype: DType,
     layout: Layout,
@@ -177,7 +177,7 @@ struct SMemTileArray[
 
         self.ptr = rebind[type_of(self.ptr)](unsafe_ptr)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at index.
 
@@ -204,7 +204,7 @@ struct SMemTileArray[
     ):
         return type_of(result)(self.ptr + eval[Self.layout.size()] * start)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation() -> Self:
         var ptr = unsafe_stack_allocation[
@@ -234,7 +234,7 @@ struct SMemArray[type: TrivialRegisterPassable, size: Int](
 
     var ptr: Self.ptr_type
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         unsafe_ptr: Self.ptr_type,
@@ -250,7 +250,7 @@ struct SMemArray[type: TrivialRegisterPassable, size: Int](
         """Initialize from Storage."""
         return Self(rebind[Self.ptr_type](storage.unsafe_ptr()))
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.ptr_type:
         """Get a pointer to the element at index.
 
@@ -262,7 +262,7 @@ struct SMemArray[type: TrivialRegisterPassable, size: Int](
         """
         return self.ptr + Int(index)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def len() -> Int:
         """Get array length in bytes.
@@ -272,7 +272,7 @@ struct SMemArray[type: TrivialRegisterPassable, size: Int](
         """
         return Self.size * size_of[Self.type]()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation[alignment: Int = align_of[Self.type]()]() -> Self:
         var ptr = unsafe_stack_allocation[

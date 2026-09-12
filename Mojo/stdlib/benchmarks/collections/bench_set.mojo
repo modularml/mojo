@@ -41,7 +41,7 @@ def bench_set_eq_int[size: Int](mut b: Bencher) raises:
     var s1 = make_int_set[size]()
     var s2 = make_int_set[size]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) == black_box(s2))
 
@@ -56,7 +56,7 @@ def bench_set_eq_string[size: Int](mut b: Bencher) raises:
     var s1 = make_string_set[size]()
     var s2 = make_string_set[size]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) == black_box(s2))
 
@@ -71,7 +71,7 @@ def bench_set_eq_diff_size[size: Int](mut b: Bencher) raises:
     var s1 = make_int_set[size]()
     var s2 = make_int_set[size + 1]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) == black_box(s2))
 
@@ -88,7 +88,7 @@ def bench_set_eq_diff_elems[size: Int](mut b: Bencher) raises:
     for i in range(size):
         s2.add(i + size)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) == black_box(s2))
 
@@ -102,7 +102,7 @@ def bench_set_contains[size: Int](mut b: Bencher) raises:
     """Benchmark membership check for 10 elements."""
     var s = make_int_set[size]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         ref int_set = black_box(s)
         for key in range(10):
@@ -118,7 +118,7 @@ def bench_set_add[size: Int](mut b: Bencher) raises:
     """Benchmark adding 10 existing elements (duplicate check) to a set."""
     var s = make_int_set[size]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {mut s}:
         ref int_set = black_box(s)
         for key in range(10):
@@ -138,7 +138,7 @@ def bench_set_union[size: Int](mut b: Bencher) raises:
     for i in range(half, half + size):
         s2.add(i)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) | black_box(s2))
 
@@ -156,7 +156,7 @@ def bench_set_intersection[size: Int](mut b: Bencher) raises:
     for i in range(half, half + size):
         s2.add(i)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) & black_box(s2))
 
@@ -174,7 +174,7 @@ def bench_set_difference[size: Int](mut b: Bencher) raises:
     for i in range(half, half + size):
         s2.add(i)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(black_box(s1) - black_box(s2))
 
@@ -197,11 +197,11 @@ def bench_set_intersection_update[size: Int](mut b: Bencher) raises:
     for i in range(half, half + size):
         s2.add(i)
 
-    @always_inline
+    @inline(.always)
     def reset(mut s1: Set[Int]) {imm s1_orig}:
         s1 = s1_orig.copy()
 
-    @always_inline
+    @inline(.always)
     def call_fn(mut s1: Set[Int]) {imm s2}:
         black_box(s1).intersection_update(black_box(s2))
         keep(len(s1))
@@ -226,11 +226,11 @@ def bench_set_intersection_update_asymmetric[
     for i in range(10):
         s2.add(i)
 
-    @always_inline
+    @inline(.always)
     def reset(mut s1: Set[Int]) {imm s1_orig}:
         s1 = s1_orig.copy()
 
-    @always_inline
+    @inline(.always)
     def call_fn(mut s1: Set[Int]) {s2}:
         black_box(s1).intersection_update(black_box(s2))
         keep(s1)

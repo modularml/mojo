@@ -27,7 +27,7 @@ from nn.gather_scatter import gather
 def test_gather() raises:
     print("== test_gather")
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _test_gather[indices_type: DType]() raises:
         comptime num_rows = 16
@@ -89,7 +89,7 @@ def test_gather() raises:
 def test_gather_3d() raises:
     print("== test_gather_3d\n")
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _test_gather[indices_type: DType]() raises:
         comptime num_rows = 16
@@ -149,7 +149,7 @@ def test_gather_3d() raises:
 def test_gather_empty_indices() raises:
     print("== test_gather_empty_indices")
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _test_gather[indices_type: DType]() raises:
         comptime num_rows = 16

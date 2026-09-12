@@ -124,7 +124,7 @@ primitives:
 
 ```mojo
 @__parameter
-@always_inline
+@inline(.always)
 def dispatch[entry: ScheduleEntry]():
     comptime if entry.op.tag == MyOps.LOAD_A.value:
         load_a_from_dram(entry.op.stage)
@@ -284,7 +284,7 @@ comptime schedule = build_default_matmul_schedule[
 ]()
 
 @__parameter
-@always_inline
+@inline(.always)
 def _bind[entry: ScheduleEntry]():
     comptime if entry.op.tag == LOAD_DRAM:
         load_tiles_from_dram()
@@ -889,7 +889,7 @@ The dispatch function maps to the existing WGMMA ceremony:
 
 ```mojo
 @__parameter
-@always_inline
+@inline(.always)
 def inner_dispatch[entry: ScheduleEntry]():
     comptime if entry.op.tag == FA3InnerOps.WGMMA_QK.value:
         warpgroup_fence(p_reg_tile)
@@ -970,7 +970,7 @@ runs them, with barrier ops injected at the synchronization points.
 
 ```mojo
 @__parameter
-@always_inline
+@inline(.always)
 def producer_dispatch[entry: ScheduleEntry]():
     comptime if entry.op.tag == FA3Ops.TMA_LOAD_K.value:
         # Wait for consumer to free stage, set expected bytes, TMA copy
@@ -984,7 +984,7 @@ def producer_dispatch[entry: ScheduleEntry]():
         v_tma_op.async_copy(v_tile(stage_idx), produced_mbar_kv[stage_idx], coord)
 
 @__parameter
-@always_inline
+@inline(.always)
 def consumer_dispatch[entry: ScheduleEntry]():
     comptime if entry.op.tag == FA3Ops.WGMMA_QK.value:
         # Wait for K data, then async MMA

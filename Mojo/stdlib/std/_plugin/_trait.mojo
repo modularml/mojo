@@ -13,7 +13,6 @@
 
 from std.collections import OptionalReg
 from std.reflection.location import SourceLocation
-from std.sys.info import _TargetType, _current_target
 
 from std.utils.index import IndexList
 from std.math.math import _ExpPluginHookFnType, _TanhPluginHookFnType
@@ -66,6 +65,10 @@ trait PluginHooks(Plugin):
     comptime name: __mlir_type.`!kgen.string`
     """Stable plugin identifier used by the selector to select this backend."""
 
+    # ===------------------------------------------------------------------=== #
+    # Math & Algorithm Operations
+    # ===------------------------------------------------------------------=== #
+
     comptime exp_fn: OptionalReg[_ExpPluginHookFnType] = None
     """Elementwise exponential override.
 
@@ -95,6 +98,14 @@ trait PluginHooks(Plugin):
     Returns:
         Elementwise `tanh(x)` computed on the vendor backend.
     """
+
+    comptime reduce_generator_fn: OptionalReg[
+        _ReduceGeneratorPluginHookFnType
+    ] = None
+
+    # ===------------------------------------------------------------------=== #
+    # Memory Operations
+    # ===------------------------------------------------------------------=== #
 
     comptime stack_allocation_fn[address_space: AddressSpace]: OptionalReg[
         _StackAllocationPluginHookFnType[address_space]
@@ -134,13 +145,13 @@ trait PluginHooks(Plugin):
         The raw integer address used to construct the dangling pointer.
     """
 
+    # ===------------------------------------------------------------------=== #
+    # IO & System Operations
+    # ===------------------------------------------------------------------=== #
+
     comptime print_emit_fn: OptionalReg[_PrintEmitPluginHookFnType] = None
     """Plugin hook for emitting a `print()` UTF-8 byte buffer to a file
     descriptor."""
-
-    comptime reduce_generator_fn: OptionalReg[
-        _ReduceGeneratorPluginHookFnType
-    ] = None
 
     @staticmethod
     def abort_fn():

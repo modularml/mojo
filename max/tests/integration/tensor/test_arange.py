@@ -22,7 +22,7 @@ from max.experimental.testing import assert_all_close
 
 def test_range_like() -> None:
     t = Tensor.ones([3, 4, 5], dtype=DType.float32, device=CPU())
-    t2 = Tensor.range_like(t.type)
+    t2 = Tensor.range_like(t)
     assert t.type == t2.type
     assert_all_close(range(5), t2[0, 0, :])
     assert_all_close(range(5), t2[1, 2, :])

@@ -282,7 +282,7 @@ def test_conv3d_gpu_dispatch[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_lt)
     def scale_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -439,7 +439,7 @@ def test_conv3d_im2col_multi_tile[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output_lt)
         def scale_epilogue[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -616,7 +616,7 @@ def test_conv2d_im2col_multi_tile[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output_lt)
         def scale_epilogue[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -775,7 +775,7 @@ def test_conv3d_1x1x1_matmul_direct[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output_lt)
         def scale_epilogue[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1

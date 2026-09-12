@@ -142,53 +142,53 @@ struct WarpRole(TrivialRegisterPassable):
     comptime Scheduler = Self(4)
     comptime Epilogue = Self(3)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self._role == Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._role == other._role
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._role != other._role
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Int) -> Bool:
         return self._role >= Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __le__(self, other: Int) -> Bool:
         return self._role <= Int32(other)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_sfb_ready() -> Bool:
         return Self.SfbReady == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_sfb_load() -> Bool:
         return Self.SfbLoad == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_main_load() -> Bool:
         return Self.MainLoad == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         return Self.Mma == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         return Self.Epilogue >= get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_scheduler() -> Bool:
         return Self.Scheduler == get_warp_id()
 
@@ -308,7 +308,7 @@ struct B200BlockScaledMatmulSmem[
     var tmem_addr: Array[UInt32, 1]
 
 
-@always_inline
+@inline(.always)
 def load_AB_SFA[
     a_type: DType,
     b_type: DType,
@@ -536,7 +536,7 @@ def load_AB_SFA[
             )
 
 
-@always_inline
+@inline(.always)
 def _prefetch_weight_tiles_sbn[
     a_type: DType,
     b_type: DType,
@@ -694,7 +694,7 @@ def _prefetch_weight_tiles_sbn[
                 )
 
 
-@always_inline
+@inline(.always)
 def _complete_activation_tiles_sbn[
     a_type: DType,
     b_type: DType,
@@ -835,7 +835,7 @@ def _complete_activation_tiles_sbn[
                 )
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -1023,7 +1023,7 @@ def consumer_main_loop[
         mma_op.commit(load_mma_pipeline.consumer_mbar(stage))
 
 
-@always_inline
+@inline(.always)
 def _sfb_cpasync_produce_tile[
     sfb_dtype: DType,
     MMA_N: Int,
@@ -1169,7 +1169,7 @@ def _sfb_cpasync_produce_tile[
         sfb_pipeline.producer_step()
 
 
-@always_inline
+@inline(.always)
 def _sfb_cpasync_produce_tile_warpwide[
     sfb_dtype: DType,
     MMA_N: Int,
@@ -1315,7 +1315,7 @@ def _sfb_cpasync_produce_tile_warpwide[
         sfb_pipeline.producer_step()
 
 
-@always_inline
+@inline(.always)
 @__llvm_metadata(`nvvm.cluster_dim`=cluster_shape)
 # Declare the kernel's actual launch block size so the compiler register-allocates
 # accordingly and the CUDA driver permits the launch. Without this, the compiled

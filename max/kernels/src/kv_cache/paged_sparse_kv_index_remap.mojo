@@ -50,7 +50,7 @@ from extensibility import (
 )
 
 
-@always_inline
+@inline(.always)
 def _remap_one(
     log_t: Int32,
     batch_u32: UInt32,
@@ -77,7 +77,7 @@ def _remap_one(
     return Int32(Int(block_id) * page_size + tok_in_page)
 
 
-@always_inline
+@inline(.always)
 def _find_batch_for_row(
     r: Int,
     row_offsets: UnsafePointer[mut=False, UInt32, _],
@@ -222,7 +222,7 @@ def paged_sparse_kv_logical_to_physical_indices_from_row_offsets_dispatch[
         )
 
 
-@always_inline
+@inline(.always)
 def paged_sparse_kv_index_remap[
     target: StaticString,
     page_size: Int,

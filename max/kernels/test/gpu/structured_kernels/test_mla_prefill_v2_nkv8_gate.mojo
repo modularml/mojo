@@ -201,7 +201,7 @@ def _mla_naive_fp32_ref_chunked(
     score_buf.free()
 
 
-@always_inline
+@inline(.always)
 def _mla_prefill_v2_launch[
     k_nope_t: MHAOperand,
     k_rope_t: MHAOperand,

@@ -89,7 +89,7 @@ def run_group_norm_gpu[
     ctx.enqueue_copy(beta_d, beta_h)
 
     @__copy_capture(data_buf)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = data_buf.layout(coords)
@@ -97,14 +97,14 @@ def run_group_norm_gpu[
         return data_buf.raw_load[width=width](idx)
 
     @__copy_capture(gamma)
-    @always_inline
+    @inline(.always)
     @__parameter
     def gamma_scalar_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = gamma.layout(coords)
         return gamma.raw_load[width=width](idx)
 
     @__copy_capture(beta)
-    @always_inline
+    @inline(.always)
     @__parameter
     def beta_scalar_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = beta.layout(coords)

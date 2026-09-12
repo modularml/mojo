@@ -25,7 +25,7 @@ comptime _AssertMode[
 ] = "safe" if cpu_default and not is_gpu() else "none"
 
 
-@always_inline
+@inline(.always)
 def check_bounds[
     cpu_default: Bool = True,
 ](idx: Some[Indexer], size: Int, location: Optional[SourceLocation] = None):
@@ -69,7 +69,7 @@ def check_bounds[
     )
 
 
-@always_inline
+@inline(.always)
 def check_slice_bounds[
     cpu_default: Bool = True,
 ](
@@ -104,7 +104,7 @@ def check_slice_bounds[
     var start = slice.start.or_else(0)
     var end = slice.end.or_else(len)
 
-    @no_inline
+    @inline(.never)
     def do_asserts(location: SourceLocation) {imm}:
         debug_assert[assert_mode=mode](
             UInt(start) <= UInt(len),

@@ -39,7 +39,7 @@ def run_elementwise[
     var out_device = ctx.enqueue_create_buffer[dtype](length)
     var out_buffer = TileTensor(out_device, row_major(length))
 
-    @always_inline
+    @inline(.always)
     def func_uniform[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
         var rng_state = Random(seed=UInt64(idx0[0].value()))
         var rng = rng_state.step_uniform()
@@ -53,7 +53,7 @@ def run_elementwise[
                     dtype
                 ]()
 
-    @always_inline
+    @inline(.always)
     def func_normal[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
         var rng_state = NormalRandom(seed=UInt64(idx0[0].value()))
         var rng = rng_state.step_normal()

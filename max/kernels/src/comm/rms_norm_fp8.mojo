@@ -46,7 +46,7 @@ from max.runtime.tracing import Trace, TraceLevel, trace_arg
 from internal_utils.fp8_utils import compute_dynamic_fp8_scale, fp8_quantize
 
 
-@always_inline
+@inline(.always)
 def block_reduce_sum_and_max[
     dtype: DType, max_warps_per_block: Int
 ](sum_val: Scalar[dtype], max_val: Scalar[dtype]) -> Tuple[
@@ -58,7 +58,7 @@ def block_reduce_sum_and_max[
     barriers (vs 4 for separate block.sum + block.max with broadcast).
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -79,7 +79,7 @@ def block_reduce_sum_and_max[
     return (results[0], results[1])
 
 
-@always_inline
+@inline(.always)
 def rms_norm_fused_fp8[
     in_dtype: DType,
     out_dtype: DType,
@@ -146,7 +146,7 @@ def rms_norm_fused_fp8[
     ), "output dtype should be float8_e4m3fn or float8_e4m3fnuz"
 
     # Tracing for performance profiling
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return (
             trace_arg("input", shape, in_dtype)
@@ -181,7 +181,7 @@ def rms_norm_fused_fp8[
             raise Error("CPU implementation not yet supported")
 
 
-@always_inline
+@inline(.always)
 def _rms_norm_fused_fp8_gpu[
     in_dtype: DType,
     out_dtype: DType,
@@ -215,7 +215,7 @@ def _rms_norm_fused_fp8_gpu[
 
     # Create 2D input function (following rms_norm_fused_residual_add pattern)
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) -> SIMD[in_dtype, simd_width]:
@@ -329,7 +329,7 @@ def _rms_norm_fused_fp8_kernel_warp_tiling[
     var idx = tid * simd_width
 
     # Helper: Load gamma and apply to value (shared between both kernel variants)
-    @always_inline
+    @inline(.always)
     @__copy_capture(gamma, _weight_offset)
     @__parameter
     def apply_gamma[
@@ -424,7 +424,7 @@ def _rms_norm_fused_fp8_gpu_launch[
     var grid_dim = rows
     var block_dim = threads_per_block
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(output)
     def output_fn[width: Int](row: Int, col: Int, val: SIMD[out_dtype, width]):
@@ -549,7 +549,7 @@ def _rms_norm_fused_fp8_kernel_block[
     var tid = thread_idx.x
 
     # Helper: Load gamma and apply to value (same as warp-tiling variant)
-    @always_inline
+    @inline(.always)
     @__copy_capture(gamma, _weight_offset)
     @__parameter
     def apply_gamma[

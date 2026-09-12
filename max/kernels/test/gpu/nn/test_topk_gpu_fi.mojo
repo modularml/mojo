@@ -666,7 +666,7 @@ def test_topk_sampling[
     # STEP 3: Benchmark the kernel (separate from validation).
     comptime if DEBUG_BENCH:
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {var}:
             comptime if sampling_from_prob:
                 topk_sampling_from_prob[dtype, out_idx_type, block_size](
@@ -826,7 +826,7 @@ def test_case_batched[
 
     comptime if DEBUG_BENCH:
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {var}:
             topk_mask_logits[dtype, out_idx_type, block_size](
                 ctx,
@@ -895,7 +895,7 @@ def test_case_batched[
 
                 comptime if DEBUG_BENCH:
 
-                    @always_inline
+                    @inline(.always)
                     def run_func_cpu(ctx: DeviceContext) raises {var}:
                         _top_k_cpu[
                             dtype=dtype,
@@ -965,9 +965,9 @@ def time_kernel(
     kernel_name: String,
     func: Some[def(DeviceContext) raises -> None],
 ) raises:
-    @always_inline
+    @inline(.always)
     def bench_func(mut m: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             func(ctx)
 

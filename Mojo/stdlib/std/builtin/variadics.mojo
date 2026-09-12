@@ -551,7 +551,7 @@ struct TypeList[
         0 <= start <= end <= length.
     """
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Gets the number of elements in the TypeList.
 
@@ -584,7 +584,7 @@ struct _ParameterListIter[type: Copyable, //, *values: type](
 
     var index: Int
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> ref[ImmStaticOrigin] Self.type:
@@ -598,7 +598,7 @@ struct _ParameterListIter[type: Copyable, //, *values: type](
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var len = Self.values.size - self.index
         return (len, {len})
@@ -679,7 +679,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
     # Accessors
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Gets the size of the list.
 
@@ -710,7 +710,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
         var first_elt = Pointer(to=static_array).unsafe_bitcast[Self.type]()
         return Span(unsafe_ptr=first_elt, length=Self.size)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, idx: Int) -> ref[ImmStaticOrigin] Self.type:
         """Gets a single element on the variadic list.
 
@@ -738,7 +738,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
     # Constructors
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Constructs a ParameterList."""
         pass
@@ -994,7 +994,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
                 self[i].write_to(writer)
         writer.write_string(")")
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.type, Writable):
@@ -1008,7 +1008,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
         """
         self._write_elements(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.type, Writable):
@@ -1032,7 +1032,7 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
 
     # We can only support iteration when the elements are Copyable, because
     # iterators currently need to return the elements by value.
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> _ParameterListIter[
@@ -1094,7 +1094,7 @@ struct _VariadicListIter[
         self.index = index
         self.src = Pointer(to=list)
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> ref[self.src[][0]] Self.elt_type:
@@ -1138,7 +1138,7 @@ struct VariadicList[
     # ===-------------------------------------------------------------------===#
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__[
         size: __mlir_type.index, container_origin: ImmOrigin
@@ -1175,7 +1175,7 @@ struct VariadicList[
     # The destructor for this type is trivial if not an "owned" list.
     comptime __del__is_trivial: Bool = not Self.is_owned
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         """Destructor that releases elements if owned."""
 
@@ -1229,7 +1229,7 @@ struct VariadicList[
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Gets the size of the list.
 
@@ -1242,7 +1242,7 @@ struct VariadicList[
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __getitem__[
         self_origin: ImmOrigin
     ](ref[self_origin] self, idx: Int) -> ref[
@@ -1283,7 +1283,7 @@ struct VariadicList[
                 self[i].write_to(writer)
         writer.write_string(")")
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.element_type, Writable):
@@ -1297,7 +1297,7 @@ struct VariadicList[
         """
         self._write_elements(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.element_type, Writable):
@@ -1427,7 +1427,7 @@ struct VariadicPack[
     # ===-------------------------------------------------------------------===#
 
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     # This disables nested origin exclusivity checking because it is taking a
     # raw variadic pack which can have nested origins in it (which this does not
     # dereference).
@@ -1440,7 +1440,7 @@ struct VariadicPack[
         """
         self._value = value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(
         out self, *, copy: Self
     ) where (not Self.is_owned, "Cannot copy an owned variadic pack."):
@@ -1458,7 +1458,7 @@ struct VariadicPack[
     # The destructor for this type is trivial if not an "owned" pack.
     comptime __del__is_trivial: Bool = not Self.is_owned
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __deinit__(deinit self):
         """Destructor that releases elements if owned."""
 
@@ -1515,7 +1515,7 @@ struct VariadicPack[
         """
         return Self.Ts.length
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Return the VariadicPack length.
 
@@ -1528,7 +1528,7 @@ struct VariadicPack[
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __getitem_param__[index: Int](self) -> ref[Self.origin] Self.Ts[index]:
         """Return a reference to an element of the pack.
 
@@ -1574,7 +1574,7 @@ struct VariadicPack[
     """This is the !kgen.struct type with pointer elements."""
 
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_as_kgen_pack(self) -> Self._kgen_pack_with_pointer_type:
         """This rebinds `in_pack` to the equivalent `!kgen.struct` with kgen
         pointers."""
@@ -1599,7 +1599,7 @@ struct VariadicPack[
     # Returns all the elements in a kgen.pack.
     # Useful for FFI, such as calling printf. Otherwise, avoid this if possible.
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_loaded_kgen_pack(self) -> Self._loaded_kgen_pack_type:
         """This returns the stored KGEN pack after loading all of the elements.
         """
@@ -1649,7 +1649,7 @@ struct VariadicPack[
                 self[i].write_to(writer)
         writer.write_string(end)
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self,
         mut writer: Some[Writer],
@@ -1665,7 +1665,7 @@ struct VariadicPack[
             end=StaticString(")"),
         )
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self,
         mut writer: Some[Writer],
@@ -1682,7 +1682,7 @@ struct VariadicPack[
         )
 
 
-@always_inline
+@inline(.always)
 def _call_with_dynamic_pack_pointers[
     ArgTrait: type_of(AnyType),
     Args: TypeList[Trait=ArgTrait, ...],
@@ -1718,6 +1718,41 @@ def _call_with_dynamic_pack_pointers[
             for a given index. The pointer origin must be valid for the duration
             of the call to `user_func`.
     """
+    var borrowed = _create_dynamic_pack[Args](make_elem_ptr)
+    return user_func(*borrowed)
+
+
+# TODO(MSTDL-3177): Take a caller specified origin instead of MutUnsafeAnyOrigin
+@inline(.always)
+def _create_dynamic_pack[
+    ArgTrait: type_of(AnyType),
+    //,
+    Args: TypeList[Trait=ArgTrait, ...],
+](
+    init_element_func: Some[
+        def[idx: Int]() -> Pointer[Args[idx], MutUnsafeAnyOrigin]
+    ],
+) -> VariadicPack[
+    origin=MutUnsafeAnyOrigin,
+    element_trait=ArgTrait,
+    False,
+    *Args,
+]:
+    """Constructs a borrowed `VariadicPack` from per-element pointers.
+
+    The closure is invoked exactly once for each type in `Args`, in ascending
+    index order.
+
+    Parameters:
+        Args: The pack element types.
+
+    Args:
+        init_element_func: Returns the pointer for a given pack element. Each
+            pointer must remain valid while the returned pack is used.
+
+    Returns:
+        The dynamically constructed borrowed pack.
+    """
     comptime ToPointer[T: ArgTrait]: ImplicitlyCopyable & Deinitable = Pointer[
         T, MutUnsafeAnyOrigin
     ]
@@ -1730,7 +1765,7 @@ def _call_with_dynamic_pack_pointers[
     # Get a pointer to each pack element value. It's up to the caller
     # to ensure that these pointers are valid for the duration of this function.
     comptime for i in range(Args.length):
-        var element = make_elem_ptr[i]()
+        var element = init_element_func[i]()
         # FIXME(MOCO-4635): This rebind is needed to work around a type folding bug
         pointers[i] = rebind[type_of(pointers[i])](element)
 
@@ -1741,11 +1776,10 @@ def _call_with_dynamic_pack_pointers[
         False,
         *Args,
     ]
-    var borrowed = BorrowedPack(
+    var pack = BorrowedPack(
         __mlir_op.`lit.ref.pack.from_pointer_pack`[
             _type=BorrowedPack._mlir_type
         ](pointers._mlir_value)
     )
 
-    # Call the user primary function
-    return user_func(*borrowed)
+    return pack^

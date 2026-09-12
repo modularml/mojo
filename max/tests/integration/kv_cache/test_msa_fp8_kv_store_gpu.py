@@ -39,7 +39,7 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import rope_split_store_ragged
-from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MHAKVCacheParams
 from test_common.graph_utils import is_b100_b200
 from test_common.simple_kv_cache import paged_kv_cache_inputs
 
@@ -102,29 +102,15 @@ def _run_store(
             *kv_params.flattened_kv_inputs(),
         ],
     ) as graph:
-        (
-            qkv_in,
-            iro_in,
-            freqs_in,
-            blocks,
-            cache_lengths,
-            lookup,
-            max_p,
-            max_c,
-            *_,
-        ) = graph.inputs
+        qkv_in, iro_in, freqs_in, *_kv_rest = graph.inputs
         roped_q = rope_split_store_ragged(
             kv_params,
             qkv_in.tensor,
             iro_in.tensor,
             freqs_in.tensor,
-            kv_collection=PagedCacheValues(
-                blocks.buffer,
-                cache_lengths.tensor,
-                lookup.tensor,
-                max_p.tensor,
-                max_c.tensor,
-            ),
+            kv_collection=kv_params.unflatten_kv_inputs(
+                iter(graph.inputs[3:])
+            ).inputs[0],
             layer_idx=ops.constant(0, DType.uint32, device=DeviceRef.CPU()),
             n_heads=_NUM_Q_HEADS,
             interleaved=True,

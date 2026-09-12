@@ -18,6 +18,7 @@ import pytest
 from max.benchmark.benchmark_shared.datasets.distribution import (
     BaseDistribution,
     Burr12Distribution,
+    CategoricalDistribution,
     ConstantDistribution,
     ContinuousDistribution,
     DiscreteDistribution,
@@ -50,6 +51,118 @@ def test_returns_same_value() -> None:
     dist = ConstantDistribution(value=42.0)
     assert dist.sample_value() == 42.0
     assert dist.sample_value() == 42.0
+
+
+# ---------------------------------------------------------------------------
+# CategoricalDistribution
+# ---------------------------------------------------------------------------
+
+
+def test_categorical_empty_values_raises() -> None:
+    with pytest.raises(ValueError, match="at least one value"):
+        CategoricalDistribution(values=[], weights=[])
+
+
+def test_categorical_mismatched_lengths_raises() -> None:
+    with pytest.raises(ValueError, match="same length"):
+        CategoricalDistribution(values=[1.0, 2.0], weights=[1.0])
+
+
+def test_categorical_negative_weight_raises() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        CategoricalDistribution(values=[1.0, 2.0], weights=[1.0, -1.0])
+
+
+def test_categorical_nonfinite_weight_raises() -> None:
+    """nan passes both `w < 0` and `sum(w) <= 0`, so it must be caught here or
+    it surfaces later inside np.random.choice."""
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="finite"):
+            CategoricalDistribution(values=[1.0, 2.0], weights=[1.0, bad])
+
+
+def test_categorical_nonfinite_value_raises() -> None:
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="finite"):
+            CategoricalDistribution(values=[1.0, bad], weights=[1.0, 1.0])
+
+
+def test_categorical_all_zero_weights_raises() -> None:
+    with pytest.raises(ValueError, match="positive value"):
+        CategoricalDistribution(values=[1.0, 2.0], weights=[0.0, 0.0])
+
+
+def test_categorical_weights_summing_to_inf_still_sample() -> None:
+    """Each weight is finite, but their sum overflows; dividing by that sum
+    would send every probability to 0 and np.random.choice would reject it."""
+    np.random.seed(0)
+    dist = CategoricalDistribution(values=[1.0, 2.0], weights=[1e308, 1e308])
+    samples = [dist.sample_value() for _ in range(200)]
+    assert set(samples) == {1.0, 2.0}
+    assert 0.3 < samples.count(1.0) / len(samples) < 0.7
+
+
+def test_categorical_string_with_weights() -> None:
+    dist = BaseDistribution.from_distribution_parameter(
+        "Cat(1024:0.7, 512:0.2, 2048:0.1)"
+    )
+    assert isinstance(dist, CategoricalDistribution)
+    assert dist.values == [1024.0, 512.0, 2048.0]
+    assert dist.weights == [0.7, 0.2, 0.1]
+
+
+def test_categorical_string_lowercase() -> None:
+    dist = BaseDistribution.from_distribution_parameter("cat(1, 2, 3)")
+    assert isinstance(dist, CategoricalDistribution)
+
+
+def test_categorical_string_uniform_weights_default_to_one() -> None:
+    dist = BaseDistribution.from_distribution_parameter("Cat(512, 1024)")
+    assert isinstance(dist, CategoricalDistribution)
+    assert dist.weights == [1.0, 1.0]
+
+
+def test_categorical_string_single_value() -> None:
+    dist = BaseDistribution.from_distribution_parameter("Cat(512)")
+    assert isinstance(dist, CategoricalDistribution)
+    assert dist.sample_value() == 512.0
+
+
+def test_categorical_string_empty_entry_raises() -> None:
+    with pytest.raises(ValueError, match="Cat"):
+        BaseDistribution.from_distribution_parameter("Cat()")
+
+
+def test_categorical_string_non_numeric_raises() -> None:
+    with pytest.raises(ValueError, match="Cannot parse numeric"):
+        BaseDistribution.from_distribution_parameter("Cat(1:1, 2:notaweight)")
+
+
+def test_categorical_samples_only_given_values() -> None:
+    dist = CategoricalDistribution(values=[1.0, 2.0, 3.0], weights=[1, 1, 1])
+    samples = {dist.sample_value() for _ in range(200)}
+    assert samples <= {1.0, 2.0, 3.0}
+
+
+def test_categorical_sample_frequencies_match_weights() -> None:
+    np.random.seed(0)
+    dist = CategoricalDistribution(values=[10.0, 20.0], weights=[0.9, 0.1])
+    samples = [dist.sample_value() for _ in range(5000)]
+    frequency_of_10 = samples.count(10.0) / len(samples)
+    assert abs(frequency_of_10 - 0.9) < 0.03
+
+
+def test_categorical_weights_need_not_sum_to_one() -> None:
+    np.random.seed(0)
+    dist = CategoricalDistribution(values=[1.0, 2.0], weights=[9.0, 1.0])
+    samples = [dist.sample_value() for _ in range(5000)]
+    frequency_of_1 = samples.count(1.0) / len(samples)
+    assert abs(frequency_of_1 - 0.9) < 0.03
+
+
+def test_categorical_is_not_continuous_or_discrete() -> None:
+    assert not issubclass(CategoricalDistribution, ContinuousDistribution)
+    assert not issubclass(CategoricalDistribution, DiscreteDistribution)
 
 
 # ---------------------------------------------------------------------------

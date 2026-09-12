@@ -408,9 +408,12 @@ ParseResult ParsedArgument::parse(ParserBase &p, KWArgMarkerInfo &markerInfo,
     // Parse the constraint for error recovery, then discard it: we already
     // diagnosed it above, and parameter-list `where` clauses are no longer
     // representable. A `where (cond, "msg")` message parses as a single
-    // parenthesized expression, so no message handling is needed here.
-    ExprNode *discardedProp = nullptr;
-    if (p.parseExpression(discardedProp))
+    // parenthesized expression; an `else "msg"` message needs discarding of
+    // its own so the rest of the parameter list still parses.
+    ExprNode *discarded = nullptr;
+    if (p.parseExpression(discarded))
+      return failure();
+    if (p.consumeIf(Token::kw_else) && p.parseExpression(discarded))
       return failure();
   }
 
@@ -1295,18 +1298,22 @@ PogListAttr TypeCheckedParamList::getParamListAttr() const {
 // ParsedConstraint Implementation
 //===----------------------------------------------------------------------===//
 
-ParseResult ParsedConstraint::parse(ParserBase &p) {
+ParseResult ParsedConstraint::parse(ParserBase &p,
+                                    std::optional<size_t> stmtIndent) {
   loc = p.getToken().getLoc();
 
-  // Parse the constraint expression into a local; `extractParenthesizedMessage`
-  // splits it into the final `propExpr` (the condition) and `message`.
+  // Parse the constraint expression into a local; the two message spellings
+  // below split it into the final `propExpr` (the condition) and `message`.
   ExprNode *parsed;
-  if (p.parseExpression(parsed))
+  if (p.parseExpression(parsed, stmtIndent))
     return failure();
 
-  // A message is written `where (condition, "message")`, which the expression
-  // parser produces as a parenthesized two-element tuple; split it if present.
-  return extractParenthesizedMessage(p, parsed);
+  // A message is written either `where (condition, "message")` -- which the
+  // expression parser produces as a parenthesized two-element tuple -- or
+  // `where condition else "message"`, whose `else` is left for us to consume.
+  if (extractParenthesizedMessage(p, parsed))
+    return failure();
+  return parseElseMessage(p, stmtIndent);
 }
 
 ParseResult ParsedConstraint::extractParenthesizedMessage(ParserBase &p,
@@ -1352,6 +1359,47 @@ ParseResult ParsedConstraint::extractParenthesizedMessage(ParserBase &p,
   return success();
 }
 
+ParseResult ParsedConstraint::parseElseMessage(ParserBase &p,
+                                               std::optional<size_t> stmtIndent,
+                                               StringRef what) {
+  // Watch out for an `else` dedented onto its own line.
+  SMLoc elseLoc = p.getToken().getLoc();
+  if (!p.isTokenInCurrentStatement(stmtIndent) || !p.consumeIf(Token::kw_else))
+    return success();
+
+  if (message)
+    return p.emitError(elseLoc, "a 'where' clause takes at most one message: "
+                                "prefer 'where condition else \"message\"'");
+
+  // A clause terminator right after `else` means the message was left out;
+  // catch common mistakes rather than letting the expression parser report the
+  // terminator as an unexpected token.
+  if (p.getToken().isAny(Token::colon, Token::comma, Token::equal,
+                         Token::r_paren, Token::r_square))
+    return p.emitError(p.getToken().getLoc(),
+                       "expected a string literal message after 'else'");
+
+  ExprNode *msgExpr;
+  if (p.parseExpression(msgExpr, stmtIndent))
+    return failure();
+
+  // Parentheses around the message let it wrap across lines, the way the
+  // parenthesized form's message wraps inside the condition's parentheses.
+  while (auto *paren = dyn_cast_if_present<ParenNode>(msgExpr))
+    msgExpr = paren->subExpr;
+
+  // Only string literals, for the same reason as the parenthesized form: a
+  // non-literal expression would need comptime evaluation that the parser
+  // cannot perform.
+  auto *strLit = dyn_cast_if_present<StringLiteralNode>(msgExpr);
+  if (!strLit)
+    return p.emitError(msgExpr ? msgExpr->getLoc() : elseLoc,
+                       "the message in " + what + " must be a string literal");
+
+  message = StringAttr::get(p.getContext(), strLit->getValue());
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // ParsedParamList Implementation
 //===----------------------------------------------------------------------===//
@@ -1372,10 +1420,13 @@ ParseResult ParsedParamList::parseParametersIfPresent(ParserBase &p,
   return p.parseToken(Token::r_square, "expected ']' for parameter list");
 }
 
-ParseResult ParsedParamList::parseTrailingConstraintsIfPresent(ParserBase &p) {
-  while (p.consumeIfSoftIdentifier("where")) {
+ParseResult ParsedParamList::parseTrailingConstraintsIfPresent(
+    ParserBase &p, std::optional<size_t> stmtIndent) {
+  // Watch out for a dedented `where` clause on a new line.
+  while (p.isTokenInCurrentStatement(stmtIndent) &&
+         p.consumeIfSoftIdentifier("where")) {
     ParsedConstraint constraint;
-    if (constraint.parse(p))
+    if (constraint.parse(p, stmtIndent))
       return failure();
 
     bodyConstraints.push_back(constraint);

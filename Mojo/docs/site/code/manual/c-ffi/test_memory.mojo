@@ -78,14 +78,14 @@ def test_getenv_optional() raises:
     var key: String = "MOJO_FFI_TEST_VAR"
     var value: String = "present"
     _ = external_call["setenv", c_int](
-        key.as_c_string_slice(),
-        value.as_c_string_slice(),
+        key.as_c_string_span(),
+        value.as_c_string_span(),
         c_int(1),  # overwrite
     )
 
     var wrapped = external_call[
         "getenv", Optional[Pointer[c_char, MutUntrackedOrigin]]
-    ](key.as_c_string_slice())
+    ](key.as_c_string_span())
     assert_true(Bool(wrapped))
     assert_equal(
         String(unsafe_from_utf8_ptr=wrapped.value()), String("present")
@@ -94,7 +94,7 @@ def test_getenv_optional() raises:
     var missing: String = "MOJO_FFI_DEFINITELY_NOT_SET_98765"
     var empty = external_call[
         "getenv", Optional[Pointer[c_char, MutUntrackedOrigin]]
-    ](missing.as_c_string_slice())
+    ](missing.as_c_string_span())
     assert_true(not empty)
 
 
@@ -106,11 +106,11 @@ def test_origin_keeps_alive() raises:
     var c_strlen = proc.get_function[c_size_t]("strlen")
 
     var line = String("Hello")
-    assert_equal(Int(c_strlen(line.as_c_string_slice())), 5)
+    assert_equal(Int(c_strlen(line.as_c_string_span())), 5)
 
     # Refill the same variable; the pointer's origin still holds.
     line = "Hello, Mojo!"
-    assert_equal(Int(c_strlen(line.as_c_string_slice())), 12)
+    assert_equal(Int(c_strlen(line.as_c_string_span())), 12)
 
 
 def main() raises:

@@ -217,6 +217,15 @@ def _validate_tensor_shape(tensors: Sequence[Buffer]) -> int:
     """
     first_tensor = tensors[0]
     first_shape = tuple(first_tensor.shape)
+    # TODO(MXSERV-502): `_build_group_descriptors` uses one number as both the
+    # page stride and the copy length, which a padded leaf needs separated.
+    for i, tensor in enumerate(tensors):
+        if not tensor.is_contiguous:
+            raise ValueError(
+                f"NIXL group tensor {i} is not contiguous (shape "
+                f"{tuple(tensor.shape)}, strides {tuple(tensor.strides)}): "
+                "padded KV pages cannot be transferred yet (MXSERV-502)."
+            )
     for i, tensor in enumerate(tensors[1:], 1):
         if tuple(tensor.shape) != first_shape:
             raise ValueError(
@@ -261,7 +270,7 @@ def _resolve_remote_bytes_per_group(
 
     Raises unless the remote advertises exactly as many groups as the local
     engine has: connect() already enforces this (a full ``bytes_per_group``
-    equality check), so this is defense-in-depth, not the primary guard --
+    equality check), so this is defense-in-num_blocks, not the primary guard --
     fewer groups means there is no way to infer the remote's stride for a
     group it never advertised, and more groups would silently assume a
     positional-prefix correspondence that was never validated.
@@ -298,6 +307,50 @@ class TensorAgentMetadata(
 
     device_id: int
     """Device ID for this tensor."""
+
+
+_AMD_RDMA_START_ALIGNMENT = 2 * 1024 * 1024
+_AMD_RDMA_ALIGNED_SIZE_FACTOR = 32
+
+
+def _check_rdma_start_alignment(
+    base_addr: int,
+    num_bytes: int,
+    device: Device,
+    agent_name: str,
+    group_index: int,
+) -> None:
+    """Rejects a VRAM region amdgpu cannot pin for RDMA.
+
+    ``amdgpu`` pins device memory for RDMA a 2 MiB page at a time, so
+    ``ibv_reg_mr`` refuses any region whose *start* is not 2 MiB aligned --
+    regardless of its length. NIXL surfaces that refusal as a bare
+    ``NIXL_ERR_BACKEND``, arbitrarily far into a serving run and with nothing
+    pointing at the allocator, so check the address up front instead.
+
+    Only regions the allocator was asked to align are checked.
+    ``MemoryManager`` grants the coarse start address to blocks of
+    ``_AMD_RDMA_ALIGNED_SIZE_FACTOR`` times the alignment and up
+    (``kLargeAllocSizeFactor`` in ``MemoryManager.h``). A KV cache group sits
+    far above that bar; the small buffers other callers register sit below it
+    and keep the device's plain 256-byte alignment by design, so there is no
+    missed promise to report for them.
+    """
+    aligned_size = _AMD_RDMA_START_ALIGNMENT * _AMD_RDMA_ALIGNED_SIZE_FACTOR
+    if (
+        device.api != "hip"
+        or num_bytes < aligned_size
+        or base_addr % _AMD_RDMA_START_ALIGNMENT == 0
+    ):
+        return
+    raise ValueError(
+        f"NIXL group {group_index} for agent {agent_name} starts at "
+        f"{base_addr:#x}, which is not aligned to "
+        f"{_AMD_RDMA_START_ALIGNMENT // (1024 * 1024)} MiB. AMD GPUs cannot "
+        "register a device memory region for RDMA unless its start address "
+        "is 2 MiB aligned, so this buffer must be allocated with that "
+        "alignment."
+    )
 
 
 @dataclass
@@ -418,9 +471,12 @@ class TensorAgent:
         # Register one memory region per group, uniformly.
         base_addrs: list[int] = []
         reg_dlists: list[nixl.RegistrationDescriptorList] = []
-        for tensor in tensors:
+        for group_index, tensor in enumerate(tensors):
             base_addr = tensor._data_ptr()
             num_bytes = tensor.num_elements * tensor.dtype.size_in_bytes
+            _check_rdma_start_alignment(
+                base_addr, num_bytes, device, agent_name, group_index
+            )
             reg_dlist = nixl.RegistrationDescriptorList(
                 type=memory_type,
                 descs=[(base_addr, num_bytes, device.id, "")],

@@ -23,7 +23,7 @@ from std.testing import assert_equal
 from layout import TileTensor, Idx, row_major
 
 
-@no_inline
+@inline(.never)
 def test_vec_init[
     dtype: DType, block_dim: Int = 256
 ](length: Int, init_type: InitializationType, context: DeviceContext) raises:

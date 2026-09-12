@@ -29,7 +29,7 @@ from std.utils.index import Index, IndexList
 comptime PAD_SLOT_ID: Int32 = -1
 
 
-@always_inline
+@inline(.always)
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
     var x_f32 = x.cast[.float32]()

@@ -170,7 +170,7 @@ struct _SwiGLUSmem[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -336,7 +336,7 @@ def load_AB[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -450,7 +450,7 @@ def consumer_main_loop[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _swiglu_epilogue_gmem[
     a_type: DType,
     b_type: DType,
@@ -846,7 +846,7 @@ def _swiglu_epilogue_gmem[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _swiglu_epilogue_smem_tma[
     a_type: DType,
     b_type: DType,

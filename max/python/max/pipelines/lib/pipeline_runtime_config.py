@@ -175,6 +175,18 @@ class PipelineRuntimeConfig(ConfigFileModel):
         ),
     )
 
+    enable_spec_decode_mixed_batches: bool = Field(
+        default=False,
+        description=(
+            "When enabled with speculative decoding, prefill requests are "
+            "batched into decode steps (implies in-flight batching) and the "
+            "decode rows keep verifying their draft tokens instead of "
+            "advancing draft-less. Architectures that do not declare "
+            "``supports_spec_decode_mixed_batches`` fall back to plain "
+            "in-flight batching."
+        ),
+    )
+
     eplb_replicas_per_gpu: int = Field(
         default=0,
         description=(
@@ -380,9 +392,9 @@ class PipelineRuntimeConfig(ConfigFileModel):
     prefer_module_v3: bool = Field(
         default=False,
         description=(
-            "Whether to prefer the eager API architecture over the graph API architecture. "
+            "Whether to prefer the ModuleV3 architecture over the graph API architecture. "
             "When ``False`` (default), the inference server uses the graph API architecture. "
-            "When ``True``, the server uses the eager API architecture when available and "
+            "When ``True``, the server uses the ModuleV3 architecture when available and "
             "falls back to the graph API architecture."
         ),
     )

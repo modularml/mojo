@@ -108,7 +108,8 @@ generateInstantiateStub(GeneratorOp func, SymbolConstantAttr symbol,
   auto linkageNameAttr = sliced.getLinkageNameAttr();
 
   sliced.setNotExported();
-  sliced.setInlineLevel(InlineLevel::Always);
+  sliced.setInlineLevelAttr(
+      getInlineLevelAttr(sliced.getContext(), InlineLevel::Always));
   if (symtab) {
     // Clone first so the original retains its linkage name for any subsequent
     // stubs generated from the same generator (e.g. two instantiations of the
@@ -776,10 +777,13 @@ static ElaboratorCompileOffloadRetType compileOffloads(
             if (traitsOr.isError())
               return Error(traitsOr.getError());
             const TargetTraits *traits = *traitsOr;
-            llvm::StringRef ext =
-                compilationOptions.offloadOutputKind == EmitAs::LLVM
-                    ? traits->getLLVMExtension()
-                    : traits->getAsmExtension();
+            EmitAs outKind = compilationOptions.offloadOutputKind;
+            llvm::StringRef ext = outKind == EmitAs::LLVM
+                                      ? traits->getLLVMExtension()
+                                  : outKind == EmitAs::LLVM_BITCODE ||
+                                          outKind == EmitAs::LLVM_OPT_BITCODE
+                                      ? traits->getBitcodeExtension()
+                                      : traits->getAsmExtension();
             constexpr size_t kFileNameMaxChars = 64;
             std::string fileName =
                 reserveOffloadOutputBaseName(

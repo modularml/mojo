@@ -268,7 +268,7 @@ def bench_blockwise_fp8_1d2d[
         k_group_size=1,
     )
 
-    @always_inline
+    @inline(.always)
     def bench_legacy(
         mut bencher: Bencher,
     ) {
@@ -281,7 +281,7 @@ def bench_blockwise_fp8_1d2d[
         var expert_ids_tt,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_matmul_sm100_blockwise_scaled_fp8_persistent[
                 config=config,
@@ -307,7 +307,7 @@ def bench_blockwise_fp8_1d2d[
     )
 
     # ===== Benchmark Structured Kernel =====
-    @always_inline
+    @inline(.always)
     def bench_structured(
         mut bencher: Bencher,
     ) {
@@ -321,7 +321,7 @@ def bench_blockwise_fp8_1d2d[
         var expert_scales_tt,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_matmul_dynamic_scaled_fp8_1d2d[
                 a_scales_type=DType.float32,

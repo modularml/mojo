@@ -74,7 +74,7 @@ def LIT_FnOp : LITOp<"fn", [
     UnitAttr:$external,
     UnitAttr:$defaultedTraitFn, // Present for trait methods with non-empty bodies.
     KGEN_ExportKindAttr:$exportKind,
-    KGEN_InlineLevelAttr:$inlineLevel,
+    TypedAttrInterface:$inlineLevel,
     DefaultValuedOptionalAttr<I8Attr, "0">:$specialFnKind,
     // The linkage name of this function within the compiled artifact. If null,
     // the flattened full symbol reference of the function will be used.

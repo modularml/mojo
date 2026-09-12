@@ -86,6 +86,7 @@ from .mappings import (
     DeviceMapping,
     NamedMapping,
     PlacementMapping,
+    as_device_mapping,
 )
 from .mesh import DeviceMesh, get_active_mesh, mesh_context
 
@@ -109,23 +110,20 @@ from .placements import (
 )
 from .rules import *
 from .types import (
-    DistributedBufferType,
-    DistributedTensorType,
-    DistributedType,
+    BufferLayout,
     TensorLayout,
+    as_layout,
 )
 
 __all__ = [
     "Action",
     "ActionSet",
     "AxisAssignment",
+    "BufferLayout",
     "Collective",
     "ConversionError",
     "DeviceMapping",
     "DeviceMesh",
-    "DistributedBufferType",
-    "DistributedTensorType",
-    "DistributedType",
     "GreedyReshard",
     "NamedMapping",
     "NoReshard",
@@ -144,6 +142,8 @@ __all__ = [
     "ShardingError",
     "Solver",
     "TensorLayout",
+    "as_device_mapping",
+    "as_layout",
     "build_action_set",
     "force_replicated_action_set",
     "get_active_mesh",

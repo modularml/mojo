@@ -27,11 +27,15 @@ struct LargeAlign:
 def main() raises:
     comptime if std.sys.get_defined_int["ALLOC_TEST"]() == 1:
         comptime to_small = 2
-        # CHECK-TEST1: note: constraint failed: alignment '2' must be at least align_of[{{.*}}LargeAlign]() '128'
-        var _layout = Layout[LargeAlign].aligned[to_small](count=1)
+        # CHECK-TEST1: note: constraint failed: `Layout` alignment must be at least `align_of[T]()`
+        var _layout = Layout[LargeAlign, alignment=.of_bytes[to_small]()](
+            count=1
+        )
     comptime if std.sys.get_defined_int["ALLOC_TEST"]() == 2:
         comptime not_pow_of_2 = 129
-        # CHECK-TEST2: note: constraint failed: alignment '129' is not a power of two
-        var _layout = Layout[LargeAlign].aligned[not_pow_of_2](count=1)
+        # CHECK-TEST2: note: constraint failed: alignment must be a power of two
+        var _layout = Layout[LargeAlign, alignment=.of_bytes[not_pow_of_2]()](
+            count=1
+        )
     else:
         comptime assert False, "unreachable!"

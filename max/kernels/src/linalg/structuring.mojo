@@ -44,7 +44,7 @@ struct ScatterGatherAmd[
 
     var buffer: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, tensor: LayoutTensor):
         """Initialize with a tensor.
 
@@ -53,7 +53,7 @@ struct ScatterGatherAmd[
         """
         self.buffer = make_amd_buffer_resource(tensor)
 
-    @always_inline
+    @inline(.always)
     def copy(
         self,
         dst_reg_tile: LayoutTensor[mut=True, address_space=.LOCAL, ...],
@@ -74,7 +74,7 @@ struct ScatterGatherAmd[
             Self.block_dim_count,
         ](dst_reg_tile, src_gmem_tile, self.buffer)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst_gmem_tile: LayoutTensor[mut=True, ...],
@@ -111,7 +111,7 @@ struct IteratorScatterGatherAmd[
 
     var buffer: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, tensor: LayoutTensor, tensor_iter: LayoutTensorIter):
         """Initialize with tensor and iterator.
 
@@ -121,7 +121,7 @@ struct IteratorScatterGatherAmd[
         """
         self.buffer = make_amd_buffer_resource(tensor_iter, _get_bounds(tensor))
 
-    @always_inline
+    @inline(.always)
     def copy(
         self,
         dst_reg_tile: LayoutTensor[mut=True, ...],
@@ -167,7 +167,7 @@ trait SharedMemoryBasePtr:
 
     comptime alignment: Int
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def ptr() -> UnsafePointer[Int8, MutUntrackedOrigin, address_space=.SHARED]:
         ...
@@ -190,7 +190,7 @@ struct NVIDIASharedMemoryBasePtr[
 
     comptime alignment: Int = 128
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def ptr() -> UnsafePointer[Int8, MutUntrackedOrigin, address_space=.SHARED]:
         return external_memory[
@@ -227,13 +227,13 @@ struct SharedMemoryManager[SMBP: SharedMemoryBasePtr]:
     var base_ptr: UnsafePointer[Int8, MutUntrackedOrigin, address_space=.SHARED]
     var offset: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize the shared memory manager."""
         self.base_ptr = Self.SMBP.ptr()
         self.offset = 0
 
-    @always_inline
+    @inline(.always)
     def build[
         dtype: DType,
         layout: Layout,
@@ -258,7 +258,7 @@ struct SharedMemoryManager[SMBP: SharedMemoryBasePtr]:
         self.offset += T.storage_size
         return result
 
-    @always_inline
+    @inline(.always)
     def build[
         dtype: DType,
         layout: Layout,
@@ -283,7 +283,7 @@ struct SharedMemoryManager[SMBP: SharedMemoryBasePtr]:
         self.offset += T.storage_size
         return result
 
-    @always_inline
+    @inline(.always)
     def build[
         type: TrivialRegisterPassable,
         size: Int,

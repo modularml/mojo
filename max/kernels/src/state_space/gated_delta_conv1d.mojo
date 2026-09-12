@@ -64,7 +64,7 @@ from max.gpu import (
     block_idx,
     thread_idx,
 )
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from std.utils.index import IndexList
 
 
@@ -84,21 +84,28 @@ def gated_delta_conv1d_fwd_gpu[
     slot_idx_LT: TensorLayout,
     input_row_offsets_LT: TensorLayout,
     conv_output_ragged_LT: TensorLayout,
+    Engine: TensorEngine,
 ](
     batch_size: Int32,
     total_seq_len: Int32,
     conv_dim: Int32,
     qkv_input_ragged: TileTensor[
-        work_dtype, qkv_input_ragged_LT, MutUntrackedOrigin
+        work_dtype, qkv_input_ragged_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    conv_weight: TileTensor[work_dtype, conv_weight_LT, MutUntrackedOrigin],
-    conv_state: TileTensor[state_dtype, conv_state_LT, MutUntrackedOrigin],
-    slot_idx: TileTensor[.uint32, slot_idx_LT, MutUntrackedOrigin],
+    conv_weight: TileTensor[
+        work_dtype, conv_weight_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    conv_state: TileTensor[
+        state_dtype, conv_state_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    slot_idx: TileTensor[
+        .uint32, slot_idx_LT, MutUntrackedOrigin, Engine=Engine
+    ],
     input_row_offsets: TileTensor[
-        .uint32, input_row_offsets_LT, MutUntrackedOrigin
+        .uint32, input_row_offsets_LT, MutUntrackedOrigin, Engine=Engine
     ],
     conv_output_ragged: TileTensor[
-        work_dtype, conv_output_ragged_LT, MutUntrackedOrigin
+        work_dtype, conv_output_ragged_LT, MutUntrackedOrigin, Engine=Engine
     ],
     # Strides for [total_seq_len, conv_dim] tensors
     qkv_input_seqlen_stride: UInt32,  # stride along total_seq_len axis
@@ -139,14 +146,14 @@ def gated_delta_conv1d_fwd_gpu[
 
     # Read the pool slot for this batch item exactly once. The caller
     # (`GatedDeltaNetStateCache.claim`) guarantees `slot < max_slots`.
-    var slot = Int(slot_idx._storage[batch_item_idx])
+    var slot = Int(slot_idx.raw_load(batch_item_idx))
 
     # ── Sequence boundaries from ragged offsets ─────────────────────────────
     var sequence_start_flat_idx = Int(
-        input_row_offsets._storage[batch_item_idx]
+        input_row_offsets.raw_load(batch_item_idx)
     )
     var sequence_end_flat_idx = Int(
-        input_row_offsets._storage[batch_item_idx + 1]
+        input_row_offsets.raw_load(batch_item_idx + 1)
     )
     var sequence_length = sequence_end_flat_idx - sequence_start_flat_idx
 
@@ -158,9 +165,9 @@ def gated_delta_conv1d_fwd_gpu[
             UInt32(conv_channel_idx) * conv_weight_channel_stride
             + UInt32(kernel_offset_k) * conv_weight_offset_stride
         )
-        weight_register[kernel_offset_k] = conv_weight._storage[
+        weight_register[kernel_offset_k] = conv_weight.raw_load(
             weight_flat_offset
-        ]
+        )
 
     comptime KERNEL_SIZE_MINUS_ONE = KERNEL_SIZE - 1
 
@@ -194,7 +201,7 @@ def gated_delta_conv1d_fwd_gpu[
                     + UInt32(conv_channel_idx) * qkv_input_channel_stride
                 )
                 input_value = Float32(
-                    qkv_input_ragged._storage[ragged_flat_offset]
+                    qkv_input_ragged.raw_load(ragged_flat_offset)
                 )
             else:
                 # Before the current sequence: read from conv_state pool slot.
@@ -211,7 +218,7 @@ def gated_delta_conv1d_fwd_gpu[
                         + UInt32(window_idx) * conv_state_window_stride
                     )
                     input_value = Float32(
-                        conv_state._storage[state_flat_offset]
+                        conv_state.raw_load(state_flat_offset)
                     )
 
             conv_sum += input_value * Float32(weight_register[kernel_offset_k])
@@ -220,8 +227,8 @@ def gated_delta_conv1d_fwd_gpu[
             UInt32(flat_token_idx) * conv_output_seqlen_stride
             + UInt32(conv_channel_idx) * conv_output_channel_stride
         )
-        conv_output_ragged._storage[output_flat_offset] = Scalar[work_dtype](
-            conv_sum
+        conv_output_ragged.raw_store(
+            output_flat_offset, Scalar[work_dtype](conv_sum)
         )
 
     # ── Update conv_state: the last KERNEL_SIZE-1 raw input tokens ──────────
@@ -248,7 +255,7 @@ def gated_delta_conv1d_fwd_gpu[
                 + UInt32(conv_channel_idx) * qkv_input_channel_stride
             )
             state_value = Scalar[state_dtype](
-                qkv_input_ragged._storage[source_flat_offset]
+                qkv_input_ragged.raw_load(source_flat_offset)
             )
         else:
             # Source token is before the current sequence; carry from old state.
@@ -264,11 +271,11 @@ def gated_delta_conv1d_fwd_gpu[
                     + UInt32(conv_channel_idx) * conv_state_channel_stride
                     + UInt32(old_window_idx) * conv_state_window_stride
                 )
-                state_value = conv_state._storage[old_state_flat_offset]
+                state_value = conv_state.raw_load(old_state_flat_offset)
 
         var new_state_flat_offset = (
             UInt32(slot) * conv_state_pool_stride
             + UInt32(conv_channel_idx) * conv_state_channel_stride
             + UInt32(state_slot_j) * conv_state_window_stride
         )
-        conv_state._storage[new_state_flat_offset] = state_value
+        conv_state.raw_store(new_state_flat_offset, state_value)

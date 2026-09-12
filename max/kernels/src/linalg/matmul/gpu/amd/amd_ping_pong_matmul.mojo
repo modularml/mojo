@@ -95,7 +95,7 @@ struct KernelConfig(ImplicitlyCopyable, Movable, Writable):
                 writer.write(sep)
             writer.write(list[i])
 
-    @always_inline
+    @inline(.always)
     def num_threads(self) -> Int:
         var num_warps = self.block_shape // self.warp_shape
         return num_warps.flattened_length() * WARP_SIZE
@@ -474,11 +474,11 @@ struct AMDPingPongMatmul[
         ](c)
 
         # === Sync helpers ===
-        @always_inline
+        @inline(.always)
         def s_barrier():
             llvm_intrinsic["llvm.amdgcn.s.barrier", NoneType]()
 
-        @always_inline
+        @inline(.always)
         def s_setprio[priority: Int16]():
             llvm_intrinsic["llvm.amdgcn.s.setprio", NoneType](priority)
 
@@ -493,7 +493,7 @@ struct AMDPingPongMatmul[
             (b_s1_h0, b_s1_h1),
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             a_loader.load_tile(
@@ -504,7 +504,7 @@ struct AMDPingPongMatmul[
                 k_offset=k,
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
@@ -551,7 +551,7 @@ struct AMDPingPongMatmul[
         ](sched_config, target)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _bind[entry: ScheduleEntry](k_base: Int):
             comptime k_off = entry.op.k_offset.signed_bk_multiple()
             var k = k_base + k_off * BK
@@ -683,7 +683,7 @@ struct AMDPingPongMatmul[
                         )
 
 
-@always_inline
+@inline(.always)
 def amd_ping_pong_matmul[
     a_type: DType,
     b_type: DType,
@@ -721,7 +721,7 @@ def amd_ping_pong_matmul[
     var N = Int(c.dim[1]())
     var M = Int(c.dim[0]())
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_kernel[config: KernelConfig]() raises:
         comptime kernel = AMDPingPongMatmul[

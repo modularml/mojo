@@ -34,7 +34,7 @@ comptime MAX_DSTATE = 16
 comptime LOG2E = 1.4426950408889634
 
 
-@always_inline
+@inline(.always)
 def softplus_ref(val: Float32) -> Float32:
     """Reference softplus: log(1 + exp(x)) with numerical stability."""
     if val > 20.0:
@@ -42,7 +42,7 @@ def softplus_ref(val: Float32) -> Float32:
     return log(Float32(1.0) + exp(val))
 
 
-@always_inline
+@inline(.always)
 def silu_ref(val: Float32) -> Float32:
     """Reference SiLU: x * sigmoid(x) = x / (1 + exp(-x))."""
     if val < -20.0:
@@ -281,6 +281,7 @@ def run_ssd_combined_gpu[
         z_cpu_lt.LayoutType,
         delta_bias_cpu_lt.LayoutType,
         gamma_cpu_lt.LayoutType,
+        output_cpu_lt.Engine,
     ](
         batch,
         dim,

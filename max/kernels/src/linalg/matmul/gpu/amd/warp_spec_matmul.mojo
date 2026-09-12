@@ -125,7 +125,7 @@ def validate_config[
     ), "Consumer warps must be power of 2"
 
 
-@always_inline
+@inline(.always)
 def determine_thread_role[
     producer_a_warps: Int,
     producer_b_warps: Int,
@@ -272,7 +272,7 @@ def get_producer_warp_thread_layout[
     )
 
 
-@always_inline
+@inline(.always)
 def lgkm_wait():
     """Emits an `s_waitcnt lgkmcnt(0)` instruction to wait for outstanding shared memory loads.
     """
@@ -284,7 +284,7 @@ def lgkm_wait():
     ]()
 
 
-@always_inline
+@inline(.always)
 def run_producer[
     dtype: DType,
     layout: Layout,
@@ -679,7 +679,7 @@ def warp_specialized_matmul_kernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def warp_specialized_matmul[
     M: Int,
     N: Int,

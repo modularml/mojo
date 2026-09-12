@@ -448,7 +448,7 @@ kgen.param.assert <rebind(:i73 rebind(:i53 42))>, "rebind must fold"
 
 "some.op"() {
   // Equality against an unknown value stays symbolic.
-  // CHECK: a = #kgen.param.expr<eq, #kgen<simd 2> : !kgen.scalar<si32>, #kgen.unknown : !kgen.scalar<si32>> : !kgen.scalar<bool>
+  // CHECK: a = #kgen.param.identical<#kgen<simd 2> : !kgen.scalar<si32>, #kgen.unknown : !kgen.scalar<si32>> : !kgen.scalar<bool>
   a = #kgen.param.expr<eq, #kgen.unknown : !kgen.scalar<si32>, #kgen<simd 2> : !kgen.scalar<si32>> : !kgen.scalar<bool>,
   // CHECK: b = #kgen<simd false> : !kgen.scalar<bool>
   b = #kgen.param.expr<eq, #kgen<simd 1> : !kgen.scalar<si32>, #kgen<simd 2> : !kgen.scalar<si32>> : !kgen.scalar<bool>,
@@ -651,3 +651,48 @@ kgen.param.assert <rebind(:i73 rebind(:i53 42))>, "rebind must fold"
   // CHECK: f = #kgen.param.expr<floor_div_s, #kgen<simd 9223372036854775807>
   f = #kgen.param.expr<floor_div_s,  #kgen.simd<9223372036854775807> : !kgen.scalar<index>, #kgen.simd<-3> : !kgen.scalar<index>> : !kgen.scalar<index>
 } : () -> ()
+
+// `opaque_plugin` itself round-trips in Support/test/m-ir/m-attrs.mlir; what
+// matters here is that a KGEN param value survives the `#kgen.target` spelling,
+// which wraps TargetInfoAttr rather than printing it directly.
+"some.op"() {
+  // CHECK: a = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128> : !kgen.target
+  a = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128> : !kgen.target,
+  // CHECK-SAME: b = #kgen.target<triple = "unknown", arch = "", opaque_plugin = #kgen.param_list<index, struct<(index)>> : !kgen.param_list<type>, simd_bit_width = 128> : !kgen.target
+  b = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128, opaque_plugin = #kgen.param_list<index, !kgen.struct<(index)>> : !kgen.param_list<!kgen.type>> : !kgen.target
+} : () -> ()
+
+// CHECK-LABEL: kgen.generator @get_target_plugin_unfolded
+kgen.generator @get_target_plugin_unfolded<t0: target>() {
+  // A target parameter has no payload to read yet, so the expression is kept.
+  // CHECK-NEXT: = kgen.param.constant: param_list<type> = <#kgen.get_target_plugin<t0>>
+  kgen.param.constant: !kgen.param_list<!kgen.type> =
+    <#kgen.get_target_plugin<t0> : !kgen.param_list<!kgen.type>>
+  kgen.return
+}
+
+// CHECK-LABEL: kgen.generator @get_target_plugin_folds
+kgen.generator @get_target_plugin_folds() {
+  // Literal target, payload type matches the requested type: folds to the
+  // payload itself, so no `get_target_plugin` is left behind.
+  // CHECK-NEXT: = kgen.param.constant: param_list<type> = <[index, f32]>
+  kgen.param.constant: !kgen.param_list<!kgen.type> =
+    <#kgen.get_target_plugin<#kgen.target<triple = "unknown", arch = "",
+      opaque_plugin = #kgen.param_list<index, f32> : !kgen.param_list<!kgen.type>>
+      : !kgen.target> : !kgen.param_list<!kgen.type>>
+
+  // Literal target carrying no payload at all: nothing to fold to.
+  // CHECK-NEXT: = kgen.param.constant: param_list<type> = <#kgen.get_target_plugin<#kgen.target<triple = "unknown", arch = "">>>
+  kgen.param.constant: !kgen.param_list<!kgen.type> =
+    <#kgen.get_target_plugin<#kgen.target<triple = "unknown", arch = ""> : !kgen.target>
+      : !kgen.param_list<!kgen.type>>
+
+  // Literal target whose payload is a different type than the one requested:
+  // must not fold, or the constant would take on the wrong type.
+  // CHECK-NEXT: = kgen.param.constant: param_list<type> = <#kgen.get_target_plugin<#kgen.target<triple = "unknown", arch = "", opaque_plugin = #kgen.param_list<1, 2> : !kgen.param_list<index>>>>
+  kgen.param.constant: !kgen.param_list<!kgen.type> =
+    <#kgen.get_target_plugin<#kgen.target<triple = "unknown", arch = "",
+      opaque_plugin = #kgen.param_list<1, 2> : !kgen.param_list<index>>
+      : !kgen.target> : !kgen.param_list<!kgen.type>>
+  kgen.return
+}

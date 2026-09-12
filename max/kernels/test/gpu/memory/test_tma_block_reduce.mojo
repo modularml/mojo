@@ -46,7 +46,7 @@ from std.utils.numerics import get_accum_type
 from layout import TileTensor, Coord, Idx, row_major
 
 
-@always_inline
+@inline(.always)
 def block_reduce[
     dtype: DType, max_warps_per_block: Int = 32
 ](val: Scalar[dtype]) -> Scalar[dtype]:
@@ -200,7 +200,7 @@ def test_tma_block_reduce[
     ctx.enqueue_memset(d_out, 0)
 
     # Define the kernel launch function for benchmarking
-    @always_inline
+    @inline(.always)
     def kernel_launch(ctx: DeviceContext) raises {imm} -> None:
         comptime if use_tma:
             var tma_desc = create_tma_descriptor[dtype, 2](
@@ -229,7 +229,7 @@ def test_tma_block_reduce[
 
             # Change the input function to match RMS norm pattern
             @__copy_capture(data_buf)
-            @always_inline
+            @inline(.always)
             @__parameter
             def input_fn_2d[
                 width: Int, _rank: Int

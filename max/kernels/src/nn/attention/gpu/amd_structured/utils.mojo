@@ -24,7 +24,7 @@ from max.gpu import warp_id as get_warp_id
 from std.math.uutils import udivmod
 
 
-@always_inline
+@inline(.always)
 def get_warp_coords[BN: Int, WN: Int]() -> Tuple[Int, Int]:
     """Return `(warp_row, warp_col)` for the current warp given a BN×WN grid.
 

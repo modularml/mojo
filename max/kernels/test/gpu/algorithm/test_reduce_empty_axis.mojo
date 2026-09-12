@@ -98,7 +98,7 @@ def _test_reduce_sum_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
         )
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -107,7 +107,7 @@ def _test_reduce_sum_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
                 width=width, alignment=alignment * align_of[dtype]()
             ](idx)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:
@@ -175,7 +175,7 @@ def _test_reduce_max_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
         )
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -184,7 +184,7 @@ def _test_reduce_max_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
                 width=width, alignment=alignment * align_of[dtype]()
             ](idx)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:
@@ -249,7 +249,7 @@ def _test_reduce_argmax_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
         )
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -258,7 +258,7 @@ def _test_reduce_argmax_stale_buffer_gpu[dtype: DType = DType.float32]() raises:
                 width=width, alignment=alignment * align_of[dtype]()
             ](idx)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[out_dtype, width]) {var out_ptr}:
@@ -312,13 +312,13 @@ def _max_non_inner_real_then_empty[
         ctx.synchronize()
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {} -> SIMD[dtype, width]:
             return SIMD[dtype, width](real_value)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:
@@ -373,13 +373,13 @@ def _test_reduce_sum_rank1_stale_buffer_gpu[
         ctx.synchronize()
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {} -> SIMD[dtype, width]:
             return SIMD[dtype, width](real_value)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:
@@ -420,13 +420,13 @@ def _test_reduce_mean_int_empty_axis_gpu[dtype: DType = DType.int32]() raises:
         ctx.synchronize()
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {} -> SIMD[dtype, width]:
             return SIMD[dtype, width](real_value)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:
@@ -471,13 +471,13 @@ def _test_reduce_mean_float_empty_axis_gpu[
         ctx.synchronize()
         var out_ptr = out_d.unsafe_ptr()
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {} -> SIMD[dtype, width]:
             return SIMD[dtype, width](real_value)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr}:

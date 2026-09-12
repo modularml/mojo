@@ -24,7 +24,6 @@ from max.nn.kernels import kv_cache_ragged_2m_iadd
 from max.nn.kv_cache import (
     KVCacheParams,
     MHAKVCacheParams,
-    PagedCacheValues,
 )
 from test_common.simple_kv_cache import (
     block_ids_for_batch,
@@ -165,13 +164,7 @@ def run_kv_cache_2m_iadd(
         kv_input, row_offsets, end_idx, batch_len, *kv_inputs = graph.inputs
         layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
 
-        kv_collection = PagedCacheValues(
-            kv_blocks=kv_inputs[0].buffer,
-            cache_lengths=kv_inputs[1].tensor,
-            lookup_table=kv_inputs[2].tensor,
-            max_prompt_length=kv_inputs[3].tensor,
-            max_cache_length=kv_inputs[4].tensor,
-        )
+        kv_collection = kv_params.unflatten_kv_inputs(iter(kv_inputs)).inputs[0]
 
         kv_cache_ragged_2m_iadd(
             kv_params=kv_params,

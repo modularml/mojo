@@ -32,7 +32,7 @@ span begun without a matching end (mirrors the C++ RAII discipline).
 from std.ffi import external_call
 
 
-@always_inline
+@inline(.always)
 def is_enabled() -> Bool:
     """Reports whether the libkineto profiler is currently enabled.
 
@@ -96,7 +96,7 @@ struct Range(ImplicitlyCopyable):
     external code would unbalance libkineto's bookkeeping.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, name: StaticString, color: UInt32 = 0):
         """Records the span name and color; opening is deferred to `__enter__`.
 
@@ -114,7 +114,7 @@ struct Range(ImplicitlyCopyable):
         # entered (or entered while disabled) never closes a span in __exit__.
         self._began = False
 
-    @always_inline
+    @inline(.always)
     def __enter__(mut self):
         """Begin a libkineto activity span if the profiler is enabled.
 
@@ -138,7 +138,7 @@ struct Range(ImplicitlyCopyable):
             # span must never set this to True.
             self._began = True
 
-    @always_inline
+    @inline(.always)
     def __exit__(self):
         """Close the libkineto activity span if `__enter__` opened one.
 

@@ -22,9 +22,10 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
+from .agentic_tools import ToolConfig
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
-from .multiturn_distribution_fit import build_chat_samples_from_user_text_pool
+from .multiturn_distribution_fit import build_fitted_chat_samples
 from .types import (
     ChatSamples,
     ChatSession,
@@ -35,6 +36,66 @@ from .types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def fetch_instruct_coder_dataset_path(dataset_path: str | None = None) -> str:
+    """Return a local path to the InstructCoder ``train.json`` file.
+
+    Downloads the dataset from HuggingFace Hub (``likaixin/InstructCoder``)
+    when ``dataset_path`` is not already provided.
+
+    Args:
+        dataset_path: Existing local path to reuse, if any.
+
+    Returns:
+        Local filesystem path to the dataset's ``train.json``.
+    """
+    if dataset_path is not None:
+        return dataset_path
+    return hf_hub_download_with_retry(
+        repo_id="likaixin/InstructCoder",
+        filename="train.json",
+        repo_type="dataset",
+    )
+
+
+def load_instruct_coder_pairs(
+    dataset_path: str | None = None,
+) -> list[tuple[str, str]]:
+    """Load (prompt, completion) pairs from the InstructCoder dataset.
+
+    Fetches the dataset via :func:`fetch_instruct_coder_dataset_path` and
+    parses each entry into a prompt (the instruction, plus any input code)
+    and a completion (the expected edited code). Reused by
+    :class:`InstructCoderBenchmarkDataset` and by other benchmark tools that
+    only need the raw text pairs (e.g. the engine benchmark's
+    ``InstructCoderTokenSource``).
+
+    Args:
+        dataset_path: Existing local path to reuse, if any. Downloaded from
+            HuggingFace Hub otherwise.
+
+    Returns:
+        List of (prompt, completion) text pairs.
+    """
+    resolved_path = fetch_instruct_coder_dataset_path(dataset_path)
+
+    with open(resolved_path, encoding="utf-8") as f:
+        dataset = json.load(f)
+
+    pairs: list[tuple[str, str]] = []
+    for entry in dataset:
+        instruction = entry.get("instruction", "").strip()
+        code_input = entry.get("input", "").strip()
+        output = entry.get("output", "").strip()
+        if not instruction or not output:
+            continue
+        if code_input:
+            prompt = f"{instruction}\n\n{code_input}"
+        else:
+            prompt = instruction
+        pairs.append((prompt, output))
+    return pairs
 
 
 class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
@@ -64,36 +125,14 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
     """
 
     def fetch(self) -> None:
-        if self.dataset_path is not None:
-            return
-        self.dataset_path = hf_hub_download_with_retry(
-            repo_id="likaixin/InstructCoder",
-            filename="train.json",
-            repo_type="dataset",
-        )
+        self.dataset_path = fetch_instruct_coder_dataset_path(self.dataset_path)
 
     def _load_pairs(self) -> list[tuple[str, str]]:
         """Load and return (prompt, completion) pairs from the dataset file."""
         assert self.dataset_path is not None, (
             "dataset_path must be set before loading"
         )
-
-        with open(self.dataset_path, encoding="utf-8") as f:
-            dataset = json.load(f)
-
-        pairs: list[tuple[str, str]] = []
-        for entry in dataset:
-            instruction = entry.get("instruction", "").strip()
-            code_input = entry.get("input", "").strip()
-            output = entry.get("output", "").strip()
-            if not instruction or not output:
-                continue
-            if code_input:
-                prompt = f"{instruction}\n\n{code_input}"
-            else:
-                prompt = instruction
-            pairs.append((prompt, output))
-        return pairs
+        return load_instruct_coder_pairs(self.dataset_path)
 
     def sample_requests(
         self,
@@ -173,6 +212,8 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
         sys_prompt_ratio: float = 0.0,
         max_num_unique_sys_prompt: int = 1,
         min_input_len: int = 4,
+        tools: Sequence[ToolConfig] | None = None,
+        agentic_rounds_per_turn: DistributionParameter | None = None,
         min_output_len: int = 1,
     ) -> ChatSamples:
         """Generate multi-turn chat sessions from InstructCoder entries.
@@ -214,12 +255,19 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
             random.shuffle(pairs)
 
         if fit_length_distributions:
-            assert num_turns is not None, "num_turns is required when fitting"
-            assert input_len is not None, "input_len is required when fitting"
-            assert output_len is not None, "output_len is required when fitting"
-            if pool is None:
+            if (
+                pool is None
+                or num_turns is None
+                or input_len is None
+                or output_len is None
+            ):
                 raise ValueError(
-                    "pool is required for InstructCoder fit-distributions multiturn"
+                    "pool, num_turns, input_len and output_len are required for"
+                    " InstructCoder fit-distributions multiturn; got"
+                    f" pool={pool!r},"
+                    f" num_turns={num_turns!r},"
+                    f" input_len={input_len!r},"
+                    f" output_len={output_len!r}."
                 )
             return self._gen_multiturn_sessions_from_distributions(
                 num_sessions=num_sessions,
@@ -233,6 +281,8 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
                 max_num_unique_sys_prompt=max_num_unique_sys_prompt,
                 min_input_len=min_input_len,
                 min_output_len=min_output_len,
+                tools=tools,
+                agentic_rounds_per_turn=agentic_rounds_per_turn,
             )
 
         # Pre-tokenize to get lengths and filter unusable entries.
@@ -300,9 +350,11 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
         max_num_unique_sys_prompt: int,
         min_input_len: int,
         min_output_len: int,
+        tools: Sequence[ToolConfig] | None,
+        agentic_rounds_per_turn: DistributionParameter | None,
     ) -> ChatSamples:
         """Build multiturn sessions with sampled lengths (see ``gen_multiturn_sessions``)."""
-        return build_chat_samples_from_user_text_pool(
+        return build_fitted_chat_samples(
             pool=pool,
             user_text_pool=[p for p, _ in pairs],
             num_sessions=num_sessions,
@@ -315,5 +367,7 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
             min_input_len=min_input_len,
             min_output_len=min_output_len,
             shuffle_pool=False,
+            tools=tools,
+            agentic_rounds_per_turn=agentic_rounds_per_turn,
             log_prefix="instruct-coder",
         )

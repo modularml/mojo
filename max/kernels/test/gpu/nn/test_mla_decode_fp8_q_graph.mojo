@@ -341,7 +341,7 @@ def _run_arm[
     var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def kv_input_fn[width: Int](coords: IndexList[2]) -> SIMD[dtype, width]:
         comptime assert type_of(kv_in_tt).flat_rank == 2
         return kv_in_tt.load[width=width](Coord(coords))

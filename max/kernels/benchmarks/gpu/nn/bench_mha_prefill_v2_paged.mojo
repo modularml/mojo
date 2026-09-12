@@ -264,11 +264,11 @@ def run_mha_prefill_v2_paged[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut b: Bencher,
         ) raises {var cb_q, var cb_o, var k_operand, var v_operand, imm}:
-            @always_inline
+            @inline(.always)
             def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 var q_ptr = cb_q.offset_ptr(iteration).bitcast[
                     Scalar[qkv_type]

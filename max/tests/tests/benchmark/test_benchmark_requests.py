@@ -26,6 +26,7 @@ from max.benchmark.benchmark_serving import validate_task_and_endpoint
 from max.benchmark.benchmark_shared.config import SamplingConfig
 from max.benchmark.benchmark_shared.datasets.types import (
     ChatMessage,
+    OpenAIImage,
     PixelGenerationImageOptions,
     TextContentBlock,
 )
@@ -43,6 +44,7 @@ from max.benchmark.benchmark_shared.request import (
     TRTLLMRequestDriver,
     VllmOmniPixelGenerationRequestDriver,
     VllmOmniVideoRequestDriver,
+    _attach_images_to_first_user_message,
     _build_final_payload,
     _build_sglang_pixel_generation_payload,
     _build_sglang_video_payload,
@@ -1590,3 +1592,47 @@ class TestMarkCancelledIfPastDeadline:
         out = RequestFuncOutput(success=True)
         mark_cancelled_if_past_deadline(out, past)
         assert out.cancelled is False
+
+
+def test_attach_images_targets_first_user_message() -> None:
+    """A leading system message must not receive the images."""
+    img: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,AAA"},
+    }
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": [{"type": "text", "text": "sys"}]},
+        {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+    ]
+    _attach_images_to_first_user_message(messages, [img])
+    assert messages[0]["content"] == [{"type": "text", "text": "sys"}]
+    assert messages[1]["content"][-1] == img
+
+
+def test_attach_images_normalizes_string_content() -> None:
+    """agentic-code passes plain-string content through, which used to raise
+    AttributeError on append."""
+    img: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,AAA"},
+    }
+    messages: list[dict[str, Any]] = [
+        {"role": "user", "content": "plain string"}
+    ]
+    _attach_images_to_first_user_message(messages, [img])
+    assert messages[0]["content"] == [
+        {"type": "text", "text": "plain string"},
+        img,
+    ]
+
+
+def test_attach_images_without_user_message_is_a_noop() -> None:
+    img: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,AAA"},
+    }
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": [{"type": "text", "text": "sys"}]}
+    ]
+    _attach_images_to_first_user_message(messages, [img])
+    assert messages[0]["content"] == [{"type": "text", "text": "sys"}]

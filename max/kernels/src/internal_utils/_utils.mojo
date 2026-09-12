@@ -34,7 +34,7 @@ from std.utils import IndexList
 
 
 struct InitializationType(DevicePassable, Equatable, TrivialRegisterPassable):
-    var _value: Int
+    var _value: Int64
     comptime zero = InitializationType(0)
     comptime one = InitializationType(1)
     comptime uniform_distribution = InitializationType(2)
@@ -46,17 +46,17 @@ struct InitializationType(DevicePassable, Equatable, TrivialRegisterPassable):
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
         return "InitializationType"
 
     def __init__(out self, value: Int):
-        self._value = value
+        self._value = Int64(value)
 
     def __init__(out self, value: Float64):
-        self._value = Int(value)
+        self._value = Int64(Int(value))
 
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
@@ -90,9 +90,9 @@ def bench_compile_time[
     comptime assert emission_kind in ("asm", "llvm", "ptx")
 
     # TODO: add docstring, this function should be used on its own or at the end of measured benchmarks.
-    @always_inline
+    @inline(.always)
     def bench_call(mut b: Bencher) raises {}:
-        @always_inline
+        @inline(.always)
         def bench_iter() raises {}:
             comptime if emission_kind == "asm" or emission_kind == "llvm":
                 var s = compile_info[func, emission_kind=emission_kind]().asm

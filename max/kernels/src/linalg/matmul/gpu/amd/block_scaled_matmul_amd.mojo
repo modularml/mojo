@@ -132,7 +132,7 @@ comptime SCHED_MASK_MFMA = 3
 #     swizzle here entirely (see `use_smem_swizzle` below). Validated on
 #     MI355 via rocprofv3: it eliminates the measured LDS bank conflicts
 #     on the A/B fragment reads.
-@always_inline
+@inline(.always)
 def _full_row_lds_swizzle[BK_BYTES: Int]() -> Swizzle:
     """Builds the LDS swizzle for a row-major `[rows, BK_BYTES]` uint8 tile.
 
@@ -154,7 +154,7 @@ def _full_row_lds_swizzle[BK_BYTES: Int]() -> Swizzle:
     return Swizzle(bits, 4, bits)
 
 
-@always_inline
+@inline(.always)
 def _smem_row_bytes[payload_bytes: Int]() -> Int:
     """SMEM row stride for a `[rows, payload_bytes]` uint8 A/B tile.
 
@@ -184,7 +184,7 @@ def _smem_row_bytes[payload_bytes: Int]() -> Int:
     return w
 
 
-@always_inline
+@inline(.always)
 def _swizzled_smem_off[
     BK_BYTES: Int, swizzle: Optional[Swizzle]
 ](row: Int, col_byte: Int) -> Int:
@@ -313,14 +313,12 @@ struct BlockScaledMmaOp[
     # permutes whole granules -- so what FP6 lacked was the power-of-two row,
     # not a different swizzle. `num_k_tiles == 1` keeps that stride at 128.
     # Padding and swizzle must land together: padding alone measured 1.49x
-    # slower. `MXFP6_SMEM_SWIZZLE` re-checks that pairing for a new tile
-    # shape; it is not a production knob.
+    # slower.
     comptime _frag_is_fp6 = (
         Self.a_bits == 6
         and Self.b_bits == 6
         and Self.a_frag_width_bytes == 24
         and Self.b_frag_width_bytes == 24
-        and get_defined_bool["MXFP6_SMEM_SWIZZLE", True]()
     )
     comptime use_smem_swizzle = (
         Self.num_k_tiles == 1
@@ -388,7 +386,7 @@ struct BlockScaledMmaOp[
         address_space=.LOCAL,
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert (
             Self.num_m_mmas <= 4
@@ -415,11 +413,11 @@ struct BlockScaledMmaOp[
         _ = self._a_scale_packed.fill(Int32(0))
         _ = self._b_scale_packed.fill(Int32(0))
 
-    @always_inline
+    @inline(.always)
     def accum_tile(self) -> ref[self._c_reg] type_of(self._c_reg):
         return self._c_reg
 
-    @always_inline
+    @inline(.always)
     def load_frag_from_smem[
         k_tile_idx: Int, slot: Int = 0
     ](
@@ -445,42 +443,48 @@ struct BlockScaledMmaOp[
         """
         comptime assert slot < Self.num_b_slots, "slot out of range"
         comptime if Self.b_bits == 6:
+            var b_reg8 = self._b_reg.vectorize[1, 8]()
+            var b_lane = Int(lane_id())
+            var b_lane_row = b_lane % Self.MMA_M
+            var b_byte_base = (
+                k_tile_idx * Self.b_packed_k_per_mma
+                + (b_lane // Self.MMA_M) * Self.b_frag_width_bytes
+            )
             comptime for i in range(Self.num_n_mmas):
                 var b_idx = (
                     slot * Self._b_slot_stride
                     + k_tile_idx * Self.num_n_mmas
                     + i
                 )
-                self._b_reg.vectorize[1, Self.b_reg_frag_bytes]()[
-                    b_idx, 0
-                ] = self._load_fp6_lane_fragment[
-                    Self.b_packed_k_per_mma,
-                    Self.b_frag_width_bytes,
-                    Self.b_reg_frag_bytes,
-                    Self.B_SMEM_ROW_BYTES,
-                ](
-                    b_smem_warp, i, k_tile_idx
-                )
+                var b_row = i * Self.MMA_M + b_lane_row
+                comptime for chunk in range(Self.b_frag_width_bytes // 8):
+                    var b_off = _swizzled_smem_off[
+                        Self.B_SMEM_ROW_BYTES, Self.smem_swizzle
+                    ](b_row, b_byte_base + chunk * 8)
+                    b_reg8[b_idx, chunk] = b_smem_warp.raw_load[width=8](b_off)
         else:
             self._load_b_frag_vectorized[k_tile_idx, slot=slot](b_smem_warp)
 
         comptime if Self.a_bits == 6:
+            var a_reg8 = self._a_reg.vectorize[1, 8]()
+            var a_lane = Int(lane_id())
+            var a_lane_row = a_lane % Self.MMA_M
+            var a_byte_base = (
+                k_tile_idx * Self.a_packed_k_per_mma
+                + (a_lane // Self.MMA_M) * Self.a_frag_width_bytes
+            )
             comptime for i in range(Self.num_m_mmas):
                 var a_idx = k_tile_idx * Self.num_m_mmas + i
-                self._a_reg.vectorize[1, Self.a_reg_frag_bytes]()[
-                    a_idx, 0
-                ] = self._load_fp6_lane_fragment[
-                    Self.a_packed_k_per_mma,
-                    Self.a_frag_width_bytes,
-                    Self.a_reg_frag_bytes,
-                    Self.A_SMEM_ROW_BYTES,
-                ](
-                    a_smem_warp, i, k_tile_idx
-                )
+                var a_row = i * Self.MMA_M + a_lane_row
+                comptime for chunk in range(Self.a_frag_width_bytes // 8):
+                    var a_off = _swizzled_smem_off[
+                        Self.A_SMEM_ROW_BYTES, Self.smem_swizzle
+                    ](a_row, a_byte_base + chunk * 8)
+                    a_reg8[a_idx, chunk] = a_smem_warp.raw_load[width=8](a_off)
         else:
             self._load_a_frag_vectorized[k_tile_idx](a_smem_warp)
 
-    @always_inline
+    @inline(.always)
     def _load_b_frag_vectorized[
         k_tile_idx: Int, slot: Int = 0
     ](
@@ -531,7 +535,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 b_reg_v[b_idx, h] = b_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
+    @inline(.always)
     def _load_a_frag_vectorized[
         k_tile_idx: Int
     ](
@@ -567,58 +571,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 a_reg_v[a_idx, h] = a_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
-    def _load_fp6_lane_fragment[
-        packed_k: Int, frag_w: Int, reg_w: Int, smem_row_bytes: Int
-    ](
-        self,
-        smem_warp: TileTensor[.uint8, _, _, address_space=.SHARED, ...],
-        mma_idx: Int,
-        k_tile_idx: Int,
-    ) -> SIMD[.uint8, reg_w]:
-        """Reads one lane's 24 FP6 payload bytes out of row-major SMEM.
-
-        `vectorize`/`distribute` cannot express a 24-byte element, so this
-        indexes SMEM directly. The lane mapping is deliberately identical to
-        the power-of-two path's `col_major[MMA_M, lanes_per_row]`: lane `l`
-        owns row `l % MMA_M` and K-group `l // MMA_M`.
-
-        Three 8-byte reads rather than 16+8: a lane's byte offset is a multiple
-        of 24, which is 8-byte but not 16-byte aligned, so a 16-byte read would
-        be misaligned for odd K-groups.
-
-        Offsets go through `_swizzled_smem_off` on the flat in-tile offset, the
-        same formula the store side uses, so the swizzle (when enabled) is
-        applied identically on both. Each 8-byte chunk lies inside one 16-byte
-        granule, which a `base=4` swizzle moves as a unit.
-
-        Parameters:
-            packed_k: Payload bytes per MFMA k-tile for this operand.
-            frag_w: Payload bytes in one lane's fragment (24 at FP6).
-            reg_w: Register fragment width the MFMA expects (32 at FP6).
-            smem_row_bytes: Row stride of the SMEM tile, padded per
-                `_smem_row_bytes`.
-
-        Returns:
-            The lane's fragment, payload in bytes 0..23 and zeros above.
-        """
-        comptime assert frag_w % 8 == 0, "FP6 fragment must be 8-byte aligned"
-
-        var lane = Int(lane_id())
-        var row = mma_idx * Self.MMA_M + (lane % Self.MMA_M)
-        var byte_base = k_tile_idx * packed_k + (lane // Self.MMA_M) * frag_w
-
-        var fragment = SIMD[.uint8, reg_w](0)
-        comptime for chunk in range(frag_w // 8):
-            var off = _swizzled_smem_off[smem_row_bytes, Self.smem_swizzle](
-                row, byte_base + chunk * 8
-            )
-            fragment = fragment.insert[offset=chunk * 8](
-                rebind[SIMD[.uint8, 8]](smem_warp.raw_load[width=8](off))
-            )
-        return fragment
-
-    @always_inline
+    @inline(.always)
     def load_a_frag_from_smem[
         k_tile_idx: Int
     ](self, a_smem_warp: TileTensor[.uint8, _, _, address_space=.SHARED, ...],):
@@ -652,7 +605,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 a_reg_v[a_idx, h] = a_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
+    @inline(.always)
     def load_b_frag_preshuffled[
         k_tile_idx: Int, N: Int, K_BYTES: Int, slot: Int = 0
     ](
@@ -707,7 +660,7 @@ struct BlockScaledMmaOp[
                 b_idx, 0
             ] = b_loader.load_fragment(n_log, k_byte_log)
 
-    @always_inline
+    @inline(.always)
     def load_scales_from_smem[
         k_tile_idx: Int
     ](
@@ -772,7 +725,7 @@ struct BlockScaledMmaOp[
             b_packed = b_packed | bitcast[.int32](byte_val << UInt32(n_mma * 8))
         self._b_scale_packed.raw_store(k_tile_idx, b_packed)
 
-    @always_inline
+    @inline(.always)
     def mma[k_tile_idx: Int, slot: Int = 0](self):
         """Execute block-scaled MFMA for k-tile k_tile_idx using B from `slot`.
 
@@ -1196,7 +1149,7 @@ struct BlockScaledMatmulAMD[
         var k_counter = split_id * tiles_per_split
         var k_scale_counter = split_id * tiles_per_split
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_tiles_from_dram():
             """Load one BK-wide tile from DRAM to register buffers."""
@@ -1206,7 +1159,7 @@ struct BlockScaledMatmulAMD[
             b_loader.load(b_load_reg, b_block.vectorize[1, simd_width]())
             k_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_tiles_to_smem[stage: Int = 0]():
             """Copy register buffers to SMEM in row-major order.
@@ -1229,11 +1182,16 @@ struct BlockScaledMatmulAMD[
                     the stage base (a multiple of the swizzle's 1024-byte span).
             """
             comptime MmaOpT = type_of(mma_op)
-            comptime a_stage_base = stage * Self.BM * A_BK_BYTES
-            comptime b_stage_base = stage * Self.BN * B_BK_BYTES
+            # Stride by the SMEM row, not the payload: at FP6 the 96-byte BK
+            # row is padded to 128 in the allocation above, so stepping by
+            # `A_BK_BYTES` would put stage 1 short of where it was written.
+            # The two are equal at MXFP4/MXFP8, which is why this only shows up
+            # as wrong results on FP6.
+            comptime a_stage_base = stage * Self.BM * A_SMEM_ROW_BYTES
+            comptime b_stage_base = stage * Self.BN * B_SMEM_ROW_BYTES
             var tid = Int(thread_idx.x)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def store_a():
                 var a_row = tid // a_load_cols
@@ -1247,7 +1205,7 @@ struct BlockScaledMatmulAMD[
                         a_load_reg.raw_load[width=simd_width](v * simd_width),
                     )
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def store_b():
                 var b_row = tid // b_load_cols
@@ -1273,7 +1231,7 @@ struct BlockScaledMatmulAMD[
                 if tid < b_active_threads:
                     store_b()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_scales_from_dram():
             """Cooperatively read one BK iteration's scale tiles to registers.
@@ -1317,7 +1275,7 @@ struct BlockScaledMatmulAMD[
 
             k_scale_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_scales_to_smem[stage: Int = 0]():
             """Copy staged scale dwords to SMEM at the fragment-read offsets.
@@ -1346,7 +1304,7 @@ struct BlockScaledMatmulAMD[
         comptime a_loads_per_thread = Self.BM // a_load_rows
         comptime b_loads_per_thread = Self.BN // b_load_rows
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def simple_k_loop():
             """Fallback for small K where schedule prologue doesn't fit."""
@@ -1376,7 +1334,7 @@ struct BlockScaledMatmulAMD[
                     mma_op.mma[k]()
                 barrier()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def scheduled_k_loop():
             """Pipelined K-loop via build_default_matmul_schedule."""
@@ -1392,7 +1350,7 @@ struct BlockScaledMatmulAMD[
             ]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _bind[entry: ScheduleEntry]():
                 comptime if entry.op.tag == LOAD_DRAM:
                     load_tiles_from_dram()
@@ -1458,7 +1416,7 @@ struct BlockScaledMatmulAMD[
             comptime for i in range(len(schedule.epilogue)):
                 _bind[schedule.epilogue[i]]()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def double_buffered_k_loop():
             """Depth-2 LDS ping-pong: read stage `k%2` while writing tile k+1
@@ -1470,7 +1428,7 @@ struct BlockScaledMatmulAMD[
             )
             comptime n_pairs = (tiles_per_split - 2) // 2
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def load_frags[stage: Int, slot: Int]():
                 var a_warp = a_smem.tile[Self.WM, A_BK_BYTES](
@@ -1489,7 +1447,7 @@ struct BlockScaledMatmulAMD[
                     )
                     mma_op.load_scales_from_smem[k](sfa_k, sfb_k)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def step[cur: Int, prefetch_dram: Bool]():
                 """One steady-state K-tile: stage/slot `cur` in, `1 - cur` out.
@@ -1611,16 +1569,28 @@ def _launch_block_scaled[
     ctx: DeviceContext,
 ) raises:
     """Instantiate BlockScaledMatmulAMD with the given tile shape and launch."""
-    # Depth-2 LDS ping-pong: MXFP8 BK=128 is one K-sub-tile, so the single-buffer
-    # body cannot overlap ds_write with MFMA. VGPR-bound, so 2x LDS costs no occupancy.
+    # Depth-2 LDS ping-pong: at BK=128 the K-sub-tile is one deep, so the
+    # single-buffer body cannot overlap ds_write with MFMA. VGPR-bound, so 2x
+    # LDS costs no occupancy (64 KiB of the 160 KiB budget at BM=BN=128).
+    #
+    # FP6 is admitted alongside FP8. Its 96-byte BK row is padded to 128 in
+    # SMEM (`_smem_row_bytes`), so the staged footprint and the swizzle are the
+    # same as FP8's; what differs is the DRAM side, where a 6-byte-per-16
+    # column count leaves some load threads idle. That is a load-side cost the
+    # pipelining is meant to hide, so it is measured, not assumed -- see the
+    # MXFP6 dense dispatch below for which shapes actually take this tile.
     comptime _a_bk_bytes = (BK_ELEMS * matrix_format.bits_per_element()) // 8
     comptime _k_tiles_total = type_of(a).static_shape[1] // _a_bk_bytes
     comptime num_stages = 2 if (
-        matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3
+        (
+            matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3
+            or matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3
+            or matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2
+        )
         and BK_ELEMS == 128
         and BM == 128
         and BN == 128
-        and WM == 64
+        and (WM == 64 or WM == 32)
         and WN == 64
         and MMA_M == 16
         and MMA_N == 16
@@ -2297,7 +2267,7 @@ def block_scaled_matmul_amd[
             ](c, a, b, a_scales, b_scales, M, ctx)
 
 
-@always_inline
+@inline(.always)
 def _largest_divisor_at_most[n: Int](cap: Int) -> Int:
     """Returns the largest divisor of `n` that is at most `cap`.
 
@@ -2553,6 +2523,7 @@ def mxfp6_block_scaled_matmul_amd[
     num_splits: Int = 1,
     preshuffled_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    allow_lds_pingpong: Bool = True,
 ](
     c: TileTensor[mut=True, ...],
     a: TileTensor[mut=False, .uint8, ...],
@@ -2599,6 +2570,10 @@ def mxfp6_block_scaled_matmul_amd[
         elementwise_lambda_fn: Optional epilogue applied to each output
             element in registers instead of storing it. The fused QKV ops
             use it to scatter K/V into the paged cache.
+        allow_lds_pingpong: Whether the depth-2 LDS ping-pong tile may be
+            selected. Callers whose `elementwise_lambda_fn` is expensive pass
+            False: the tile was measured with a plain store epilogue, and a
+            heavier one spills past the GPU stack-frame limit at BM=128.
 
     Args:
         c: Output `[M, N]` (any float dtype).
@@ -2676,6 +2651,63 @@ def mxfp6_block_scaled_matmul_amd[
         " column overhang wraps into the next row and corrupts it"
     )
 
+    # === Narrow-M decode band (M <= NARROW_M_MAX) ===
+    # The BM=48 tile below was tuned on N=2048/K=6144 and N=6144/K=3072, which
+    # stopped being production shapes when the fused QKV+IndexQK projection
+    # replaced them. It is also the widest BM the tuning sweep could reach: the
+    # sweep prunes on warps-per-CTA % 3 == 0 for full DRAM->SMEM loader
+    # utilization, which admits only BM=48 and BM=96 and so never measured any
+    # 2-warp tile. Those build and compute correctly (checksums agree to 1e-9
+    # against the shipping tile at every M) and they win below M=16.
+    #
+    # Median of 3 reps, us/call, vs the BM=48 tile:
+    #
+    #   N=2560 K=6144   M=1 1.20x  M=8 1.17x  M=16 1.04x  M=20 0.83x
+    #   N=6144 K=2048   M=1 1.27x  M=8 1.22x  M=16 1.18x  M=20 0.96x
+    #
+    # The split factor is the lever, not the tile: the same tile at
+    # `_pick_num_splits`'s value measures 1.05x / 0.93x instead. Both winners
+    # sit at the largest split the K-loop admits, which is well past that
+    # formula's two-wave CTA cap -- so the band is shape-gated (as the MXFP8
+    # path gates its own measured bands) rather than derived, and must not be
+    # widened to shapes it was not measured on.
+    comptime NARROW_M_MAX = 16
+    comptime W_BM = 16
+    comptime W_BN = 32
+    comptime W_BK_ELEMS = 128
+    comptime W_WM = 16
+    comptime W_WN = 16
+    comptime W_BK_BYTES = (W_BK_ELEMS * fp6_format.bits_per_element()) // 8
+    # Largest legal split: `BlockScaledMatmulAMD.run` needs every band to be a
+    # whole number of BK tiles, and at least two so the K-loop stays pipelined.
+    comptime W_SPLITS = (K_BYTES // W_BK_BYTES) // 2
+    comptime _m3_fp6_narrow_m = (N == 2560 and K_BYTES == 4608) or (
+        N == 6144 and K_BYTES == 1536
+    )
+    comptime _narrow_ok = (
+        _m3_fp6_narrow_m
+        and num_splits == 1
+        and W_SPLITS > 1
+        and N % W_BN == 0
+        and K_BYTES % W_BK_BYTES == 0
+        and K_BYTES % W_SPLITS == 0
+        and (K_BYTES // W_SPLITS) % W_BK_BYTES == 0
+    )
+
+    comptime if _narrow_ok:
+        if M <= NARROW_M_MAX:
+            _launch_block_scaled_split_k[
+                BM=W_BM,
+                BN=W_BN,
+                BK_ELEMS=W_BK_ELEMS,
+                WM=W_WM,
+                WN=W_WN,
+                num_splits=W_SPLITS,
+                matrix_format=fp6_format,
+                elementwise_lambda_fn=elementwise_lambda_fn,
+            ](c, a, b, a_scales, b_scales, M, ctx)
+            return
+
     # === Decode tile (M <= DECODE_M_MAX) ===
     # The BM=96 tile below spans the whole decode M range in one M-tile, so
     # M=1 costs what M=64 does, and without a split it launches too few CTAs
@@ -2686,7 +2718,7 @@ def mxfp6_block_scaled_matmul_amd[
     # `_pick_num_splits` already does. BK_ELEMS=128 is also the only depth
     # where `use_smem_swizzle` fires (it needs `num_k_tiles == 1`) -- re-sweep
     # if that gate is ever widened.
-    comptime DECODE_M_MAX = 64
+    comptime DECODE_M_MAX = 256
     comptime D_BM = 48
     comptime D_BN = 64
     comptime D_BK_ELEMS = 128
@@ -2711,6 +2743,7 @@ def mxfp6_block_scaled_matmul_amd[
         and N % D_BN == 0
         and K_BYTES % D_BK_BYTES == 0
         and num_splits == 1
+        and not preshuffled_b
     )
 
     comptime if _decode_ok:
@@ -2796,6 +2829,49 @@ def mxfp6_block_scaled_matmul_amd[
             WM=WM,
             WN=WN,
             num_splits=num_splits,
+            matrix_format=fp6_format,
+            elementwise_lambda_fn=elementwise_lambda_fn,
+        ](c, a, b, a_scales, b_scales, M, ctx)
+        return
+
+    # Depth-2 LDS ping-pong tile. `_launch_block_scaled` turns the pipeline on
+    # for BM=BN=128, WN=64, WM in {32, 64}, BK_ELEMS=128 with an even K-tile
+    # count, so those are the conditions here; anything else falls through to
+    # the single-buffer BM=96 tile below.
+    #
+    # `allow_lds_pingpong=False` is how a caller declines it. The tile was
+    # measured with a plain store epilogue; the fused QKV scatter is far
+    # heavier, and at BM=128/WM=64 inlining it puts the frame past the GPU's
+    # 131056-byte limit (136288 at N=1280, 203616 at N=1920), so the kernel
+    # fails to build and the launch returns hipErrorIllegalState. The width
+    # alone is fine -- N=1280 with a plain store epilogue builds.
+    #
+    # This is the shape MXFP8 already runs for the same projections, where it
+    # is the difference between 214 and 618 us per generated token on
+    # N=2560/K=6144 at concurrency 32. FP6 pays a load-side cost FP8 does not
+    # -- its 96-byte BK row is 6 uint8x16 columns, so 192 of 256 threads are
+    # active on the DRAM read -- which is why this is measured against the
+    # BM=96 tile rather than assumed to win.
+    comptime P2_BM = 128
+    comptime P2_BN = 128
+    comptime P2_WM = 32
+    comptime P2_WN = 64
+    comptime P2_BK_BYTES = (128 * fp6_format.bits_per_element()) // 8
+    comptime _p2_k_tiles = K_BYTES // P2_BK_BYTES
+    comptime _pingpong_ok = (
+        allow_lds_pingpong
+        and N % P2_BN == 0
+        and K_BYTES % P2_BK_BYTES == 0
+        and _p2_k_tiles >= 2
+        and _p2_k_tiles % 2 == 0
+    )
+    comptime if _pingpong_ok:
+        _launch_block_scaled[
+            BM=P2_BM,
+            BN=P2_BN,
+            BK_ELEMS=128,
+            WM=P2_WM,
+            WN=P2_WN,
             matrix_format=fp6_format,
             elementwise_lambda_fn=elementwise_lambda_fn,
         ](c, a, b, a_scales, b_scales, M, ctx)

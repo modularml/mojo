@@ -454,8 +454,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--prefer-module-v3",
         action="store_true",
         help=(
-            "Whether to prefer the eager API architecture over the graph API "
-            "architecture. When set, the server uses the eager API architecture "
+            "Whether to prefer the ModuleV3 architecture over the graph API "
+            "architecture. When set, the server uses the ModuleV3 architecture "
             "when available and falls back to the graph API architecture."
         ),
     )

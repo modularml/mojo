@@ -2235,25 +2235,30 @@ def ssd_combined_cpu[
     z_LT: TensorLayout,
     delta_bias_LT: TensorLayout,
     gamma_LT: TensorLayout,
+    Engine: TensorEngine,
 ](
     batch: Int,
     dim: Int,
     seqlen: Int,
     group_size: Int,
     delta_softplus: Int8,
-    output: TileTensor[kernel_dtype, output_LT, MutAnyOrigin],
-    x: TileTensor[kernel_dtype, x_LT, MutAnyOrigin],
-    out_z: TileTensor[kernel_dtype, out_z_LT, MutAnyOrigin],
-    residual: TileTensor[kernel_dtype, residual_LT, MutAnyOrigin],
-    u: TileTensor[kernel_dtype, u_LT, MutAnyOrigin],
-    delta: TileTensor[kernel_dtype, delta_LT, MutAnyOrigin],
-    A: TileTensor[kernel_dtype, A_LT, MutAnyOrigin],
-    B: TileTensor[kernel_dtype, B_LT, MutAnyOrigin],
-    C: TileTensor[kernel_dtype, C_LT, MutAnyOrigin],
-    D: TileTensor[kernel_dtype, D_LT, MutAnyOrigin],
-    z: TileTensor[kernel_dtype, z_LT, MutAnyOrigin],
-    delta_bias: TileTensor[kernel_dtype, delta_bias_LT, MutAnyOrigin],
-    gamma: TileTensor[kernel_dtype, gamma_LT, MutAnyOrigin],
+    output: TileTensor[kernel_dtype, output_LT, MutAnyOrigin, Engine=Engine],
+    x: TileTensor[kernel_dtype, x_LT, MutAnyOrigin, Engine=Engine],
+    out_z: TileTensor[kernel_dtype, out_z_LT, MutAnyOrigin, Engine=Engine],
+    residual: TileTensor[
+        kernel_dtype, residual_LT, MutAnyOrigin, Engine=Engine
+    ],
+    u: TileTensor[kernel_dtype, u_LT, MutAnyOrigin, Engine=Engine],
+    delta: TileTensor[kernel_dtype, delta_LT, MutAnyOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutAnyOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutAnyOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutAnyOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutAnyOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutAnyOrigin, Engine=Engine],
+    delta_bias: TileTensor[
+        kernel_dtype, delta_bias_LT, MutAnyOrigin, Engine=Engine
+    ],
+    gamma: TileTensor[kernel_dtype, gamma_LT, MutAnyOrigin, Engine=Engine],
     epsilon: Scalar[kernel_dtype],
     weight_offset: Scalar[kernel_dtype],
     ctx: Optional[DeviceContext] = None,
@@ -2281,6 +2286,7 @@ def ssd_combined_cpu[
         delta_bias_LT: Memory layout of the `delta_bias` tensor.
         gamma_LT: Memory layout of the `gamma` normalization scale
             tensor.
+        Engine: Engine shared by all tile operands.
 
     Args:
         batch: Number of sequences processed in parallel.
@@ -2733,6 +2739,7 @@ def mamba_split_conv1d_scan_combined_cpu[
     rmsnorm_weight_layout: TensorLayout,
     outproj_weight_layout: TensorLayout,
     outproj_bias_layout: TensorLayout,
+    Engine: TensorEngine,
 ](
     batch: Int,
     seqlen: Int,
@@ -2747,48 +2754,52 @@ def mamba_split_conv1d_scan_combined_cpu[
     has_rmsnorm: Int8,
     has_outproj: Int8,
     zxbcdt: TileTensor[
-        kernel_dtype, zxbcdt_layout, MutAnyOrigin
+        kernel_dtype, zxbcdt_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, seqlen, 2*dim + 2*ngroups*dstate + nheads)
     conv_weight: TileTensor[
-        kernel_dtype, conv_weight_layout, MutAnyOrigin
+        kernel_dtype, conv_weight_layout, MutAnyOrigin, Engine=Engine
     ],  # (dim + 2*ngroups*dstate, width)
     conv_bias: TileTensor[
-        kernel_dtype, conv_bias_layout, MutAnyOrigin
+        kernel_dtype, conv_bias_layout, MutAnyOrigin, Engine=Engine
     ],  # (dim + 2*ngroups*dstate,)
     dt_bias: TileTensor[
-        kernel_dtype, delta_bias_layout, MutAnyOrigin
+        kernel_dtype, delta_bias_layout, MutAnyOrigin, Engine=Engine
     ],  # (nheads,)
-    A: TileTensor[kernel_dtype, A_layout, MutAnyOrigin],  # (nheads,)
+    A: TileTensor[
+        kernel_dtype, A_layout, MutAnyOrigin, Engine=Engine
+    ],  # (nheads,)
     D: TileTensor[
-        kernel_dtype, D_layout, MutAnyOrigin
+        kernel_dtype, D_layout, MutAnyOrigin, Engine=Engine
     ],  # (nheads, headdim) or (nheads,)
     x: TileTensor[
-        kernel_dtype, x_layout, MutAnyOrigin
+        kernel_dtype, x_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, dim, num_chunks, 2*dstate)
     out_z: TileTensor[
-        kernel_dtype, out_z_layout, MutAnyOrigin
+        kernel_dtype, out_z_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, dim, seqlen)
     dt: TileTensor[
-        kernel_dtype, dt_layout, MutAnyOrigin
+        kernel_dtype, dt_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, nheads, seqlen)
     B: TileTensor[
-        kernel_dtype, B_layout, MutAnyOrigin
+        kernel_dtype, B_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, ngroups, dstate, seqlen)
     C: TileTensor[
-        kernel_dtype, C_layout, MutAnyOrigin
+        kernel_dtype, C_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, ngroups, dstate, seqlen)
-    z: TileTensor[kernel_dtype, z_layout, MutAnyOrigin],  # (batch, dim, seqlen)
+    z: TileTensor[
+        kernel_dtype, z_layout, MutAnyOrigin, Engine=Engine
+    ],  # (batch, dim, seqlen)
     rmsnorm_weight: TileTensor[
-        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin
+        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin, Engine=Engine
     ],  # (dim,)
     outproj_weight: TileTensor[
-        kernel_dtype, outproj_weight_layout, MutAnyOrigin
+        kernel_dtype, outproj_weight_layout, MutAnyOrigin, Engine=Engine
     ],  # (out_dim, dim)
     outproj_bias: TileTensor[
-        kernel_dtype, outproj_bias_layout, MutAnyOrigin
+        kernel_dtype, outproj_bias_layout, MutAnyOrigin, Engine=Engine
     ],  # (out_dim,)
     output: TileTensor[
-        kernel_dtype, output_layout, MutAnyOrigin
+        kernel_dtype, output_layout, MutAnyOrigin, Engine=Engine
     ],  # (batch, seqlen, dim) or (batch, seqlen, out_dim)
     epsilon: Scalar[kernel_dtype],
     ctx: Optional[DeviceContext] = None,

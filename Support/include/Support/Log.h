@@ -259,7 +259,7 @@ struct LogRecord {
             std::string_view fmt, std::array<LogArg, maxArgs> prebuiltArgs,
             uint8_t count)
       : timestamp(ts), fmtString(fmt), args(std::move(prebuiltArgs)),
-        argCount(count), level(lvl), channel(c) {}
+        argCount(count), level(lvl), kind(RecordKind::Formatted), channel(c) {}
 
   // Required for ring-buffer slot pre-allocation.
   LogRecord() = default;

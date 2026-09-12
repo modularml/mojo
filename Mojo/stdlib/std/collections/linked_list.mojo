@@ -88,7 +88,7 @@ struct Node[
     def _into_value(deinit self) -> Self.T:
         return self.value^
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Writable):
@@ -177,12 +177,12 @@ struct _LinkedListIterOwned[T: Movable & Deinitable](
 
     var _list: LinkedList[Self.T]
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         # LinkedList.__deinit__ handles destroying remaining nodes.
         pass
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -207,7 +207,7 @@ struct _LinkedListIterOwned[T: Movable & Deinitable](
         )
         return node^._into_value()
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var sz = self._list._size
         return (sz, {sz})
@@ -465,7 +465,7 @@ struct LinkedList[ElementType: Movable](
         )
         return node^._into_value()
 
-    @always_inline
+    @inline(.always)
     def pop[
         I: Indexer & Deinitable, //
     ](mut self, var i: I) raises -> Self.ElementType:
@@ -536,7 +536,7 @@ struct LinkedList[ElementType: Movable](
         )
         return node^._into_value()
 
-    @always_inline
+    @inline(.always)
     def maybe_pop[
         I: Indexer & Deinitable, //
     ](mut self, var i: I) -> Optional[Self.ElementType]:
@@ -602,7 +602,7 @@ struct LinkedList[ElementType: Movable](
         self._tail = Self._NodePointer()
         self._size = 0
 
-    @always_inline
+    @inline(.always)
     def insert[I: Indexer](mut self, idx: I, var elem: Self.ElementType):
         """Insert an element `elem` into the list at index `idx`.
 
@@ -809,7 +809,7 @@ struct LinkedList[ElementType: Movable](
             curr = curr.value()[].next()
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def get_nth[
         I: Indexer
     ](ref self, idx: I) -> ref[
@@ -833,7 +833,7 @@ struct LinkedList[ElementType: Movable](
             to=self._get_node_ptr(idx).value()[].value
         )._get_ref_with_unsafe_interior_origin["element", origin_of(self)]()
 
-    @always_inline
+    @inline(.always)
     def _get_node_ptr[I: Indexer, //](ref self, idx: I) -> Self._NodePointer:
         """Get an optional pointer to the node at the specified index.
 

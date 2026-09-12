@@ -21,7 +21,7 @@ from std.testing import assert_equal
 from std.utils.index import IndexList
 
 
-@no_inline
+@inline(.never)
 def test_pad_constant_gpu[
     dtype: DType, rank: Int
 ](

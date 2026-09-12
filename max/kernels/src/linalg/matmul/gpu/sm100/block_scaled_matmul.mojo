@@ -194,7 +194,7 @@ struct B200BlockScaledMatmulSmem[
     var tmem_addr: Array[UInt32, 1]
 
 
-@always_inline
+@inline(.always)
 def load_AB_SFA_SFB[
     a_type: DType,
     b_type: DType,
@@ -478,7 +478,7 @@ def load_AB_SFA_SFB[
             )
 
 
-@always_inline
+@inline(.always)
 def _prefetch_weight_tiles[
     a_type: DType,
     b_type: DType,
@@ -681,7 +681,7 @@ def _prefetch_weight_tiles[
                 )
 
 
-@always_inline
+@inline(.always)
 def _complete_activation_tiles[
     a_type: DType,
     b_type: DType,
@@ -858,7 +858,7 @@ def _complete_activation_tiles[
                 )
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,

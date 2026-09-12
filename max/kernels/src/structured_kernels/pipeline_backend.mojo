@@ -72,7 +72,7 @@ trait PipelineBackend(TrivialRegisterPassable):
     # to reason about generically.
     comptime Handle: TrivialRegisterPassable
 
-    @always_inline
+    @inline(.always)
     def __init__[
         num_stages: Int
     ](
@@ -105,7 +105,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def init_barriers[
         num_stages: Int
     ](self, producer_arrive_count: Int32, consumer_arrive_count: Int32,):
@@ -123,7 +123,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def wait_full[
         ticks: Optional[UInt32] = None
     ](self, stage: UInt32, phase: UInt32):
@@ -139,7 +139,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def wait_empty[
         ticks: Optional[UInt32] = None
     ](self, stage: UInt32, phase: UInt32):
@@ -155,7 +155,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def try_full(self, stage: UInt32, phase: UInt32) -> Bool:
         """Return whether the producer has filled `stage` (non-blocking).
 
@@ -168,7 +168,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def try_empty(self, stage: UInt32, phase: UInt32) -> Bool:
         """Return whether the consumer has drained `stage` (non-blocking).
 
@@ -181,7 +181,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def arrive_full(self, stage: UInt32):
         """Raise the `full` signal for `stage` (producer side).
 
@@ -190,7 +190,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def arrive_empty(self, stage: UInt32):
         """Raise the `empty` signal for `stage` (consumer side).
 
@@ -199,7 +199,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def full_handle(self, stage: UInt32) -> Self.Handle:
         """Return the `full` signal handle for `stage`.
 
@@ -211,7 +211,7 @@ trait PipelineBackend(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def empty_handle(self, stage: UInt32) -> Self.Handle:
         """Return the `empty` signal handle for `stage`.
 
@@ -248,7 +248,7 @@ struct NvidiaMbarBackend[num_stages: Int](PipelineBackend):
     # and producer waits on this barrier.
     var empty: MbarPtr
 
-    @always_inline
+    @inline(.always)
     def __init__[passed_num_stages: Int](out self, ptr: MbarPtr):
         """Construct from the base pointer of the backing barrier array.
 
@@ -267,7 +267,7 @@ struct NvidiaMbarBackend[num_stages: Int](PipelineBackend):
         self.empty = ptr + Self.num_stages
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def storage_elems[passed_num_stages: Int]() -> Int:
         comptime assert passed_num_stages == Self.num_stages, (
             "num_stages passed to NvidiaMbarBackend.storage_elems must match"
@@ -275,7 +275,7 @@ struct NvidiaMbarBackend[num_stages: Int](PipelineBackend):
         )
         return 2 * Self.num_stages
 
-    @always_inline
+    @inline(.always)
     def init_barriers[
         passed_num_stages: Int
     ](self, producer_arrive_count: Int32, consumer_arrive_count: Int32,):
@@ -287,39 +287,39 @@ struct NvidiaMbarBackend[num_stages: Int](PipelineBackend):
             self.full[i].init(producer_arrive_count)
             self.empty[i].init(consumer_arrive_count)
 
-    @always_inline
+    @inline(.always)
     def wait_full[
         ticks: Optional[UInt32] = None
     ](self, stage: UInt32, phase: UInt32):
         # mbarrier tracks a single parity bit; `& 1` reduces the lap to it.
         self.full[stage].wait[ticks=ticks](phase & 1)
 
-    @always_inline
+    @inline(.always)
     def wait_empty[
         ticks: Optional[UInt32] = None
     ](self, stage: UInt32, phase: UInt32):
         self.empty[stage].wait[ticks=ticks](phase & 1)
 
-    @always_inline
+    @inline(.always)
     def try_full(self, stage: UInt32, phase: UInt32) -> Bool:
         return self.full[stage].try_wait(phase & 1)
 
-    @always_inline
+    @inline(.always)
     def try_empty(self, stage: UInt32, phase: UInt32) -> Bool:
         return self.empty[stage].try_wait(phase & 1)
 
-    @always_inline
+    @inline(.always)
     def arrive_full(self, stage: UInt32):
         _ = self.full[stage].arrive()
 
-    @always_inline
+    @inline(.always)
     def arrive_empty(self, stage: UInt32):
         _ = self.empty[stage].arrive()
 
-    @always_inline
+    @inline(.always)
     def full_handle(self, stage: UInt32) -> Self.Handle:
         return self.full + stage
 
-    @always_inline
+    @inline(.always)
     def empty_handle(self, stage: UInt32) -> Self.Handle:
         return self.empty + stage

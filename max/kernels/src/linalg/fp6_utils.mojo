@@ -235,7 +235,7 @@ comptime E3M2_TO_FLOAT32 = SIMD[.float32, 64](
 )
 
 
-@always_inline
+@inline(.always)
 def fp6_reference_table[fmt: FP6Format]() -> SIMD[.float32, 64]:
     """Returns the hand-written decode table for `fmt`.
 
@@ -251,7 +251,7 @@ def fp6_reference_table[fmt: FP6Format]() -> SIMD[.float32, 64]:
         return E3M2_TO_FLOAT32
 
 
-@always_inline
+@inline(.always)
 def decode_fp6_to_f32[
     width: SIMDLength, //, fmt: FP6Format
 ](code: SIMD[.uint8, width]) -> SIMD[.float32, width]:
@@ -311,7 +311,7 @@ def decode_fp6_to_f32[
     return bitcast[.float32](sign | magnitude)
 
 
-@always_inline
+@inline(.always)
 def decode_fp6_to_bf16[
     width: SIMDLength, //, fmt: FP6Format
 ](code: SIMD[.uint8, width]) -> SIMD[.bfloat16, width]:
@@ -334,7 +334,7 @@ def decode_fp6_to_bf16[
     return decode_fp6_to_f32[fmt](code).cast[.bfloat16]()
 
 
-@always_inline
+@inline(.always)
 def encode_f32_to_fp6[
     width: SIMDLength, //, fmt: FP6Format
 ](x: SIMD[.float32, width]) -> SIMD[.uint8, width]:
@@ -405,7 +405,7 @@ def encode_f32_to_fp6[
     return (sign | min(code, Bits(max_code))).cast[.uint8]()
 
 
-@always_inline
+@inline(.always)
 def compute_mxfp6_even_scale[
     fmt: FP6Format
 ](max_val: Float32) -> Float8_e8m0fnu:
@@ -440,7 +440,7 @@ def compute_mxfp6_even_scale[
     return bitcast[.float8_e8m0fnu](UInt8(scale_exp))
 
 
-@always_inline
+@inline(.always)
 def pack_fp6_x4(code: SIMD[.uint8, 4]) -> UInt32:
     """Packs four FP6 codes into the low 24 bits of a word, element 0 lowest.
 
@@ -469,7 +469,7 @@ def pack_fp6_x4(code: SIMD[.uint8, 4]) -> UInt32:
     return c[0] | (c[1] << 6) | (c[2] << 12) | (c[3] << 18)
 
 
-@always_inline
+@inline(.always)
 def unpack_fp6_x32(fragment: SIMD[.uint8, 32]) -> SIMD[.uint8, 32]:
     """Unpacks the 24 payload bytes of a 32-byte fragment into 32 FP6 codes.
 
@@ -498,7 +498,7 @@ def unpack_fp6_x32(fragment: SIMD[.uint8, 32]) -> SIMD[.uint8, 32]:
     return codes
 
 
-@always_inline
+@inline(.always)
 def unpack_fp6_x4(packed: UInt32) -> SIMD[.uint8, 4]:
     """Unpacks a 24-bit group into four FP6 codes, the inverse of `pack_fp6_x4`.
 

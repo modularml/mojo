@@ -32,7 +32,7 @@ def test_elementwise_1d() raises:
     for i in range(len(vector)):
         vector[i] = Float32(i)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(vector)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx: Coord):

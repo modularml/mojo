@@ -35,7 +35,7 @@ from max.gpu.compute.mma import mma
 from std._gpu.primitives.warp import shuffle_down
 
 
-@always_inline
+@inline(.always)
 def tc_reduce_gevm_8x[
     out_type: DType, in_type: DType, simd_width: Int
 ](val1: SIMD[in_type, simd_width], val2: SIMD[in_type, simd_width]) -> SIMD[
@@ -73,7 +73,7 @@ def tc_reduce_gevm_8x[
     return c_reg
 
 
-@always_inline
+@inline(.always)
 def tc_reduce_gevm_4x[
     out_type: DType, in_type: DType, simd_width: Int
 ](val1: SIMD[in_type, simd_width]) -> SIMD[out_type, simd_width]:
@@ -105,7 +105,7 @@ def tc_reduce_gevm_4x[
     return d_reg
 
 
-@always_inline
+@inline(.always)
 def tc_reduce[
     in_type: DType, simd_width: Int, //, out_type: DType
 ](val: SIMD[in_type, simd_width]) -> Scalar[out_type]:
@@ -133,7 +133,7 @@ def tc_reduce[
         return _tc_reduce_vector[out_type](val)
 
 
-@always_inline
+@inline(.always)
 def _tc_reduce_vector[
     in_type: DType, simd_width: SIMDLength, //, out_type: DType
 ](val: SIMD[in_type, simd_width]) -> Scalar[out_type]:
@@ -225,7 +225,7 @@ def _tc_reduce_vector[
         comptime assert False, "unsupported simd_width for BF16"
 
 
-@always_inline
+@inline(.always)
 def _tc_reduce_scalar[
     in_type: DType, //, out_type: DType
 ](val: Scalar[in_type]) -> Scalar[out_type]:

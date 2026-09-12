@@ -38,7 +38,7 @@ from std.utils.index import Index, IndexList
 comptime PAD_SLOT_ID: Int32 = -1
 
 
-@always_inline
+@inline(.always)
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
     var x_f32 = x.cast[.float32]()
@@ -586,7 +586,7 @@ def run_varlen_causal_conv1d_fwd_gpu[
     comptime TILE_SEQ = 128
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def launch_seqpar_gpu[kWidth: Int]() raises:
         var compiled_func = ctx.compile_function[
             causal_conv1d_varlen_fwd_seqparallel_gpu[

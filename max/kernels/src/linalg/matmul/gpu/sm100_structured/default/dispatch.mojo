@@ -84,7 +84,7 @@ comptime DISPATCH_HIT = 1
 comptime logger = Logger()
 
 
-@always_inline
+@inline(.always)
 def small_MN_gemms[
     config: TuningConfigSmallMNGemms,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -192,7 +192,7 @@ def small_MN_gemms[
         )
 
 
-@always_inline
+@inline(.always)
 def dispatch_gemv[
     c_type: DType,
     a_type: DType,
@@ -276,7 +276,7 @@ def dispatch_gemv[
     ](c, a, b, ctx)
 
 
-@always_inline
+@inline(.always)
 def matmul_dispatch_sm100[
     c_type: DType,
     a_type: DType,
@@ -632,7 +632,7 @@ def matmul_dispatch_sm100[
     ](c, a, b, ctx)
 
 
-@always_inline
+@inline(.always)
 # NOTE:
 # 1. SM100 matmul supports compute lambdas, so we should use normal and
 #    compute lambdas.
@@ -706,7 +706,7 @@ def matmul_dispatch_sm100_fp8[
         return DISPATCH_HIT
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _dispatch[entry: TuningConfigSM100]() raises:
         comptime config = MatmulConfig[a_type, b_type, c_type, transpose_b](
             mma_shape=entry.mma_shape,
@@ -723,7 +723,7 @@ def matmul_dispatch_sm100_fp8[
         ](c, a, b, ctx)
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _search[
         T: Table[TuningConfigSM100],
         domain: List[Int] = List[Int](),
@@ -813,7 +813,7 @@ def _sm100_outlier_configs[
     `mma_k` into its tile shapes -- is never instantiated for bf16/fp32.
     """
 
-    @always_inline
+    @inline(.always)
     def rule(x: TuningConfigSM100) {} -> Bool:
         return x.K == static_K and x.N == static_N
 
@@ -1018,7 +1018,7 @@ def heuristic_and_outliers_dispatch[
             (defaults to `None`).
     """
 
-    @always_inline
+    @inline(.always)
     def launch_callback[
         config: MatmulConfig[...]
     ](
@@ -1244,7 +1244,7 @@ def matmul_dispatch_sm100_fp32[
 # NOTE: Vendor BLAS, naive matmul, and multistage GEMM do not support compute
 # lambdas, so we wrap them in a lambda function.
 # If there is no compute lambda, this wrapper is a simple elementwise lambda.
-@always_inline
+@inline(.always)
 def _vendor_blas_matmul_sm100[
     c_type: DType,
     a_type: DType,
@@ -1485,7 +1485,7 @@ def _sm100_batched_outlier_configs[
     dtype's list is only instantiated for its own dtype.
     """
 
-    @always_inline
+    @inline(.always)
     def rule(x: TuningConfigSM100) {} -> Bool:
         return x.K == static_K and x.N == static_N
 
@@ -1506,7 +1506,7 @@ def _sm100_batched_outlier_configs[
         ).find(rule=rule)
 
 
-@always_inline
+@inline(.always)
 def dispatch_sm100_batched_matmul[
     c_type: DType,
     a_type: DType,
@@ -1691,7 +1691,7 @@ def sm100_heuristic_and_outliers_dispatch[
             (defaults to `None`).
     """
 
-    @always_inline
+    @inline(.always)
     def launch_callback[
         config: MatmulConfig[...]
     ](

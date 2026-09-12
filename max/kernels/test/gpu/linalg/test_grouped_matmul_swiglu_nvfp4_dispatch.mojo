@@ -55,7 +55,7 @@ from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.primitives.grid_controls import PDLLevel, pdl_launch_attributes
 from std.memory import alloc
 from std.random import random_ui64, seed, rand
-from std.builtin.simd import _convert_f32_to_float8_scalar
+from std.simd import _convert_f32_to_float8_scalar
 
 from layout import (
     Coord,

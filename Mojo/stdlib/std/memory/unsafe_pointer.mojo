@@ -27,7 +27,7 @@ from std.memory.pointer import OptionalPointer, Pointer
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 @doc_hidden
 def unsafe_cast[
     from_mut: Bool,
@@ -49,7 +49,7 @@ def unsafe_cast[
     result = Pointer(to=pointer).unsafe_bitcast[type_of(result)]()[]
 
 
-@always_inline
+@inline(.always)
 @doc_hidden
 def unsafe_cast[
     from_mut: Bool,
@@ -71,7 +71,7 @@ def unsafe_cast[
     result = Pointer(to=pointer).unsafe_bitcast[type_of(result)]()[]
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 @doc_hidden
 def pointer_to_int(pointer: OptionalPointer[...]) -> Int:
     return Pointer(to=pointer).unsafe_bitcast[Int]()[]

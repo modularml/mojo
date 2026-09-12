@@ -640,7 +640,7 @@ struct AbortOnDel(Copyable):
     var value: Int
     """Test value payload."""
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         """Aborts the program if called."""
         abort(

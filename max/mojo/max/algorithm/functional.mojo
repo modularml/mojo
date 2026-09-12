@@ -53,7 +53,7 @@ from .backend.gpu import (
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _get_start_indices_of_nth_subvolume[
     rank: Int, //, subvolume_rank: Int = 1
 ](n: Int, shape: IndexList[rank, element_type=_], out res: type_of(shape)):
@@ -122,7 +122,7 @@ def _get_start_indices_of_nth_subvolume[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def elementwise[
     func: def[width: Int, alignment: Int = 1](Coord) capturing[_] -> None,
     simd_width: Int,
@@ -156,7 +156,7 @@ def elementwise[
     ](Coord(shape), context)
 
 
-@always_inline
+@inline(.always)
 def elementwise[
     func: def[width: Int, alignment: Int = 1](Coord) capturing[_] -> None,
     simd_width: Int,
@@ -192,7 +192,7 @@ def elementwise[
     ](func_unified, shape, context)
 
 
-@always_inline
+@inline(.always)
 def elementwise[
     FuncType: ImplicitlyCopyable
     & RegisterPassable
@@ -262,7 +262,7 @@ struct _IndexListToCoordAdapter[
 
     var func: Self.FuncType
 
-    @always_inline
+    @inline(.always)
     def __call__[width: Int, alignment: Int = 1](self, coords: Coord):
         self.func[width, Self.rank, alignment](
             rebind[IndexList[Self.rank]](coord_to_index_list(coords))
@@ -297,7 +297,7 @@ struct _CoordToIndexListAdapter[
 
     var func: Self.FuncType
 
-    @always_inline
+    @inline(.always)
     def __call__[
         width: Int, call_rank: Int, alignment: Int = 1
     ](self, indices: IndexList[call_rank]):
@@ -305,7 +305,7 @@ struct _CoordToIndexListAdapter[
         self.func[width, alignment](Coord(indices))
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl[
     simd_width: Int,
     FuncType: ImplicitlyCopyable
@@ -316,7 +316,7 @@ def _elementwise_impl[
     target: StaticString = "cpu",
     trace_description: StaticString,
 ](func: FuncType, shape: Coord, context: DeviceContext) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         var shape_str = trace_arg("shape", coord_to_index_list(shape))
         var vector_width_str = String(t"vector_width={simd_width}")
@@ -340,7 +340,7 @@ def _elementwise_impl[
         # Should not need to additionally check accelerator arch here
         comptime if is_cpu[target]():
 
-            @always_inline
+            @inline(.always)
             def func_wrap_cpu[
                 width: Int, alignment: Int = 1
             ](coords: Coord) {imm}:
@@ -351,10 +351,10 @@ def _elementwise_impl[
                 trace_description=trace_description,
             ](func_wrap_cpu, shape=shape, ctx=Optional(context))
         elif _accelerator_arch() != "" and MaxPluginForTarget[
-            context.default_device_info.target()
+            CompilationTarget.from[context.default_device_info]()
         ]._handles_elementwise:
             comptime plugin = MaxPluginForTarget[
-                context.default_device_info.target()
+                CompilationTarget.from[context.default_device_info]()
             ]
             return plugin.elementwise_fn[shape.rank, simd_width](
                 _CoordToIndexListAdapter[shape.rank, FuncType](func),
@@ -381,7 +381,7 @@ def _elementwise_impl[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def dual_elementwise[
     func_0: def[width: Int, alignment: Int = 1](Coord) capturing[_] -> None,
     func_1: def[width: Int, alignment: Int = 1](Coord) capturing[_] -> None,
@@ -423,7 +423,7 @@ def dual_elementwise[
     ](func_0_unified, func_1_unified, shape_0, shape_1, context)
 
 
-@always_inline
+@inline(.always)
 def _dual_elementwise_impl[
     simd_width: Int,
     Func0Type: ImplicitlyCopyable
@@ -443,7 +443,7 @@ def _dual_elementwise_impl[
     shape_1: Coord,
     context: DeviceContext,
 ) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         var s0 = trace_arg("shape_0", coord_to_index_list(shape_0))
         var s1 = trace_arg("shape_1", coord_to_index_list(shape_1))

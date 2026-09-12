@@ -69,7 +69,7 @@ def reduce_sum[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -78,7 +78,7 @@ def reduce_sum[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -91,7 +91,7 @@ def reduce_sum[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: sum via the ReduceSum monoid.
-        @always_inline
+        @inline(.always)
         def add[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -102,7 +102,7 @@ def reduce_sum[
         var acc = row.reduce[ReduceSum[dtype, params.simd_width]](add, load).acc
 
         # Emit: per-row output — the reduced scalar.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var acc, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -154,7 +154,7 @@ def reduce_max[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -163,7 +163,7 @@ def reduce_max[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -176,7 +176,7 @@ def reduce_max[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: max via the ReduceMax monoid.
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -187,7 +187,7 @@ def reduce_max[
         var acc = row.reduce[ReduceMax[dtype, params.simd_width]](val, load).acc
 
         # Emit: per-row output — the reduced scalar.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var acc, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -232,7 +232,7 @@ def reduce_min[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -241,7 +241,7 @@ def reduce_min[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -254,7 +254,7 @@ def reduce_min[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: min via the ReduceMin monoid.
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -265,7 +265,7 @@ def reduce_min[
         var acc = row.reduce[ReduceMin[dtype, params.simd_width]](val, load).acc
 
         # Emit: per-row output — the reduced scalar.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var acc, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -310,7 +310,7 @@ def reduce_product[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -319,7 +319,7 @@ def reduce_product[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -332,7 +332,7 @@ def reduce_product[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: product via the ReduceProduct monoid.
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -345,7 +345,7 @@ def reduce_product[
         ).acc
 
         # Emit: per-row output — the reduced scalar.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var acc, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -390,7 +390,7 @@ def reduce_mean[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -399,7 +399,7 @@ def reduce_mean[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -412,7 +412,7 @@ def reduce_mean[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: sum via the ReduceSum monoid.
-        @always_inline
+        @inline(.always)
         def add[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -426,7 +426,7 @@ def reduce_mean[
         # `mean` scaling: floats multiply by an f64 (f32 on Apple) reciprocal
         # cast to `dtype`; ints integer-divide by the axis length.
         # Accumulation stays in `dtype` (no upcast).
-        @always_inline
+        @inline(.always)
         def write(
             oc: RowCoord[rank],
         ) {var acc, var axis_size, var output_fn}:
@@ -504,7 +504,7 @@ def reduce_argmin[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -513,7 +513,7 @@ def reduce_argmin[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -526,7 +526,7 @@ def reduce_argmin[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: argmin via the ArgMin monoid (lower index wins ties).
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -539,7 +539,7 @@ def reduce_argmin[
         ).acc_indices
 
         # Emit: per-row output — the winning index.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var indices, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -584,7 +584,7 @@ def reduce_argmax[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -593,7 +593,7 @@ def reduce_argmax[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -606,7 +606,7 @@ def reduce_argmax[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: argmax via the ArgMax monoid (lower index wins ties).
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -619,7 +619,7 @@ def reduce_argmax[
         ).acc_indices
 
         # Emit: per-row output — the winning index.
-        @always_inline
+        @inline(.always)
         def write(oc: RowCoord[rank]) {var indices, var output_fn}:
             output_fn[params.emit_tile_width](
                 oc.coord,
@@ -676,7 +676,7 @@ def reduce_min_and_max[
     comptime assert input_shape.is_flat, "input_shape must be flat"
     var axis_size = Int(input_shape[reduce_dim].value())
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {
@@ -685,7 +685,7 @@ def reduce_min_and_max[
         comptime rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -698,7 +698,7 @@ def reduce_min_and_max[
         ](row_coords, Int(axis_size), ctx, load)
 
         # Reduce: min and max in one pass via the MinMax monoid.
-        @always_inline
+        @inline(.always)
         def val[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[rank]) {} -> SIMD[
@@ -711,7 +711,7 @@ def reduce_min_and_max[
         var mx = stats.max_acc
 
         # Emit: per-row output — both the min and the max.
-        @always_inline
+        @inline(.always)
         def write(
             oc: RowCoord[rank],
         ) {var mn, var mx, var output_min_fn, var output_max_fn,}:

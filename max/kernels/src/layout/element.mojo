@@ -34,7 +34,7 @@ from . import Layout, RuntimeLayout, RuntimeTuple
 from .int_tuple import IntTuple, UNKNOWN_VALUE, _get_index_type
 
 
-@always_inline
+@inline(.always)
 def _get_offset[
     i: Int
 ](runtime_layout: RuntimeLayout) -> Scalar[runtime_layout.linear_idx_type]:
@@ -57,7 +57,7 @@ def _get_offset[
         return runtime_layout(i)
 
 
-@always_inline
+@inline(.always)
 def _get_offset[
     i: Int, j: Int
 ](runtime_layout: RuntimeLayout) -> Scalar[runtime_layout.linear_idx_type]:
@@ -155,7 +155,7 @@ struct Element[
         self.element_data = element_data
         self.runtime_layout = runtime_layout
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def load(
         # Bare `Pointer`, not `ImmPointer`: a `mut=True` source pointer (the
@@ -244,7 +244,7 @@ struct Element[
                 ]
         return Element(element_data, runtime_layout)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def masked_load(
         ptr: Pointer[Scalar[Self.dtype], ...],
@@ -374,7 +374,7 @@ struct Element[
                 ]
         return Element(element_data, runtime_layout)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def store(self, ptr: MutPointer[Scalar[Self.dtype], ...]):
         """Stores element data to memory according to the specified layout.
 
@@ -446,7 +446,7 @@ struct Element[
                     self.element_data[i + j * dim_0]
                 )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def masked_store(self, ptr: MutPointer[Scalar[Self.dtype], ...]):
         """Stores element data to memory with masking for partial stores.
 
@@ -568,7 +568,7 @@ struct Element[
                     self.element_data[i + j * dim_0]
                 )
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the element to the specified writer.
 
@@ -662,7 +662,7 @@ struct MemoryElement[
         self.ptr = ptr
         self.runtime_layout = runtime_layout
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load(
         self,
         out result: Element[
@@ -684,7 +684,7 @@ struct MemoryElement[
         return type_of(result).load(self.ptr, self.runtime_layout)
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def store(
         self: Self._AsMut,
         src: Element[Self.dtype, Self.layout, ...],
@@ -705,7 +705,7 @@ struct MemoryElement[
         return src.store(self.ptr)
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def transfer(self: Self._AsMut, src: MemoryElement):
         """Transfers data from another `MemoryElement` to this one.
 

@@ -89,13 +89,13 @@ config_setting(
 
 string_flag(
     name = "max_base_version",
-    build_setting_default = "26.6.0",
+    build_setting_default = "26.7.0",
     make_variable = "MAX_BASE_VERSION",
 )
 
 string_flag(
     name = "mojo_base_version",
-    build_setting_default = "1.1.0",
+    build_setting_default = "1.2.0",
     make_variable = "MOJO_BASE_VERSION",
 )
 

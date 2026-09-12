@@ -37,7 +37,6 @@ import max.driver as md
 import numpy as np
 import pytest
 import torch
-from fusion_utils import xfail_under_adv_fusion
 from max.driver import accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -138,7 +137,6 @@ def _build_dual_layout_graph(gpu: DeviceRef) -> Graph:
 
 
 @pytest.mark.skipif(accelerator_count() == 0, reason="Requires GPU")
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_causal_conv1d_channels_last_matches_channels_first(
     session: InferenceSession,
 ) -> None:

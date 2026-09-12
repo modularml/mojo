@@ -66,7 +66,7 @@ struct LoadStore_i8mm[
     var skip_boundary_check: Bool
     """Whether to skip partial-tile boundary handling on load and store."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, skip_boundary_check: Bool):
         """Initializes the tile buffer with a boundary-check setting.
 
@@ -79,11 +79,11 @@ struct LoadStore_i8mm[
         ]()
         self.skip_boundary_check = skip_boundary_check
 
-    @always_inline
+    @inline(.always)
     def _initialize_c_tile(mut self):
         self.output_tile.init(0)
 
-    @always_inline
+    @inline(.always)
     def _load_c_tile(
         mut self,
         c_ptr: UnsafePointer[Scalar[Self.dtype], ...],
@@ -127,7 +127,7 @@ struct LoadStore_i8mm[
 
                 self.output_tile[idx0, idx1] = c_data
 
-    @always_inline
+    @inline(.always)
     def _store_c_tile(
         mut self,
         c_ptr: UnsafePointer[mut=True, Scalar[Self.dtype], ...],
@@ -186,7 +186,7 @@ struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
 
     # Parameters for global reference.
 
-    @always_inline
+    @inline(.always)
     def _accumulate[
         simd_size: Int, kernel_rows: Int, kernel_cols: Int
     ](
@@ -247,7 +247,7 @@ struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
                 c_val = _neon_matmul(c_val, a_val, b_val)
                 c_local[idx0, idx1] = c_val
 
-    @always_inline
+    @inline(.always)
     def __inner_matmul__[
         kernel_rows: Int,
         kernel_cols: Int,

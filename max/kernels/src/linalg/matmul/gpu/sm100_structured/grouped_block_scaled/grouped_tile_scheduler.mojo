@@ -82,7 +82,7 @@ struct GroupedWorkInfo(
     var group_changed: Bool
     """True if group changed since last tile (triggers tensormap update)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Create an invalid/empty work info."""
         self.m = 0
@@ -93,17 +93,17 @@ struct GroupedWorkInfo(
         self.k_tile_count = 0
         self.group_changed = False
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         """Check if this work tile is valid."""
         return self.is_valid_tile
 
-    @always_inline
+    @inline(.always)
     def coord(self) -> Tuple[Int, Int]:
         """Get (m, n) tile coordinates as a tuple."""
         return (Int(self.m), Int(self.n))
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write(
             "GroupedWorkInfo(m=",
@@ -187,7 +187,7 @@ struct GroupedWorkIterator[
     var num_groups: UInt32
     """Number of active groups."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         problem_sizes: _ProblemSizesTile[Self.max_groups],
@@ -254,11 +254,11 @@ struct GroupedWorkIterator[
         self.work_info = self._delinearize_to_group(self.linear_tile_idx)
         self.work_info.group_changed = True  # First tile always triggers update
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> GroupedWorkInfo:
         """Return current work item, deferring advance to next call.
 
@@ -283,7 +283,7 @@ struct GroupedWorkIterator[
 
         return current
 
-    @always_inline
+    @inline(.always)
     def _delinearize_to_group(self, linear_idx: UInt32) -> GroupedWorkInfo:
         """Map linear tile index to group + local coordinates.
 
@@ -367,7 +367,7 @@ struct GroupedTileScheduler[
     var problem_sizes: _ProblemSizesTile[Self.max_groups]
     """Problem sizes tensor (num_groups, 4) with [M, N, K, L] per group."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         problem_sizes: _ProblemSizesTile[Self.max_groups],
@@ -382,7 +382,7 @@ struct GroupedTileScheduler[
         self.problem_sizes = problem_sizes
         self.num_groups = num_groups
 
-    @always_inline
+    @inline(.always)
     def work_iterator(
         self,
     ) -> GroupedWorkIterator[
@@ -407,7 +407,7 @@ struct GroupedTileScheduler[
             UInt32(grid_dim.x),
         )
 
-    @always_inline
+    @inline(.always)
     def total_tiles(self) -> Int:
         """Compute total number of tiles across all groups."""
         var total = 0
@@ -496,7 +496,7 @@ struct GroupedCLCWorkIterator[
     var use_clc_fetch: Bool
     """If True, __next__ waits on CLC barriers (for MMA warp)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         problem_sizes: _ProblemSizesTile[Self.max_groups],
@@ -558,11 +558,11 @@ struct GroupedCLCWorkIterator[
 
         self.total_tiles = cumsum
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> GroupedWorkInfo:
         """Return current work item and advance.
 
@@ -582,7 +582,7 @@ struct GroupedCLCWorkIterator[
             self.work_info = self._compute_next_work()
         return current
 
-    @always_inline
+    @inline(.always)
     def _fetch_next_work(self) -> GroupedWorkInfo:
         """Fetch next work item with CLC barrier synchronization.
 
@@ -613,7 +613,7 @@ struct GroupedCLCWorkIterator[
         # Delinearize to grouped work info
         return self._delinearize_to_group(linear_idx, self.work_info.group_idx)
 
-    @always_inline
+    @inline(.always)
     def _read_linear_idx_from_clc(self) -> UInt32:
         """Read linear tile index from CLC response.
 
@@ -626,7 +626,7 @@ struct GroupedCLCWorkIterator[
         # Note: The working kernel uses inline assembly here, but for simplicity
         # we just cast the UInt128 to UInt32 to get the first component
 
-    @always_inline
+    @inline(.always)
     def _compute_next_work(self) -> GroupedWorkInfo:
         """Compute next work item without CLC wait (for non-MMA warps)."""
         # Simple linear advance
@@ -637,7 +637,7 @@ struct GroupedCLCWorkIterator[
             return GroupedWorkInfo()  # Invalid
         return self._delinearize_to_group(linear_idx, self.work_info.group_idx)
 
-    @always_inline
+    @inline(.always)
     def _current_linear_idx(self) -> UInt32:
         """Compute current linear tile index from work_info."""
         var g = Int(self.work_info.group_idx)
@@ -648,7 +648,7 @@ struct GroupedCLCWorkIterator[
             + self.work_info.m
         )
 
-    @always_inline
+    @inline(.always)
     def _delinearize_to_group(
         self, linear_idx: UInt32, prev_group_idx: UInt32
     ) -> GroupedWorkInfo:
@@ -755,7 +755,7 @@ struct GroupedCLCSchedulerIterator[
     var signal_count: UInt32
     """Number of signals sent (for pipeline fill tracking)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         problem_sizes: _ProblemSizesTile[Self.max_groups],
@@ -819,11 +819,11 @@ struct GroupedCLCSchedulerIterator[
 
         self.total_tiles = cumsum
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> GroupedWorkInfo:
         """Return current work item, deferring advance to next call.
 
@@ -848,7 +848,7 @@ struct GroupedCLCSchedulerIterator[
 
         return current
 
-    @always_inline
+    @inline(.always)
     def signal_and_advance(mut self):
         """Signal CLC throttle and produce next work request.
 
@@ -909,7 +909,7 @@ struct GroupedCLCSchedulerIterator[
                 next_linear_idx, self.work_info.group_idx
             )
 
-    @always_inline
+    @inline(.always)
     def drain(mut self):
         """Drain all pending CLC requests before kernel exit.
 
@@ -930,7 +930,7 @@ struct GroupedCLCSchedulerIterator[
             var phase = UInt32(i // Self.num_clc_stages) & 1
             self.empty_mbar[stage].wait(phase)
 
-    @always_inline
+    @inline(.always)
     def _delinearize_to_group(
         self, linear_idx: UInt32, prev_group_idx: UInt32
     ) -> GroupedWorkInfo:

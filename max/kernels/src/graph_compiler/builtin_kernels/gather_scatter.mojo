@@ -105,7 +105,7 @@ from .kernels import (
 )
 
 
-@always_inline
+@inline(.always)
 def check_axis_in_range[idx: Int, dim_size: Int]() raises:
     """Indices passed to gather and scatter ops may be negative. This performs
     a check to see if the axis is valid.
@@ -119,7 +119,7 @@ def check_axis_in_range[idx: Int, dim_size: Int]() raises:
     raise Error("indices must be in range [-dim_size, dim_size)")
 
 
-@always_inline
+@inline(.always)
 def check_axis_in_range[dim_size: Int](idx: Int) raises:
     """Indices passed to gather and scatter ops may be negative. This performs
     a check to see if the axis is valid.
@@ -358,7 +358,7 @@ struct ScatterNDAdd:
         indices: InputTensor,
         ctx: DeviceContext,
     ) raises:
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -409,7 +409,7 @@ struct ScatterNDMul:
         indices: InputTensor,
         ctx: DeviceContext,
     ) raises:
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -460,7 +460,7 @@ struct ScatterNDMin:
         indices: InputTensor,
         ctx: DeviceContext,
     ) raises:
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -511,7 +511,7 @@ struct ScatterNDMax:
         indices: InputTensor,
         ctx: DeviceContext,
     ) raises:
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -662,7 +662,7 @@ struct ScatterAdd:
     ) raises:
         check_axis_in_range[output.rank](Int(axis))
 
-        @always_inline
+        @inline(.always)
         def reduce_func[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -715,7 +715,7 @@ struct ScatterMax:
     ) raises:
         check_axis_in_range[output.rank](Int(axis))
 
-        @always_inline
+        @inline(.always)
         def reduce_func[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -768,7 +768,7 @@ struct ScatterMin:
     ) raises:
         check_axis_in_range[output.rank](Int(axis))
 
-        @always_inline
+        @inline(.always)
         def reduce_func[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -821,7 +821,7 @@ struct ScatterMul:
     ) raises:
         check_axis_in_range[output.rank](Int(axis))
 
-        @always_inline
+        @inline(.always)
         def reduce_func[
             dtype: DType, width: SIMDLength
         ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[
@@ -926,7 +926,7 @@ def broadcast_to_shape_fn[
 struct BroadcastShape:
     """Registers the `mo.broadcast_shape` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def broadcast_shape_impl(
         out_buf: ManagedTensorSlice[rank=1, ...],
@@ -996,7 +996,7 @@ struct StaticBroadcastTo:
     """Registers the `mo.static.broadcast_to` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def build_view[
         out_rank: Int,
@@ -1177,7 +1177,7 @@ def reshape_shape_fn[
 struct Transpose:
     """Registers the `mo.transpose` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def transpose_in_place(
         input: InputTensor,
@@ -1246,7 +1246,7 @@ struct Transpose:
         ](output, view, ctx)
 
     # TODO(GEX-1033) Make it possible to have multiple raises.
-    @no_inline
+    @inline(.never)
     @staticmethod
     def shape_impl(
         input: InputTensor,
@@ -1540,7 +1540,7 @@ struct Gather:
         indices: FusedInputTensor,
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, _rank: Int, element_alignment: Int
         ](coords: IndexList[_rank]) {var input} -> SIMD[output.dtype, width]:
@@ -1548,7 +1548,7 @@ struct Gather:
                 width=width, element_alignment=element_alignment
             ](rebind[IndexList[input.rank]](coords))
 
-        @always_inline
+        @inline(.always)
         def indices_fn[
             width: Int, _rank: Int
         ](coords: IndexList[_rank]) {var indices} -> SIMD[indices.dtype, width]:
@@ -1556,7 +1556,7 @@ struct Gather:
                 rebind[IndexList[indices.rank]](coords)
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, _rank: Int, element_alignment: Int
         ](coords: IndexList[_rank], val: SIMD[output.dtype, width]) {
@@ -1709,7 +1709,7 @@ struct Concat:
         # capture and reads garbage (concat with >=3 inputs silently returned
         # all-zeros). `inputs` (`FusedInputVariadicTensors`) stores its tensors
         # by value, so the copy brings their device pointers into the kernel.
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(inputs)
         def inputs_lambda[
@@ -1725,7 +1725,7 @@ struct Concat:
         # Copy-capture `output` for the same reason as `inputs` above: a
         # by-reference capture leaves the device kernel holding a host pointer
         # to the output tensor on Metal.
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(output)
         def epilogue_wrapper[
@@ -1793,7 +1793,7 @@ struct FusedConcatSlice:
         # pointers on Metal, so it reads garbage/zeros (the concat>=4-input
         # all-zeros bug). Copy-capture brings the device pointers into the
         # closure.
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(inputs)
         def inputs_lambda[
@@ -1809,7 +1809,7 @@ struct FusedConcatSlice:
                 width=width, element_alignment=alignment
             ](rebind[IndexList[rank]](indices))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(concat_output, slice_output)
         def epilogue_wrapper[
@@ -1918,7 +1918,7 @@ struct DualFusedConcatSlice:
         # A by-reference capture leaves the GPU kernel holding host-side
         # pointers on Metal, so it reads garbage/zeros. Copy-capture brings
         # the device pointers into the closure.
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(inputs)
         def inputs_lambda_0[
@@ -1934,7 +1934,7 @@ struct DualFusedConcatSlice:
                 width=width, element_alignment=alignment
             ](rebind[IndexList[rank]](indices))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(inputs)
         def inputs_lambda_1[
@@ -1950,7 +1950,7 @@ struct DualFusedConcatSlice:
                 width=width, element_alignment=alignment
             ](rebind[IndexList[rank]](indices))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(concat_output_0, slice_output_0)
         def epilogue_0[
@@ -2004,7 +2004,7 @@ struct DualFusedConcatSlice:
                 rebind[SIMD[slice_output_0.dtype, width]](value),
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(concat_output_1, slice_output_1)
         def epilogue_1[
@@ -2219,7 +2219,7 @@ struct AdvancedIndexingGetItem:
     """Registers the `advanced_indexing_getitem` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_rank: Int,
@@ -2249,7 +2249,7 @@ struct AdvancedIndexingGetItem:
         # Do not support boolean masks at this time.
         comptime assert index_type != .bool
 
-        @always_inline
+        @inline(.always)
         def input_tensor_fn[
             dtype: DType, width: Int
         ](idx: IndexList[input_rank]) {var input_tensor} -> SIMD[dtype, width]:
@@ -2257,7 +2257,7 @@ struct AdvancedIndexingGetItem:
                 input_tensor._fused_load[width](idx)
             )
 
-        @always_inline
+        @inline(.always)
         def indices_fn[
             indices_index: Int,
         ](coordinates: IndexList[index_rank]) {var indices} -> Int:
@@ -2308,7 +2308,7 @@ struct AdvancedIndexingSetItemInplace:
     """Registers the `advanced_indexing_setitem_inplace` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_rank: Int,
@@ -2334,13 +2334,13 @@ struct AdvancedIndexingSetItemInplace:
         ],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def updates_tensor_fn[
             dtype: DType, width: Int
         ](idx: IndexList[updates_rank]) {var updates} -> SIMD[dtype, width]:
             return rebind[SIMD[dtype, width]](updates._fused_load[width](idx))
 
-        @always_inline
+        @inline(.always)
         def indices_fn[
             indices_index: Int,
         ](coordinates: IndexList[index_rank]) {var indices} -> Int:
@@ -2369,7 +2369,7 @@ struct AdvancedIndexingSetItem:
     """Registers the `advanced_indexing_setitem` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_rank: Int,
@@ -2399,7 +2399,7 @@ struct AdvancedIndexingSetItem:
 
         # First copy over input tensor into the output
         @__parameter
-        @always_inline
+        @inline(.always)
         def func[
             width: Int, element_alignment: Int
         ](idx: IndexList[output_tensor.rank]) -> SIMD[
@@ -2437,7 +2437,7 @@ struct AdvancedIndexingSetItem:
 struct Struct_sliced_add_ragged:
     """Registers the `mo.sliced.add.ragged` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,

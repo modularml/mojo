@@ -237,7 +237,7 @@ is `TrivialRegisterPassable`, so any state is byte-shuffle-safe; this is purely
 a size cutoff (Welford = 3 words → shuffle; ArgMax/ArgMin → tree)."""
 
 
-@always_inline
+@inline(.always)
 def _state_fits_warp_shuffle[S: ReduceOp]() -> Bool:
     """Returns `True` when `S` is small enough that the register-only
     warp-shuffle butterfly beats the shmem tree in `generic`.
@@ -263,7 +263,7 @@ def _state_fits_warp_shuffle[S: ReduceOp]() -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _warp_shuffle_combine[S: ReduceOp](mut state: S):
     """Within-warp butterfly all-reduce over `state.join`, exchanging
     the multi-field state between lanes as `uint32` words. Register-only
@@ -306,12 +306,12 @@ struct BlockReducer[BLOCK_SIZE: Int](Reducer, TrivialRegisterPassable):
         BLOCK_SIZE: Number of threads in the launching block.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Default-initializes a `BlockReducer`."""
         pass
 
-    @always_inline
+    @inline(.always)
     def sum[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the sum of `val` across the block.
 
@@ -326,7 +326,7 @@ struct BlockReducer[BLOCK_SIZE: Int](Reducer, TrivialRegisterPassable):
         """
         return block.sum[block_size=Self.BLOCK_SIZE, broadcast=True](val)
 
-    @always_inline
+    @inline(.always)
     def max[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the maximum of `val` across the block.
 
@@ -341,7 +341,7 @@ struct BlockReducer[BLOCK_SIZE: Int](Reducer, TrivialRegisterPassable):
         """
         return block.max[block_size=Self.BLOCK_SIZE, broadcast=True](val)
 
-    @always_inline
+    @inline(.always)
     def min[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the minimum of `val` across the block.
 
@@ -356,7 +356,7 @@ struct BlockReducer[BLOCK_SIZE: Int](Reducer, TrivialRegisterPassable):
         """
         return block.min[block_size=Self.BLOCK_SIZE, broadcast=True](val)
 
-    @always_inline
+    @inline(.always)
     def generic[S: ReduceOp](self, mut state: S):
         """Block-wide all-reduce over `state.join`; on return every
         thread holds the combined value.
@@ -459,12 +459,12 @@ struct WarpReducer[WARPS_PER_BLOCK: Int = 1](Reducer, TrivialRegisterPassable):
         WARPS_PER_BLOCK: Number of warps in the launching block.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Default-initializes a `WarpReducer`."""
         pass
 
-    @always_inline
+    @inline(.always)
     def sum[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the sum of `val` across the warp.
 
@@ -479,7 +479,7 @@ struct WarpReducer[WARPS_PER_BLOCK: Int = 1](Reducer, TrivialRegisterPassable):
         """
         return warp.sum(val)
 
-    @always_inline
+    @inline(.always)
     def max[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the maximum of `val` across the warp.
 
@@ -494,7 +494,7 @@ struct WarpReducer[WARPS_PER_BLOCK: Int = 1](Reducer, TrivialRegisterPassable):
         """
         return warp.max(val)
 
-    @always_inline
+    @inline(.always)
     def min[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns the minimum of `val` across the warp.
 
@@ -509,7 +509,7 @@ struct WarpReducer[WARPS_PER_BLOCK: Int = 1](Reducer, TrivialRegisterPassable):
         """
         return warp.min(val)
 
-    @always_inline
+    @inline(.always)
     def generic[S: ReduceOp](self, mut state: S):
         """Warp-wide all-reduce over `state.join`; on return every lane
         holds the combined value.
@@ -570,7 +570,7 @@ struct WarpReducer[WARPS_PER_BLOCK: Int = 1](Reducer, TrivialRegisterPassable):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def reduce[
     params: ContextParams,
     rank: Int,
@@ -695,7 +695,7 @@ def reduce[
                         tile_fn[1](coords)
 
 
-@always_inline
+@inline(.always)
 def reduce[
     State: ReduceOp,
     params: ContextParams,
@@ -783,7 +783,7 @@ def reduce[
                         tile_fn[1](state, coords)
 
 
-@always_inline
+@inline(.always)
 def pjoin[
     State: ReduceOp,
     params: ContextParams,
@@ -923,7 +923,7 @@ def pjoin[
         state = State(s)
 
 
-@always_inline
+@inline(.always)
 def once[
     Emit: ImplicitlyCopyable & RegisterPassable & (def() -> None),
     params: ContextParams,
@@ -981,7 +981,7 @@ def once[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _pointwise_splitk_slot_base[
     params: ContextParams, //
 ](ctx: Context[params], reduce_index: Int) -> Int:
@@ -996,7 +996,7 @@ def _pointwise_splitk_slot_base[
     ) * _SPLITK_STATE_BYTES
 
 
-@always_inline
+@inline(.always)
 def _pointwise_splitk_store_partial[
     State: ReduceOp, params: ContextParams, //
 ](mut state: State, ctx: Context[params], reduce_index: Int):
@@ -1015,7 +1015,7 @@ def _pointwise_splitk_store_partial[
         (ctx._partials_base + off).bitcast[State]()[0] = state
 
 
-@always_inline
+@inline(.always)
 def _pointwise_splitk_combine[
     params: ContextParams, //, State: ReduceOp
 ](ctx: Context[params], reduce_index: Int) -> State:
@@ -1061,7 +1061,7 @@ struct _BlockKernel[rank: Int, params: ContextParams, Body: RowBody](
     var body: Self.Body
     var shape: DynamicCoord[.int64, Self.rank]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         body: Self.Body,
@@ -1099,7 +1099,7 @@ struct _WarpKernel[rank: Int, params: ContextParams, Body: RowBody](
     var body: Self.Body
     var shape: DynamicCoord[.int64, Self.rank]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         body: Self.Body,
@@ -1142,7 +1142,7 @@ struct _TiledKernel[rank: Int, params: ContextParams, Body: RowBody](
     var body: Self.Body
     var shape: DynamicCoord[.int64, Self.rank]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         body: Self.Body,
@@ -1204,7 +1204,7 @@ struct _SplitkKernel[rank: Int, params: ContextParams, Body: RowBody](
     var counters: UnsafePointer[Int32, MutUntrackedOrigin]
     var blocks_per_row: Int32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         body: Self.Body,
@@ -1265,7 +1265,7 @@ struct _PointwiseSplitkKernel[rank: Int, params: ContextParams, Body: RowBody](
     var num_splits: Int32
     var phase: Int32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         body: Self.Body,

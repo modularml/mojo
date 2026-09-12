@@ -30,7 +30,7 @@ comptime epilogue_func_type = def[
 ](SIMD[dtype, width]) capturing -> SIMD[dtype, width]
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def elementwise_epilogue_fn[
     dtype: DType,
@@ -107,7 +107,7 @@ def run_bmm_and_check_result[
 
     # Run BMM
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_device)
     def epilogue_fn[
         dtype: DType,
@@ -185,7 +185,7 @@ def run_bmm_and_check_result[
 
     comptime pack_size = simd_width_of[dtype, target=get_gpu_target()]()
 
-    @always_inline
+    @inline(.always)
     def func[simd_width: Int, alignment: Int = 1](coord: Coord) {var}:
         comptime assert c_device_ref.flat_rank >= 3
         var val = c_device_ref.load[width=simd_width](coord)

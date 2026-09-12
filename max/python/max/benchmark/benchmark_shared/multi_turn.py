@@ -30,7 +30,12 @@ except ImportError:
 import numpy as np
 from max.benchmark.benchmark_shared.config import SamplingConfig
 from max.benchmark.benchmark_shared.datasets import ChatSession
-from max.benchmark.benchmark_shared.datasets.types import TextContentBlock
+from max.benchmark.benchmark_shared.datasets.types import (
+    ImageContentBlock,
+    ImageURLDetail,
+    OpenAIImage,
+    TextContentBlock,
+)
 from max.benchmark.benchmark_shared.lora_benchmark_manager import (
     LoRABenchmarkManager,
 )
@@ -53,6 +58,15 @@ from max.benchmark.benchmark_shared.utils import (
 from transformers import PreTrainedTokenizerBase
 
 logger = logging.getLogger(__name__)
+
+
+def _image_content_blocks(
+    images: Sequence[OpenAIImage],
+) -> list[ImageContentBlock]:
+    return [
+        ImageContentBlock(image_url=ImageURLDetail(url=img["image_url"]["url"]))
+        for img in images
+    ]
 
 
 def _poisson_interval(request_rate: float, burstiness: float) -> float:
@@ -117,7 +131,10 @@ async def chat_session_driver(
         message_history.append(
             ChatMessage(
                 role="user",
-                content=[TextContentBlock(text=user_prompt)],
+                content=[
+                    TextContentBlock(text=user_prompt),
+                    *_image_content_blocks(messages[content_idx].images),
+                ],
             )
         )
         # Synthetic placeholder for the assistant response.
@@ -158,7 +175,10 @@ async def chat_session_driver(
         message_history.append(
             ChatMessage(
                 role="user",
-                content=[TextContentBlock(text=user_prompt)],
+                content=[
+                    TextContentBlock(text=user_prompt),
+                    *_image_content_blocks(messages[content_idx].images),
+                ],
             )
         )
         request_func_input.prompt = message_history
@@ -291,7 +311,8 @@ async def prerun_warmup_turns(
                 ChatMessage(
                     role="user",
                     content=[
-                        TextContentBlock(text=messages[content_idx].content)
+                        TextContentBlock(text=messages[content_idx].content),
+                        *_image_content_blocks(messages[content_idx].images),
                     ],
                 )
             )

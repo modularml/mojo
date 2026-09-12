@@ -35,6 +35,12 @@ Example `local-image` JSONL:
 serving benchmarks such as vLLM-Omni: MAX generates a white PNG in the system
 temp directory and reuses it for each request in the run.
 
+To mix generated images into any dataset's requests or chat turns—for
+benchmarking vision-capable models without a dataset that natively carries
+images—use `--image-fraction` and the related `--image-*` flags. See the
+separate guide, [Mix generated images into any benchmark
+workload](benchmarking_mixed_images.md), for details.
+
 For `benchmark_serving.py` usage instructions, see [Benchmarking a MAX
 endpoint](/max/docs/max-benchmarking.md).
 

@@ -29,7 +29,7 @@ comptime SIZES = [64, 1024, 16384]
 
 
 def bench_append[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var n = black_box(size)
         var list = List[Int]()
@@ -43,7 +43,7 @@ def bench_append[size: Int](mut b: Bencher) raises:
 def bench_extend_owned[size: Int](mut b: Bencher) raises:
     # Extending in a loop is the shape that turns an exact-reserve `extend`
     # into quadratic work.
-    @always_inline
+    @inline(.always)
     def call_fn():
         var n = black_box(size)
         var list = List[Int]()
@@ -56,7 +56,7 @@ def bench_extend_owned[size: Int](mut b: Bencher) raises:
 
 
 def bench_insert_front[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var n = black_box(size)
         var list = List[Int]()
@@ -68,7 +68,7 @@ def bench_insert_front[size: Int](mut b: Bencher) raises:
 
 
 def bench_pop_back[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var n = black_box(size)
         var list = List[Int](length=n, fill=0)
@@ -83,7 +83,7 @@ def bench_pop_back[size: Int](mut b: Bencher) raises:
 def bench_iterate_sum[size: Int](mut b: Bencher) raises:
     var list = List[Int](length=black_box(size), fill=1)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm list}:
         var total = 0
         for element in list:
@@ -99,7 +99,7 @@ def bench_reverse[size: Int](mut b: Bencher) raises:
     # measure of whether that load stays hoisted out of the loop.
     var list = List[Int](length=black_box(size), fill=1)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {mut list}:
         list.reverse()
         keep(list.unsafe_ptr())
@@ -113,7 +113,7 @@ def bench_resize_grow[size: Int](mut b: Bencher) raises:
     # quadratic. `bench_byte_resize_fill` reaches its length in one step, where
     # an exact reserve and an amortized one allocate the same amount, so it
     # cannot see that difference.
-    @always_inline
+    @inline(.always)
     def call_fn():
         var n = black_box(size)
         var list = List[Int]()
@@ -125,7 +125,7 @@ def bench_resize_grow[size: Int](mut b: Bencher) raises:
 
 
 def bench_byte_resize_fill[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var list = List[Byte]()
         list.resize(black_box(size), 0)

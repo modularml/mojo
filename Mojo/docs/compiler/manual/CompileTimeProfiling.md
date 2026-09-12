@@ -317,9 +317,16 @@ moved, not what moved it — which is bisected like any other regression. The
 `input.*` series record what the compiler was given, so a step that comes from
 the graph compiler emitting more code is visible beside the timings.
 
-They are separate targets because emitting is expensive: it downloads a
-checkpoint and builds a 31B graph. Locally you pay that once and then compile
-the result as often as you like.
+They are separate targets because emitting is expensive: it builds the model's
+whole graph from its checkpoint. Locally you pay that once and then compile the
+result as often as you like.
+
+Two models are tracked. `gemma-4-31b` is the small end; `kimi-k25`
+(`nvidia/Kimi-K2.5-NVFP4`, sharded over eight devices) is the large one, and
+about two thirds of the daily job. `kimi-k25` sits out the per-PR comparison —
+see [comparing a pull request](#comparing-a-pull-request) — because emitting
+and compiling it takes around 35 minutes, which two arms and a repeat would not
+fit.
 
 ### Emitting the sources
 
@@ -328,16 +335,34 @@ the result as often as you like.
   --out ~/mojo-artifacts
 ```
 
-| Option      | Meaning                                                    |
-|-------------|------------------------------------------------------------|
-| `--out`     | Directory to emit into; created if absent.                 |
-| `--inputs`  | Model manifest (default: `model_inputs.yaml`).             |
-| `--model`   | Emit one model by name, rather than every model.           |
+| Option      | Meaning                                                     |
+|-------------|-------------------------------------------------------------|
+| `--out`     | Directory to emit into; created if absent.                  |
+| `--inputs`  | Model manifest (default: `model_inputs.yaml`).              |
+| `--model`   | Emit one model by name, rather than every model.            |
+| `--pr-only` | Emit only the models the per-PR comparison measures.        |
 
-It writes the emitted `.mojo` files plus an `ARTIFACTS.yaml` recording the
-commit and what each file looks like. The graph compiler run needs HuggingFace
-access and fails on a target it cannot reach from here; its output is kept in a
-log and only shown if a source is missing, which is the real failure.
+Each source lands at `<out>/<model>/<source>.mojo`, beside an `ARTIFACTS.yaml`
+recording the commit, the name the graph compiler actually gave each file, and
+what each file looks like. The graph compiler run fails on a target it cannot
+reach from here; its output is kept in a log and only shown when a source is
+missing, which is the real failure.
+
+The emit needs the model's **whole checkpoint on local disk** — 58 GiB for
+`gemma-4-31b`, 550 GiB for `kimi-k25` — and downloads every weight file it does
+not already have. CI does not pay this: the benchmark runner mounts a shared
+HuggingFace cache that already holds both, which is why `HF_HOME` points into
+it. On a workstation the first emit of `kimi-k25` is a 550 GiB download, so
+check what you already have before starting one — `HF_HOME` is usually unset
+locally, in which case the cache is `~/.cache/huggingface/hub`:
+
+```bash
+du -sh "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--nvidia--Kimi-K2.5-NVFP4"
+```
+
+Measuring needs none of this. `bench_mojo_compile_time` reads only the `.mojo`
+files, so once an emit has run — or once you have copied its output directory
+from elsewhere — the compile loop is offline and the checkpoint is irrelevant.
 
 ### Measuring
 
@@ -359,7 +384,10 @@ log and only shown if a source is missing, which is the real failure.
 The first four are this benchmark's own; `--benchmark` comes from the shared
 Kepler runner, as does everything else on that command line. In CI the sources
 directory is named by `MOJO_COMPILE_SOURCES` instead, because the benchmark runs
-as a bazel test and cannot take arguments.
+as a bazel test and cannot take arguments. `MOJO_COMPILE_PR_ONLY=1` restricts
+the run to the models the per-PR comparison measures, matching
+`make_artifacts --pr-only`; it is an environment variable because benchmarks are
+registered before any argument is parsed.
 
 Each repeat compiles the source twice: once with no timing flags at the
 compiler's default thread count, reported as `wall.total`, and once with
@@ -371,6 +399,26 @@ Budget for the cost in compiles rather than in minutes, which vary by machine:
 per source, two full compiles per repeat, and the large emitted source dominates
 everything else. Start with `--runs 1`.
 
+#### One model at a time
+
+Emitting and compiling every model takes the better part of an hour, and each
+emit wants its checkpoint on disk, so a local loop usually wants one model.
+`--model` restricts the emit and `--benchmark` the measurement; the series names
+come from the manifest, so every model has them:
+
+```bash
+./bazelw run //utils/benchmarking/kepler/mojo_compilation:make_artifacts -- \
+  --model kimi-k25 --out ~/mojo-artifacts
+
+./bazelw run //utils/benchmarking/kepler/mojo_compilation:bench_mojo_compile_time -- \
+  --sources ~/mojo-artifacts --runs 1 \
+  --benchmark kimi-k25.language
+```
+
+`--list` prints the names to choose from. Note that `--benchmark` reaches the
+binary only under `bazelw run`; through `bazelw test` it has to be passed as
+`--test_arg=--benchmark --test_arg=<name>`.
+
 ### Adding a model
 
 Every series comes from `model_inputs.yaml` beside the two targets. A model
@@ -379,11 +427,7 @@ produces are its sources, each compiled and plotted on its own.
 
 To add one:
 
-1. Emit it by hand first, with the command from
-   [step 1 above](#1-get-the-emitted-mojo) pointed at the new model, and look at
-   what lands in the output directory. You need the emitted file names, and they
-   are not predictable from the model name.
-2. Add an entry:
+1. Add the entry with a `match` you expect to be right:
 
    ```yaml
    - name: my-model
@@ -391,32 +435,73 @@ To add one:
      emitted_by:
        model_path: org/My-Model
        target: cuda:sm_100a
+       extra_args:
+         - --devices
+         - gpu:0,1
        command: >-
          MODULAR_DEBUG=ir-output-dir=<out-dir>
          ./bazelw run //max/python/max/_entrypoints:pipelines -- warm-cache
-         --model-path org/My-Model --target cuda:sm_100a
+         --model-path org/My-Model --target cuda:sm_100a --devices gpu:0,1
      sources:
        - name: language
-         file: my-model/the_emitted_file.mojo
+         match: "*_language.mojo"
    ```
 
+2. Emit it: `make_artifacts --model my-model --out <dir>`. If a `match` is
+   wrong, the error lists every `.mojo` the graph compiler emitted, which is
+   what you need to correct it — the names are not predictable from the model
+   name, so guessing first and reading the error is the short path.
 3. Re-emit. The statistics and the series follow from the manifest, so nothing
    else needs editing.
 
-Three things to get right:
+Four things to get right:
 
-- `file` is the path **inside the output directory**. Only its basename has to
-  match an emitted file; the leading directory is yours to choose, and exists to
-  keep one model's sources away from another's.
+- `match` is a glob and has to match exactly one emitted file. Prefer one that
+  keys off the part of the name you care about — the graph compiler builds a
+  filename by joining the graphs it holds with `+`, so a full name is hostage to
+  how the graph happens to be partitioned. Zero matches and several matches are
+  both errors; neither silently measures the wrong file.
 - `emitted_by` is what the emitter runs, so keep `command` in step with the
-  fields above it.
+  fields above it. `extra_args` is for anything past `--model-path` and
+  `--target`: a sharded model needs its device list, and an MoE its
+  `--ep-size`, or the emitted graph is not the one that gets served.
 - `name` and each source's `name` form the series name, `<model>.<source>`.
   They are the dashboard's identity for the series: renaming one starts a fresh
   line rather than continuing the existing one. A model name must not contain a
-  dot.
+  dot. The source name also names the stored file, `<model>/<source>.mojo`.
+- Set `in_pr_comparison: false` if the model is too slow for the per-PR
+  comparison to carry. The daily benchmark still measures it.
 
-The results land in BigQuery and Looker. See the Kepler docs for the table and
-the dashboard: `docs/internal/KeplerBenchmarking.md`.
+### Reading the results
+
+Every run uploads to BigQuery, and the series are plotted at
+<https://benchmark-visibility.prod.modular-internal.com/perf/mojo-compile-time>.
+See `docs/internal/KeplerBenchmarking.md` for the table itself.
+
+The page draws three charts per source, because the series do not share an
+axis: `wall.total` on its own, the pipeline phases from the flagged compile,
+and the `input.*` counts. Points come from main only, one per CI run, and each
+links to the commit it measured.
+
+### Comparing a pull request
+
+The daily series says compile time moved; to ask whether your branch moved it,
+label the pull request `ci-mojo-compile-time-benchmark`. The `Mojo Compile Time
+A/B` workflow then measures the two *arms* — the merge base and the branch
+head — on one runner, and posts the comparison as a comment, refreshed on every
+push while the label is on. The benchmark takes about an hour, and needs the
+machine to itself for the timings to be stable, so it is label-gated rather
+than run on every pull request.
+
+Each arm builds its own compiler and emits its own Mojo, so a graph-compiler or
+kernel-library change counts the same way a Mojo-compiler change does. The arms
+are interleaved rather than run back to back, so drift over the run lands on
+both of them, and a difference smaller than the spread between one arm's own
+repeats is reported as noise rather than as a number to act on. The comment
+uses the same word.
+
+A regression is reported, never enforced: more compile time is often the honest
+cost of more work. The check fails only when an arm fails to build or compile.
 
 ## Notes for benchmarking
 

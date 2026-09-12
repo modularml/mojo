@@ -77,37 +77,36 @@ struct AnyAsyncValueRef(ImplicitlyCopyable, Movable):
         external_call["AsyncRT_AsyncValue_retain", NoneType](copy._handle)
         self._handle = copy._handle
 
-    def __init__(out self, *, retained_storage_of: OpaquePointer[MutAnyOrigin]):
-        """Retains the backing storage of a packed async slot into a new ref.
+    def __init__(out self, *, retained_storage_of: _AsyncValuePtr[mut=True]):
+        """Retains the backing storage of a packed async value into a new ref.
 
-        Reads the `AsyncValue*` behind the slot's `TensorBufferRef` storage
-        handle and adds one reference, so the returned handle independently keeps
-        the backing memory alive (e.g. when an unpacked value is re-packed).
+        Reads the `AsyncValue*` of the packed buffer/tensor value and adds one
+        reference to its storage handle, so the returned handle independently
+        keeps the backing memory alive (e.g. when an unpacked value is re-packed).
 
         Args:
-            retained_storage_of: A pointer to the packed async value (slot) whose
-                backing storage should be retained.
+            retained_storage_of: The `AsyncValue*` whose backing storage should
+                be retained.
         """
-        # AsyncValue *AsyncRT_AsyncValue_retainBufferStorage(
-        #     AnyAsyncValueRef *async)
+        # AsyncValue *AsyncRT_AsyncValue_retainBufferStorage(AsyncValue *value)
         self._handle = external_call[
             "AsyncRT_AsyncValue_retainBufferStorage", _AsyncValuePtr[mut=True]
         ](retained_storage_of)
 
-    def __init__(out self, *, retain_handle: OpaquePointer[MutAnyOrigin]):
-        """Retains an existing `AnyAsyncValueRef` storage handle into a new ref.
+    def __init__(out self, *, take_slot: OpaquePointer[MutAnyOrigin]):
+        """Moves the AsyncValue out of a runtime-owned slot and nulls the slot.
 
-        Reads the `AsyncValue*` behind the given C++ `AnyAsyncValueRef` handle
-        (e.g. a cached buffer's memory handle) and adds one reference. A null
-        handle yields the empty (non-tracked) reference.
+        Takes ownership of the single reference stored in the C++
+        `AnyAsyncValueRef` pointed to by `take_slot`, resets the slot to empty,
+        and adopts the reference without retaining.
 
         Args:
-            retain_handle: A pointer to a C++ `AnyAsyncValueRef` storage handle.
+            take_slot: A pointer to the runtime-owned `AnyAsyncValueRef` slot.
         """
-        # AsyncValue *AsyncRT_AsyncValue_retainHandle(AnyAsyncValueRef *handle)
+        # AsyncValue *AsyncRT_AsyncValue_takeHandle(AnyAsyncValueRef *slot)
         self._handle = external_call[
-            "AsyncRT_AsyncValue_retainHandle", _AsyncValuePtr[mut=True]
-        ](retain_handle)
+            "AsyncRT_AsyncValue_takeHandle", _AsyncValuePtr[mut=True]
+        ](take_slot)
 
     def __init__(out self, *, var storage_buf: DeviceBuffer):
         """Wraps a live owning `DeviceBuffer` in an `AsyncValue[DeviceBufferRef]`.
@@ -130,6 +129,18 @@ struct AnyAsyncValueRef(ImplicitlyCopyable, Movable):
         """Releases this reference to the underlying `AsyncValue`."""
         # void AsyncRT_AsyncValue_release(AsyncValue *value)
         external_call["AsyncRT_AsyncValue_release", NoneType](self._handle)
+
+    def get_handle(self) -> _AsyncValuePtr[mut=True]:
+        """Returns the underlying `AsyncValue*` without transferring ownership.
+
+        The returned pointer remains valid only as long as this
+        `AnyAsyncValueRef` keeps the underlying AsyncValue alive.
+
+        Returns:
+            The `AsyncValue*` backing this type. The handle is still held and
+            managed by the AnyAsyncValueRef.
+        """
+        return self._handle
 
     def take_handle(deinit self) -> _AsyncValuePtr[mut=True]:
         """Surrenders the owning handle net-zero, suppressing the destructor.

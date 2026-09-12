@@ -40,14 +40,23 @@ def test_cast_from_mutable_tile_tensor() raises:
     assert_true(Bool(nullable.ptr))
 
 
-def test_ptr_none_after_clear() raises:
-    """Ptr is None when cleared manually."""
+def test_ptr_none_without_storage() raises:
+    """Ptr is None for a tile that carries a layout but no backing memory."""
     var data = Array[Float32, 6](fill={})
     var tile = TileTensor(data, row_major[2, 3]())
     var nullable = NullableTileTensor(tile)
     assert_true(Bool(nullable.ptr))
-    nullable.ptr = Optional[type_of(nullable).PtrType](None)
-    assert_false(Bool(nullable.ptr))
+    assert_false(Bool(type_of(nullable)(None, nullable.layout).ptr))
+
+
+def test_value_preserves_element_size() raises:
+    """Value() keeps the engine, so a vectorized tile stays vectorized."""
+    var data = Array[Float32, 16](fill={})
+    var tile = TileTensor(data, row_major[4, 4]()).vectorize[1, 4]()
+    var restored = NullableTileTensor(tile).value()
+    assert_equal(type_of(restored).element_size, 4)
+    assert_equal(restored.dim[0](), 4)
+    assert_equal(restored.dim[1](), 1)
 
 
 def test_dim_comptime() raises:

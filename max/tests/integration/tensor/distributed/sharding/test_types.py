@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Tests for DistributedTensorType and DistributedBufferType.
+"""Tests for TensorLayout and BufferLayout.
 
 These types live in ``max.experimental.sharding`` and describe how
 a tensor's global shape maps to per-device local types for graph compilation.
@@ -22,11 +22,12 @@ import pytest
 from max.driver import CPU
 from max.dtype import DType
 from max.experimental.sharding import (
+    BufferLayout,
+    DeviceMapping,
     DeviceMesh,
-    DistributedBufferType,
-    DistributedTensorType,
     Replicated,
     Sharded,
+    TensorLayout,
 )
 from max.graph import BufferType, SymbolicDim, TensorType
 
@@ -43,17 +44,21 @@ def mesh_2d(rows: int, cols: int) -> DeviceMesh:
     )
 
 
-class TestDistributedTensorType:
+class TestTensorSpec:
     def test_basic_construction(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         assert dt.dtype == DType.float32
         assert list(dt.shape) == [8, 16]
         assert dt.rank == 2
 
     def test_local_types(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         local = dt.local_types
         assert len(local) == 4
         for lt in local:
@@ -63,14 +68,24 @@ class TestDistributedTensorType:
 
     def test_replicated_local_types(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Replicated()])
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Replicated(),))
+        )
         for lt in dt.local_types:
             assert list(lt.shape) == [8, 16]
 
     def test_2d_mesh(self) -> None:
         mesh = mesh_2d(2, 4)
-        dt = DistributedTensorType(
-            DType.float32, [8, 16], mesh, [Sharded(0), Sharded(1)]
+        dt = TensorLayout(
+            DType.float32,
+            [8, 16],
+            DeviceMapping(
+                mesh,
+                (
+                    Sharded(0),
+                    Sharded(1),
+                ),
+            ),
         )
         local = dt.local_types
         assert len(local) == 8
@@ -81,8 +96,10 @@ class TestDistributedTensorType:
         """Each rank gets a per-rank distinct symbolic name so uneven
         runtime values can bind independently per rank."""
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 16], mesh, [Sharded(0)]
+        dt = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 16],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         local = dt.local_types
         for rank, lt in enumerate(local):
@@ -91,8 +108,10 @@ class TestDistributedTensorType:
 
     def test_symbolic_dim_non_sharded_unchanged(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 16], mesh, [Replicated()]
+        dt = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 16],
+            DeviceMapping(mesh, (Replicated(),)),
         )
         local = dt.local_types
         assert isinstance(local[0].shape[0], SymbolicDim)
@@ -101,20 +120,32 @@ class TestDistributedTensorType:
     def test_wrong_placement_count_raises(self) -> None:
         mesh = mesh_1d(4)
         with pytest.raises(ValueError, match="one placement per mesh axis"):
-            DistributedTensorType(
-                DType.float32, [8, 16], mesh, [Sharded(0), Replicated()]
+            TensorLayout(
+                DType.float32,
+                [8, 16],
+                DeviceMapping(
+                    mesh,
+                    (
+                        Sharded(0),
+                        Replicated(),
+                    ),
+                ),
             )
 
     def test_out_of_range_shard_axis_raises(self) -> None:
         mesh = mesh_1d(4)
         with pytest.raises(ValueError, match="out of range"):
-            DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(5)])
+            TensorLayout(
+                DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(5),))
+            )
 
     def test_uneven_static_dim_yields_per_rank_distinct_sizes(self) -> None:
         """Uneven static dim is supported: each rank gets its own size
         from ``_shard_sizes_along_axis`` (e.g. 7 on 4 ranks -> [2,2,2,1])."""
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [7, 16], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [7, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         local = dt.local_types
         assert [int(lt.shape[0]) for lt in local] == [2, 2, 2, 1]
         for lt in local:
@@ -122,31 +153,39 @@ class TestDistributedTensorType:
 
     def test_repr(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         r = repr(dt)
-        assert "DistributedTensorType" in r
+        assert "TensorLayout" in r
         assert "float32" in r
         assert "Sharded" in r
 
     def test_local_types_count_matches_device_count(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedTensorType(DType.float32, [8, 4], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
         local = dt.local_types
         assert len(local) == 2
         for lt in local:
             assert lt.device is not None
 
 
-class TestDistributedBufferType:
+class TestBufferSpec:
     def test_basic_construction(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.float32, [8, 4], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
         assert dt.dtype == DType.float32
         assert dt.rank == 2
 
     def test_local_types_are_buffer_types(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.float32, [8, 4], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
         local = dt.local_types
         assert len(local) == 2
         for lt in local:
@@ -155,7 +194,9 @@ class TestDistributedBufferType:
 
     def test_replicated_local_types(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedBufferType(DType.float32, [8, 16], mesh, [Replicated()])
+        dt = BufferLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Replicated(),))
+        )
         local = dt.local_types
         assert len(local) == 4
         for lt in local:
@@ -164,8 +205,16 @@ class TestDistributedBufferType:
 
     def test_2d_mesh(self) -> None:
         mesh = mesh_2d(2, 4)
-        dt = DistributedBufferType(
-            DType.float32, [8, 16], mesh, [Sharded(0), Sharded(1)]
+        dt = BufferLayout(
+            DType.float32,
+            [8, 16],
+            DeviceMapping(
+                mesh,
+                (
+                    Sharded(0),
+                    Sharded(1),
+                ),
+            ),
         )
         local = dt.local_types
         assert len(local) == 8
@@ -176,25 +225,39 @@ class TestDistributedBufferType:
     def test_wrong_placement_count_raises(self) -> None:
         mesh = mesh_1d(4)
         with pytest.raises(ValueError, match="one placement per mesh axis"):
-            DistributedBufferType(
-                DType.float32, [8, 16], mesh, [Sharded(0), Replicated()]
+            BufferLayout(
+                DType.float32,
+                [8, 16],
+                DeviceMapping(
+                    mesh,
+                    (
+                        Sharded(0),
+                        Replicated(),
+                    ),
+                ),
             )
 
     def test_out_of_range_shard_axis_raises(self) -> None:
         mesh = mesh_1d(4)
         with pytest.raises(ValueError, match="out of range"):
-            DistributedBufferType(DType.float32, [8, 16], mesh, [Sharded(5)])
+            BufferLayout(
+                DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(5),))
+            )
 
     def test_uneven_static_dim_yields_per_rank_distinct_sizes(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedBufferType(DType.float32, [7, 16], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.float32, [7, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         local = dt.local_types
         assert [int(lt.shape[0]) for lt in local] == [2, 2, 2, 1]
 
     def test_symbolic_dim_produces_per_rank_distinct_names(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedBufferType(
-            DType.float32, [SymbolicDim("batch"), 16], mesh, [Sharded(0)]
+        dt = BufferLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 16],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         local = dt.local_types
         for rank, lt in enumerate(local):
@@ -203,25 +266,31 @@ class TestDistributedBufferType:
 
     def test_rank_property(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.float32, [8, 4, 3], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.float32, [8, 4, 3], DeviceMapping(mesh, (Sharded(0),))
+        )
         assert dt.rank == 3
 
     def test_dtype_preserved(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.bfloat16, [8, 4], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.bfloat16, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
         assert dt.dtype == DType.bfloat16
 
     def test_repr(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.float32, [8, 4], mesh, [Sharded(0)])
-        assert "DistributedBufferType" in repr(dt)
+        dt = BufferLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
+        assert "BufferLayout" in repr(dt)
 
 
 # ─── Cross-tensor / cross-construction consistency ────────────────────
 
 
 class TestSymbolConsistency:
-    """Two :class:`DistributedTensorType` with identical global shape
+    """Two :class:`TensorLayout` with identical global shape
     and placements on the same mesh must produce identical per-rank
     symbolic names — this is what lets the engine identify two
     compiled inputs as sharing the same per-rank dim."""
@@ -235,11 +304,15 @@ class TestSymbolConsistency:
         self,
     ) -> None:
         mesh = mesh_1d(4)
-        a = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 16], mesh, [Sharded(0)]
+        a = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 16],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
-        b = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 32], mesh, [Sharded(0)]
+        b = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 32],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         a_local = a.local_types
         b_local = b.local_types
@@ -250,15 +323,19 @@ class TestSymbolConsistency:
             assert self._name(a_local[rank].shape[0]) == f"batch_tp_{rank}"
 
     def test_buffer_and_tensor_share_per_rank_names(self) -> None:
-        """A :class:`DistributedBufferType` and
-        :class:`DistributedTensorType` over the same global symbolic
+        """A :class:`BufferLayout` and
+        :class:`TensorLayout` over the same global symbolic
         dim and mesh produce the same per-rank names."""
         mesh = mesh_1d(4)
-        t = DistributedTensorType(
-            DType.float32, [SymbolicDim("seq"), 8], mesh, [Sharded(0)]
+        t = TensorLayout(
+            DType.float32,
+            [SymbolicDim("seq"), 8],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
-        b = DistributedBufferType(
-            DType.float32, [SymbolicDim("seq"), 8], mesh, [Sharded(0)]
+        b = BufferLayout(
+            DType.float32,
+            [SymbolicDim("seq"), 8],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         for rank in range(mesh.num_devices):
             assert self._name(t.local_types[rank].shape[0]) == self._name(
@@ -271,11 +348,15 @@ class TestSymbolConsistency:
         """Different global names should NOT collide at any rank
         (e.g. ``batch_tp_0`` and ``seq_tp_0`` must remain distinct)."""
         mesh = mesh_1d(2)
-        a = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 4], mesh, [Sharded(0)]
+        a = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 4],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
-        b = DistributedTensorType(
-            DType.float32, [SymbolicDim("seq"), 4], mesh, [Sharded(0)]
+        b = TensorLayout(
+            DType.float32,
+            [SymbolicDim("seq"), 4],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         for rank in range(mesh.num_devices):
             assert self._name(a.local_types[rank].shape[0]) != self._name(
@@ -303,8 +384,10 @@ class TestSymbolScalingSanity:
     @pytest.mark.parametrize("n", [8, 16, 32])
     def test_n_ranks_yield_n_distinct_symbol_names(self, n: int) -> None:
         mesh = mesh_1d(n)
-        dt = DistributedTensorType(
-            DType.float32, [SymbolicDim("batch"), 4], mesh, [Sharded(0)]
+        dt = TensorLayout(
+            DType.float32,
+            [SymbolicDim("batch"), 4],
+            DeviceMapping(mesh, (Sharded(0),)),
         )
         local = dt.local_types
         assert len(local) == n
@@ -321,11 +404,16 @@ class TestSymbolScalingSanity:
         flat rank) — ranks (0,0)/(0,1)/(0,2)/(0,3) all share
         ``batch_dp_0``; ranks (1,*) all share ``batch_dp_1``."""
         mesh = mesh_2d(2, 4)
-        dt = DistributedTensorType(
+        dt = TensorLayout(
             DType.float32,
             [SymbolicDim("batch"), 4],
-            mesh,
-            [Sharded(0), Replicated()],
+            DeviceMapping(
+                mesh,
+                (
+                    Sharded(0),
+                    Replicated(),
+                ),
+            ),
         )
         local = dt.local_types
         assert len(local) == 8

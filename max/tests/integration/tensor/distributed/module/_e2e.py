@@ -44,14 +44,16 @@ from max.experimental.functional import (
 )
 from max.experimental.nn.module import Module, module_dataclass
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
     Partial,
     PlacementMapping,
     Replicated,
     Sharded,
 )
-from max.experimental.sharding.types import DistributedTensorType
-from max.experimental.tensor import Tensor, TensorType
+from max.experimental.sharding.types import TensorLayout
+from max.experimental.tensor import Tensor
+from max.graph import TensorType
 
 F32 = DType.float32
 HIDDEN = 8
@@ -431,11 +433,8 @@ class IRTests:
             ),
         )
 
-        input_type = DistributedTensorType(
-            dtype=F32,
-            shape=["batch", HIDDEN],
-            mesh=mesh,
-            placements=(Replicated(),),
+        input_type = TensorLayout(
+            F32, ["batch", HIDDEN], DeviceMapping(mesh, (Replicated(),))
         )
         ir = repr(model.trace(input_type))
         assert "mo.matmul" in ir or "matmul" in ir.lower()
@@ -477,11 +476,10 @@ class IRTests:
             ),
         )
 
-        input_type = DistributedTensorType(
-            dtype=F32,
-            shape=["batch", HIDDEN],
-            mesh=mesh,
-            placements=(Replicated(), Replicated()),
+        input_type = TensorLayout(
+            F32,
+            ["batch", HIDDEN],
+            DeviceMapping(mesh, (Replicated(), Replicated())),
         )
         ir = repr(model.trace(input_type))
         assert len(ir) > 0

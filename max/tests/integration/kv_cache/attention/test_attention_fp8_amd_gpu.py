@@ -27,7 +27,7 @@ from max.nn import (
     ScaleOrigin,
 )
 from max.nn.attention.attention_with_rope import AttentionWithRope
-from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from max.nn.quant_config import WeightScaleSpec
 from max.nn.rotary_embedding import RotaryEmbedding
 from test_common.simple_kv_cache import paged_kv_cache_inputs
@@ -196,25 +196,9 @@ def _build_and_execute_attention_graph(
         freqs_cis = rope.freqs_cis
         layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
 
-        (
-            x,
-            input_row_offsets,
-            blocks,
-            cache_lengths,
-            lookup_table,
-            max_prompt_length,
-            max_cache_length,
-            attention_dispatch_metadata,
-        ) = graph.inputs
+        x, input_row_offsets, *kv_inputs = graph.inputs
 
-        kv_collection = PagedCacheValues(
-            blocks.buffer,
-            cache_lengths.tensor,
-            lookup_table.tensor,
-            max_prompt_length.tensor,
-            max_cache_length.tensor,
-            attention_dispatch_metadata=attention_dispatch_metadata.tensor,
-        )
+        kv_collection = kv_params.unflatten_kv_inputs(iter(kv_inputs)).inputs[0]
         output = attention(
             layer_idx=layer_idx.tensor,
             x=x.tensor,

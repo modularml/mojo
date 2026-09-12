@@ -306,7 +306,7 @@ def test_load_store[
     var residual_vec1 = SIMD[type, residual](-2.0)
 
     # TODO: replace the following with simd.mojo:insert (after resolving its issue).
-    @always_inline
+    @inline(.always)
     def simd_insert(mut x: SIMD[type, _], y: SIMD[type, _]):
         comptime assert x.length >= y.length
 

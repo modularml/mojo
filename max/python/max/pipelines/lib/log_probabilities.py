@@ -39,6 +39,21 @@ else:
     _MixinBase = object
 
 
+_LOGPROBS_HEAP_LEVELS = 3
+"""Heap depth the pipeline models build their logprobs graph with."""
+
+_MAX_TOP_LOGPROBS = 2**_LOGPROBS_HEAP_LEVELS - 1
+"""Largest top-k the logprobs graph can return.
+
+The kernel's min-heap holds ``2**levels - 1`` candidates and the graph reserves
+one further output slot for the sampled token, so the graph built with
+``_LOGPROBS_HEAP_LEVELS`` cannot answer a larger ``top_n``. Request routes
+validate against this so an out-of-range value is rejected at the boundary
+rather than raising inside the model worker, which takes the server down with
+it.
+"""
+
+
 def log_probabilities_ragged_graph(device: DeviceRef, *, levels: int) -> Graph:
     """Create a graph to compute log probabilities over ragged inputs.
 
@@ -189,10 +204,12 @@ def compute_log_probabilities_ragged(
     lp_tokens = model_outputs[1].to_numpy()
 
     def compute_top(output_index: int, top_n: int) -> dict[int, float]:
+        if top_n < 0:
+            raise ValueError(f"top_n must be non-negative, was {top_n}.")
         if top_n > lp_logits.shape[1] - 1:
             raise ValueError(
-                "top_n too large for this graph -- "
-                "rebuild with larger levels & rerun"
+                f"top_n={top_n} exceeds the {lp_logits.shape[1] - 1} this "
+                "graph supports -- raise _LOGPROBS_HEAP_LEVELS and rerun"
             )
         top_assoc = [
             (int(token), float(logit))
@@ -260,7 +277,8 @@ class LogProbabilitiesMixin(_MixinBase):
         super().__init__(pipeline_config, session, *args, **kwargs)
         self._logprobs_device = self.devices[0]
         graph = log_probabilities_ragged_graph(
-            DeviceRef.from_device(self._logprobs_device), levels=3
+            DeviceRef.from_device(self._logprobs_device),
+            levels=_LOGPROBS_HEAP_LEVELS,
         )
         self._logprobs_model = session.load(graph)
 

@@ -26,20 +26,15 @@ needed: its epilogue binds through the store-lambda path (`FusedOutputTensor`
 + `_bind_to_fused_output`).
 
 Several of that suite's cases are NOT ported here (see the trailing
-comment): `matmul_add`/`chain`/`no_fuse_matmul_cast` because `mo.matmul`'s
-epilogue currently fails to compile under `MAX_GC_USE_ADV_FUSION=1` at all
+comment): `matmul_add`/`chain` because `mo.matmul`'s same-dtype (compute
+lambda) epilogue currently fails to compile under `MAX_GC_USE_ADV_FUSION=1`
 (a separate, already-tracked compute-lambda gap -- see
 `test_view_fusion.py`'s `test_broadcast_fuses_into_existing_epilogue`
-docstring); `fuse_in_if`/`no_fuse_across_blocks` because of a newly-found,
-currently-unreported gap: any epilogue-fusible op inside an `ops.cond`
-(`mo.if`) branch fails the same way, with `'map.index.reshape' op MAPToMOGG:
-unsupported op` -- reproduces even with both branches already the same
-shape, so it isn't a shape-mismatch artifact of a particular test; ruled out
-against the prologue side, which compiles and runs correctly inside `mo.if`
-branches (see `test_prologue_fusion.py`'s
-`test_fuses_independently_per_conditional_branch`). A couple of the
-remaining cases have no real-op counterpart at all and are intentionally not
-ported either (see the trailing comment).
+docstring). A dtype-CHANGING matmul epilogue does compile now -- the
+mixed-precision accumulating path (`AllocateAccumulatingBuffers`) gives it a
+pre-cast scratch buffer -- so `cast(matmul(...))` is exercised below. A
+couple of the remaining cases have no real-op counterpart at all and are
+intentionally not ported either (see the trailing comment).
 """
 
 from __future__ import annotations
@@ -71,6 +66,35 @@ def test_reduce_max_epilogue_fuses_cast(
     assert out.dtype == np.int32
     ref = np.max(x_np, axis=0, keepdims=True).astype(np.int32)
     np.testing.assert_allclose(out, ref)
+
+
+def test_matmul_epilogue_fuses_cast(
+    session: InferenceSession, adv_fusion_enabled: None
+) -> None:
+    """`cast(matmul(a, b))` fuses the cast into the matmul's epilogue. A
+    dtype-changing (mixed-precision) accumulating kernel: the matmul must
+    accumulate in f32, so `AllocateAccumulatingBuffers` gives the epilogue a
+    pre-cast f32 scratch buffer to accumulate through while the store lands in
+    the si32 output. Without it the kernel would accumulate f32 through the si32
+    buffer. Mirrors `matmul-cast-epilogue-fusion.mlir`.
+    """
+    with Graph(
+        "matmul_epilogue_fuses_cast",
+        input_types=[
+            TensorType(DType.float32, [2, 2], device=DeviceRef.CPU()),
+            TensorType(DType.float32, [2, 2], device=DeviceRef.CPU()),
+        ],
+    ) as graph:
+        a, b = (v.tensor for v in graph.inputs)
+        graph.output(ops.matmul(a, b).cast(DType.int32))
+
+    a_np = np.random.randn(2, 2).astype(np.float32)
+    b_np = np.random.randn(2, 2).astype(np.float32)
+    (out,) = run_and_verify_fusion(
+        session, graph, a_np, b_np, fused=r"mo\.matmul.*mo\.cast"
+    )
+    assert out.dtype == np.int32
+    np.testing.assert_array_equal(out, (a_np @ b_np).astype(np.int32))
 
 
 def test_no_fuse_multi_use(
@@ -149,6 +173,100 @@ def test_two_producers_one_fuses(
         b_np, axis=0, keepdims=True
     )
     np.testing.assert_allclose(out, ref, rtol=1e-5, atol=1e-5)
+
+
+def test_fuses_independently_per_conditional_branch(
+    session: InferenceSession, adv_fusion_enabled: None
+) -> None:
+    """Each `mo.if` branch gets its own, independently-fused epilogue.
+
+    Mirrors `fuse_in_if`: the then-branch computes `reduce.max(x, axis) + b`,
+    the else-branch `reduce.max(x, axis) * b` -- same shapes, a different
+    epilogue op fused into the reduction per branch.
+    """
+    with Graph(
+        "epilogue_fuses_independently_per_conditional_branch",
+        input_types=[
+            TensorType(DType.float32, [4, 4], device=DeviceRef.CPU()),
+            TensorType(DType.float32, [1, 4], device=DeviceRef.CPU()),
+            TensorType(DType.bool, [], device=DeviceRef.CPU()),
+        ],
+    ) as graph:
+        x, b, cond = (v.tensor for v in graph.inputs)
+        out_type = TensorType(DType.float32, [1, 4], device=DeviceRef.CPU())
+
+        def then_fn():  # noqa: ANN202
+            return [ops.max(x, axis=0) + b]
+
+        def else_fn():  # noqa: ANN202
+            return [ops.max(x, axis=0) * b]
+
+        (result,) = ops.cond(cond, [out_type], then_fn, else_fn)
+        graph.output(result)
+
+    x_np = np.random.randn(4, 4).astype(np.float32)
+    b_np = np.random.randn(1, 4).astype(np.float32)
+    reduced_np = np.max(x_np, axis=0, keepdims=True)
+
+    # Both branches compile regardless of which one a given call executes, so
+    # the fusion check only needs to run once, against either branch's
+    # pattern; the loop below is purely for the numeric check per branch.
+    (out,) = run_and_verify_fusion(
+        session,
+        graph,
+        x_np,
+        b_np,
+        np.array(True),
+        fused=r"mo\.reduce\.max.*mo\.add",
+    )
+    np.testing.assert_allclose(out, reduced_np + b_np, rtol=1e-5, atol=1e-5)
+
+    for cond_np, ref in (
+        (np.array(True), reduced_np + b_np),
+        (np.array(False), reduced_np * b_np),
+    ):
+        (out,) = run_and_verify_fusion(session, graph, x_np, b_np, cond_np)
+        np.testing.assert_allclose(out, ref, rtol=1e-5, atol=1e-5)
+
+
+def test_no_fuse_across_conditional_blocks(
+    session: InferenceSession, adv_fusion_enabled: None
+) -> None:
+    """A producer defined *outside* an `mo.if` cannot fuse into a consumer
+    inside one of its branches -- `EpilogueFuser` never crosses block
+    boundaries. Mirrors `no_fuse_across_blocks`.
+    """
+    with Graph(
+        "epilogue_no_fuse_across_conditional_blocks",
+        input_types=[
+            TensorType(DType.float32, [4, 4], device=DeviceRef.CPU()),
+            TensorType(DType.float32, [1, 4], device=DeviceRef.CPU()),
+            TensorType(DType.bool, [], device=DeviceRef.CPU()),
+        ],
+    ) as graph:
+        x, b, cond = (v.tensor for v in graph.inputs)
+        reduced = ops.max(x, axis=0)
+        out_type = TensorType(DType.float32, [1, 4], device=DeviceRef.CPU())
+
+        def then_fn():  # noqa: ANN202
+            return [reduced + b]
+
+        def else_fn():  # noqa: ANN202
+            return [b]
+
+        (result,) = ops.cond(cond, [out_type], then_fn, else_fn)
+        graph.output(result)
+
+    x_np = np.random.randn(4, 4).astype(np.float32)
+    b_np = np.random.randn(1, 4).astype(np.float32)
+    reduced_np = np.max(x_np, axis=0, keepdims=True)
+
+    for cond_np, ref in (
+        (np.array(True), reduced_np + b_np),
+        (np.array(False), b_np),
+    ):
+        (out,) = run_and_verify_fusion(session, graph, x_np, b_np, cond_np)
+        np.testing.assert_allclose(out, ref, rtol=1e-5, atol=1e-5)
 
 
 # NOTE: `epilogue_fusion.mlir`'s `no_fuse_plain_output` and

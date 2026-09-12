@@ -41,13 +41,26 @@ _EXTRA_DEPS = {
     "test_mfma_fragment_lane_mapping.mojo": ["//max:max_mojo"],
 }
 
+# Per-file tags. `manual` keeps a test referenced (no unreferenced-file lint)
+# but out of CI: wildcard `//...` expansion skips it, and the presubmit
+# target-pattern file subtracts manual targets (ci/bazel-diff/utils.sh). It
+# still runs when named explicitly.
+_EXTRA_TAGS = {
+    # Cross-row leak canary: the leak it guards still reproduces
+    # nondeterministically (KERN-3589). #98414 fixed one instance and added
+    # this canary, but the same seed passes one run and fails the next, so it
+    # red-flags unrelated presubmits. Re-enable once KERN-3589 is fixed; run
+    # it by explicit target to check a fix.
+    "test_mha_prefill_v2_lazy_rescale_crossrow_canary.mojo": ["manual"],
+}
+
 [
     mojo_test(
         name = src + ".test",
         size = "medium",
         srcs = [src],
         copts = IGNORED_POINTER_DEPRECATIONS_COPTS + _EXTRA_COPTS.get(src, []),
-        tags = ["gpu"],
+        tags = ["gpu"] + _EXTRA_TAGS.get(src, []),
         target_compatible_with = _EXTRA_CONSTRAINTS.get(
             src,
             [

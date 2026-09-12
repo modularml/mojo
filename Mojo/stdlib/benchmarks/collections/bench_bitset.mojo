@@ -24,7 +24,7 @@ comptime OP_LOOP_SIZE = 1000
 
 
 def bench_empty_bitset_init[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         for _ in range(0, INIT_LOOP_SIZE):
             var b = BitSet[size]()
@@ -36,7 +36,7 @@ def bench_empty_bitset_init[size: Int](mut b: Bencher) raises:
 def bench_bitset_init_from[width: Int](mut b: Bencher) raises:
     var initial = SIMD[.bool, width](fill=True)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var initial}:
         for _ in range(0, INIT_LOOP_SIZE):
             var b = BitSet(initial)
@@ -46,7 +46,7 @@ def bench_bitset_init_from[width: Int](mut b: Bencher) raises:
 
 
 def bench_bitset_set[size: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var bitset = BitSet[size]()
         for _ in range(0, OP_LOOP_SIZE):
@@ -60,7 +60,7 @@ def bench_bitset_set[size: Int](mut b: Bencher) raises:
 def bench_bitset_clear[width: Int](mut b: Bencher) raises:
     var initial = SIMD[.bool, width](fill=True)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var initial}:
         var bitset = BitSet[width](initial)
         for _ in range(0, OP_LOOP_SIZE):
@@ -75,7 +75,7 @@ def bench_bitset_clear[width: Int](mut b: Bencher) raises:
 def bench_bitset_toggle[width: Int](mut b: Bencher) raises:
     var initial = SIMD[.bool, width](fill=True)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var initial}:
         var bitset = BitSet[width](initial)
         for _ in range(0, OP_LOOP_SIZE):
@@ -90,7 +90,7 @@ def bench_bitset_toggle[width: Int](mut b: Bencher) raises:
 def bench_bitset_test[width: Int](mut b: Bencher) raises:
     var initial = SIMD[.bool, width](fill=True)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var initial}:
         var bitset = BitSet[width](initial)
         for _ in range(0, OP_LOOP_SIZE):
@@ -104,7 +104,7 @@ def bench_bitset_union[width: Int](mut b: Bencher) raises:
     var lhs_init = SIMD[.bool, width](fill=True)
     var rhs_init = SIMD[.bool, width](fill=False)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var lhs_init, var rhs_init}:
         var lhs = BitSet[width](lhs_init)
         var rhs = BitSet[width](rhs_init)
@@ -120,7 +120,7 @@ def bench_bitset_intersection[width: Int](mut b: Bencher) raises:
     var lhs_init = SIMD[.bool, width](fill=True)
     var rhs_init = SIMD[.bool, width](fill=False)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var lhs_init, var rhs_init}:
         var lhs = BitSet[width](lhs_init)
         var rhs = BitSet[width](rhs_init)
@@ -136,7 +136,7 @@ def bench_bitset_difference[width: Int](mut b: Bencher) raises:
     var lhs_init = SIMD[.bool, width](fill=True)
     var rhs_init = SIMD[.bool, width](fill=False)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {var lhs_init, var rhs_init}:
         var lhs = BitSet[width](lhs_init)
         var rhs = BitSet[width](rhs_init)

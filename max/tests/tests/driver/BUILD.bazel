@@ -8,12 +8,16 @@ package(default_visibility = [
 
 modular_py_test(
     name = "tests",
+    # The eager stamping cases compile real graphs, which `medium` (300s) does
+    # not cover on a contended worker, still less under a sanitizer.
+    size = "large",
     srcs = glob(
         ["*.py"],
         exclude = [
             "test_buffer_sync_contracts.py",
             "test_device_event.py",
             "test_buffer_device_pinned.py",
+            "test_hazard_gpu.py",
             "test_host_func.py",
             "test_launch_trace.py",
         ],
@@ -22,6 +26,9 @@ modular_py_test(
         "enable-sanitizers",
     ],
     deps = [
+        "//max/python/max:_core",
+        # The eager realization path is one of the hazard-record stamp sites.
+        "//max/python/max:tensor",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         requirement("hypothesis"),
@@ -38,6 +45,7 @@ modular_py_test(
         "test_buffer_device_pinned.py",
         "test_buffer_sync_contracts.py",
         "test_device_event.py",
+        "test_hazard_gpu.py",
         "test_host_func.py",
         "test_launch_trace.py",
     ],
@@ -47,6 +55,7 @@ modular_py_test(
     }),  # FIXME: MOCO-2411
     tags = ["gpu"],
     deps = [
+        "//max/python/max:_core",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/graph",
@@ -57,13 +66,17 @@ modular_py_test(
 
 modular_py_test(
     name = "multi_gpu_tests",
-    srcs = ["accelerator_tests/test_multi_device.py"],
+    srcs = [
+        "accelerator_tests/test_hazard_multi_gpu.py",
+        "accelerator_tests/test_multi_device.py",
+    ],
     gpu_constraints = ["//:has_multi_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     tags = ["gpu"],
     deps = [
+        "//max/python/max:_core",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         requirement("numpy"),

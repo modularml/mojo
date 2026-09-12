@@ -84,7 +84,9 @@ struct IntLiteralNode final : public ExprNode {
 
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -101,7 +103,9 @@ struct FloatLiteralNode final : public ExprNode {
   SourceRange getRange() const override { return {getLoc(), getLoc()}; }
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -120,7 +124,9 @@ struct BoolLiteralNode final : public ExprNode {
   SourceRange getRange() const override { return {getLoc(), getLoc()}; }
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -145,7 +151,9 @@ struct SimpleLiteralNode final : public ExprNode {
   LogicalResult emitDestructuringPValue(PValue value,
                                         IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -178,7 +186,9 @@ struct StringLiteralNode final : public ExprNode {
   }
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -258,7 +268,9 @@ struct DeclRefNode final : public LValueCapableExprNode, Identifier {
   ELVIITResult emitLCVIR(ExprDest &dest, IREmitter &emitter,
                          bool isSpeculative) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return true; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -282,7 +294,9 @@ struct AttributeRefNode final : public LValueCapableExprNode, Identifier {
   ELVIITResult emitLCVIR(ExprDest &dest, IREmitter &emitter,
                          bool isSpeculative) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 
   /// Emit a reference to a stored field with a base that is known not to be a
@@ -312,7 +326,9 @@ struct InferredAttributeRefNode final : public LValueCapableExprNode,
   ELVIITResult emitLCVIR(ExprDest &dest, IREmitter &emitter,
                          bool isSpeculative) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override { return false; }
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -376,14 +392,17 @@ struct CallNode final : public ExprNode {
   SourceRange getParenRange() const { return {lparenLoc, rparenLoc}; }
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override;
   void print(mlir::raw_indented_ostream &os) const override;
 
 private:
   /// Match `Type.Case(payload...)` against an `EnumLike` subject: check the
   /// active discriminant, then deep-match payload subpatterns.
   CValue emitEnumMatch(IREmitter &emitter, CValue subject,
-                       PatternDeclKind patternKind) const;
+                       PatternDeclKind patternKind,
+                       llvm::SmallVectorImpl<BoundName> &bindings) const;
 };
 
 /// This represents `A[i,j]`.  In the case of slices (e.g. `A[i, ::]`), the
@@ -466,7 +485,9 @@ struct ParenNode final : public ExprNode {
   LogicalResult emitDestructuringPValue(PValue value,
                                         IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override;
   ELVIITResult
   emitLValueIfImplicitlyTyped(IREmitter &emitter, PatternDeclKind kind,
                               bool hasInferrableRHS) const override {
@@ -502,7 +523,9 @@ struct TupleNode final : public LValueCapableExprNode {
   LogicalResult emitDestructuringPValue(PValue value,
                                         IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override;
   void print(mlir::raw_indented_ostream &os) const override;
 };
 
@@ -667,7 +690,9 @@ struct BinOpNode final : public ExprNode {
                               bool hasInferrableRHS) const override;
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override;
   void print(mlir::raw_indented_ostream &os) const override;
 
 private:
@@ -676,9 +701,11 @@ private:
   AnyValue emitWalrus(ExprDest &dest, IREmitter &emitter) const;
   AnyValue emitInplace(ExprDest &dest, IREmitter &emitter) const;
   CValue emitAsMatch(IREmitter &emitter, CValue subject,
-                     PatternDeclKind patternKind) const;
+                     PatternDeclKind patternKind,
+                     llvm::SmallVectorImpl<BoundName> &bindings) const;
   CValue emitOrMatch(IREmitter &emitter, CValue subject,
-                     PatternDeclKind patternKind) const;
+                     PatternDeclKind patternKind,
+                     llvm::SmallVectorImpl<BoundName> &bindings) const;
 };
 
 struct UnaryOpNode final : public ExprNode {
@@ -699,7 +726,9 @@ struct UnaryOpNode final : public ExprNode {
   }
   AnyValue emitIR(ExprDest &dest, IREmitter &emitter) const override;
   CValue emitMatch(IREmitter &emitter, CValue subject,
-                   PatternDeclKind patternKind) const override;
+                   PatternDeclKind patternKind,
+                   llvm::SmallVectorImpl<BoundName> &bindings) const override;
+  bool mayContainBindingPatterns() const override;
   ELVIITResult
   emitLValueIfImplicitlyTyped(IREmitter &emitter, PatternDeclKind kind,
                               bool hasInferrableRHS) const override;

@@ -20,7 +20,7 @@ run, and they must agree.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from typing import Any
 
@@ -31,16 +31,18 @@ from max.dtype import DType
 from max.experimental import compilation
 from max.experimental import functional as F
 from max.experimental.compilation import (
-    _SPEC_TYPES,
+    _LAYOUT_TYPES,
     StagedGraph,
     as_layout,
     as_subgraph,
     compile,
     stage,
 )
+from max.experimental.nn.common_layers.kv_cache import PagedCacheValues
 from max.experimental.sharding import (
+    BufferLayout,
+    DeviceMapping,
     DeviceMesh,
-    DistributedBufferType,
     PlacementMapping,
     Replicated,
     Sharded,
@@ -56,6 +58,7 @@ from max.graph import (
     TensorValue,
     ops,
 )
+from max.nn.kv_cache import MHAKVCacheParams
 
 _F32 = DType.float32
 
@@ -111,6 +114,10 @@ def _calls(graph: object, name: str) -> int:
     return len(re.findall(rf"mo\.call @{name}\b", str(graph)))
 
 
+def _bodies(staged: object, name: str) -> int:
+    return len(re.findall(rf"mo\.graph @{name}\b", str(staged)))
+
+
 class TestAsLayout:
     def test_a_layout_passes_through(self) -> None:
         spec = _spec(4)
@@ -122,14 +129,20 @@ class TestAsLayout:
         assert layout.mesh.num_devices == 1
         assert not layout.mesh.num_devices > 1
 
-    def test_a_tensor_reads_as_its_own_layout(self) -> None:
-        layout = as_layout(_tensor(1.0, 2.0, 3.0))
+    def test_a_tensor_is_a_value_and_not_a_layout(self) -> None:
+        """Its dims are whatever it holds, so reading a boundary off one
+        would fix every dimension to that size by accident."""
+        with pytest.raises(TypeError, match="is a value, not a layout"):
+            as_layout(_tensor(1.0, 2.0, 3.0))
+
+    def test_a_tensors_own_layout_says_it_on_purpose(self) -> None:
+        layout = as_layout(_tensor(1.0, 2.0, 3.0).layout)
         assert isinstance(layout, TensorLayout)
         assert layout.dtype == _F32
         assert [int(d) for d in layout.shape] == [3]
 
-    def test_a_sharded_tensor_keeps_its_distribution(self) -> None:
-        layout = as_layout(_sharded_tensor(1.0, 2.0))
+    def test_a_sharded_tensors_layout_keeps_its_distribution(self) -> None:
+        layout = as_layout(_sharded_tensor(1.0, 2.0).layout)
         assert isinstance(layout, TensorLayout)
         assert layout.mesh.num_devices == 2
 
@@ -147,8 +160,8 @@ class TestStage:
         assert staged._signature.out_structure.num_leaves == 1
         assert staged._signal_device_ids == ()
 
-    def test_an_example_tensor_serves_as_a_spec(self) -> None:
-        staged = stage(lambda x: x * 2)(_tensor(1.0, 2.0))
+    def test_an_example_tensors_layout_serves_as_a_spec(self) -> None:
+        staged = stage(lambda x: x * 2)(_tensor(1.0, 2.0).layout)
         assert len(staged.graph.inputs) == 1
 
     def test_keyword_arguments_are_traced(self) -> None:
@@ -286,7 +299,7 @@ class TestWeights:
     def test_a_weight_is_external_and_computes(self) -> None:
         def layer(x: Tensor) -> Tensor:
             return x * F.constant_external(
-                "w", TensorType(_F32, [2], DeviceRef.CPU())
+                "w", TensorLayout(_F32, [2], DeviceRef.CPU())
             )
 
         assert "mo.constant.external" in str(stage(layer)(_spec(2)))
@@ -381,7 +394,7 @@ class TestSubgraphable:
         def body(x: Tensor) -> Tensor:
             return x * F.constant_external(
                 "w",
-                TensorType(_F32, [1], DeviceRef.CPU()),
+                TensorLayout(_F32, [1], DeviceRef.CPU()),
                 is_placeholder=True,
             )
 
@@ -406,7 +419,7 @@ class TestSubgraphable:
         def body(x: Tensor) -> Tensor:
             return x * F.constant_external(
                 "shared.w",
-                TensorType(_F32, [1], DeviceRef.CPU()),
+                TensorLayout(_F32, [1], DeviceRef.CPU()),
                 is_placeholder=False,
             )
 
@@ -643,7 +656,7 @@ class TestTheHardestSignature:
         args, kwargs = _gnarly_specs(_spec)
         staged = stage(_gnarly)(*args, **kwargs)
         assert (
-            list(tree_paths(staged._signature.in_specs, leaf=_SPEC_TYPES))
+            list(tree_paths(staged._signature.in_specs, leaf=_LAYOUT_TYPES))
             == _GNARLY_ROUTES
         )
 
@@ -656,9 +669,10 @@ class TestTheHardestSignature:
         assert out["arity"] == 2
         assert out["tags"] == ("alpha", "beta")
 
-    def test_example_tensors_serve_as_specs(self) -> None:
+    def test_example_tensors_layouts_serve_as_specs(self) -> None:
         args, kwargs = _gnarly_call(_tensor)
-        run = compile(_gnarly)(*args, **kwargs)
+        spec_args, spec_kwargs = _gnarly_call(lambda *v: _tensor(*v).layout)
+        run = compile(_gnarly)(*spec_args, **spec_kwargs)
         np.testing.assert_allclose(
             run(*args, **kwargs)["out"].to_numpy(), _GNARLY_EXPECTED
         )
@@ -744,7 +758,7 @@ def _block(x, /, pair, *rest, gain, **extras):  # noqa: ANN001, ANN202
 
 def _stack(x, /, table, *, scale, **tails):  # noqa: ANN001, ANN202
     out = x * F.constant_external(
-        "blk.w", TensorType(_F32, [2], DeviceRef.CPU())
+        "blk.w", TensorLayout(_F32, [2], DeviceRef.CPU())
     )
     for name in sorted(tails):
         out = _block(
@@ -806,9 +820,9 @@ class Projections:
     under test here as much as the round trip.
     """
 
-    a: Tensor
-    b: Tensor
-    bias: Tensor | None = None
+    a: Tensor | TensorLayout
+    b: Tensor | TensorLayout
+    bias: Tensor | TensorLayout | None = None
 
     def __tree_flatten__(self) -> tuple[dict[str, Any], None]:
         return {f.name: getattr(self, f.name) for f in fields(self)}, None
@@ -825,7 +839,7 @@ class TestARecordArgumentSurvivesTheRoundTrip:
     """A pytree record as an argument, all the way through execution.
 
     Tracing one was already covered; *calling* the result was not, and the two
-    walks are different -- specs flatten under ``leaf=_SPEC_TYPES`` and a call
+    walks are different -- specs flatten under ``leaf=_LAYOUT_TYPES`` and a call
     flattens under ``_one_slot``. When those disagreed about a record the
     symptom was not a mismatch error: the record became one static slot, and
     checking it against its own spec ran ``Tensor.__eq__`` against a
@@ -833,25 +847,19 @@ class TestARecordArgumentSurvivesTheRoundTrip:
     """
 
     def test_a_record_of_tensors_round_trips_compiled(self) -> None:
-        run = compile(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        run = compile(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         out = run(Projections(a=_tensor(2.0, 3.0), b=_tensor(4.0, 5.0)))
 
         np.testing.assert_allclose(out.to_numpy(), [8.0, 15.0])
 
     def test_each_of_a_records_tensors_is_its_own_input(self) -> None:
-        staged = stage(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        staged = stage(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         assert len(staged.graph.inputs) == 2, "not one slot for the record"
 
     def test_a_wrong_shape_inside_a_record_names_its_field(self) -> None:
-        run = compile(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        run = compile(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         with pytest.raises(ValueError, match=r"argument 0\.a: expected"):
             run(Projections(a=_tensor(1.0), b=_tensor(4.0, 5.0)))
@@ -898,7 +906,9 @@ class TestBufferSpecs:
         mesh = DeviceMesh(
             devices=(CPU(), CPU()), mesh_shape=(2,), axis_names=("tp",)
         )
-        spec = DistributedBufferType(DType.float32, [4, 8], mesh, (Sharded(0),))
+        spec = BufferLayout(
+            DType.float32, [4, 8], DeviceMapping(mesh, (Sharded(0),))
+        )
 
         def read_first(b: Tensor) -> TensorValue:
             return ops.buffer_load(b.local_shards[0].__buffervalue__())
@@ -939,7 +949,7 @@ class TestBufferSpecs:
             return x * 2
 
         run = compile(fill)(
-            DistributedBufferType(_F32, [4], mesh, (Sharded(0),)),
+            BufferLayout(_F32, [4], DeviceMapping(mesh, (Sharded(0),))),
             TensorLayout(_F32, [4], PlacementMapping(mesh, (Sharded(0),))),
         )
         cache = Tensor._from_shards(
@@ -963,3 +973,254 @@ class TestBufferSpecs:
 
         np.testing.assert_allclose(cache.local_shards[0].to_numpy(), [1.0, 2.0])
         np.testing.assert_allclose(cache.local_shards[1].to_numpy(), [3.0, 4.0])
+
+
+class TestExplicitMutability:
+    """Which tensor a store may promote, and where a caller has to say so.
+
+    A store into a tensor backed by a ``TensorValue`` creates a
+    ``BufferValue`` and copies the value in. That is sound where the buffer it
+    made is the one the reader will read, and wrong at a boundary, where the
+    type is already fixed and the buffer is local to the graph that made it.
+    """
+
+    def test_writing_a_tensor_staged_argument_is_refused(self) -> None:
+        """Promotion would store into a graph-local buffer the caller never
+        sees, so it is an error rather than a lost write."""
+
+        def writes_its_argument(cache: Tensor, x: Tensor) -> Tensor:
+            cache[0:1] = x[0:1]
+            return x
+
+        with pytest.raises(TypeError, match="staged as a tensor"):
+            stage(writes_its_argument)(_spec(2), _spec(2))
+
+    def test_a_value_the_graph_computed_is_promoted_by_a_store(self) -> None:
+        """Nothing outside the graph names it, so create-and-store is sound."""
+
+        def writes_a_local(x: Tensor) -> Tensor:
+            scratch = x * 1.0
+            scratch[1:2] = x[1:2] * 2.0
+            return scratch[...]
+
+        assert "mo.buffer.create" in str(stage(writes_a_local)(_spec(2)))
+
+    def test_a_body_writes_through_a_buffer_the_caller_promoted(self) -> None:
+        """An operand's type is the body's argument type, so a value a body
+        writes has to be a buffer before the call. A store in the caller
+        promotes it; promoting inside the body would create a buffer the
+        caller never sees and the store would be lost."""
+
+        def block(scratch: Tensor, x: Tensor) -> Tensor:
+            scratch[0:1] = x[0:1]
+            return scratch[...]
+
+        layer = as_subgraph(block, name="block")
+
+        def model(x: Tensor) -> Tensor:
+            scratch = x * 0.0
+            scratch[0:1] = scratch[0:1]  # promotes, before the call
+            body = layer(scratch, x)
+            # Read back through the caller's own handle, not the call result.
+            return body + scratch[...]
+
+        staged = stage(model)(_spec(2))
+        body = str(staged).split("mo.graph @block")[1]
+        assert "!mo.buffer" in body.split("{")[0], "the body takes a buffer"
+        assert "mo.buffer.create" not in body, "so it allocates none of its own"
+
+    def test_without_that_store_the_body_is_refused(self) -> None:
+        """The same model unpromoted: the operand is a tensor, so the body's
+        argument is one, and the write that used to be lost is an error."""
+
+        def block(scratch: Tensor, x: Tensor) -> Tensor:
+            scratch[0:1] = x[0:1]
+            return scratch[...]
+
+        layer = as_subgraph(block, name="block")
+
+        def model(x: Tensor) -> Tensor:
+            scratch = x * 0.0
+            return layer(scratch, x) + scratch[...]
+
+        with pytest.raises(TypeError, match="staged as a tensor"):
+            stage(model)(_spec(2))
+
+    def test_one_pool_argument_serves_every_layer_call(self) -> None:
+        """The production shape: a buffer declared at ``compile()``, threaded
+        into one shared body, called once per layer, each writing its own
+        slot. This is a paged KV cache with the kernel taken out."""
+
+        def layer(pool: Tensor, x: Tensor, slot: Tensor) -> Tensor:
+            pool[slot] = x
+            return x * 2
+
+        block = as_subgraph(layer, name="block")
+
+        def model(pool: Tensor, x: Tensor) -> Tensor:
+            for i in range(3):
+                x = block(pool, x, F.constant(i, DType.int64, device=CPU()))
+            return x
+
+        staged = stage(model)(
+            BufferType(_F32, [3, 2], device=DeviceRef.CPU()), _spec(2)
+        )
+        assert _bodies(staged, "block") == 1, "one body for every layer"
+        assert _calls(staged.graph, "block") == 3
+        body = str(staged).split("mo.graph @block")[1]
+        assert "!mo.buffer" in body.split("{")[0], "the pool stays a buffer"
+        assert "mo.buffer.create" not in body, "so none is allocated inside"
+
+        run = staged.compile()
+        pool = Tensor.from_dlpack(np.zeros((3, 2), dtype=np.float32))
+        out = run(pool, _tensor(1.0, 2.0))
+
+        np.testing.assert_allclose(out.to_numpy(), [8.0, 16.0])
+        np.testing.assert_allclose(
+            pool.to_numpy(), [[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]]
+        )
+
+
+@dataclass(frozen=True)
+class PagedSpec:
+    """How a :class:`PagedCacheValues` describes its boundary.
+
+    Mirrors every field, so the tree matches and unflattening hands the body
+    the production class. Only ``kv_blocks`` is a buffer.
+    """
+
+    kv_blocks: BufferType
+    cache_lengths: TensorType
+    lookup_table: TensorType
+    max_prompt_length: TensorType
+    max_cache_length: TensorType
+    kv_scales: None = None
+    attention_dispatch_metadata: TensorType | None = None
+    mla_num_partitions: None = None
+
+    def __tree_flatten__(self) -> tuple[tuple[Any, ...], tuple[str, ...]]:
+        names = tuple(f.name for f in fields(self))
+        return tuple(getattr(self, name) for name in names), names
+
+    @classmethod
+    def __tree_unflatten__(
+        cls, aux: tuple[str, ...], children: Sequence[Any]
+    ) -> PagedCacheValues:
+        return PagedCacheValues(**dict(zip(aux, children, strict=True)))
+
+
+class TestAPagedKVCache:
+    """The production paged cache through a shared body, which is the point.
+
+    :meth:`KVCacheParams.get_symbolic_inputs` already types one device's
+    boundary as a ``BufferType`` for the page pool and a ``TensorType`` per
+    piece of metadata, and :class:`PagedCacheValues` already carries the
+    pytree protocol. So a real attention layer reaches this with nothing
+    added to either, which is the test: whether a ModuleV3-style paged
+    pipeline can be written against this API unchanged.
+
+    Staged rather than run: the page contents a kernel reads are the
+    integration suite's business, while the boundary is this file's.
+    """
+
+    LAYERS = 2
+
+    def _boundary(self) -> tuple[Any, ...]:
+        """The production description of a paged cache, converted nowhere.
+
+        ``get_symbolic_inputs`` already types the pool as a ``BufferType`` and
+        each piece of metadata as a ``TensorType``, and ``PagedCacheValues``
+        already carries the pytree protocol, so a pipeline reaches this with
+        nothing added to either.
+        """
+        heads, head_dim = 4, 16
+        hidden = heads * head_dim
+        kv_params = MHAKVCacheParams(
+            dtype=_F32,
+            n_kv_heads=1,
+            head_dim=head_dim,
+            num_layers=self.LAYERS,
+            page_size=128,
+            devices=[DeviceRef.CPU()],
+        )
+        declared = kv_params.get_symbolic_inputs().inputs[0]
+        cache_spec = PagedSpec(
+            kv_blocks=declared.kv_blocks,
+            cache_lengths=declared.cache_lengths,
+            lookup_table=declared.lookup_table,
+            max_prompt_length=declared.max_prompt_length,
+            max_cache_length=declared.max_cache_length,
+            attention_dispatch_metadata=declared.attention_dispatch_metadata,
+        )
+        x_spec = TensorType(
+            _F32, ["total_seq_len", hidden], device=DeviceRef.CPU()
+        )
+        rows_spec = TensorType(DType.uint32, ["rows"], device=DeviceRef.CPU())
+        return hidden, cache_spec, x_spec, rows_spec
+
+    def _transformer(self) -> tuple[Any, ...]:
+        (
+            hidden,
+            cache_spec,
+            x_spec,
+            rows_spec,
+        ) = self._boundary()
+
+        def projection(name: str) -> Tensor:
+            return F.constant_external(
+                name,
+                TensorLayout(_F32, [hidden, hidden], device=DeviceRef.CPU()),
+                is_placeholder=True,
+            )
+
+        def block(
+            x: Tensor,
+            cache: PagedCacheValues,
+            layer_idx: Tensor,
+            input_row_offsets: Tensor,
+        ) -> Tensor:
+            # Where attention would read and write the pool. A kernel is not
+            # this file's business; that the pool is a buffer here is.
+            cache.kv_blocks[...] = cache.kv_blocks[...] * 1.0
+            return (x @ projection("attn.qkv")) @ projection("attn.o")
+
+        def transformer(
+            x: Tensor, cache: PagedCacheValues, input_row_offsets: Tensor
+        ) -> Tensor:
+            for i in range(self.LAYERS):
+                # The index crosses as an operand. Baked in as a constant, the
+                # way a layer holding its own does, it would be one body per
+                # layer.
+                x = as_subgraph(block, name="block", prefix=f"layers.{i}.")(
+                    x,
+                    cache,
+                    F.constant(i, DType.uint32, device=CPU()),
+                    input_row_offsets,
+                )
+            return x
+
+        return transformer, cache_spec, x_spec, rows_spec
+
+    def test_it_shares_one_body_over_one_pool_with_weights_by_prefix(
+        self,
+    ) -> None:
+        """Staged once, because every claim below is about the same graph."""
+        transformer, cache_spec, x_spec, rows_spec = self._transformer()
+
+        staged = stage(transformer)(x_spec, cache_spec, rows_spec)
+
+        assert _bodies(staged, "block") == 1, "one body, not one per layer"
+        assert _calls(staged.graph, "block") == self.LAYERS
+        buffers = [i for i in staged.graph.inputs if isinstance(i, BufferValue)]
+        assert len(buffers) == 1, "one page pool, shared by every layer"
+
+        body = str(staged).split("mo.graph @block")[1]
+        signature = body.split("{")[0]
+        assert "!mo.buffer" in signature, "the pool is a buffer in the body"
+        assert "total_num_pages" in signature, "and stays symbolic"
+        assert "mo.buffer.create" not in body, "so nothing is copied in"
+
+        assert 'name = "attn.qkv"' in body, "weights are named relatively"
+        assert "isPlaceholder = true" in body
+        for i in range(self.LAYERS):
+            assert f'prefix = "layers.{i}."' in str(staged.graph)

@@ -64,7 +64,7 @@ def _run_reduce_sum_inner[
     var output_buf = List(length=num_rows, fill=Scalar[dtype](_POISON))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr, var axis_size} -> SIMD[dtype, width]:
@@ -72,7 +72,7 @@ def _run_reduce_sum_inner[
             Int(coords[0].value()) * axis_size + Int(coords[1].value())
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var output_ptr}:
@@ -94,7 +94,7 @@ def _run_reduce_max_non_inner[
     var output_buf = List(length=num_rows, fill=Scalar[dtype](_POISON))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr, var num_rows} -> SIMD[dtype, width]:
@@ -102,7 +102,7 @@ def _run_reduce_max_non_inner[
             Int(coords[0].value()) * num_rows + Int(coords[1].value())
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var output_ptr}:
@@ -123,7 +123,7 @@ def _run_reduce_argmax_inner[
     var output_buf = List(length=num_rows, fill=Int64(-1))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr, var axis_size} -> SIMD[dtype, width]:
@@ -131,7 +131,7 @@ def _run_reduce_argmax_inner[
             Int(coords[0].value()) * axis_size + Int(coords[1].value())
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[.int64, width]) {var output_ptr}:
@@ -152,7 +152,7 @@ def _run_reduce_mean_inner_f32[
     var output_buf = List(length=num_rows, fill=Scalar[dtype](_POISON))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr, var axis_size} -> SIMD[dtype, width]:
@@ -160,7 +160,7 @@ def _run_reduce_mean_inner_f32[
             Int(coords[0].value()) * axis_size + Int(coords[1].value())
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var output_ptr}:
@@ -182,7 +182,7 @@ def _run_reduce_mean_inner_i32[
     var output_buf = List(length=num_rows, fill=Scalar[dtype](111))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr, var axis_size} -> SIMD[dtype, width]:
@@ -190,7 +190,7 @@ def _run_reduce_mean_inner_i32[
             Int(coords[0].value()) * axis_size + Int(coords[1].value())
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var output_ptr}:
@@ -213,13 +213,13 @@ def _run_reduce_sum_rank1[
     var output_buf = List(length=1, fill=Scalar[dtype](_POISON))
     var output_ptr = output_buf.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var input_ptr} -> SIMD[dtype, width]:
         return input_ptr.unsafe_load[width=width](Int(coords[0].value()))
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var output_ptr}:

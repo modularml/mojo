@@ -285,7 +285,7 @@ def run_matmul_sm100_block_scaled_fp4_2sm_prefetch_suite[
         comptime MMA_K = 32
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def run[
             MType: CoordLike,
             NType: CoordLike,

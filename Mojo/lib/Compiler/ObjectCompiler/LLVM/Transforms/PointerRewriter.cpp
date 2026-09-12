@@ -122,7 +122,7 @@ static FunctionType *getTypedFunctionType(const Function *func) {
   auto &ctx = func->getContext();
   auto *fTy = func->getFunctionType();
 
-  // Apple's air backend lowers emask only on a typed `i8*`; the opaque `{}*`
+  // Apple's GPU backend lowers emask only on a typed `i8*`; the opaque `{}*`
   // MLIR emits fails the macOS-27 PSO bitcode upgrade. BitcodeWriter17's Call
   // path types the call site to match.
   if (func->getName().starts_with("llvm.agx3.") &&

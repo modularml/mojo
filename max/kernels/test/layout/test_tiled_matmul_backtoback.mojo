@@ -62,7 +62,7 @@ comptime cacheline_size: Int = 64
 # Firestorm core's l1 caches are so large, that we wouldn't
 # really need this, though.
 # Also: cacheline_size of 64 is currently hard coded.
-@always_inline
+@inline(.always)
 def stride[elt: DType](nrw: Int) -> Int:
     if nrw * size_of[elt]() >= cacheline_size:
         return cacheline_size // size_of[elt]()
@@ -70,7 +70,7 @@ def stride[elt: DType](nrw: Int) -> Int:
         return nrw
 
 
-@always_inline
+@inline(.always)
 def getKr[mode: IntTuple]() -> Int:
     if mode.is_value() or len(mode) == 1:
         return 1
@@ -79,7 +79,7 @@ def getKr[mode: IntTuple]() -> Int:
 
 
 # Assumes that we have packed `A` and `B`, `C` also uses a packed layout.
-# @always_inline
+# @inline(.always)
 def matmul_ukern[
     elt: DType, width: Int, mr: Int, nr: Int, kr: Int, kf: Int
 ](
@@ -336,7 +336,7 @@ def delete_idx(arg: List[Int], idx: Int) -> List[Int]:
     return res^
 
 
-@always_inline
+@inline(.always)
 def strided_load[
     elt: DType, //, W: Int, X: Int
 ](p: ImmPointer[Scalar[elt], _], i: Int) -> SIMD[elt, W]:
@@ -346,7 +346,7 @@ def strided_load[
         return (p + i * X).unsafe_strided_load[width=W](X)
 
 
-@always_inline
+@inline(.always)
 def strided_store[
     elt: DType, W: Int, //, X: Int
 ](p: MutPointer[Scalar[elt], _], i: Int, x: SIMD[elt, W]):
@@ -356,7 +356,7 @@ def strided_store[
         (p + i * X).unsafe_strided_store(x, X)
 
 
-@always_inline
+@inline(.always)
 def vectorize_flat[
     elt_a: DType,
     elt_b: DType,
@@ -388,7 +388,7 @@ def vectorize_flat[
         comptime int_stride_b: Int = stride_b[0]
         comptime size = shape[0]
 
-        @always_inline
+        @inline(.always)
         def vf[width: Int](i: Int) {var a, var b, imm f}:
             f[width, int_stride_a, int_stride_b](a, b, i)
 
@@ -467,7 +467,7 @@ def copy_to[
     dst: LayoutTensor[elt_dst, layout_dst, MutAnyOrigin],
     src: LayoutTensor[elt_src, layout_src, MutAnyOrigin],
 ):
-    @always_inline
+    @inline(.always)
     def copy[
         width: Int, stride_a: Int, stride_b: Int
     ](
@@ -500,7 +500,7 @@ def check_approx_equal[
 ) raises:
     var fail: Bool = False
 
-    @always_inline
+    @inline(.always)
     def check[
         width: Int, stride_a: Int, stride_b: Int
     ](
@@ -769,7 +769,7 @@ def matmulb2b[
         pd = pdk
 
 
-@always_inline
+@inline(.always)
 def bench_b2b[
     elt: DType,
     M: Int,
@@ -896,7 +896,7 @@ def bench_b2b[
     matmul_naive(ABrm64, Arm64, Brm64)
     matmul_naive(Drm64, ABrm64, Crm64)
 
-    @always_inline
+    @inline(.always)
     def test_tile_fn() {var}:
         matmul[elt, M, L, K, W, Mc, Nc, Kc, Mr, Nr, Kr](ABtile, Atile, Btile)
         matmul[elt, M, N, L, W, Mc, Nc, Kc, Mr, Nr, Kr](Dtile, ABtile, Ctile)
@@ -912,7 +912,7 @@ def bench_b2b[
 
     check_approx_equal[.float32](Dtile, Drm64)
 
-    @always_inline
+    @inline(.always)
     def test_tile_b2b_fn() {var}:
         matmulb2b[elt, M, N, K, L, W, Mc, Nc, Mr, Nr, Kr](
             Dtile, Atile, Btile, Ctileb2b

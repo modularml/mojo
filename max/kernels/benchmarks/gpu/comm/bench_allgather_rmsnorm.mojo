@@ -64,7 +64,7 @@ from std.math import rsqrt
 from std.utils.index import Index
 
 
-@always_inline
+@inline(.always)
 def _gathered_value[in_dtype: DType](row: Int, col: Int) -> Scalar[in_dtype]:
     """Value at global (row, col) of the gathered stream (shard fill + oracle).
     """
@@ -90,13 +90,13 @@ def _launch_norm_full[
     var in_buf = TileTensor(in_ptr, row_major(Coord(Index(rows, num_cols))))
     var out_buf = TileTensor(out_ptr, row_major(Coord(Index(rows, num_cols))))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_buf)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[in_dtype, width]:
         return in_buf.raw_load[width=width](in_buf.layout(coords))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_buf)
     @__parameter
     def output_fn[
@@ -206,13 +206,16 @@ def _verify_results[
         var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
             ag_r[i].unsafe_ptr()
         )
-        var out_views = Array[FullType, ngpus](
-            fill_with=lambda (src: Int) -> FullType: FullType(
+        # `allgather`'s world-view output array holds every device's own
+        # ngpus outputs; only THIS device's slice (`[i*ngpus, (i+1)*ngpus)`)
+        # is ever read back, so the rest is left uninitialized.
+        var world_out_views = Array[FullType, ngpus * ngpus](uninitialized=True)
+        comptime for src in range(ngpus):
+            world_out_views[i * ngpus + src] = FullType(
                 out_base + config.rank_unit_start(src) * num_cols,
                 row_major(Coord(Index(config.rank_units(src), num_cols))),
             )
-        )
-        allgather(in_shards, out_views, rank_sigs, list_of_ctx[i], i)
+        allgather(in_shards, world_out_views, rank_sigs, list_of_ctx[i], i)
     group_end()
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
@@ -469,7 +472,7 @@ def bench_allgather_rmsnorm[
         num_cols,
     )
 
-    @always_inline
+    @inline(.always)
     def _rebuild_shards(
         cache_iter: Int,
         mut in_shards: Array[ShardType, ngpus],
@@ -483,11 +486,11 @@ def bench_allgather_rmsnorm[
             )
 
     # ===== Variant 1: all-gather only -> t_AG =====
-    @always_inline
+    @inline(.always)
     def bench_ag_iter(
         mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_shards, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_shards, imm}:
@@ -496,13 +499,18 @@ def bench_allgather_rmsnorm[
             var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
                 ag_full[ctx_idx].unsafe_ptr()
             )
-            var out_views = Array[FullType, ngpus](
-                fill_with=lambda (src: Int) -> FullType: FullType(
+            # `allgather`'s world-view output array holds every device's own
+            # ngpus outputs; only THIS device's slice is ever read back, so
+            # the rest is left uninitialized.
+            var world_out_views = Array[FullType, ngpus * ngpus](
+                uninitialized=True
+            )
+            comptime for src in range(ngpus):
+                world_out_views[ctx_idx * ngpus + src] = FullType(
                     out_base + config.rank_unit_start(src) * num_cols,
                     row_major(Coord(Index(config.rank_units(src), num_cols))),
                 )
-            )
-            allgather(in_shards, out_views, rank_sigs, ctx_inner, ctx_idx)
+            allgather(in_shards, world_out_views, rank_sigs, ctx_inner, ctx_idx)
 
         bencher_iter_custom(bench, call_fn, ctx)
 
@@ -515,11 +523,11 @@ def bench_allgather_rmsnorm[
     )
 
     # ===== Variant 2: standalone RMSNorm on a cold full tensor -> t_norm =====
-    @always_inline
+    @inline(.always)
     def bench_norm_cold_iter(
         mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(ctx_inner: DeviceContext, cache_iter: Int) raises {imm}:
             if num_rows > 0:
                 _launch_norm_full[in_dtype, num_cols](
@@ -543,11 +551,11 @@ def bench_allgather_rmsnorm[
     )
 
     # ===== Variant 3: AG then RMSNorm on the live gathered output -> t_chained =
-    @always_inline
+    @inline(.always)
     def bench_chained_iter(
         mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_shards, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_shards, imm}:
@@ -556,13 +564,18 @@ def bench_allgather_rmsnorm[
             var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
                 ag_full[ctx_idx].unsafe_ptr()
             )
-            var out_views = Array[FullType, ngpus](
-                fill_with=lambda (src: Int) -> FullType: FullType(
+            # `allgather`'s world-view output array holds every device's own
+            # ngpus outputs; only THIS device's slice is ever read back, so
+            # the rest is left uninitialized.
+            var world_out_views = Array[FullType, ngpus * ngpus](
+                uninitialized=True
+            )
+            comptime for src in range(ngpus):
+                world_out_views[ctx_idx * ngpus + src] = FullType(
                     out_base + config.rank_unit_start(src) * num_cols,
                     row_major(Coord(Index(config.rank_units(src), num_cols))),
                 )
-            )
-            allgather(in_shards, out_views, rank_sigs, ctx_inner, ctx_idx)
+            allgather(in_shards, world_out_views, rank_sigs, ctx_inner, ctx_idx)
             if num_rows > 0:
                 _launch_norm_full[in_dtype, num_cols](
                     ag_ptrs[ctx_idx],
@@ -585,11 +598,11 @@ def bench_allgather_rmsnorm[
     )
 
     # ===== Variant 4: fused all-gather + RMSNorm kernel -> t_fused =====
-    @always_inline
+    @inline(.always)
     def bench_fused_iter(
         mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_shards, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_shards, imm}:
@@ -616,30 +629,37 @@ def bench_allgather_rmsnorm[
     )
 
     # ===== Variant 5: shape-gated dispatch =====
-    @always_inline
+    @inline(.always)
     def bench_dispatch_iter(
         mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_shards, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_shards, imm}:
             _rebuild_shards(cache_iter, in_shards)
 
-            @always_inline
+            @inline(.always)
             def two_launch() raises capturing:
                 var out_base = rebind[
                     MutPointer[Scalar[in_dtype], MutAnyOrigin]
                 ](sum_full[ctx_idx].unsafe_ptr())
-                var out_views = Array[FullType, ngpus](uninitialized=True)
+                # `allgather`'s world-view output array holds every device's
+                # own ngpus outputs; only THIS device's slice is ever read
+                # back, so the rest is left uninitialized.
+                var world_out_views = Array[FullType, ngpus * ngpus](
+                    uninitialized=True
+                )
                 comptime for src in range(ngpus):
-                    out_views[src] = FullType(
+                    world_out_views[ctx_idx * ngpus + src] = FullType(
                         out_base + config.rank_unit_start(src) * num_cols,
                         row_major(
                             Coord(Index(config.rank_units(src), num_cols))
                         ),
                     )
-                allgather(in_shards, out_views, rank_sigs, ctx_inner, ctx_idx)
+                allgather(
+                    in_shards, world_out_views, rank_sigs, ctx_inner, ctx_idx
+                )
                 if num_rows > 0:
                     _launch_norm_full[in_dtype, num_cols](
                         rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](

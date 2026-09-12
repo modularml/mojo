@@ -18,7 +18,7 @@ from std.bit import count_leading_zeros
 from std.memory import alloc, dealloc, ThinAllocation, Layout
 from std.memory.unsafe import bitcast
 from std.builtin._format_float import _write_float
-from std.builtin.simd import _modf
+from std.simd import _modf
 from std.itertools import product
 from std.random import randn, seed
 from std.testing import (
@@ -428,7 +428,7 @@ def test_issue_1625() raises:
 
 
 def test_issue_20421() raises:
-    var a_layout = Layout[UInt8](count=16 * 64, alignment=64)
+    var a_layout = Layout[UInt8, alignment=.of_bytes[64]()](count=16 * 64)
     var ptr = alloc(a_layout).unsafe_leak()
     for i in range(16 * 64):
         ptr[unsafe_offset=i] = UInt8(i & 255)
@@ -437,7 +437,9 @@ def test_issue_20421() raises:
         .unsafe_bitcast[Int32]()
         .unsafe_load[width=4, alignment=1]()
     )
-    dealloc(ThinAllocation(unsafe_owned_ptr=ptr).unsafe_with_layout(a_layout))
+    dealloc(
+        ThinAllocation[UInt8](unsafe_owned_ptr=ptr).unsafe_with_layout(a_layout)
+    )
     assert_equal(
         av16,
         SIMD[.int32, 4](-943274556, -875902520, -808530484, -741158448),
@@ -458,7 +460,7 @@ def test_issue_30237() raises:
         -2.76076847742355e-16,
     ]
 
-    @always_inline
+    @inline(.always)
     def eval1(x: SIMD[dtype, simd_width]) {imm} -> SIMD[dtype, simd_width]:
         var c_last = coefficients[coefficients_len - 1]
         var c_second_from_last = coefficients[coefficients_len - 2]
@@ -471,7 +473,7 @@ def test_issue_30237() raises:
 
         return result
 
-    @always_inline
+    @inline(.always)
     def eval2(x: SIMD[dtype, simd_width]) {imm} -> SIMD[dtype, simd_width]:
         var c_last = coefficients[coefficients_len - 1]
         var c_second_from_last = coefficients[coefficients_len - 2]

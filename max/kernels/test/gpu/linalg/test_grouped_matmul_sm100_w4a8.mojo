@@ -38,7 +38,7 @@ from std.math import ceildiv
 from std.random import random_ui64, seed
 
 from max.gpu.host import DeviceContext
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from layout import Coord, Idx, TileTensor, row_major
 from std.testing import assert_almost_equal, assert_equal
 

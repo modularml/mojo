@@ -101,39 +101,39 @@ struct WarpRole(TrivialRegisterPassable):
     comptime MainLoad = Self(4)
     comptime Epilogue = Self(3)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self._role == Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._role == other._role
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._role != other._role
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Int) -> Bool:
         return self._role >= Int32(other)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_main_load() -> Bool:
         return Self.MainLoad == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         return Self.Mma == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         return Self.Epilogue >= get_warp_id()
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -332,7 +332,7 @@ def load_AB[
         )
 
 
-@always_inline
+@inline(.always)
 def load_AB_cuda_core[
     a_type: DType,
     b_type: DType,
@@ -553,7 +553,7 @@ def load_AB_cuda_core[
         _ = tma_mbar[stage].arrive()
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -687,7 +687,7 @@ def consumer_main_loop[
         mma_op.commit(mma_mbar + stage)
 
 
-@always_inline
+@inline(.always)
 def stsm_helper[
     swizzle: Swizzle,
     vec_dtype: DType,
@@ -769,7 +769,7 @@ def stsm_helper[
         )
 
 
-@always_inline
+@inline(.always)
 def multi_stage_store_C[
     c_type: DType,
     c_tile_rank: Int,
@@ -1199,7 +1199,7 @@ def zero_output[
             ptr += c_stride
 
 
-@always_inline
+@inline(.always)
 def zero_output_epilogue[
     c_type: DType,
     /,

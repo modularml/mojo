@@ -198,7 +198,7 @@ def test_skip_a2a[
         device_router_weights_buf, router_weights_layout
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(router_weights_tt)
     def router_weights_fn[

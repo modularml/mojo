@@ -19,7 +19,7 @@ process starts. While a capture is active (and while print is disabled via
 captured command buffers are replayable.
 """
 
-from std.ffi import CStringSlice, external_call
+from std.ffi import CStringSpan, external_call
 
 from max.gpu.host.device_context import (
     DeviceContext,
@@ -46,8 +46,8 @@ def _start_metal_trace_capture(ctx: DeviceContext, path: String) raises:
             "AsyncRT_DeviceContext_startMetalTraceCapture",
             _CString[],
             _DeviceContextPtr[mut=True],
-            CStringSlice[origin_of(path_copy)],
-        ](ctx._handle, path_copy.as_c_string_slice())
+            CStringSpan[origin_of(path_copy)],
+        ](ctx._handle, path_copy.as_c_string_span())
     )
 
 

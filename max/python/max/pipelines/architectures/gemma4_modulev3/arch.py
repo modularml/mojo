@@ -44,7 +44,7 @@ gemma4_modulev3_arch = SupportedArchitecture(
         InputModality.VIDEO,
     },
     default_weights_format=WeightsFormat.safetensors,
-    multi_gpu_supported=False,
+    multi_gpu_supported=True,
     weight_adapters={
         WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
     },

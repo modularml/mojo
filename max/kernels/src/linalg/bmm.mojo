@@ -50,7 +50,7 @@ from layout.tma_async import TMATensorTile, create_tensor_tile
 from layout.tile_layout import Layout as TileLayout
 from std.logger import Logger
 from std.memory import dealloc
-from std.memory.alloc import Layout as AllocLayout
+from std.memory.alloc import Alignment, Layout as AllocLayout
 from max.runtime.asyncrt import parallelism_level
 from max.runtime.tracing import Trace, TraceLevel, get_safe_task_id, trace_arg
 from max.gpu.host.info import H100, _is_sm10x_gpu
@@ -101,7 +101,7 @@ comptime elementwise_epilogue_type = def[
 
 # Similar to _get_start_indices_of_nth_subvolume but returns only the batch
 # dimensions for matmul, skipping the last 2 dimsnions.
-@always_inline
+@inline(.always)
 def _get_batch_dims[
     rank: Int
 ](flat_index: Int, shape: IndexList[rank, ...], out res: type_of(shape)):
@@ -146,7 +146,7 @@ dimensions are static, otherwise it's a runtime dimension.
 """
 
 
-@always_inline
+@inline(.always)
 def _reshape_tile_tensor_with_batch_to_3d(
     tensor: TileTensor,
     out result: TileTensor[
@@ -215,7 +215,7 @@ def _reshape_tile_tensor_with_batch_to_3d(
     )
 
 
-@always_inline
+@inline(.always)
 def _batched_matmul_cpu[
     rank: Int,
     a_type: DType,
@@ -334,7 +334,7 @@ def _batched_matmul_cpu[
     var num_tasks_matmul = num_tasks_matmul_tmp
     var num_tasks = num_tasks_batch * num_tasks_matmul
 
-    @always_inline
+    @inline(.always)
     def task_func(
         task_id: Int,
     ) {
@@ -379,7 +379,7 @@ def _batched_matmul_cpu[
             comptime config = get_kernel_config[a_type, b_type, c_type]()
             comptime use_i8mm = use_i8mm_fn[a_type, b_type, c_type]()
             comptime simd_size = config.simd_size
-            comptime alignment = align_of[SIMD[c_type, simd_size]]()
+            comptime alignment = Alignment.of[SIMD[c_type, simd_size]]()
             var kh = align_up(k, 8)
             var mh = align_up(m, 2)
 
@@ -417,8 +417,8 @@ def _batched_matmul_cpu[
 
             comptime if use_i8mm:
                 var a_packed_alloc = alloc(
-                    AllocLayout[Scalar[a_type]](
-                        count=mh * kh, alignment=alignment
+                    AllocLayout[Scalar[a_type], alignment=alignment](
+                        count=mh * kh
                     )
                 )
                 var a_packed = TileTensor(
@@ -674,7 +674,7 @@ def batched_matmul_kernel_gpu[
         )
 
 
-@always_inline
+@inline(.always)
 def _batched_matmul_gpu[
     a_type: DType,
     b_type: DType,
@@ -860,7 +860,7 @@ def _batched_matmul_gpu[
         )
     elif has_static_NK and has_amd_gpu_accelerator() and transpose_b:
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def kernel_helper[block_m: Int, block_n: Int]() raises:
             comptime block_k = 64
@@ -933,7 +933,7 @@ def _batched_matmul_gpu[
         )
 
 
-@always_inline
+@inline(.always)
 def batched_matmul[
     *,
     transpose_a: Bool = False,
@@ -998,7 +998,7 @@ def batched_matmul[
         coord_to_index_list(c_buf.layout.shape_coord())
     )
 
-    @always_inline
+    @inline(.always)
     def description_fn() {var a_shape, var b_shape, var c_shape, imm} -> String:
         # fmt: off
         return String(
@@ -1042,7 +1042,7 @@ def batched_matmul[
             )
 
 
-@always_inline
+@inline(.always)
 def batched_matmul_shape[
     rank: Int
 ](

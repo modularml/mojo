@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.ffi import external_call, CStringSlice, c_size_t
+from std.ffi import external_call, CStringSpan, c_size_t
 from std.builtin.device_passable import DevicePassable
 from std.collections.optional import OptionalReg
 from std.reflection import get_linkage_name, call_location, SourceLocation
@@ -42,6 +42,7 @@ from .device_context import (
     _DeviceFunctionPtr,
     _DeviceContextPtr,
     _FunctionEnqueuer,
+    _is_apple_gpu,
 )
 
 
@@ -121,7 +122,7 @@ __extension DeviceBuffer:
 
 __extension DeviceFunction:
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ctx: DeviceContext,
@@ -173,22 +174,22 @@ __extension DeviceFunction:
                 _CString[],
                 Pointer[_DeviceFunctionPtr[mut=True], origin_of(result)],
                 _DeviceContextPtr[mut=True],
-                CStringSlice[ImmStaticOrigin],
-                CStringSlice[ImmStaticOrigin],
-                CStringSlice[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
                 c_size_t,
                 Int32,
-                CStringSlice[origin_of(debug_level)],
+                CStringSpan[origin_of(debug_level)],
                 Int32,
             ](
                 Pointer(to=result),
                 ctx._handle,
-                self._func_impl.module_name.as_c_string_slice(),
-                self._func_impl.function_name.as_c_string_slice(),
-                self._func_impl.asm.as_c_string_slice(),
+                self._func_impl.module_name.as_c_string_span(),
+                self._func_impl.function_name.as_c_string_span(),
+                self._func_impl.asm.as_c_string_span(),
                 c_size_t(self._func_impl.asm.byte_length()),
                 max_dynamic_shared_size_bytes,
-                debug_level.as_c_string_slice(),
+                debug_level.as_c_string_span(),
                 Int32(Int(OptimizationLevel)),
             ),
         )
@@ -196,7 +197,7 @@ __extension DeviceFunction:
 
 
 __extension DeviceExternalFunction:
-    @always_inline
+    @inline(.always)
     @__parameter
     def _call_with_pack[
         *Ts: AnyType,
@@ -260,7 +261,7 @@ __extension DeviceExternalFunction:
         # sizes are passed to the enqueuer (matching the previous direct call).
         var no_arg_sizes = OptionalPointer[UInt64, MutAnyOrigin](None)
 
-        if self._context.api() == "metal":
+        comptime if _is_apple_gpu[Self.target]():
             # Metal takes the launch payload via `args[0]`; see
             # `MetalDeviceContext::enqueueFunctionExecDirect`.
             var dense_args_sizes = Array[UInt64, num_args](fill=0)
@@ -331,7 +332,7 @@ __extension DeviceContext:
         pass
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def enqueue_function[
         declared_arg_types: TypeList[Trait=AnyType, ...],
         //,
@@ -459,7 +460,7 @@ __extension DeviceContext:
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def enqueue_function[
         *Ts: DevicePassable
     ](

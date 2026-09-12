@@ -71,7 +71,7 @@ static bool hasStableDecorator(ASTDecl &decl) {
 }
 
 /// Find the nearest ancestor PackageOp that has opted into stability markers.
-/// Walks the full ancestor chain so that e.g. code in `std::builtin::simd`
+/// Walks the full ancestor chain so that e.g. code in `std::builtin::int`
 /// finds the `std` package.  Returns nullptr if no opted-in package is found.
 static PackageOp findOptedInPackage(ASTDecl &decl) {
   ASTDecl *cur = decl.getNearestDeclOfType<PackageOp>();

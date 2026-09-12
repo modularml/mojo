@@ -34,7 +34,7 @@ from max.gpu.host._nvidia_cuda import CUDA
 from layout import TileTensor, coord_to_index_list
 
 
-@always_inline
+@inline(.always)
 def global_cache_insert(key: String, value: OpaquePointer):
     """Inserts a key-value pair into the global compiler runtime cache.
 

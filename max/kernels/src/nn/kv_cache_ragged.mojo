@@ -13,7 +13,7 @@
 """Implements KV-cache kernels for ragged (variable-length) sequences used in continuous batching."""
 
 from std.sys.info import (
-    _current_target,
+    CompilationTarget,
     has_amd_gpu_accelerator,
     simd_width_of,
 )
@@ -99,7 +99,7 @@ from std.utils.index import IndexList
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged[
     dtype: DType,
     weight_dtype: DType,
@@ -144,7 +144,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -185,7 +185,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged[
         )
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged_bias[
     dtype: DType,
     weight_dtype: DType,
@@ -232,7 +232,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_bias[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -274,7 +274,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_bias[
         )
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale[
     dtype: DType,
     weight_dtype: DType,
@@ -343,7 +343,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale[
         bias: Optional bias vector concatenated as [q, k, v].
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -400,7 +400,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale[
         )
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
     dtype: DType,
     weight_dtype: DType,
@@ -474,7 +474,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -526,7 +526,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged[
     dtype: DType,
     weight_dtype: DType,
@@ -589,7 +589,7 @@ def _fused_qkv_matmul_kv_cache_ragged[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_bias[
     dtype: DType,
     weight_dtype: DType,
@@ -651,7 +651,7 @@ def _fused_qkv_matmul_kv_cache_ragged_bias[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_scale[
     dtype: DType,
     weight_dtype: DType,
@@ -737,7 +737,7 @@ def _fused_qkv_matmul_kv_cache_ragged_scale[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_scale_float4[
     dtype: DType,
     weight_dtype: DType,
@@ -823,7 +823,7 @@ def _fused_qkv_matmul_kv_cache_ragged_scale_float4[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_impl[
     dtype: DType,
     weight_dtype: DType,
@@ -878,7 +878,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl[
 
     @__parameter
     @__copy_capture(q_dim, qk_offset, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_dtype, width]):
@@ -951,7 +951,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_impl_bias[
     dtype: DType,
     weight_dtype: DType,
@@ -1008,7 +1008,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_bias[
 
     @__parameter
     @__copy_capture(q_dim, qk_offset, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_dtype, width]):
@@ -1076,7 +1076,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_bias[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_impl_scale[
     dtype: DType,
     weight_dtype: DType,
@@ -1162,7 +1162,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_scale[
     @__copy_capture(
         input_scale, weight_scale, q_dim, qk_offset, batch_size, bias
     )
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1258,7 +1258,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_scale[
         ](hidden_state, weight.bitcast[dtype](), context)
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_ragged_impl_scale_float4[
     dtype: DType,
     weight_dtype: DType,
@@ -1325,7 +1325,7 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_scale_float4[
 
     @__parameter
     @__copy_capture(input_scale, weight_scale, q_dim, qk_offset, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1530,7 +1530,7 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -1587,7 +1587,7 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_index_matmul_kv_cache_ragged_scale_float4[
     dtype: DType,
     weight_dtype: DType,
@@ -1667,7 +1667,7 @@ def _fused_qkv_index_matmul_kv_cache_ragged_scale_float4[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_index_matmul_kv_cache_ragged_impl_scale_float4[
     dtype: DType,
     weight_dtype: DType,
@@ -1768,7 +1768,7 @@ def _fused_qkv_index_matmul_kv_cache_ragged_impl_scale_float4[
         v_end,
         iq_end,
     )
-    @always_inline
+    @inline(.always)
     def write_to_caches[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1924,7 +1924,7 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -1966,7 +1966,7 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_index_matmul_kv_cache_ragged[
     dtype: DType,
     weight_dtype: DType,
@@ -2024,7 +2024,7 @@ def _fused_qkv_index_matmul_kv_cache_ragged[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_index_matmul_kv_cache_ragged_impl[
     dtype: DType,
     weight_dtype: DType,
@@ -2120,7 +2120,7 @@ def _fused_qkv_index_matmul_kv_cache_ragged_impl[
         iq_end,
         q_dim,
     )
-    @always_inline
+    @inline(.always)
     def write_to_caches[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_dtype, width]):
@@ -2199,7 +2199,7 @@ def _fused_qkv_index_matmul_kv_cache_ragged_impl[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_common[
     dtype: DType,
     //,
@@ -2256,7 +2256,7 @@ def _matmul_common[
         )
 
 
-@always_inline
+@inline(.always)
 def _qmatmul_common[
     dtype: DType,
     //,
@@ -2294,7 +2294,7 @@ def _qmatmul_common[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_blockwise_scaled_fp8_common[
     output_dtype: DType,
     a_type: DType,
@@ -2327,7 +2327,7 @@ def _matmul_blockwise_scaled_fp8_common[
     # Helper to convert 2D LayoutTensor to TileTensor. Needed because
     # this function still accepts LayoutTensor parameters. Will be
     # removed when kv_cache_ragged.mojo is fully migrated to TileTensor.
-    @always_inline
+    @inline(.always)
     def _lt_to_tt[
         dtype: DType,
     ](lt: LayoutTensor[dtype, _, ...]) -> TileTensor[
@@ -2373,7 +2373,7 @@ def _matmul_blockwise_scaled_fp8_common[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_blockwise_scaled_fp4_common[
     output_dtype: DType,
     a_type: DType,
@@ -2471,6 +2471,7 @@ def _matmul_blockwise_scaled_fp4_common[
                 fp6_format=CDNA4F8F6F4MatrixFormat(mx_format),
                 preshuffled_b=preshuffled_b,
                 elementwise_lambda_fn=elementwise_lambda_fn,
+                allow_lds_pingpong=False,
             ](
                 c_tt,
                 lt_to_tt(hidden_state).bitcast[.uint8](),
@@ -2557,7 +2558,7 @@ def kv_matmul_ragged_paged[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -2588,7 +2589,7 @@ def kv_matmul_ragged_paged[
         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_kv_cache_ragged[
     dtype: DType, //, *, target: StaticString
 ](
@@ -2640,7 +2641,7 @@ def _matmul_kv_cache_ragged[
 # exclusivity check is a stopgap workaround; the proper fix is to give the k/v
 # views provably-disjoint origins instead of sharing the collection's.
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def _matmul_kv_cache_ragged_impl[
     dtype: DType,
     cache_t: KVCacheT,
@@ -2684,7 +2685,7 @@ def _matmul_kv_cache_ragged_impl[
 
     @__parameter
     @__copy_capture(input_row_offsets, k_offset, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache_common[
         dtype: DType, cache_t: KVCacheT, width: SIMDLength
     ](
@@ -2737,7 +2738,7 @@ def _matmul_kv_cache_ragged_impl[
 
     @__parameter
     @__copy_capture(k_cache_reg, v_cache_reg)
-    @always_inline
+    @inline(.always)
     def write_to_cache_continuous[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -2798,7 +2799,7 @@ def k_matmul_ragged_paged[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -2827,7 +2828,7 @@ def k_matmul_ragged_paged[
         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_k_cache_ragged[
     dtype: DType,
     //,
@@ -2872,7 +2873,7 @@ def _matmul_k_cache_ragged[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_k_cache_ragged_impl[
     dtype: DType,
     cache_t: KVCacheT,
@@ -2909,7 +2910,7 @@ def _matmul_k_cache_ragged_impl[
 
     @__parameter
     @__copy_capture(batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width],):
@@ -2998,7 +2999,7 @@ def k_matmul_ragged_paged_scale[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3046,7 +3047,7 @@ def k_matmul_ragged_paged_scale[
         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_k_cache_ragged_scale_impl[
     dtype: DType,
     weight_dtype: DType,
@@ -3096,7 +3097,7 @@ def _matmul_k_cache_ragged_scale_impl[
 
     @__parameter
     @__copy_capture(input_scale, weight_scale, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype, width],):
@@ -3208,7 +3209,7 @@ def unfused_qkv_matmul_ragged_paged_gguf_quantized[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3256,7 +3257,7 @@ def unfused_qkv_matmul_ragged_paged_gguf_quantized[
         )
 
 
-@always_inline
+@inline(.always)
 def _unfused_qkv_matmul_ragged_paged_gguf_quantized_impl[
     quantization_encoding_q: StaticString,
     quantization_encoding_k: StaticString,
@@ -3285,6 +3286,7 @@ def _unfused_qkv_matmul_ragged_paged_gguf_quantized_impl[
         kv_collection.kv_params,
         kv_collection.page_size,
         kv_collection.blocks_origin,
+        kv_collection.blocks_tt_type.Engine,
         kv_collection.cache_lengths_origin,
         kv_collection.lookup_table_origin,
         kv_collection.scales_origin,
@@ -3317,7 +3319,7 @@ def _unfused_qkv_matmul_ragged_paged_gguf_quantized_impl[
 # exclusivity check is a stopgap workaround; the proper fix is to give the k/v
 # views provably-disjoint origins instead of sharing the collection's.
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def _matmul_kv_cache_ragged_gguf_quantized_impl[
     cache_t: KVCacheT,
     quantization_encoding_q: StaticString,
@@ -3371,7 +3373,7 @@ def _matmul_kv_cache_ragged_gguf_quantized_impl[
     )
 
 
-@always_inline
+@inline(.always)
 def _qmatmul_k_or_v_cache_ragged_gguf_quantized_impl[
     cache_t: KVCacheT,
     quantization_encoding: StaticString,
@@ -3391,7 +3393,7 @@ def _qmatmul_k_or_v_cache_ragged_gguf_quantized_impl[
 
     @__parameter
     @__copy_capture(input_row_offsets, batch_size)
-    @always_inline
+    @inline(.always)
     def write_to_cache_common[
         dtype: DType, cache_t: KVCacheT, width: SIMDLength
     ](k_or_v_cache: cache_t, idx: IndexList[2], val: SIMD[dtype, width],):
@@ -3439,7 +3441,7 @@ def _qmatmul_k_or_v_cache_ragged_gguf_quantized_impl[
     ](hidden_state, k_or_v_weight)
 
 
-@always_inline
+@inline(.always)
 def _qmatmul_gguf_quantized_alloc_output[
     quantization_encoding: StaticString,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -3478,7 +3480,7 @@ def _qmatmul_gguf_quantized_alloc_output[
     )
 
 
-@always_inline
+@inline(.always)
 def _qmatmul_gguf_quantized_common[
     quantization_encoding: StaticString,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -3518,7 +3520,7 @@ def _qmatmul_gguf_quantized_common[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qk_rope_bshd_paged_ragged[
     dtype: DType,
     freq_dtype: DType,
@@ -3586,7 +3588,7 @@ def generic_fused_qk_rope_bshd_paged_ragged[
         context: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3662,7 +3664,7 @@ def generic_fused_qk_rope_bshd_paged_ragged[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_flash_attention_kv_cache_ragged[
     collection_t: KVCollectionT,
     dtype: DType,
@@ -3714,7 +3716,7 @@ def generic_flash_attention_kv_cache_ragged[
             decode kernels for the GPU target.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         var desc_parts = List[String]()
         desc_parts.append(trace_arg("q", q.runtime_layout.shape.value))
@@ -3758,7 +3760,7 @@ def generic_flash_attention_kv_cache_ragged[
         )
 
 
-@always_inline
+@inline(.always)
 def _launch_flash_attention_with_mask[
     dtype: DType,
     cache_t: KVCacheT,
@@ -3876,7 +3878,7 @@ def _flash_attention_dispatch[
     ](_dispatch_flash_attention)
 
 
-@always_inline
+@inline(.always)
 def generic_flash_attention_kv_cache_ragged_rel_logits[
     collection_t: KVCollectionT,
     dtype: DType,
@@ -3911,7 +3913,7 @@ def generic_flash_attention_kv_cache_ragged_rel_logits[
     scalar accessor, not the raw tensor).
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         var desc_parts = List[String]()
         desc_parts.append(trace_arg("q", q.runtime_layout.shape.value))
@@ -3972,7 +3974,7 @@ def generic_flash_attention_kv_cache_ragged_rel_logits[
         )
 
 
-@always_inline
+@inline(.always)
 def generic_flash_attention_kv_cache_ragged_sink[
     collection_t: KVCollectionT,
     dtype: DType,
@@ -4027,7 +4029,7 @@ def generic_flash_attention_kv_cache_ragged_sink[
             decode kernels for the GPU target.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         var desc_parts = List[String]()
         desc_parts.append(trace_arg("q", q.runtime_layout.shape.value))
@@ -4077,7 +4079,7 @@ def generic_flash_attention_kv_cache_ragged_sink[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_flare_mla_decode_kv_cache_ragged[
     collection_t: KVCollectionT,
     q_dtype: DType,
@@ -4168,7 +4170,7 @@ def generic_flare_mla_decode_kv_cache_ragged[
             masking; `None` keeps the prior slot-count behavior.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -4228,7 +4230,7 @@ def generic_flare_mla_decode_kv_cache_ragged[
         )
 
 
-@always_inline
+@inline(.always)
 def _flare_mla_decode_kv_cache_ragged[
     q_dtype: DType,
     collection_t: KVCollectionT,
@@ -4318,7 +4320,7 @@ def _flare_mla_decode_kv_cache_ragged[
         num_partitions_in.value() if has_num_partitions else 0
     )
 
-    @always_inline
+    @inline(.always)
     def _dispatch_mla[
         mask_t: MHAMask
     ](mask: mask_t) raises {
@@ -4376,7 +4378,7 @@ def _flare_mla_decode_kv_cache_ragged[
     ](_dispatch_mla)
 
 
-@always_inline
+@inline(.always)
 def generic_flare_mla_prefill_kv_cache_ragged[
     collection_t: KVCollectionT,
     input_dtype: DType,
@@ -4438,7 +4440,7 @@ def generic_flare_mla_prefill_kv_cache_ragged[
         context: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -4510,7 +4512,7 @@ def generic_flare_mla_prefill_kv_cache_ragged[
         )
 
 
-@always_inline
+@inline(.always)
 def _flare_mla_prefill_kv_cache_ragged[
     input_dtype: DType,
     dtype: DType,
@@ -4595,7 +4597,7 @@ def _flare_mla_prefill_kv_cache_ragged[
     ](_mla_dispatch)
 
 
-@always_inline
+@inline(.always)
 def generic_flare_mla_prefill_ragged_paged_plan[
     target: StaticString
 ](
@@ -4658,7 +4660,7 @@ def generic_flare_mla_prefill_ragged_paged_plan[
         )
 
 
-@always_inline
+@inline(.always)
 def kv_cache_row_offsets_ragged_paged[
     target: StaticString,
 ](
@@ -4761,7 +4763,7 @@ def kv_cache_row_offsets_ragged_paged_kernel[
     cache_row_offsets[output_idx] = UInt32(running_length)
 
 
-@always_inline
+@inline(.always)
 def generic_flare_mla_decompress_k_cache_ragged_paged[
     target: StaticString, dtype: DType
 ](
@@ -4950,7 +4952,7 @@ def _cross_attention_dispatch[
     ](_dispatch_flash_attention)
 
 
-@always_inline
+@inline(.always)
 def generic_cross_attention_kv_cache[
     collection_t: KVCollectionT,
     dtype: DType,
@@ -5013,7 +5015,7 @@ def generic_cross_attention_kv_cache[
             leading cache slots.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -5191,7 +5193,7 @@ def generic_kv_cache_radd_dispatch[
             Coord(a.runtime_layout.shape.value), ctx
         )
     else:
-        comptime compile_target = _current_target()
+        comptime compile_target = CompilationTarget.current()
         comptime simd_width = simd_width_of[dtype, target=compile_target]()
 
         elementwise[do_radd, simd_width, target=target](
@@ -5273,10 +5275,13 @@ def kv_cache_store_ragged[
             loaded_val,
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime simd_width = simd_width_of[cache_t.dtype, target=compile_target]()
+    comptime simd_width = (
+        simd_width_of[
+            cache_t.dtype, target=CompilationTarget.current()
+        ]() if is_cpu[target]() else simd_width_of[
+            cache_t.dtype, target=get_gpu_target()
+        ]()
+    )
 
     elementwise[
         write_to_cache,
@@ -5333,7 +5338,7 @@ def kv_cache_store_padded[
     # overload until cache captures in unified closures are supported.
     @__parameter
     @__copy_capture(cache, valid_lengths)
-    @always_inline
+    @inline(.always)
     def write_to_cache[width: Int, alignment: Int = 1](idx: Coord) capturing:
         var batch_idx = Int(idx[0].value())
         var token_idx = Int(idx[1].value())
@@ -5359,10 +5364,13 @@ def kv_cache_store_padded[
             loaded_val,
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime simd_width = simd_width_of[cache_t.dtype, target=compile_target]()
+    comptime simd_width = (
+        simd_width_of[
+            cache_t.dtype, target=CompilationTarget.current()
+        ]() if is_cpu[target]() else simd_width_of[
+            cache_t.dtype, target=get_gpu_target()
+        ]()
+    )
 
     elementwise[
         write_to_cache,
@@ -5510,7 +5518,7 @@ def kv_cache_2m_iadd_dispatch[
                 Coord(elementwise_shape), ctx
             )
     else:
-        comptime compile_target = _current_target()
+        comptime compile_target = CompilationTarget.current()
         comptime simd_width = simd_width_of[dtype, target=compile_target]()
 
         elementwise[iadd, simd_width, target=target](

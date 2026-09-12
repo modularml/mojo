@@ -58,7 +58,7 @@ struct UMMAKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
     comptime KIND_MXF4NVF4 = Self(7)
     """MXF4NVF4 type."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Convert UMMA kind to an integer value.
 
@@ -67,7 +67,7 @@ struct UMMAKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return Int(self._value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Check if two UMMA kinds are equal.
 
@@ -79,7 +79,7 @@ struct UMMAKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Check if two UMMA kinds are not equal.
 
@@ -91,7 +91,7 @@ struct UMMAKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Write the UMMA kind to a writer.
 
@@ -116,7 +116,7 @@ struct UMMAKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
             writer.write("kind::unknown")
 
 
-@always_inline
+@inline(.always)
 def _constrained_mma_m[
     mma_m: Int,
     mma_m_valid: Tuple[Int, Int],
@@ -147,7 +147,7 @@ def _constrained_mma_m[
     )
 
 
-@always_inline
+@inline(.always)
 def _constrained_mma_n[
     mma_n: Int,
     mma_n_range: Tuple[Int, Int],
@@ -188,7 +188,7 @@ def _constrained_mma_n[
     )
 
 
-@always_inline
+@inline(.always)
 def _get_f16_mma_shape[
     output_shape: IndexList[2, element_type=.uint32],
     /,
@@ -264,7 +264,7 @@ def _get_f16_mma_shape[
             comptime assert False, String("Invalid MMA shape: ", mma_m, mma_n)
 
 
-@always_inline
+@inline(.always)
 def _get_tf32_mma_shape[
     output_shape: IndexList[2, element_type=.uint32],
     /,
@@ -341,7 +341,7 @@ def _get_tf32_mma_shape[
             comptime assert False, String("Invalid MMA shape: ", mma_m, mma_n)
 
 
-@always_inline
+@inline(.always)
 def _get_f8f6f4_mma_shape[
     output_shape: IndexList[2, element_type=.uint32],
     /,
@@ -420,7 +420,7 @@ def _get_f8f6f4_mma_shape[
             comptime assert False, String("Invalid MMA shape: ", mma_m, mma_n)
 
 
-@always_inline
+@inline(.always)
 def _get_mxf8f6f4_mma_shape[
     output_shape: IndexList[2, element_type=.uint32],
     /,
@@ -489,7 +489,7 @@ def _get_mxf8f6f4_mma_shape[
             comptime assert False, String("Invalid MMA shape: ", mma_m, mma_n)
 
 
-@always_inline
+@inline(.always)
 def _mxf8f6f4_operand_format[dtype: DType]() -> UInt32:
     """Encode one operand's format for the `kind::mxf8f6f4` descriptor.
 
@@ -997,7 +997,7 @@ struct MMASmemDescriptor(MMAOperandDescriptor, TrivialRegisterPassable):
     comptime mask_14_bits: Int = (1 << 14) - 1
     """Mask with the lower 14 bits set."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, val: UInt64):
         """Initialize descriptor with raw 64-bit value.
 
@@ -1011,7 +1011,7 @@ struct MMASmemDescriptor(MMAOperandDescriptor, TrivialRegisterPassable):
         """
         self.desc = val
 
-    @always_inline
+    @inline(.always)
     def _insert_bit[start_bit: Int](self, val: UInt64) -> Self:
         """Insert bits at specified position in descriptor.
 
@@ -1027,7 +1027,7 @@ struct MMASmemDescriptor(MMAOperandDescriptor, TrivialRegisterPassable):
         return Self(self.desc | (val << UInt64(start_bit)))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create[
         stride_byte_offset: Int,
         leading_byte_offset: Int,
@@ -1094,7 +1094,7 @@ struct MMASmemDescriptor(MMAOperandDescriptor, TrivialRegisterPassable):
 
         return desc
 
-    @always_inline
+    @inline(.always)
     def __iadd__(mut self, offset: Int):
         """Add offset to descriptor's base address in-place.
 
@@ -1103,7 +1103,7 @@ struct MMASmemDescriptor(MMAOperandDescriptor, TrivialRegisterPassable):
         """
         self = self + offset
 
-    @always_inline
+    @inline(.always)
     def __add__(self, offset: Int) -> Self:
         """Add offset to descriptor's base address.
 
@@ -1151,7 +1151,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
     comptime mask_14_bits: UInt32 = (1 << 14) - 1
     """Mask with the lower 14 bits set."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, hi: UInt32, lo: UInt32):
         """Initialize descriptor with raw 64-bit value.
 
@@ -1167,7 +1167,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
         self.hi = hi
         self.lo = lo
 
-    @always_inline
+    @inline(.always)
     def _insert_bit[start_bit: Int](self, val: UInt32) -> Self:
         """Insert bits at specified position in descriptor.
 
@@ -1187,7 +1187,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
             return Self(self.hi | (val << UInt32(start_bit - 32)), self.lo)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create[
         stride_byte_offset: Int,
         leading_byte_offset: Int,
@@ -1254,7 +1254,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
 
         return desc
 
-    @always_inline
+    @inline(.always)
     def __iadd__(mut self, offset: UInt32):
         """Add offset to descriptor's base address in-place.
 
@@ -1263,7 +1263,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
         """
         self = self + offset
 
-    @always_inline
+    @inline(.always)
     def __add__(self, offset: UInt32) -> Self:
         """Add offset to descriptor's base address.
 
@@ -1275,7 +1275,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
         """
         return Self(self.hi, self.lo + ((offset >> 4) & Self.mask_14_bits))
 
-    @always_inline
+    @inline(.always)
     def descriptor(self) -> MMASmemDescriptor:
         """Get the descriptor for the shared memory operand.
 
@@ -1290,7 +1290,7 @@ struct MMASmemDescriptorPair(TrivialRegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def mma[
     kind: UMMAKind,
     //,
@@ -1381,7 +1381,7 @@ def mma[
         comptime assert False, String("Unsupported cta group: ", cta_group)
 
 
-@always_inline
+@inline(.always)
 def mma[
     kind: UMMAKind,
     //,
@@ -1421,7 +1421,7 @@ def mma[
         UMMAKind.KIND_MXF4NVF4,
     ), "Only MXF8F6F4, MXF4, or MXF4NVF4 MMA kind supports block scale factors"
 
-    @always_inline
+    @inline(.always)
     def _get_scale_vector_size[kind: UMMAKind]() -> String:
         var scale_vector_size = String(".block_scale")
 
@@ -1477,7 +1477,7 @@ def mma[
         comptime assert False, String("Unsupported cta group: ", cta_group)
 
 
-@always_inline
+@inline(.always)
 def mma[
     kind: UMMAKind,
     //,
@@ -1564,7 +1564,7 @@ def mma[
         comptime assert False, String("Unsupported cta group: ", cta_group)
 
 
-@always_inline
+@inline(.always)
 def mma[
     kind: UMMAKind,
     //,
@@ -1650,7 +1650,7 @@ def mma[
         comptime assert False, String("Unsupported cta group: ", cta_group)
 
 
-@always_inline
+@inline(.always)
 def mma[
     kind: UMMAKind,
     //,
@@ -1746,7 +1746,7 @@ def mma[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def mma_arrive[
     cta_group: Int = 1,
 ](mbar_ptr: Pointer[_, _, address_space=.SHARED]):
@@ -1775,7 +1775,7 @@ def mma_arrive[
     ](Int32(Int(mbar_ptr)))
 
 
-@always_inline
+@inline(.always)
 def mma_arrive_multicast[
     cta_group: Int = 1,
 ](mbar_ptr: Pointer[_, _, address_space=.SHARED], cta_mask: UInt16,):

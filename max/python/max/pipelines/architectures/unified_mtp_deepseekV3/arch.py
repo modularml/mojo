@@ -11,37 +11,24 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-
 from max.graph.weights import WeightsFormat
-from max.pipelines.context import TextContext
-from max.pipelines.lib import SupportedArchitecture, TextTokenizer
-from max.pipelines.modeling.types import PipelineTask
+from max.pipelines.lib import Speculator
 
-from ..deepseekV3.memory_planner import DeepseekV3MemoryPlanner
-from ..deepseekV3.model_config import DeepseekV3Config
+from ..deepseekV3.arch import deepseekV3_arch
 from .batch_processor import UnifiedMTPDeepseekV3BatchProcessor
 from .model import UnifiedMTPDeepseekV3Model
 from .weight_adapters import convert_with_mtp_state_dict
 
-unified_mtp_deepseekV3_arch = SupportedArchitecture(
+# MTP, whose NextN head is baked into the target checkpoint.
+unified_mtp_deepseekV3_speculator = Speculator(
     name="UnifiedMTPDeepseekV3ForCausalLM",
-    task=PipelineTask.TEXT_GENERATION,
-    example_repo_ids=[
-        "deepseek-ai/DeepSeek-V3",
-    ],
-    default_encoding=DeepseekV3Config.DEFAULT_ENCODING,
-    supported_encodings={"bfloat16", "float8_e4m3fn", "float4_e2m1fnx2"},
-    multi_gpu_supported=True,
+    base=deepseekV3_arch,
+    draft_arch=None,
+    method="mtp",
     pipeline_model=UnifiedMTPDeepseekV3Model,
-    tokenizer=TextTokenizer,
-    context_type=TextContext,
-    default_weights_format=WeightsFormat.safetensors,
+    batching=UnifiedMTPDeepseekV3BatchProcessor,
     weight_adapters={
         WeightsFormat.safetensors: convert_with_mtp_state_dict,
     },
-    supports_empty_batches=True,
-    requires_max_batch_context_length=True,
-    config=DeepseekV3Config,
-    memory_planner=DeepseekV3MemoryPlanner,
-    batching=UnifiedMTPDeepseekV3BatchProcessor,
+    opt_out_cascade=True,
 )

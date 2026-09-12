@@ -82,7 +82,7 @@ def matmul_sram(
     # Can't use 0 as tile size so set to 1 when the remainder is 0.
     var K_remainder = K - K_roundbytile if K - K_roundbytile > 0 else 1
 
-    @always_inline
+    @inline(.always)
     def update_tile[
         full_tile: Bool
     ](offset: Int, end: Int, tile_size: Int) {

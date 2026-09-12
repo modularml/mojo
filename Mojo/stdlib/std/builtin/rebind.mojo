@@ -45,7 +45,7 @@ def rebind[
     return __mlir_op.`kgen.rebind`[_type=dest_type](src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def rebind[
     src_type: AnyType,
     //,
@@ -75,7 +75,7 @@ def rebind[
     return __get_litref_as_mvalue(rebound)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def rebind_var[
     src_type: Movable,
     //,

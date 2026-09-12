@@ -119,7 +119,7 @@ def execute_fp8_index[
 
     if run_benchmark:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut b: Bencher,
         ) raises {
@@ -132,7 +132,7 @@ def execute_fp8_index[
             var cache_row_offsets_device,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext) raises {imm}:
                 fp8_index[num_heads, depth](
                     o_device,

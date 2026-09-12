@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.sys.info import _current_target, simd_width_of
+from std.sys.info import CompilationTarget, simd_width_of
 from std.math.uutils import ufloordiv
 
 from max.algorithm.functional import elementwise
@@ -23,7 +23,7 @@ from layout import Coord, Idx, coord_to_index_list
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def get_batch_from_row_offsets(
     row_offsets: LayoutTensor[mut=False, .uint32, ...], tok_idx: Int
 ) -> Int:
@@ -48,7 +48,7 @@ def get_batch_from_row_offsets(
     return low
 
 
-@always_inline
+@inline(.always)
 def get_batch_from_row_offsets(
     row_offsets: TileTensor[mut=False, .uint32, ...], tok_idx: Int
 ) -> Int:
@@ -75,7 +75,7 @@ def get_batch_from_row_offsets(
     return low
 
 
-@always_inline
+@inline(.always)
 def get_batch_and_token_idx_from_row_offsets(
     row_offsets: TileTensor[mut=False, .uint32, ...], tok_idx: Int
 ) -> Tuple[Int, Int]:
@@ -114,7 +114,7 @@ def merge_ragged_tensors[
         b_row_offsets.flat_rank == 1
     ), "b_row_offsets.flat_rank must be 1"
 
-    @always_inline
+    @inline(.always)
     def merge_fn[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert idx.rank == rank, "Invalid rank passed to the kernel"
 
@@ -145,7 +145,7 @@ def merge_ragged_tensors[
 
         # Compute flat offsets for pointer load/store (Horner form).
         # Inner dimensions are the same across a, b, and c.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _flat_offset[r: Int](index: IndexList[r]) -> Int:
             comptime assert r == rank
@@ -182,10 +182,11 @@ def merge_ragged_tensors[
                 var total_size = Int(a.dim[0]()) + Int(b.dim[0]())
                 c_row_offsets[batch_id + 1] = UInt32(total_size)
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
     comptime kernel_simd_width = 1 if rank == 1 else target_simd_width
 
     elementwise[
@@ -212,7 +213,7 @@ def eagle_prefill_shift_tokens[
     comptime assert offsets.flat_rank == 1
     comptime assert shift_next_tokens.flat_rank == 1
 
-    @always_inline
+    @inline(.always)
     def shift_fn[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert idx.rank == 1
 

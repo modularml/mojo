@@ -133,7 +133,7 @@ def _open_file(path: String, mode: String) raises -> Int:
     # umask).
     var path_str = path
     var fd = external_call["open", c_int, num_fixed_args=2](
-        path_str.as_c_string_slice(), c_int(flags), c_int(0o666)
+        path_str.as_c_string_span(), c_int(flags), c_int(0o666)
     )
 
     if fd < 0:
@@ -550,7 +550,7 @@ struct FileHandle(Defaultable, Movable, Writer):
 
             total_written += chunk_written
 
-    @always_inline
+    @inline(.always)
     def write_bytes(mut self, bytes: Span[Byte, _]):
         """Write a span of bytes to the file.
 

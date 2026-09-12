@@ -39,7 +39,7 @@ import extensibility
 # ===-----------------------------------------------------------------------===#
 # Kernel imports
 # ===-----------------------------------------------------------------------===#
-from std.builtin.simd import _pow
+from std.simd import _pow
 
 from nn.activations import (
     gelu,
@@ -67,7 +67,7 @@ from std.utils.numerics import isinf, isnan
 from .kernels import *
 
 
-@always_inline
+@inline(.always)
 def _elementwise_tile[
     Op: ElementwiseBinaryOp,
     dtype: DType,

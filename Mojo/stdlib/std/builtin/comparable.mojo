@@ -50,7 +50,7 @@ trait Equatable:
     in the cycle.
     """
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self, /) -> Bool:
         """Define whether two instances of the object are equal to each other.
 
@@ -81,7 +81,7 @@ trait Equatable:
                 return False
         return True
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self, /) -> Bool:
         """Define whether two instances of the object are not equal to each
         other.
@@ -117,7 +117,7 @@ trait Comparable(Equatable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def __gt__(self, rhs: Self) -> Bool:
         """Define whether `self` is greater than `rhs`.
 
@@ -129,7 +129,7 @@ trait Comparable(Equatable):
         """
         return rhs < self
 
-    @always_inline
+    @inline(.always)
     def __le__(self, rhs: Self) -> Bool:
         """Define whether `self` is less than or equal to `rhs`.
 
@@ -141,7 +141,7 @@ trait Comparable(Equatable):
         """
         return not rhs < self
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, rhs: Self) -> Bool:
         """Define whether `self` is greater than or equal to `rhs`.
 

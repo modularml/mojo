@@ -58,7 +58,7 @@ def main():
 """
 
 from std.builtin.variadics import ParameterList, TypeList
-from std.sys.info import _TargetType, _current_target
+from std.sys import CompilationTarget
 
 
 # ===----------------------------------------------------------------------=== #
@@ -415,7 +415,7 @@ struct Reflected[T: AnyType]:
     # `nodebug` (not `builtin`) because the body emits a `lit.ref.struct.ger`
     # MLIR op, which is not legal inside a `@always_inline("builtin")` function.
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def field_ref[
         idx: Int
     ](ref s: Self.T) -> ref[s] _field_types_of[Self.T]()[idx]:
@@ -470,7 +470,7 @@ struct Reflected[T: AnyType]:
     def field_offset[
         *,
         name: StringLiteral,
-        target: _TargetType = _current_target(),
+        target: CompilationTarget = CompilationTarget.current(),
     ]() -> Int:
         """Returns the byte offset of the named field within struct `T`.
 
@@ -506,7 +506,7 @@ struct Reflected[T: AnyType]:
                 `, `,
                 str_value,
                 `, `,
-                target,
+                target._mlir_value,
                 `> : index`,
             ]
         )
@@ -515,7 +515,7 @@ struct Reflected[T: AnyType]:
     def field_offset[
         *,
         index: Int,
-        target: _TargetType = _current_target(),
+        target: CompilationTarget = CompilationTarget.current(),
     ]() -> Int:
         """Returns the byte offset of the field at the given index.
 
@@ -540,7 +540,7 @@ struct Reflected[T: AnyType]:
                 `, `,
                 index.__mlir_index__(),
                 `, `,
-                target,
+                target._mlir_value,
                 `> : index`,
             ]
         )

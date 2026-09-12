@@ -61,7 +61,7 @@ def is_benchmark() -> Bool:
     return False
 
 
-@always_inline
+@inline(.always)
 def args_to_tuple[swap: Bool](arg_0: Int, arg_1: Int) -> Tuple[Int, Int]:
     comptime if swap:
         return Tuple(arg_1, arg_0)
@@ -100,7 +100,7 @@ def repack_Q4_0_for_sm8x[
     comptime uint_K = K // pack_factor
     comptime uint_BK = BK // pack_factor
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def convert_bytes_to_bf16[
         scales_type: DType
@@ -331,7 +331,7 @@ def create_ref_b[
 
     var vec = bitcast[.int32, 4](warp_q_tile.vectorize[1, 4]()[0, lane_id])
 
-    @always_inline
+    @inline(.always)
     def int4tobf16(i4: Int32, scale: BFloat16) -> SIMD[.bfloat16, 2]:
         comptime MASK: Int32 = 0x000F000F
         comptime I4s_TO_BF16s_MAGIC_NUM: Int32 = 0x43004300
@@ -711,7 +711,7 @@ def test_quantized[
         comptime nrun = 200
         comptime nwarmup = 2
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {imm}:
             multistage_gemm_q[
                 group_size=group_size, pack_factor=pack_factor, config=config

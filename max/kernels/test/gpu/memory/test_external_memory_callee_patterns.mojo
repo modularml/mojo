@@ -27,11 +27,11 @@ comptime EXPECTED_SUM = BLOCK_SIZE * (BLOCK_SIZE - 1) // 2
 
 # ── Pattern 1: helper (not the kernel) owns the external_memory reference ─────
 #
-# @no_inline keeps the helper as a distinct function in the IR so the compiler
+# @inline(.never) keeps the helper as a distinct function in the IR so the compiler
 # must handle the callee-uses-extern-shared case.
 
 
-@no_inline
+@inline(.never)
 def _callee_fill_and_reduce(
     data: MutPointer[Float32, MutAnyOrigin], local_idx: Int, blk_idx: Int
 ):
@@ -92,7 +92,7 @@ def test_external_memory_in_callee(ctx: DeviceContext) raises:
 # external_memory.  _deep_bar is a pure pass-through.
 
 
-@no_inline
+@inline(.never)
 def _deep_baz(
     data: MutPointer[Float32, MutAnyOrigin], local_idx: Int, blk_idx: Int
 ):
@@ -112,7 +112,7 @@ def _deep_baz(
         data[blk_idx] = s
 
 
-@no_inline
+@inline(.never)
 def _deep_bar(
     data: MutPointer[Float32, MutAnyOrigin], local_idx: Int, blk_idx: Int
 ):

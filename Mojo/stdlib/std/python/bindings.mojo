@@ -26,7 +26,10 @@ from std.sys.info import size_of
 from std.collections import StringDict
 
 from std.builtin._startup import _ensure_runtime_init
-from std.builtin.variadics import _call_with_dynamic_pack_pointers
+from std.builtin.variadics import (
+    _call_with_dynamic_pack_pointers,
+    _create_dynamic_pack,
+)
 from std.reflection import reflect
 from std.memory import OpaquePointer, unsafe_stack_allocation
 from std.python import Python, PythonObject
@@ -676,7 +679,7 @@ struct PythonTypeBuilder(Copyable):
 
         var type_spec = PyType_Spec(
             # FIXME(MOCO-1306): This should be `T.__name__`.
-            self.type_name.as_c_string_slice(),
+            self.type_name.as_c_string_span(),
             c_int(self.basicsize),
             0,
             Py_TPFLAGS_DEFAULT,
@@ -735,7 +738,7 @@ struct PythonTypeBuilder(Copyable):
             If the slot insertion fails.
         """
 
-        @always_inline
+        @inline(.always)
         def default_init_func(
             out self: T, args: PythonObject, kwargs: PythonObject
         ) raises:
@@ -1199,7 +1202,7 @@ def _set_python_error(
     var error_type = cpython.get_error_global(exc_type.global_name)
     cpython.PyErr_SetString(
         error_type,
-        error_message.as_c_string_slice().ptr().as_unsafe_any_origin(),
+        error_message.as_c_string_span().ptr().as_unsafe_any_origin(),
     )
 
 
@@ -1255,7 +1258,7 @@ def _py_init_function_nonregistered(
     cpython.PyErr_SetString(
         error_type,
         "No initializer registered for this type. Use def_py_init() or"
-        " def_init_defaultable() to register an initializer.".as_c_string_slice()
+        " def_init_defaultable() to register an initializer.".as_c_string_span()
         .ptr()
         .as_unsafe_any_origin(),
     )
@@ -1297,7 +1300,7 @@ def _py_init_function_wrapper[
         return -1
 
 
-@always_inline
+@inline(.always)
 def _raising_py_init_wrapper[
     T: Movable & Deinitable,
     init_func: def(args: PythonObject, kwargs: PythonObject) thin -> T,
@@ -1305,7 +1308,7 @@ def _raising_py_init_wrapper[
     t = init_func(args, kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_c_function_wrapper[
     user_func: GenericPyFunction
 ](py_self_ptr: PyObjectPtr, args_ptr: PyObjectPtr, kwargs_ptr: PyObjectPtr) abi(
@@ -1407,7 +1410,7 @@ def _convert_kwargs(
     return result^
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_function_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1423,7 +1426,7 @@ def _py_kwargs_function_wrapper[
     (METH_FASTCALL) instead.
     """
 
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1435,7 +1438,7 @@ def _py_kwargs_function_wrapper[
     return GenericPyFunction(wrapper_with_kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_method_wrapper[
     SelfType: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1446,7 +1449,7 @@ def _py_kwargs_method_wrapper[
         var ** kwargs: PythonObject,
     ) raises thin -> RetType,
 ]() -> GenericPyFunction:
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1460,7 +1463,7 @@ def _py_kwargs_method_wrapper[
     return GenericPyFunction(wrapper_with_kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_method_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1469,7 +1472,7 @@ def _py_kwargs_method_wrapper[
         self_: PythonObject, * args: * PyArgs, var ** kwargs: PythonObject
     ) raises thin -> RetType,
 ]() -> GenericPyFunction:
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1487,7 +1490,7 @@ def _py_kwargs_method_wrapper[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _py_function_fastcall_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1535,7 +1538,7 @@ def _py_function_fastcall_wrapper[
         return raise_python_exception(e)
 
 
-@always_inline
+@inline(.always)
 def _py_method_typed_fastcall_wrapper[
     SelfType: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1559,7 +1562,7 @@ def _py_method_typed_fastcall_wrapper[
         return raise_python_exception(e)
 
 
-@always_inline
+@inline(.always)
 def _py_method_fastcall_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1600,7 +1603,7 @@ def _py_method_fastcall_wrapper[
 # are each handled by a dedicated dispatcher below.
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_function[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1627,7 +1630,7 @@ def _dispatch_python_object_function[
     return _return_python_object(result^)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_method[
     SelfArg: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1641,28 +1644,14 @@ def _dispatch_python_object_method[
 ) raises -> PythonObject:
     check_arguments_arity(PyArgs.length, nargs)
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
-        var p: Pointer[PyObjectPtr, _] = Pointer(to=args[unsafe_offset=i])
-        pointers[i] = rebind[type_of(pointers[i])](
-            p.unsafe_bitcast[PythonObject]().as_unsafe_any_origin()
-        )
+    def make_elem_ptr[
+        idx: Int
+    ]() {args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
+        var p1: Pointer[PyObjectPtr, _] = Pointer(to=args[unsafe_offset=idx])
+        var p2 = p1.unsafe_bitcast[PythonObject]().as_unsafe_any_origin()
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](p2)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var result = method(self_arg, *borrowed)
 
     return _return_python_object(result^)
@@ -1670,7 +1659,7 @@ def _dispatch_python_object_method[
 
 # TODO: Combine this overload if/when it's possible to make
 #       `_call_with_dynamic_pack_pointers` generic over presence of kwargs.
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_kwargs_function[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1685,28 +1674,17 @@ def _dispatch_python_object_kwargs_function[
     comptime for i in range(PyArgs.length):
         positional_args.unsafe_ptr().unsafe_offset(i).unsafe_write(py_args[i])
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
+    def make_elem_ptr[
+        idx: Int
+    ]() {positional_args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
         var element = (
-            positional_args.unsafe_ptr().unsafe_offset(i).as_unsafe_any_origin()
+            positional_args.unsafe_ptr()
+            .unsafe_offset(idx)
+            .as_unsafe_any_origin()
         )
-        pointers[i] = rebind[type_of(pointers[i])](element)
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](element)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var kwargs = _convert_kwargs(py_kwargs)
     var result = func(*borrowed, **kwargs^)
 
@@ -1716,7 +1694,7 @@ def _dispatch_python_object_kwargs_function[
 # TODO: Combine this overload if/when it's possible to make
 #       `_call_with_dynamic_pack_pointers` generic over presence of `SelfArg`
 #       and kwargs.
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_kwargs_method[
     SelfArg: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1737,28 +1715,17 @@ def _dispatch_python_object_kwargs_method[
     comptime for i in range(PyArgs.length):
         positional_args.unsafe_ptr().unsafe_offset(i).unsafe_write(py_args[i])
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
+    def make_elem_ptr[
+        idx: Int
+    ]() {positional_args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
         var element = (
-            positional_args.unsafe_ptr().unsafe_offset(i).as_unsafe_any_origin()
+            positional_args.unsafe_ptr()
+            .unsafe_offset(idx)
+            .as_unsafe_any_origin()
         )
-        pointers[i] = rebind[type_of(pointers[i])](element)
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](element)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var kwargs = _convert_kwargs(py_kwargs)
     var result = method(self_arg, *borrowed, **kwargs^)
 
@@ -1968,11 +1935,11 @@ def _try_convert_arg[
 
 
 # NOTE:
-#   @always_inline is needed so that the unsafe_stack_allocation() that
+#   @inline(.always) is needed so that the unsafe_stack_allocation() that
 #   appears in the definition below is valid in the _callers_ stack frame,
 #   effectively allowing us to "return" a pointer to stack-allocated data
 #   from this function.
-@always_inline
+@inline(.always)
 def check_and_get_or_convert_arg[
     T: ConvertibleFromPython
 ](func_name: StaticString, py_args: PythonObject, index: Int) raises -> Pointer[
@@ -2015,7 +1982,7 @@ def check_and_get_or_convert_arg[
             )
         )
         # Return a pointer to stack data. Only valid because this function is
-        # @always_inline.
+        # @inline(.always).
         return converted_arg_ptr
 
 

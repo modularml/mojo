@@ -226,7 +226,7 @@ def reversed[
     )
 
 
-@always_inline
+@inline(.always)
 def reversed[
     T: Copyable
 ](value: Span[T, _]) -> _SpanIter[T, value.origin, forward=False]:

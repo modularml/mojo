@@ -63,7 +63,7 @@ trait Copyable(Movable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     @stable(since="1.0")
     def copy(self) -> Self:
         """Explicitly construct a copy of self, a convenience method for

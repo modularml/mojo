@@ -158,7 +158,7 @@ def _pack_fp6(
                 packed[unsafe_offset=byte + 1] |= UInt8(code >> (8 - shift))
 
 
-@always_inline
+@inline(.always)
 def _e8m0(bits: UInt8) -> Float64:
     """Decodes an E8M0 scale byte to `2^(bits - 127)` in float64."""
     var exponent = Int(bits) - 127
@@ -732,6 +732,12 @@ def test_production_shapes(ctx: DeviceContext) raises -> Int:
         bad += _report[fmt, 2048, 7168](ctx, m, DATA_RANDOM, SCALE_VARY)
     for m in [1, 17, 73, 129]:
         bad += _report[fmt, 4096, 7168](ctx, m, DATA_RANDOM, SCALE_VARY)
+    # M3's two decode-dominant dense shapes, at M values either side of the
+    # narrow-M band boundary: M <= 16 takes the BM=16 split-K tile, M > 16 the
+    # BM=48 one, so both branches of that dispatch are executed here.
+    for m in [1, 8, 16, 17, 64]:
+        bad += _report[fmt, 2560, 6144](ctx, m, DATA_RANDOM, SCALE_VARY)
+        bad += _report[fmt, 6144, 2048](ctx, m, DATA_RANDOM, SCALE_VARY)
     # Widest N and deepest K: maximum DRAM and scale volume against a single
     # real row, with the rest of the block OOB.
     bad += _report[fmt, 18432, 7168](ctx, 1, DATA_RANDOM, SCALE_VARY)

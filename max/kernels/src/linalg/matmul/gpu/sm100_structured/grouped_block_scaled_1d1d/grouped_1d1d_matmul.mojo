@@ -163,6 +163,18 @@ def grouped_matmul_block_scaled[
         trace_buf: Per-CTA timestamp buffer when `swiglu_enable_trace=True`.
             `NullTrace()` otherwise.
     """
+    # Early-exit for empty inputs to avoid creating invalid TMA descriptors: a
+    # tensor map rejects `globalDim == 0` (while accepting
+    # `globalDim < boxDim`), so a zero-row token operand fails the launch with
+    # CUDA_ERROR_INVALID_VALUE instead of computing nothing. Mirrors the SM90
+    # grouped matmul's guard. The graph wrappers test only
+    # `num_active_experts == 0`, which misses the reachable case: a rank whose
+    # expert slots are all published but hold no tokens. C's extent is
+    # deliberately not tested -- a zero-element C is legitimate wherever the
+    # local output store has been elided.
+    if num_active_experts == 0 or Int(a_device.layout.shape[0]().value()) == 0:
+        return
+
     comptime assert transpose_b, "Only support transposed B"
 
     comptime assert (

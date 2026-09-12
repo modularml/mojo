@@ -354,7 +354,7 @@ site:
 ```mojo
 from std.reflection import call_location
 
-@always_inline
+@inline(.always)
 def require(
     cond: Bool, msg: String = "requirement failed"
 ) raises:
@@ -367,8 +367,8 @@ def main() raises:
     # Error: At /path/to/file.mojo:10:5: x must be > 10
 ```
 
-Mark the enclosing function `@always_inline` (or
-`@always_inline("nodebug")`). The decorator is what guarantees the location
+Mark the enclosing function `@inline(.always)` (or
+`@inline(.nodebug)`). The decorator is what guarantees the location
 the function reports; without it, the result depends on whether the compiler
 inlined the call anyway. `call_location()` also accepts an optional
 `inline_count` parameter. The default (1) reports the immediate caller's

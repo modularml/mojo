@@ -266,6 +266,26 @@ struct NeverCopyableOuter(Copyable where False):
     var m: NeverCopyableInner
 
 
+# The `not` spelling of the same two shapes. Field conformance is checked
+# through a different route than synthesis gating (`ASTType::isMovable` rather
+# than `getConformanceCondition`), so the composed cases are worth pinning for
+# both spellings.
+struct NotDeletableInner(not Deinitable, not Movable):
+    pass
+
+
+struct NotDeletableOuter(not Deinitable, not Movable):
+    var m: NotDeletableInner
+
+
+struct NotMovableInner(not Movable):
+    pass
+
+
+struct NotMovableOuter(not Movable):
+    var m: NotMovableInner
+
+
 # Field-movability is irrelevant once the outer struct opts out: because a
 # `Movable where False` struct synthesizes no move constructor, its fields are
 # never checked for movability. Both a movable field and a wholly non-movable

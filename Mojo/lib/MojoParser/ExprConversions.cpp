@@ -369,7 +369,7 @@ static FnOp generateConversionThunk(Attribute key, ASTDecl &moduleDecl,
   // Always inline the thunk. The calling convention conversion overhead is
   // guaranteed to be optimized away.
   attrs.set(thunk.getInlineLevelAttrName(),
-            InlineLevelAttr::get(ctx, InlineLevel::AlwaysNoDebug));
+            getInlineLevelAttr(ctx, InlineLevel::AlwaysNoDebug));
 
   // Set the attributes.
   thunk->setAttrs(attrs.getDictionary(ctx));
@@ -1947,40 +1947,6 @@ FailureOr<ConstraintResult> IREmitter::canMetaTypeUpCastToWithDetails(
 // Generalized Implicit Conversions
 //===----------------------------------------------------------------------===//
 
-static bool isClosureWrapperStruct(SharedState &shared, PValue value,
-                                   LIT::StructType structTy) {
-  if (!value)
-    return false;
-  auto fnSig = dyn_cast<FnTypeGeneratorType>(value.getType());
-  if (!fnSig)
-    return false;
-  ASTDecl &decl =
-      shared.declResolver->getDeclForTypeSymbol(structTy.getSymbolRef());
-  if (StructDeclOp structOp = dyn_cast<StructDeclOp>(decl.getIfOperation())) {
-    auto [capturedRefs, selfContainedSig] =
-        DeclResolver::createSelfContainedSignature(fnSig);
-    selfContainedSig =
-        cast<FnTypeGeneratorType>(getCanonicalType(selfContainedSig));
-    if (!structOp.getDefinesClosure() ||
-        structOp.getInputParams().size() != 1 + capturedRefs.size())
-      return false;
-    auto wrapperImplType = dyn_cast<FuncTypeGeneratorType>(
-        structOp.getInputParams().back().getType());
-    if (!wrapperImplType ||
-        !ClosureEmitter::isTypeRebindableTo(selfContainedSig, wrapperImplType))
-      return false;
-    return llvm::all_of(
-        llvm::zip(capturedRefs,
-                  structOp.getInputParams().take_front(capturedRefs.size())),
-        [](auto it) {
-          auto [capture, param] = it;
-          return isEqualCanon(capture.getType(), param.getType());
-        });
-  }
-
-  return false;
-}
-
 void ConversionFailure::addExplanation(MojoInflightDiag &diag) && {
   if (auto *refuted = std::get_if<RefutedConstraints>(&reason))
     attachConstraintNotes(diag, refuted->constraints, "failed");
@@ -2159,7 +2125,8 @@ static TriBool classifyImplicitConversionImpl(
       PValue target = value.ir.getIfPValue();
       if (auto fnLiteral = sugarDynCast<FnLiteralTypeGeneratorType>(rvType))
         target = PValue(fnLiteral.getSymbolConstantAttr());
-      if (isClosureWrapperStruct(shared, target, structTy))
+      if (shared.getClosureEmitter().isWrapperStructForFnSymbol(target,
+                                                                structTy))
         return cacheAndReturnVal(rvType, requiredType, true);
     }
   }
@@ -2430,7 +2397,8 @@ CValue IREmitter::emitImplicitConversionToType(
       auto target = valueExpr.ir.getIfPValue();
       if (auto fnLiteral = sugarDynCast<FnLiteralTypeGeneratorType>(rvType))
         target = PValue(fnLiteral.getSymbolConstantAttr());
-      if (isClosureWrapperStruct(shared, target, structTy)) {
+      if (shared.getClosureEmitter().isWrapperStructForFnSymbol(target,
+                                                                structTy)) {
         return emitConstructorCall(
             structTy,
             CallOperands(CallSyntax::kTypeCall, expr, std::move(dest), {}));

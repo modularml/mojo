@@ -56,7 +56,7 @@ struct ResourceKind(Equatable, ImplicitlyCopyable, Movable, Writable):
     """Vector ALU: parallel with MMA on CDNA architectures."""
     comptime NONE = Self(255)  # No-op sentinel
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.GLOBAL_MEM:
             writer.write("GLOBAL_MEM")
@@ -152,7 +152,7 @@ struct KOffsetKind(Equatable, ImplicitlyCopyable, Movable):
     comptime K_PREV = Self(3)  # k - 1*BK (previous iteration's stage 1)
     comptime NONE = Self(255)  # Not applicable (non-load ops)
 
-    @always_inline
+    @inline(.always)
     def signed_bk_multiple(self) -> Int:
         """Return the signed BK multiplier (K_PREV=3 maps to -1)."""
         return -1 if self.bk_multiple == 3 else self.bk_multiple
@@ -224,7 +224,7 @@ struct OpCost(ImplicitlyCopyable, Movable):
     var vgpr_kill: Int
     """VGPRs this op releases (last use of some register buffer)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         resource: ResourceKind,
@@ -340,7 +340,7 @@ struct OpDesc(ImplicitlyCopyable, Movable):
     var vgpr_kill: Int
     """VGPRs this op releases (last use of some register buffer)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -372,7 +372,7 @@ struct OpDesc(ImplicitlyCopyable, Movable):
         self.vgpr_def = vgpr_def
         self.vgpr_kill = vgpr_kill
 
-    @always_inline
+    @inline(.always)
     def is_present(self) -> Bool:
         """True if this is a real op (not the NONE sentinel)."""
         return self.tag != _Ops.NONE.value
@@ -380,7 +380,7 @@ struct OpDesc(ImplicitlyCopyable, Movable):
     # --- Kernel op factory ---
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def op(
         tag: Int,
         resource: ResourceKind,
@@ -447,7 +447,7 @@ struct OpDesc(ImplicitlyCopyable, Movable):
     # --- Logical op factory (for use with TargetCostModel) ---
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def logical(
         tag: Int,
         *,
@@ -667,7 +667,7 @@ struct DepEdge(ImplicitlyCopyable, Movable):
     var loop_distance: Int
     """Loop iterations between producer and consumer (`0` = same iteration)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         producer_idx: Int,

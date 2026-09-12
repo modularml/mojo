@@ -32,6 +32,11 @@ The replay is therefore ~2 kernels per linear layer instead of a whole extra
 target forward, which is what makes the TPOT win survive the rollback. It is
 unconditional: prefill takes the same path with an accepted length equal to
 the whole prompt, so no branch depends on the phase.
+
+Both pools are addressed as one buffer per leaf plus a
+``[batch_size, num_layers]`` tensor of the rows each layer occupies. The engine
+supplies the live rows; the shadow is this graph's own scratch, so
+:func:`shadow_row_ids` picks that layout here.
 """
 
 from __future__ import annotations
@@ -51,37 +56,64 @@ from ..qwen3_5.layers.gated_deltanet import GatedDeltaReplayInputs
 __all__ = [
     "accepted_row_plan",
     "replay_state_pools",
+    "shadow_row_ids",
     "snapshot_state_pools",
 ]
 
 
-def snapshot_state_pools(
-    live_pools: Sequence[Sequence[BufferValue]],
-    shadow_pools: Sequence[Sequence[BufferValue]],
-    slot_idx: Sequence[TensorValue],
-    batch_size: TensorValue,
-) -> None:
-    """Copies each request's live pool slot into the shadow pool.
+_SHADOW_SPAN = "shadow_span"
+"""Name of the shadow slice a snapshot fills: ``batch_size * num_layers``."""
 
-    The shadow is indexed by batch position, not by slot, so the verify runs
-    with ``slot_idx = arange(batch)`` and the copy is a gather rather than a
-    whole-pool duplicate.
+
+def shadow_row_ids(num_layers: int, device: DeviceRef) -> TensorValue:
+    """Returns the ``[batch_size, num_layers]`` uint32 shadow-pool rows.
+
+    Request ``r``'s layer ``l`` sits at row ``r * num_layers + l``, which
+    makes the snapshot one contiguous store.
+    """
+    requests = ops.range(
+        start=0,
+        stop=Dim("batch_size"),
+        out_dim=Dim("batch_size"),
+        device=device,
+        dtype=DType.uint32,
+    )
+    layers = ops.range(
+        start=0,
+        stop=num_layers,
+        out_dim=num_layers,
+        device=device,
+        dtype=DType.uint32,
+    )
+    return ops.unsqueeze(requests, -1) * num_layers + ops.unsqueeze(layers, 0)
+
+
+def snapshot_state_pools(
+    live_pools: Sequence[BufferValue],
+    shadow_pools: Sequence[BufferValue],
+    live_row_ids: Sequence[TensorValue],
+    shadow_span: TensorValue,
+) -> None:
+    """Copies each request's live rows into the shadow pool.
 
     Args:
-        live_pools: Per-device, per-layer persistent pools.
-        shadow_pools: Per-device, per-layer scratch pools, at least
-            ``max_batch_size`` rows deep.
-        slot_idx: Per-device ``[batch_size]`` slot indices.
-        batch_size: CPU int64 scalar batch size, for the destination slice.
+        live_pools: One persistent pool per device, for a single leaf.
+        shadow_pools: One scratch pool per device, at least
+            ``max_batch_size * num_layers`` rows deep.
+        live_row_ids: Per-device ``[batch_size, num_layers]`` live rows.
+        shadow_span: Scalar ``batch_size * num_layers``, the slice filled.
     """
-    for device_live, device_shadow, idx in zip(
-        live_pools, shadow_pools, slot_idx, strict=True
+    for live, shadow, rows in zip(
+        live_pools, shadow_pools, live_row_ids, strict=True
     ):
-        for live, shadow in zip(device_live, device_shadow, strict=True):
-            rows = ops.gather(ops.buffer_load(live), idx, axis=0)
-            ops.buffer_store_slice(
-                shadow, rows, [(slice(0, batch_size), "batch_size")]
-            )
+        gathered = ops.gather(
+            ops.buffer_load(live), ops.reshape(rows, [-1]), axis=0
+        )
+        ops.buffer_store_slice(
+            shadow,
+            ops.rebind(gathered, [_SHADOW_SPAN, *gathered.shape[1:]]),
+            [(slice(0, shadow_span), _SHADOW_SPAN)],
+        )
 
 
 def accepted_row_plan(
@@ -177,9 +209,10 @@ def accepted_row_plan(
 
 def replay_state_pools(
     captures: Sequence[Sequence[GatedDeltaReplayInputs]],
-    live_conv_pools: Sequence[Sequence[BufferValue]],
-    live_recurrent_pools: Sequence[Sequence[BufferValue]],
-    slot_idx: Sequence[TensorValue],
+    live_conv_pools: Sequence[BufferValue],
+    live_recurrent_pools: Sequence[BufferValue],
+    conv_row_ids: Sequence[TensorValue],
+    recurrent_row_ids: Sequence[TensorValue],
     row_indices: TensorValue,
     replay_offsets: TensorValue,
     signal_buffers: Sequence[BufferValue],
@@ -192,9 +225,10 @@ def replay_state_pools(
 
     Args:
         captures: Per-device, per-layer inputs captured by the verify pass.
-        live_conv_pools: Per-device, per-layer conv pools, still pre-verify.
-        live_recurrent_pools: Per-device, per-layer recurrent pools.
-        slot_idx: Per-device ``[batch_size]`` slot indices.
+        live_conv_pools: Per-device conv pool, still pre-verify.
+        live_recurrent_pools: Per-device recurrent pool.
+        conv_row_ids: Per-device ``[batch_size, num_layers]`` conv rows.
+        recurrent_row_ids: Per-device ``[batch_size, num_layers]`` state rows.
         row_indices: Rows of the verify tensors the replay consumes.
         replay_offsets: ``[batch + 1]`` ragged offsets over those rows.
         signal_buffers: Used only to place the plan on each device.
@@ -213,22 +247,24 @@ def replay_state_pools(
     for device_idx, device_captures in enumerate(captures):
         rows = rows_per_dev[device_idx]
         offsets = offsets_per_dev[device_idx].cast(DType.uint32)
-        slots = slot_idx[device_idx].cast(DType.uint32)
-        conv_pools = live_conv_pools[device_idx]
-        recurrent_pools = live_recurrent_pools[device_idx]
+        conv_pool = live_conv_pools[device_idx]
+        recurrent_pool = live_recurrent_pools[device_idx]
+        conv_row_id = conv_row_ids[device_idx].cast(DType.uint32)
+        recurrent_row_id = recurrent_row_ids[device_idx].cast(DType.uint32)
         for layer_idx, capture in enumerate(device_captures):
+            # No resume row: the live rows still hold the pre-verify state.
             conv_out = gated_delta_conv1d_fwd(
                 qkv_input_ragged=ops.gather(capture.qkv, rows, axis=0),
                 conv_weight=capture.conv_weight,
-                conv_state=conv_pools[layer_idx],
-                slot_idx=slots,
+                conv_state=conv_pool,
+                slot_idx=conv_row_id[:, layer_idx],
                 input_row_offsets=offsets,
             )
             gated_delta_recurrence_fwd(
                 qkv_conv_output=ops.silu(conv_out),
                 decay_per_token=ops.gather(capture.decay, rows, axis=0),
                 beta_per_token=ops.gather(capture.beta, rows, axis=0),
-                recurrent_state=recurrent_pools[layer_idx],
-                slot_idx=slots,
+                recurrent_state=recurrent_pool,
+                slot_idx=recurrent_row_id[:, layer_idx],
                 input_row_offsets=offsets,
             )

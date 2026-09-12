@@ -83,7 +83,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
     """Wraps each contiguous wait/barrier group with `schedule_barrier`
     on both sides as an LLVM machine-scheduler fence."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -133,24 +133,24 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
         self.barrier_before_pre_ops = barrier_before_pre_ops
         self.wrap_waits_with_sched_barrier = wrap_waits_with_sched_barrier
 
-    @always_inline
+    @inline(.always)
     def _has_entry_wait_group(self) -> Bool:
         """True if entry_wait or entry_wait_lgkm is present."""
         return self.entry_wait.is_present() or self.entry_wait_lgkm.is_present()
 
-    @always_inline
+    @inline(.always)
     def _has_pre_mma_sync_group(self) -> Bool:
         """True if a `pre_sync` + barrier section will fire."""
         return self.pre_sync.is_present() or self.pre_mma_barrier
 
-    @always_inline
+    @inline(.always)
     def _entry_wait_wrap(self) -> Int:
         """0 or 2 schedule_barrier ops wrapping the entry_wait group."""
         if self.wrap_waits_with_sched_barrier and self._has_entry_wait_group():
             return 2
         return 0
 
-    @always_inline
+    @inline(.always)
     def _pre_mma_sync_wrap(self) -> Int:
         """0 or 2 schedule_barrier ops wrapping the pre_sync+barrier group."""
         if (
@@ -160,7 +160,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             return 2
         return 0
 
-    @always_inline
+    @inline(.always)
     def _n_pre_barrier_ops(self) -> Int:
         """Count optional ops before the barrier (entry_wait, pre_op_0/1, drain, global loads, pre_sync).
         """
@@ -190,7 +190,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
         n += self._pre_mma_sync_wrap()
         return n
 
-    @always_inline
+    @inline(.always)
     def entry_count(self) -> Int:
         """Count the number of schedule entries this block will expand to.
 
@@ -219,7 +219,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
                 n += 1
         return n
 
-    @always_inline
+    @inline(.always)
     def mma_position(self) -> Int:
         """Return the offset of the MMA op within this block's entries."""
         var n = self._n_pre_barrier_ops()
@@ -233,7 +233,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             n += 1
         return n
 
-    @always_inline
+    @inline(.always)
     def _n_ops_before_barrier_section(self) -> Int:
         """Count ops emitted before the barrier section.
 
@@ -259,7 +259,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             n += 1
         return n
 
-    @always_inline
+    @inline(.always)
     def post_barrier_lgkm_position(self) -> Int:
         """Return the offset of the post-barrier wait_lgkm(0) within entries.
 
@@ -273,7 +273,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             n += 1
         return n
 
-    @always_inline
+    @inline(.always)
     def expand[N: Int, phase: Phase](self, mut b: EntryBuilder[N, phase]):
         """Expand this block spec into schedule entries via an EntryBuilder.
 
@@ -302,7 +302,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             b.emit(OpDesc.schedule_barrier())
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def emit_sync_section():
             if self._pre_mma_sync_wrap() > 0:
                 b.emit(OpDesc.schedule_barrier())
@@ -315,7 +315,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
                 b.emit(OpDesc.schedule_barrier())
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def emit_load_section():
             if self.global_before_frag:
                 b.emit_if(self.global_load, self.global_load_prefetch)
@@ -347,7 +347,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
             b.emit(OpDesc.barrier())
             b.emit_flag(OpDesc.schedule_barrier(), self.trailing_sched_barrier)
 
-    @always_inline
+    @inline(.always)
     def expand_to_list(self, mut out: List[ScheduleEntry], phase: Phase):
         """Expand this block spec by appending to a List.
 
@@ -355,7 +355,7 @@ struct MMABlockSpec(ImplicitlyCopyable, Movable):
         ordering flags.
         """
 
-        @always_inline
+        @inline(.always)
         def _e(
             mut out: List[ScheduleEntry],
             op: OpDesc,
@@ -617,7 +617,7 @@ struct PipelineProgram(Copyable, Movable):
     so every block uses the template."""
     var trailing_barrier: Bool
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, num_blocks: Int = 0, *, trailing_barrier: Bool = False
     ):
@@ -628,7 +628,7 @@ struct PipelineProgram(Copyable, Movable):
             self.explicit_blocks.append(List[OpDesc]())
         self.trailing_barrier = trailing_barrier
 
-    @always_inline
+    @inline(.always)
     def _block_entry_count(self, block_idx: Int) -> Int:
         """Entry count for one block: explicit override if non-empty,
         else the flag-driven template count.
@@ -640,7 +640,7 @@ struct PipelineProgram(Copyable, Movable):
             return len(self.explicit_blocks[block_idx])
         return self.blocks[block_idx].entry_count()
 
-    @always_inline
+    @inline(.always)
     def total_entries(self) -> Int:
         """Count total schedule entries this program will expand to."""
         var n = 0
@@ -650,7 +650,7 @@ struct PipelineProgram(Copyable, Movable):
             n += 1
         return n
 
-    @always_inline
+    @inline(.always)
     def block_start(self, block_idx: Int) -> Int:
         """Return the starting entry index for the given block."""
         var n = 0
@@ -658,7 +658,7 @@ struct PipelineProgram(Copyable, Movable):
             n += self._block_entry_count(i)
         return n
 
-    @always_inline
+    @inline(.always)
     def mma_entry(self, block_idx: Int) -> Int:
         """Return the entry index of the MMA op in the given block.
 
@@ -679,7 +679,7 @@ struct PipelineProgram(Copyable, Movable):
             return start
         return start + self.blocks[block_idx].mma_position()
 
-    @always_inline
+    @inline(.always)
     def expand_to_list(self, phase: Phase) -> List[ScheduleEntry]:
         """Expand all blocks into a List of schedule entries.
 

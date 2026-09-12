@@ -48,7 +48,7 @@ struct Grayscale:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def color_to_grayscale[
             simd_width: Int
         ](idx: Coord) -> SIMD[.uint8, simd_width]:
@@ -83,7 +83,7 @@ struct MyAdd:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def doit[simd_width: Int](idx: Coord) -> SIMD[C.dtype, simd_width]:
             var a = A.load[simd_width](idx)
             var b = B.load[simd_width](idx)
@@ -103,7 +103,7 @@ struct ParameterIncrement:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def doit[simd_width: Int](idx: Coord) -> SIMD[B.dtype, simd_width]:
             var a = A.load[simd_width](idx)
             return a + type_of(a)(increment)
@@ -138,7 +138,7 @@ struct UnsupportedTypeOp:
         # This operation is for testing error handling only
         # The String parameter should cause a validation error
         @__parameter
-        @always_inline
+        @inline(.always)
         def copy[simd_width: Int](idx: Coord) -> SIMD[output.dtype, simd_width]:
             return input.load[simd_width](idx)
 

@@ -413,7 +413,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
     # plus the prologue stagger on the upper wave-half (the conserved-
     # offset ping-pong keystone).
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_q_lds_exact[
         layout: TensorLayout,
     ](
@@ -565,7 +565,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         return q_reg
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _attend_exact[
         k_t: MHAOperand,
         v_t: MHAOperand,
@@ -630,7 +630,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         var w_remap = w_id & 3
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _dma_k_into(slot: Int, t: Int):
             var kp = _MlaKDmaPair[Self.config](
                 k_op, batch_idx_u32, kv_head_idx_u32, t
@@ -642,7 +642,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             kp.dma(k_slot, w_remap + 4, l_id)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _dma_v_into(slot: Int, t: Int):
             var v_slot = v_ring.tile[Self._V_SLOT_ROWS, Self._V_SUB_COLS](
                 slot, 0
@@ -661,7 +661,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _dma_kv_split(k_slot_idx: Int, v_slot_idx: Int, t: Int):
             # Reference work-split: phase-lagged upper half (waves 4-7)
             # produces V, lower half (waves 0-3) produces K. K and V use
@@ -890,7 +890,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         # the cluster interior stays free of `lgkmcnt(0)` / `sched_barrier(0)`
         # walls.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _one_tile_exact[is_upper: Bool](t32_arg: Int32):
             # Reference-faithful non-materialized V (the lean band layout):
             # V is streamed fragment-at-a-time through the (post-QK dead) K
@@ -1043,7 +1043,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
 
             # Load fragment `i` from SMEM (the rope sub-view for rope cols).
             @__parameter
-            @always_inline
+            @inline(.always)
             def _load_frag[i: Int]() -> _FRAG:
                 comptime if _is_rope(i):
                     return Self._MmaOp.load_K_frag[_sub_id(i)](k_rope_smem)
@@ -1053,7 +1053,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             # Write fragment value into ring slot `s` (comptime dispatch to
             # one of the 4 distinct SSA values).
             @__parameter
-            @always_inline
+            @inline(.always)
             def _put[s: Int](var v: _FRAG):
                 comptime if s == 0:
                     f0 = v
@@ -1066,7 +1066,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
 
             # Read ring slot `s`.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _get[s: Int]() -> _FRAG:
                 comptime if s == 0:
                     return f0
@@ -1115,7 +1115,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             comptime _PF_V_AT = (2, 6)  # V sub-call -> MFMA iter
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _pf_spread_step[i_mfma: Int]():
                 comptime if is_upper:
                     # V producer: 2 halves at _PF_V_AT.
@@ -1279,7 +1279,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             # `ds_read_b64_tr_b8` = 3 fragments × 4 reads; ref asm QK-tail
             # L2245-2272). Default (`_V_QKTAIL=False`) the prologue stays in
             # C_PV_MFMA below, so the hoist is SSA-neutral (the band vars are
-            # dead until C_PV; the `@__parameter @always_inline` helpers emit
+            # dead until C_PV; the `@__parameter @inline(.always)` helpers emit
             # nothing until called). The hoist is the lean-V design's mirror:
             # lean-V reads ALL 32 V in C_PV; `v_qktail` moves 12 up to match
             # the reference 12/20 placement, at the cost of holding 24 VGPR
@@ -1297,12 +1297,12 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             comptime _VAHEAD = 3  # 3 slots in flight (see C_PV_MFMA notes)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _vstrip(i: Int) -> Int:
                 return i // _N_DEPTH
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _vdepth(i: Int) -> Int:
                 return i % _N_DEPTH
 
@@ -1310,7 +1310,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             # `ds_read_tr8_b64` joined to one SIMD; `v_lane_base` CSEs to a
             # single base across the unrolled stream — the reference `v227`).
             @__parameter
-            @always_inline
+            @inline(.always)
             def _vload[i: Int]() -> _VFRAG:
                 return rebind[_VFRAG](
                     Self._MmaOp.load_V_frag[
@@ -1330,7 +1330,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             var vf3 = _VFRAG(0)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _vput[s: Int](var v: _VFRAG):
                 comptime if s == 0:
                     vf0 = v
@@ -1342,7 +1342,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
                     vf3 = v
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _vget[s: Int]() -> _VFRAG:
                 comptime if s == 0:
                     return vf0
@@ -1934,7 +1934,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         # drive this SAME body; they differ only in how (head_idx,
         # block_tile_idx, batch_idx) are sourced (block_idx vs WorkInfo).
         @__parameter
-        @always_inline
+        @inline(.always)
         def _run_one_work(
             head_idx: Int,
             block_tile_idx: Int,
@@ -2224,7 +2224,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         )
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_v2_ragged[
     k_nope_t: MHAOperand,
     k_rope_t: MHAOperand,
@@ -2234,9 +2234,9 @@ def mla_prefill_v2_ragged[
     output_dtype: DType,
     //,
     config: MlaConfigV2,
-    compile_options: StaticString = CompilationTarget[
-        DeviceContext.default_device_info.target()
-    ].default_compile_options(),
+    compile_options: StaticString = CompilationTarget.from[
+        DeviceContext.default_device_info
+    ]().default_compile_options(),
 ](
     q_ptr: UnsafePointer[Scalar[qkv_dtype], ImmutAnyOrigin],
     k_nope: k_nope_t,

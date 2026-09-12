@@ -13,7 +13,7 @@
 
 from std.math import inf, nan
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu.host import DeviceContext
 from std.memory import bitcast
 

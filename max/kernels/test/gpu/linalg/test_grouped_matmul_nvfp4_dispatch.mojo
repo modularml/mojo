@@ -29,7 +29,7 @@ from linalg.matmul.gpu.sm100_structured.grouped_block_scaled_1d1d import (
     grouped_matmul_nvfp4_dispatch,
 )
 from std.random import random_ui64, seed, rand
-from std.builtin.simd import _convert_f32_to_float8_scalar
+from std.simd import _convert_f32_to_float8_scalar
 from layout import (
     Coord,
     Idx,

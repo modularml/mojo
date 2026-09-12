@@ -75,7 +75,7 @@ struct Lamport:
     comptime STATE_ARRIVAL = 2
 
 
-@always_inline
+@inline(.always)
 def _sentinel_bits[
     dtype: DType
 ]() -> Scalar[_unsigned_integral_type_of[dtype]()]:
@@ -102,7 +102,7 @@ def _sentinel_bits[
     return Scalar[uint](1) << Scalar[uint](bit_width_of[uint]() - 1)
 
 
-@always_inline
+@inline(.always)
 def remove_neg_zero[
     dtype: DType, width: Int
 ](v: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -132,7 +132,7 @@ def remove_neg_zero[
     return bitcast[dtype, width](sanitized)
 
 
-@always_inline
+@inline(.always)
 def has_neg_zero[dtype: DType, width: Int](v: SIMD[dtype, width]) -> Bool:
     """Returns True if any lane of `v` holds the `-0.0` sentinel bit pattern.
 
@@ -156,7 +156,7 @@ def has_neg_zero[dtype: DType, width: Int](v: SIMD[dtype, width]) -> Bool:
     return Bool(bits.eq(SIMD[uint, width](_sentinel_bits[dtype]())).reduce_or())
 
 
-@always_inline
+@inline(.always)
 def set_neg_zero[dtype: DType, width: Int]() -> SIMD[dtype, width]:
     """Returns the universal "not ready" sentinel pack.
 
@@ -211,7 +211,7 @@ struct LamportGeneration:
     write-next-call + clear-for-the-call-after."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def data_index(flag: Int) -> Int:
         """Returns the generation index written and read on this call.
 
@@ -224,7 +224,7 @@ struct LamportGeneration:
         return flag % Self.NUM_GENERATIONS
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def clear_index(flag: Int) -> Int:
         """Returns the generation index cleared to the sentinel on this call.
 

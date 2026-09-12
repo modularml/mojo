@@ -20,7 +20,9 @@ import numpy as np
 import pytest
 from llguidance import LLMatcher
 from max.pipelines.context import (
+    ImageMetadata,
     StructuredOutputRegionDelimiters,
+    TextAndVisionContext,
     TextContext,
     TokenBuffer,
 )
@@ -38,6 +40,7 @@ from max.pipelines.lib.pipeline_variants.overlap_text_generation import (
     MAGIC_DRAFT_TOKEN_ID,
     AsyncBatch,
     _host_mirror_realized_drafts,
+    _should_verify_drafts,
 )
 from max.pipelines.lib.pipeline_variants.utils import (
     StructuredOutputHelper,
@@ -419,6 +422,95 @@ def test_prefill_and_decode_gets_overlap_pipeline() -> None:
     )
     result = get_pipeline_for_task(PipelineTask.TEXT_GENERATION, config)
     assert result is OverlapTextGenerationPipeline[TextContext]
+
+
+def _prefill_ctx(json_schema: str | None = None) -> TextContext:
+    return TextContext(
+        request_id=RequestID(),
+        max_length=1000,
+        tokens=TokenBuffer(np.array([1, 2, 3])),
+        json_schema=json_schema,
+    )
+
+
+def _decode_ctx() -> TextContext:
+    ctx = _prefill_ctx()
+    ctx.update(7)
+    assert ctx.tokens.generated_length == 1
+    return ctx
+
+
+def _inputs(*contexts: TextContext) -> TextGenerationInputs[TextContext]:
+    """One replica's batch, so ``batch_type`` is derived the way it is in
+    production rather than restated by the test."""
+    return TextGenerationInputs(batches=[list(contexts)])
+
+
+def _vision_prefill_ctx() -> TextAndVisionContext:
+    tokens = np.array([51, 52, 53, 54, 98, 98, 98, 98, 59, 60], dtype=np.int64)
+    ctx = TextAndVisionContext(
+        request_id=RequestID(),
+        max_length=1000,
+        tokens=TokenBuffer(tokens),
+        images=[
+            ImageMetadata(
+                start_idx=4,
+                end_idx=8,
+                pixel_values=np.zeros((4, 3), dtype=np.float32),
+            )
+        ],
+        vision_token_ids=[98],
+    )
+    assert ctx.needs_vision_encoding
+    return ctx
+
+
+class TestShouldVerifyDrafts:
+    """Batch-level draft-verification gate for the spec-decode path."""
+
+    def test_pure_decode_batch_always_verifies(self) -> None:
+        batch = _inputs(_decode_ctx(), _decode_ctx())
+        assert _should_verify_drafts(batch, allow_mixed_batches=False)
+        assert _should_verify_drafts(batch, allow_mixed_batches=True)
+
+    def test_pure_prefill_batch_never_verifies(self) -> None:
+        batch = _inputs(_prefill_ctx(), _prefill_ctx())
+        assert not _should_verify_drafts(batch, allow_mixed_batches=False)
+        assert not _should_verify_drafts(batch, allow_mixed_batches=True)
+
+    def test_mixed_batch_verifies_only_when_allowed(self) -> None:
+        batch = _inputs(_prefill_ctx(), _decode_ctx())
+        assert not _should_verify_drafts(batch, allow_mixed_batches=False)
+        assert _should_verify_drafts(batch, allow_mixed_batches=True)
+
+    def test_mixed_batch_with_constrained_row_falls_back(self) -> None:
+        # Grammar-constrained rows force the all-or-nothing path even when
+        # mixed batches are allowed; the async bitmask machinery has no
+        # mixed-verify fill ownership.
+        constrained = _prefill_ctx(json_schema='{"type": "object"}')
+        batch = _inputs(constrained, _decode_ctx())
+        assert not _should_verify_drafts(batch, allow_mixed_batches=True)
+        # The same batch without the constraint verifies.
+        assert _should_verify_drafts(
+            _inputs(_prefill_ctx(), _decode_ctx()), allow_mixed_batches=True
+        )
+
+    def test_mixed_batch_with_vision_row_falls_back(self) -> None:
+        # Vision scatter indices are computed against the unmerged token
+        # layout (compute_windowed_merge_indices); a K>0 merge shifts row
+        # starts by +i*K, so a batch with an unencoded-image row keeps the
+        # all-or-nothing path.
+        batch = _inputs(_vision_prefill_ctx(), _decode_ctx())
+        assert not _should_verify_drafts(batch, allow_mixed_batches=True)
+        # A pure decode batch is unaffected by the vision history of its
+        # requests once every image is encoded.
+        assert _should_verify_drafts(
+            _inputs(_decode_ctx(), _decode_ctx()), allow_mixed_batches=True
+        )
+
+    def test_empty_batch_matches_all_decode_convention(self) -> None:
+        # An empty batch leaves batch_type at its TG default; keep parity.
+        assert _should_verify_drafts(_inputs(), allow_mixed_batches=False)
 
 
 def test_async_batch_sync_with_single_step_tokens() -> None:
@@ -808,6 +900,7 @@ class TestAdvanceFsmAndComputeBitmasks:
         mock_matcher.deep_copy.return_value.try_consume_tokens = MagicMock(
             return_value=ret
         )
+        mock_matcher.deep_copy.return_value.is_stopped.return_value = False
         ctx._matcher = mock_matcher
         return ctx, mock_matcher
 

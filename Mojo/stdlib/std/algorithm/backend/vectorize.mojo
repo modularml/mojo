@@ -21,7 +21,7 @@ from std.math import align_down
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def vectorize[
     func: def[width: Int](idx: Int) -> None,
     //,
@@ -128,7 +128,7 @@ def vectorize[
         closure[1](i)
 
 
-@always_inline
+@inline(.always)
 def vectorize[
     func: def[width: Int](idx: Int, evl: Int) -> None,
     //,
@@ -255,7 +255,7 @@ def vectorize[
         closure[simd_width](simd_end, remainder)
 
 
-@always_inline
+@inline(.always)
 def vectorize[
     func: def[width: Int](idx: Int) -> None,
     //,

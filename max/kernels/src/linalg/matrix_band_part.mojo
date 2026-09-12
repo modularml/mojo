@@ -24,7 +24,7 @@ from std.utils.coord import Coord
 from std.utils.index import IndexList
 
 
-@always_inline
+@inline(.always)
 def matrix_band_part[
     dtype: DType,
     int_type: DType,
@@ -103,7 +103,7 @@ def matrix_band_part[
     unswitch(exclude.load_linear[1](IndexList[1](0)) != 0, dispatch)
 
 
-@always_inline
+@inline(.always)
 def _matrix_band_part_impl[
     dtype: DType,
     int_type: DType,
@@ -139,7 +139,7 @@ def _matrix_band_part_impl[
     """
     comptime assert rank >= 2, "Matrix band only supports rank >=2"
 
-    @always_inline
+    @inline(.always)
     def func[simd_width: Int, alignment: Int = 1](index: Coord) {var}:
         var idx = IndexList[rank]()
         comptime for i in range(rank):

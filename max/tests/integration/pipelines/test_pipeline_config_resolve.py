@@ -49,7 +49,10 @@ from max.pipelines.lib.config.model_config import (
 from max.pipelines.lib.memory_estimation import MemoryPlan
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
-from max.pipelines.lib.registry import SupportedArchitecture
+from max.pipelines.lib.registry import (
+    Speculator,
+    SupportedArchitecture,
+)
 from max.pipelines.modeling.types import PipelineTask
 from max.pipelines.sampling import SamplingConfig
 from test_common.fake_weights import (
@@ -1464,13 +1467,25 @@ class TestConstructionResolution:
 
     @prepare_registry
     def test_spec_decode_target_override_before_resolution(self) -> None:
-        """The unified spec-decode target override runs in from_args, so
-        construction resolves the overridden architecture (regression guard
-        for the pre-override arch being resolved instead; see #88511)."""
-        unified_arch = dataclasses.replace(
-            DUMMY_LLAMA_ARCH, name="UnifiedMTPDeepseekV3ForCausalLM"
+        """The unified spec-decode selection runs in from_args, so
+        construction resolves the fused architecture (regression guard for
+        the pre-override arch being resolved instead; see #88511).
+
+        A declared speculator leaves the checkpoint's own architecture name
+        alone and is applied as a delta on the target it resolves to."""
+        base = dataclasses.replace(
+            DUMMY_LLAMA_ARCH, name="DeepseekV3ForCausalLM"
         )
-        PIPELINE_REGISTRY.register(unified_arch)
+        PIPELINE_REGISTRY.register(base)
+        PIPELINE_REGISTRY.register(
+            Speculator(
+                name="UnifiedMTPDeepseekV3ForCausalLM",
+                base=base,
+                draft_arch=None,
+                method="mtp",
+                pipeline_model=DummyLlamaPipelineModel,
+            )
+        )
         hf_config = dict(_LLAMA_CONFIG)
         hf_config["architectures"] = ["DeepseekV3ForCausalLM"]
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1483,13 +1498,51 @@ class TestConstructionResolution:
                 tmpdir,
                 speculative=SpeculativeConfig(speculative_method="mtp"),
             )
+            # The checkpoint keeps saying what it is; the fused graph is
+            # reached by deriving, not by resolving a second name.
             assert (
-                config.models.main_architecture_name
-                == "UnifiedMTPDeepseekV3ForCausalLM"
+                config.models.main_architecture_name == "DeepseekV3ForCausalLM"
             )
+            resolved = PIPELINE_REGISTRY.architecture_for_config(config)
+            assert resolved is not None
+            assert resolved.pipeline_model is DummyLlamaPipelineModel
             assert _model(config).quantization_encoding == "bfloat16"
             assert _model(config).weight_path == [Path("model.safetensors")]
             self._assert_resolve_preserves(config)
+
+    @prepare_registry
+    def test_spec_decode_no_speculator_for_method_raises(self) -> None:
+        """A target that declares speculators but none for the requested
+        method is a configuration error, not a silent fallback to the
+        unfused target."""
+        base = dataclasses.replace(
+            DUMMY_LLAMA_ARCH, name="DeepseekV3ForCausalLM"
+        )
+        PIPELINE_REGISTRY.register(base)
+        PIPELINE_REGISTRY.register(
+            Speculator(
+                name="UnifiedMTPDeepseekV3ForCausalLM",
+                base=base,
+                draft_arch=None,
+                method="mtp",
+                pipeline_model=DummyLlamaPipelineModel,
+            )
+        )
+        hf_config = dict(_LLAMA_CONFIG)
+        hf_config["architectures"] = ["DeepseekV3ForCausalLM"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _make_local_repo(
+                tmpdir,
+                hf_config=hf_config,
+                safetensors_files={"model.safetensors": {"w": "BF16"}},
+            )
+            with pytest.raises(
+                ValueError, match="No speculator for DeepseekV3ForCausalLM"
+            ):
+                self._from_args(
+                    tmpdir,
+                    speculative=SpeculativeConfig(speculative_method="dflash"),
+                )
 
     @prepare_registry
     def test_custom_architectures_imported_at_construction(self) -> None:

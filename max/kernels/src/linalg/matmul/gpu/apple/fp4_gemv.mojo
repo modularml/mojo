@@ -177,7 +177,7 @@ def fp4_gemv_kernel[
             c.store[width=1](Coord(0, n_idx), y)
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_fp4_gemv[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,

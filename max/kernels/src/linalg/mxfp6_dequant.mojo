@@ -129,7 +129,7 @@ def _dequant_mxfp6_kernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def dequant_mxfp6[
     fmt: FP6Format, *, SF_VECTOR_SIZE: Int = 32
 ](

@@ -87,7 +87,7 @@ def bench_layer_norm_gpu[
     # `layer_norm` takes gamma/beta as `TileTensor`s directly (no
     # `gamma_fn`); `input_fn`/`output_fn` are unified closures matching its
     # (width, alignment) `Coord` signatures.
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
@@ -95,7 +95,7 @@ def bench_layer_norm_gpu[
 
         return data_buf.raw_load[width=width, alignment=alignment](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var out_buf} -> None:
@@ -103,7 +103,7 @@ def bench_layer_norm_gpu[
 
         out_buf.raw_store[width=width, alignment=alignment](idx, val)
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext,
     ) raises {imm}:
@@ -130,7 +130,7 @@ def bench_layer_norm_gpu[
                 ctx,
             )
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 
@@ -185,7 +185,7 @@ def bench_rms_norm_gpu[
 
     # `rms_norm_gpu` migrated to a `Coord` shape boundary (softmax PR #88203).
     @__copy_capture(data_buf)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = data_buf.layout(coords)
@@ -197,7 +197,7 @@ def bench_rms_norm_gpu[
             width=width, alignment=align_of[SIMD[dtype, width]]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(data_buf)
     @__parameter
     def identity_output_fn[
@@ -206,7 +206,7 @@ def bench_rms_norm_gpu[
         var idx = data_buf.layout(coords)
         data_buf.raw_store[width=width, alignment=alignment](idx, val)
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(ctx: DeviceContext) raises {mut data_d, imm}:
         rms_norm_gpu[
             rank, input_fn, identity_output_fn, multiply_before_cast=True
@@ -218,7 +218,7 @@ def bench_rms_norm_gpu[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

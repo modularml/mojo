@@ -350,7 +350,7 @@ struct AppleM5Fp4MatMul[
         # load, batched nibble expand, branch-free bit-arith decode, scaled by
         # the one block scale the run shares (`COLS_PER_THREAD <= 16`). Shared by
         # the interior path and the bounded path's in-bounds run.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _decode_run(
             n_abs: Int,
@@ -385,7 +385,7 @@ struct AppleM5Fp4MatMul[
         # partial last strip), so the MMA reads exact dequant for valid `(n, k)`
         # and a clean zero elsewhere. `k_valid` is the in-bounds K width of this
         # strip (used only on the bounded path).
-        @always_inline
+        @inline(.always)
         @__parameter
         def _stage_dequant[bounded: Bool](k0: Int32, k_valid: Int32, buf: Int):
             var t = Int(tid)
@@ -470,7 +470,7 @@ struct AppleM5Fp4MatMul[
         # so the interior decode reads its scale from SMEM instead of issuing a
         # scattered 1-byte DRAM load. The caller barriers after this before the
         # decode reads it. Only emitted when `coalesce_scales`.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _stage_scales(k0: Int32, buf: Int):
             comptime NSCALE = BN * NBLK
@@ -489,7 +489,7 @@ struct AppleM5Fp4MatMul[
                     ),
                 )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _mma_from_smem[
             bounded: Bool
@@ -527,7 +527,7 @@ struct AppleM5Fp4MatMul[
         var tg_is_edge = (tg_row + BM_i32 > m_i32) or (tg_col + BN_i32 > n_i32)
         var valid_rows = max(Int32(0), min(SG_M_i32, m_i32 - row_base))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _run_strips[bounded: Bool]():
             comptime use_coalesced = Self.coalesce_scales and not bounded
@@ -584,7 +584,7 @@ struct AppleM5Fp4MatMul[
             var tile_row_base = Int(row_base)
             var tile_col_base = Int(col_base)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _write4(
                 lrow: Int,
@@ -749,7 +749,7 @@ comptime _M2D_DEEPK_K_THRESHOLD = 18432
 comptime _M2D_DEEPK_M_THRESHOLD = 1024
 
 
-@always_inline
+@inline(.always)
 def _enqueue_apple_fp4_materialize_dense[
     c_type: DType,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type],
@@ -834,7 +834,7 @@ def _enqueue_apple_fp4_materialize_dense[
     _ = wdense_dev^
 
 
-@always_inline
+@inline(.always)
 def _launch_apple_fp4_matmul[
     c_type: DType,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type],
@@ -905,7 +905,7 @@ def _launch_apple_fp4_matmul[
     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_fp4_matmul[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,

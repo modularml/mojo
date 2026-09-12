@@ -80,6 +80,16 @@ struct ScaledIntCoordBox(ImplicitlyCopyable, TrivialRegisterPassable):
     var dims: Coord[Int, Int]
 
 
+# A register-passable aggregate holding a `DevicePassable` member next to a
+# `Bool`. `Bool`'s storage is a `!kgen.scalar<bool>`, which reflection reports
+# as a struct but cannot field-walk, so `_contains_device_passable_field` must
+# stop at `Bool`. It carries no device-passable data, so it is bit-copied.
+@fieldwise_init
+struct ScaledIntBoolBox(ImplicitlyCopyable, TrivialRegisterPassable):
+    var scaled: ScaledInt
+    var flag: Bool
+
+
 # A `DevicePassable` type (`device_type == Self`) whose `_to_device_type`
 # defers to `encode_fields`, mirroring how a real type with a device-pointer
 # field and a plain `Coord` layout field would encode itself.
@@ -303,6 +313,21 @@ def test_encode_fields_bit_copies_coord_field() raises:
     # values are preserved.
     assert_equal(Int(buf[].dims[0].value()), 3)
     assert_equal(Int(buf[].dims[1].value()), 4)
+
+
+def test_encode_fields_bit_copies_bool_field() raises:
+    var box = ScaledIntBoolBox(scaled=ScaledInt(raw=9), flag=True)
+    var allocation = alloc[ScaledIntBoolBox]({count = 1}).into_managed()
+    var buf = allocation.unsafe_ptr()
+    var encoder = DefaultDeviceTypeEncoder()
+    # Without the `Bool` guard in `_contains_device_passable_field`,
+    # elaborating this call is a compile error (`struct_field_types requires a
+    # struct type`) from walking `Bool`'s `!kgen.scalar<bool>` storage.
+    encoder.encode_fields(box, buf.unsafe_bitcast[NoneType]())
+    # `scaled` is `DevicePassable`, so `ScaledInt._to_device_type` doubles `raw`.
+    assert_equal(buf[].scaled.raw, 18)
+    # `flag` holds nothing device-passable and is bit-copied unchanged.
+    assert_equal(buf[].flag, True)
 
 
 def test_to_device_type_encodes_fields_with_coord() raises:

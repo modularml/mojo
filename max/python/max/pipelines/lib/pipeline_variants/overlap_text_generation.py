@@ -111,6 +111,7 @@ from max.nn.kv_cache import (
     KVCacheInputsInterface,
     KVCacheInputsPerDevice,
     MultiKVCacheInputs,
+    RecurrentStateInputs,
     spec_decode_cache_slack,
 )
 from max.nn.transformer import ReturnLogits
@@ -237,13 +238,51 @@ def _reachable_verify_widths(
     num_speculative_tokens: int,
     max_batch_size: int,
 ) -> list[int]:
-    """Every number of carried drafts a step could verify."""
+    """Every number of carried drafts a step could verify.
+
+    Includes the mixed-batch width, which is reachable at any batch size and so
+    is not in the batch-size lookup. The constrained-decoding bitmask allocates
+    one buffer per width from this, and a width missing here fails the step with
+    "no allocated buffer" rather than degrading.
+    """
     lookup = _verify_width_lookup(
         spec_config, num_speculative_tokens, max_batch_size
     )
-    if lookup is None:
-        return [num_speculative_tokens]
-    return sorted(set(lookup[1:]))
+    widths = (
+        [num_speculative_tokens] if lookup is None else sorted(set(lookup[1:]))
+    )
+    mixed = _mixed_verify_width(spec_config, num_speculative_tokens)
+    if mixed is not None:
+        widths.append(mixed)
+    return sorted(set(widths))
+
+
+def _mixed_verify_width(
+    spec_config: SpeculativeConfig | None,
+    num_speculative_tokens: int,
+) -> int | None:
+    """Drafts a mixed prefill+decode step verifies; ``None`` to not narrow.
+
+    Clamped here rather than at config validation because ``dflash`` leaves
+    ``num_speculative_tokens`` for the architecture to resolve from the draft
+    checkpoint, so the ceiling does not exist yet when the config is read.
+
+    Args:
+        spec_config: The pipeline's speculative config, which carries the
+            width.
+        num_speculative_tokens: The configured draft depth, which caps the
+            width. A step cannot verify more drafts than it carries.
+
+    Returns:
+        The mixed-batch width, or ``None`` when mixed steps should stay on the
+        batch-size schedule.
+    """
+    if spec_config is None or num_speculative_tokens <= 0:
+        return None
+    width = spec_config.num_speculative_tokens_mixed_batch
+    if width is None:
+        return None
+    return min(width, num_speculative_tokens)
 
 
 def _contiguous_prefix_3d(
@@ -344,6 +383,29 @@ def _host_mirror_realized_drafts(
         if 0 <= curr_i < curr_batch_size:
             realized[curr_i] = prev_next_draft_tokens[prev_i, :verify_width]
     return realized
+
+
+def _should_verify_drafts(
+    inputs: TextGenerationInputs[TextGenerationContextType],
+    *,
+    allow_mixed_batches: bool,
+) -> bool:
+    """Whether this batch runs the K>0 draft-verification path."""
+    if inputs.batch_type == BatchType.TG:
+        return True
+    if not allow_mixed_batches:
+        return False
+    has_decode_row = False
+    for ctx in inputs.flat_batch:
+        if (
+            ctx.matcher is not None
+            or ctx.grammar is not None
+            or ctx.json_schema is not None
+            or getattr(ctx, "needs_vision_encoding", False)
+        ):
+            return False
+        has_decode_row = has_decode_row or ctx.tokens.generated_length > 0
+    return has_decode_row
 
 
 def _resolve_thinking_token_ids(
@@ -646,13 +708,11 @@ class _SupportsModelCapture(Protocol):
 
 @runtime_checkable
 class SupportsSSMStateWarmup(Protocol):
-    """Protocol for pipeline models with SSM/conv state pools.
+    """Protocol for pipeline models holding state slots of their own.
 
-    Models (e.g. Nemotron-H, Qwen3.5, LFM2) that allocate per-request state
-    pool slots outside the KV cache must implement
-    :meth:`release_warmup_state` so that graph-capture warmup can release
-    those slots after each ``(batch_size, cache_length)`` probe.  Without it,
-    warmup would exhaust the state pool before reaching steady serving.
+    A model whose per-request SSM/conv state is a slot pool outside the KV
+    cache must implement :meth:`release_warmup_state`; nothing else frees
+    those slots. A model whose state lives in KV pages needs none of this.
 
     The overlap pipeline's ``_warmup_model_inputs`` context manager calls
     ``release_warmup_state`` after each probe's capture completes, with the
@@ -1563,6 +1623,9 @@ class RealizeFutureTokenProcessor:
             elif isinstance(kv, MultiKVCacheInputs):
                 for child in kv.children.values():
                     _recurse_kv_tree(child, kv_collections)
+            elif isinstance(kv, RecurrentStateInputs):
+                # No cache length and no page for the scatter to address.
+                pass
             else:
                 raise ValueError(f"Unexpected KV cache input type: {type(kv)}")
 
@@ -1743,6 +1806,10 @@ class OverlapTextGenerationPipeline(
     """``batch_size -> drafts to verify``, set only under speculative decoding
     with a schedule configured. ``None`` verifies every carried draft."""
 
+    _mixed_verify_width: int | None = None
+    """Drafts a mixed prefill+decode step verifies, overriding the schedule.
+    ``None`` leaves mixed steps on the batch-size schedule."""
+
     def __init__(
         self,
         pipeline_config: PipelineConfig,
@@ -1919,6 +1986,17 @@ class OverlapTextGenerationPipeline(
                     sorted(set(self._width_lookup[1:])),
                     self._spec_decode_state.num_speculative_tokens,
                 )
+            self._mixed_verify_width = _mixed_verify_width(
+                self._pipeline_config.speculative,
+                self._spec_decode_state.num_speculative_tokens,
+            )
+            if self._mixed_verify_width is not None:
+                logger.info(
+                    "Verifying %d of %d drafted tokens on mixed "
+                    "prefill+decode batches.",
+                    self._mixed_verify_width,
+                    self._spec_decode_state.num_speculative_tokens,
+                )
             if (
                 self._pipeline_config.speculative is not None
                 and self._pipeline_config.speculative.synthetic_acceptance_rate
@@ -1930,6 +2008,19 @@ class OverlapTextGenerationPipeline(
                     "Results are for benchmarking only.",
                     self._pipeline_config.speculative.synthetic_acceptance_rate,
                 )
+
+        self._allow_mixed_verify = (
+            self._spec_decode_state is not None
+            and pipeline_config.runtime.enable_spec_decode_mixed_batches
+        )
+        if (
+            self._mixed_verify_width is not None
+            and not self._allow_mixed_verify
+        ):
+            logger.warning(
+                "num_speculative_tokens_mixed_batch is set but mixed batches "
+                "do not verify drafts here, so it has no effect."
+            )
 
         self._encoder_cache: VisionEncoderCache[TextAndVisionContext] | None = (
             None
@@ -2399,10 +2490,8 @@ class OverlapTextGenerationPipeline(
         try:
             yield model_inputs
         finally:
-            # Models that maintain per-request SSM / conv state pools
-            # outside the KV cache (e.g. Nemotron-H, Qwen3.5, LFM2) must
-            # release their warmup slots here; otherwise the pool is
-            # exhausted before serving begins.
+            # State slots a model owns itself; KV pages go with the release
+            # below.
             if isinstance(self._pipeline_model, SupportsSSMStateWarmup):
                 self._pipeline_model.release_warmup_state(warmup_request_ids)
             for replica in replica_batches:
@@ -2436,6 +2525,8 @@ class OverlapTextGenerationPipeline(
             else 0
         )
 
+        # Pure-decode widths only. A mixed batch is CE, replay is TG-only, so a
+        # mixed step never reaches a captured graph.
         width_lookup = self._width_lookup
         verify_widths = (
             sorted(set(width_lookup[1 : max_capture_batch_size + 1]))
@@ -2660,10 +2751,17 @@ class OverlapTextGenerationPipeline(
 
         """
         assert self._spec_decode_state is not None
-        if not all(
-            ctx.tokens.generated_length > 0 for ctx in inputs.flat_batch
+        if not _should_verify_drafts(
+            inputs, allow_mixed_batches=self._allow_mixed_verify
         ):
             return 0
+        # Past the gate above, a CE batch is a mixed prefill+decode batch: a
+        # pure prefill batch does not verify at all.
+        if (
+            self._mixed_verify_width is not None
+            and inputs.batch_type == BatchType.CE
+        ):
+            return self._mixed_verify_width
         if self._width_lookup is None:
             return self._spec_decode_state.num_speculative_tokens
         batch_size = max((len(b) for b in inputs.batches), default=0)

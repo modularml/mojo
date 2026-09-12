@@ -123,7 +123,7 @@ def bench_next_power_of_two_int[
 ](mut b: Bencher) raises:
     var _values = _build_list[0, 2**width - 1]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm}:
         for _ in range(10_000):
             for i in range(len(_values)):
@@ -138,7 +138,7 @@ def bench_next_power_of_two_uint[
 ](mut b: Bencher) raises:
     var _values = _build_list[0, 2**width - 1]()
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm}:
         for _ in range(10_000):
             for i in range(len(_values)):

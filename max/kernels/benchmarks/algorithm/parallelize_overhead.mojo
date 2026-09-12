@@ -19,7 +19,7 @@ from std.testing import assert_true
 
 
 def bench_empty_sync_parallelize(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def parallel_fn(thread_id: Int):
         keep(thread_id)
 
@@ -27,7 +27,7 @@ def bench_empty_sync_parallelize(mut b: Bencher) raises:
 
 
 def bench_empty_parallelize(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def parallel_fn(thread_id: Int):
         keep(thread_id)
 

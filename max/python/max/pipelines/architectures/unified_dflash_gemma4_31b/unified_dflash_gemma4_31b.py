@@ -379,7 +379,14 @@ class UnifiedDflashGemma4_31B(Module):
             inputs.input_row_offsets[1:] - inputs.input_row_offsets[:-1]
         ).rebind(["batch_size"])
         decode_commit = (num_accepted + 1).cast(DType.uint32)
-        commit_lengths = ops.where(is_prefill, prompt_lens, decode_commit)
+        # A dummy-draft row inside a K>0 batch is either a decode row with no
+        # real drafts (prompt_lens == 1 == decode_commit, both branches equal)
+        # or a prefill row riding a mixed batch, which commits its whole chunk
+        # into the draft-KV bump. The nested ``ops.where`` calls keep
+        # ``is_dummy_draft`` -- an empty-axis reduction when num_steps == 0 --
+        # off the prefill path.
+        mixed_commit = ops.where(is_dummy_draft, prompt_lens, decode_commit)
+        commit_lengths = ops.where(is_prefill, prompt_lens, mixed_commit)
 
         target_tokens = ops.concat([recovered, bonus], axis=1)
         gather_idx = ops.where(

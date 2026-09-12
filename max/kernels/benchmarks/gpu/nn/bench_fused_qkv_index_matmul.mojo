@@ -282,7 +282,7 @@ def bench_shape(
     ) * elt
 
     # ============ FUSED: one GEMM over the stacked weight ============
-    @always_inline
+    @inline(.always)
     def fused_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut cb_hs, mut cb_w, mut fused_out, imm,}:
@@ -314,7 +314,7 @@ def bench_shape(
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def fused_bench(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, fused_launch, ctx)
 
@@ -328,7 +328,7 @@ def bench_shape(
     )
 
     # ============ UNFUSED: main QKV then indexer QKV (2 calls) ============
-    @always_inline
+    @inline(.always)
     def unfused_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut cb_hs, mut cb_w, mut q_out, mut iq_out, imm,}:
@@ -375,7 +375,7 @@ def bench_shape(
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def unfused_bench(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, unfused_launch, ctx)
 

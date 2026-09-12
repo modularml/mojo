@@ -10,13 +10,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# ===---------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===---------------------------------------------------------------------=== #
 """CLI, eval wrapper, and report for the GPQA logit-shift gate."""
 
 from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import click
@@ -30,10 +42,13 @@ from calibration.gpqa_gate import (
     LiveVerdict,
     ScoredGate,
     make_spec,
+    rate_from_k,
     score_catalog,
     score_results,
     score_spec,
+    subset_park_rates,
 )
+from calibration.gpqa_gate_report import write_report
 
 GPQA_EVAL = "//max/tests/integration/accuracy/model_evals:gpqa_eval"
 
@@ -51,6 +66,7 @@ def _parse_row_ids(raw: str) -> list[int]:
 
 def scored_to_dict(cfg: ScoredGate) -> dict[str, object]:
     spec = cfg.spec
+    acc_h, acc_r, stop_h, stop_r = subset_park_rates(spec)
     return {
         "name": spec.name,
         "hist_mode": spec.hist_mode,
@@ -79,6 +95,12 @@ def scored_to_dict(cfg: ScoredGate) -> dict[str, object]:
         "base_acc": cfg.base_acc,
         "acc_h": cfg.acc_h,
         "acc_r": cfg.acc_r,
+        "subset_acc_h": acc_h,
+        "subset_acc_r": acc_r,
+        "subset_stop_h": stop_h,
+        "subset_stop_r": stop_r,
+        "acc_rate_cutoff": rate_from_k(cfg.acc_cutoff, cfg.cost),
+        "stop_rate_cutoff": rate_from_k(cfg.stop_cutoff, cfg.cost),
     }
 
 
@@ -86,7 +108,8 @@ def print_catalog(rows: list[ScoredGate]) -> None:
     if not rows:
         return
     click.echo(
-        f"{'name':<28} {'n':>4} {'m':>5} {'cost':>7} {'stopSNR':>8} {'accSNR':>8}"
+        f"{'name':<28} {'n':>4} {'m':>5} {'cost':>7} "
+        f"{'stopSNR':>8} {'accSNR':>8}"
     )
     for cfg in rows:
         click.echo(
@@ -129,180 +152,6 @@ def run_gpqa_eval(
     if not results.is_file():
         raise FileNotFoundError(f"gpqa_eval did not write {results}")
     return results
-
-
-def _svg(
-    path: Path, title: str, points: list[tuple[str, float, float]], ylabel: str
-) -> None:
-    xs = [max(p[1], 1) for p in points]
-    ys = [p[2] for p in points]
-    pad, w, h = 56, 640, 320
-    xmax, ymax = max(xs) * 1.15, (max(ys) or 1.0) * 1.25
-    body = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}">',
-        f'<rect width="{w}" height="{h}" fill="white"/>',
-        f'<text x="{w / 2}" y="20" text-anchor="middle" font-size="14">{title}</text>',
-        f'<line x1="{pad}" y1="{h - pad}" x2="{w - 24}" y2="{h - pad}" stroke="#333"/>',
-        f'<line x1="{pad}" y1="36" x2="{pad}" y2="{h - pad}" stroke="#333"/>',
-        f'<text x="14" y="{h / 2}" font-size="11" transform="rotate(-90 14 {h / 2})">{ylabel}</text>',
-    ]
-    for name, x, y in points:
-        px = pad + x / xmax * (w - pad - 24)
-        py = (h - pad) - y / ymax * (h - pad - 36)
-        body.append(
-            f'<circle cx="{px:.1f}" cy="{py:.1f}" r="5" fill="#2563eb"/>'
-        )
-        body.append(
-            f'<text x="{px + 7:.1f}" y="{py - 6:.1f}" font-size="10">{name}</text>'
-        )
-    body.append("</svg>")
-    path.write_text("\n".join(body) + "\n")
-
-
-def write_report(
-    work_dir: Path,
-    rows: list[ScoredGate],
-    selected: ScoredGate | None,
-    live: LiveVerdict | None,
-) -> Path:
-    plots = work_dir / "plots"
-    plots.mkdir(parents=True, exist_ok=True)
-    plot_rows = rows or ([selected] if selected is not None else [])
-    if plot_rows:
-        _svg(
-            plots / "cost_vs_snr.svg",
-            "Cost vs stop SNR",
-            [(c.spec.name, float(c.cost), c.stop_snr) for c in plot_rows],
-            "stop SNR",
-        )
-    if live is not None and selected is not None and live.status != "error":
-        observed: list[tuple[str, float, float]] = []
-        if selected.stop_cutoff is not None:
-            observed.extend(
-                [
-                    ("stop S", 1.0, float(live.n_trunc)),
-                    ("stop k", 2.0, float(selected.stop_cutoff)),
-                ]
-            )
-        if selected.acc_cutoff is not None:
-            observed.extend(
-                [
-                    ("acc S", 3.0, float(live.n_wrong)),
-                    ("acc k", 4.0, float(selected.acc_cutoff)),
-                ]
-            )
-        if observed:
-            _svg(
-                plots / "observed_s.svg",
-                "Observed S vs cutoff",
-                observed,
-                "count",
-            )
-    if live is None:
-        metrics = []
-        if selected is None or selected.spec.want_stop:
-            metrics.append("a 0.5pp stop drop (98.5% → 98.0%)")
-        if selected is None or selected.spec.want_acc:
-            metrics.append("a 1pp accuracy drop (92.5% → 91.5%)")
-        joint = (
-            "Joint m is max of the enabled solvers. "
-            if selected is None
-            or (selected.spec.want_stop and selected.spec.want_acc)
-            else "Repeats are sized from the enabled metric only. "
-        )
-        verdict, rationale = (
-            "compare-only",
-            (
-                "No live eval. Default is bins x noisy_15 detecting "
-                + " and ".join(metrics)
-                + f" at 1% caps. {joint}"
-                "plus_bucket adds the 12 rares at ≥3%; ever_trunc is all 49."
-            ),
-        )
-    else:
-        mark = {"pass": "✅ pass", "fail": "❌ fail", "error": "⚠️ error"}
-        verdict, rationale = mark[live.status], live.rationale
-    lines = [
-        "# GPQA logit-gate report",
-        "",
-        "## Verdict",
-        "",
-        f"**{verdict}**",
-        "",
-        rationale,
-        "",
-        "## Configurations",
-        "",
-        "| Config | n | m | Cost | Stop SNR | Acc SNR | k_stop | k_acc |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
-
-    def _k(value: int | None) -> str:
-        return "-" if value is None else str(value)
-
-    table_rows = rows or ([selected] if selected is not None else [])
-    for cfg in table_rows:
-        lines.append(
-            f"| `{cfg.spec.name}` | {len(cfg.spec.prompt_ids)} | {cfg.n_repeats} | "
-            f"**{cfg.cost}** | {cfg.stop_snr:.3f} | {cfg.acc_snr:.3f} | "
-            f"{_k(cfg.stop_cutoff)} | {_k(cfg.acc_cutoff)} |"
-        )
-    if selected is not None:
-        selected_lines = [
-            "",
-            "## Selected",
-            "",
-            f"- `{selected.spec.name}` ids={selected.spec.prompt_ids}",
-            "- metrics: "
-            + ", ".join(
-                name
-                for name, on in (
-                    ("stop", selected.spec.want_stop),
-                    ("accuracy", selected.spec.want_acc),
-                )
-                if on
-            ),
-        ]
-        if selected.spec.want_stop:
-            selected_lines.append(
-                f"- stop park {selected.stop_h:.4%} → {selected.stop_r:.4%} "
-                f"(H pinned, R = H - {selected.spec.delta_stop:.2%})"
-            )
-        if selected.spec.want_acc:
-            selected_lines.append(
-                f"- acc park {selected.acc_h:.4%} → {selected.acc_r:.4%} "
-                f"(H pinned, R = H - {selected.spec.delta_acc:.2%})"
-            )
-        designed = next(
-            (cfg for cfg in rows if cfg.spec.name == selected.spec.name), None
-        )
-        if designed is not None and (
-            designed.n_repeats != selected.n_repeats
-            or designed.spec.prompt_ids != selected.spec.prompt_ids
-        ):
-            selected_lines.append(
-                f"- override: designed n={len(designed.spec.prompt_ids)} "
-                f"m={designed.n_repeats} cost={designed.cost}; "
-                f"smoke n={len(selected.spec.prompt_ids)} m={selected.n_repeats} "
-                f"cost={selected.cost}"
-            )
-        selected_lines.extend(
-            [
-                f"- n={len(selected.spec.prompt_ids)} m={selected.n_repeats} "
-                f"cost={selected.cost} stop k={_k(selected.stop_cutoff)} "
-                f"acc k={_k(selected.acc_cutoff)}",
-                "",
-            ]
-        )
-        lines.extend(selected_lines)
-    lines.extend(["## Plots", ""])
-    if (plots / "cost_vs_snr.svg").exists():
-        lines.append("- [Cost vs stop SNR](plots/cost_vs_snr.svg)")
-    if (plots / "observed_s.svg").exists():
-        lines.append("- [Observed S vs cutoff](plots/observed_s.svg)")
-    path = work_dir / "REPORT.md"
-    path.write_text("\n".join(lines) + "\n")
-    return path
 
 
 def run_gate(
@@ -374,12 +223,18 @@ def run_gate(
                 n_repeats=selected.n_repeats,
                 out_dir=work_dir / "eval",
             )
-        live = score_results(results, selected)
+        live = replace(
+            score_results(results, selected),
+            model=model,
+            base_url=base_url,
+        )
         (work_dir / "verdict.json").write_text(
             json.dumps(asdict(live), indent=2) + "\n"
         )
         click.echo(f"[{live.status}] {live.rationale}")
-    report = write_report(work_dir, rows, selected, live)
+    report = write_report(
+        work_dir, rows, selected, live, model=model, base_url=base_url
+    )
     click.echo(f"Wrote report: {report}")
     if live is not None and live.status == "fail":
         raise SystemExit(1)
@@ -395,13 +250,13 @@ def run_gate(
     "--hist",
     "hist_mode",
     type=click.Choice(HIST_MODES),
-    default="bins",
+    default="per_prompt",
     show_default=True,
 )
 @click.option(
     "--subset",
     type=click.Choice(SUBSETS),
-    default="noisy_15",
+    default="plus_bucket",
     show_default=True,
 )
 @click.option("--base-url", default=None)
@@ -429,7 +284,10 @@ def run_gate(
     "--row-ids", default=None, help="Comma-separated prompt indexes (smoke)."
 )
 @click.option(
-    "--catalog/--no-catalog", "include_catalog", default=True, show_default=True
+    "--catalog/--no-catalog",
+    "include_catalog",
+    default=True,
+    show_default=True,
 )
 def main(
     list_configs: bool,

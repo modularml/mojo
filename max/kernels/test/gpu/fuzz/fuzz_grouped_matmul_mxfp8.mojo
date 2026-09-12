@@ -44,7 +44,7 @@
 # so a token's result must not depend on what it is co-batched with. A failure
 # would mean someone added M-keyed dispatch or a cross-partition reduction.
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from std.math import align_up, ceildiv, max, min
 from std.random import rand, random_ui64, seed
 from std.sys import size_of

@@ -73,8 +73,12 @@ from structured_kernels.trace_buf import GmemTrace, NullTrace
 
 
 def _string_to_int_list(s: String) raises -> List[Int]:
-    """Parse `[a, b, c]` (or `a,b,c`) into a `List[Int]`."""
-    var stripped = s.strip("[]")
+    """Parse `[a, b, c]`, `a,b,c` or `a;b;c` into a `List[Int]`.
+
+    kbench splits a swept value on commas, so a per-group list that is
+    itself swept must separate its entries with semicolons.
+    """
+    var stripped = s.strip("[]").replace(";", ",")
     var out = List[Int]()
     for tok in stripped.split(","):
         try:
@@ -477,7 +481,7 @@ def main() raises:
             trace_buf_dev.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
         )
 
-        @always_inline
+        @inline(.always)
         def kernel_launch(
             ctx: DeviceContext, iteration: Int
         ) raises {
@@ -674,7 +678,7 @@ def main() raises:
                             attributes=pdl_launch_attributes(PDLLevel.ON),
                         )
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, kernel_launch, ctx)
 

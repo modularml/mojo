@@ -41,7 +41,7 @@ from nn.gather_scatter import scatter_nd_generator
 comptime itype = DType.int64
 
 
-@no_inline
+@inline(.never)
 def run_row_scatter[
     dtype: DType, rows: Int, cols: Int, num_idx: Int
 ](mut m: Bench, ctx: DeviceContext) raises:
@@ -63,11 +63,11 @@ def run_row_scatter[
     var upd_tt = TileTensor(upd_dev, row_major[num_idx, cols]())
     var idx_tt = TileTensor(idx_dev, row_major[num_idx, 1]())
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) raises {var data_tt, var out_tt, var upd_tt, var idx_tt, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             scatter_nd_generator[target="gpu"](
                 data_tt, idx_tt, upd_tt, out_tt, ctx
@@ -98,7 +98,7 @@ def run_row_scatter[
     _ = idx_host
 
 
-@no_inline
+@inline(.never)
 def run_elem_scatter[
     dtype: DType, rows: Int, cols: Int, num_idx: Int
 ](mut m: Bench, ctx: DeviceContext) raises:
@@ -120,11 +120,11 @@ def run_elem_scatter[
     var upd_tt = TileTensor(upd_dev, row_major[num_idx]())
     var idx_tt = TileTensor(idx_dev, row_major[num_idx, 2]())
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) raises {var data_tt, var out_tt, var upd_tt, var idx_tt, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             scatter_nd_generator[target="gpu"](
                 data_tt, idx_tt, upd_tt, out_tt, ctx

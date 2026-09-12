@@ -148,7 +148,7 @@ conform to `ConvertibleFromPython`) methods exist:
 - in the`Bool` struct in `Mojo/stdlib/std/builtin/bool.mojo`
 - in the`Int` struct in `Mojo/stdlib/std/builtin/int.mojo`
 - in the`String` struct in `Mojo/stdlib/std/collections/String.mojo`
-- in the `SIMD` struct in `Mojo/stdlib/std/builtin/simd.mojo`
+- in the `SIMD` struct in `Mojo/stdlib/std/simd.mojo`
 
 And also the `to_python_object` methods (from `PythonConvertible` trait):
 

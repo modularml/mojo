@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.builtin.simd import FastMathFlag
+from std.simd import FastMathFlag
 from std.compile import compile_info
 from std.testing import TestSuite, assert_false, assert_true
 

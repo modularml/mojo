@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import std.builtin.simd as _simd
+import std.simd as _simd
 import std.collections.string
 from .aliases import function, StructWithAlias
 

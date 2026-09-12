@@ -296,7 +296,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
         comptime num_reg_mma_store = 80
         var batch_size = Int(scalar_args.raw_load(0))
         var q_max_seq_len = Int(scalar_args.raw_load(1))
-        var num_partitions = mla_decode_pack.num_partitions
+        var num_partitions = Int(mla_decode_pack.num_partitions)
         var mask = mla_decode_pack.mask
         var valid_length = mla_decode_pack.valid_length
         var lse_accum_split_ptr = mla_decode_pack.lse_accum_split_ptr
@@ -622,7 +622,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
     # gather WG's 4 elected lanes.  Caller acquires the KV stage.
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _gather_tile(
         mut kv_prod: DecodeKVProducer[Self.kv_type, Self.config],
         warp_in_wg: Int,
@@ -723,7 +723,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
     # after the original cache.
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def gather_load(
         q_tma: QOTMATile[
             dtype=Self.q_type,
@@ -865,7 +865,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
     # matches the dense BF16 reader.
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.q_type]],
@@ -939,7 +939,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
     # MMA PV warp (warp 13).  P SMEM aliases the rope slot of KV SMEM.
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.q_type]],

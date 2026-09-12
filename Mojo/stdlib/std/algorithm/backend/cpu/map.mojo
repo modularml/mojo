@@ -18,7 +18,7 @@
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def map(size: Int, func: Some[def(Int) -> None]):
     """Maps a function over the integer range [0, size).
     This lets you apply an integer index-based operation across data

@@ -26,7 +26,7 @@ from std.memory import (
 )
 from std.reflection import SourceLocation
 from std.sys import size_of
-from std.sys.info import _current_target, _TargetType
+from std.sys.info import _current_target
 
 from .device_context import (
     _checked_call,
@@ -67,14 +67,7 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
         """Initializes the encoder with an empty buffer list."""
         self._buffers = []
 
-    @staticmethod
-    def target() -> _TargetType:
-        """Returns the target architecture this encoder is encoding for.
-
-        Returns:
-            The target architecture this encoder is encoding for.
-        """
-        return _current_target()
+    comptime _raw_mlir_target = _current_target()
 
     def encode_device_ptr[
         DevicePointerType: DevicePointerLike
@@ -97,7 +90,7 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
         self._buffers.append(handle.value().unsafe_bitcast[_DeviceBufferCpp]())
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def call_with_pack_metal[
     func: Some[TrivialRegisterPassable],
@@ -215,7 +208,7 @@ def call_with_pack_metal[
         )
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def call_with_pack_checked_metal[
     func: Some[TrivialRegisterPassable],

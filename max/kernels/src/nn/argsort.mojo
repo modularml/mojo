@@ -101,7 +101,7 @@ def _argsort_cpu[
     )
 
 
-@always_inline
+@inline(.always)
 def _sentinel_val[dtype: DType, ascending: Bool]() -> Scalar[dtype]:
     """
     Returns a sentinel value based on sort direction.

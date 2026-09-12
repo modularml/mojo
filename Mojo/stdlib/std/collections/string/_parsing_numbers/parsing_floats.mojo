@@ -53,7 +53,7 @@ struct UInt128Decomposed(ImplicitlyCopyable, RegisterPassable):
 
 
 def _get_w_and_q_from_float_string(
-    input_string: StringSlice[mut=False, _],
+    input_string: StringSlice,
 ) raises -> Tuple[UInt64, Int64]:
     """We suppose the number is in the form '123.2481' or '123' or '123e-2' or '12.3e2'.
 
@@ -164,11 +164,11 @@ def _get_w_and_q_from_float_string(
     return (significand_as_integer, Int64(exponent_as_integer))
 
 
-def strip_unused_characters(x: StringSlice[mut=False, _]) -> type_of(x):
+def strip_unused_characters(x: StringSlice[_]) -> type_of(x):
     return x.strip().removeprefix("+").removesuffix("f").removesuffix("F")
 
 
-def get_sign(x: StringSlice[mut=False, _]) -> Tuple[Float64, type_of(x)]:
+def get_sign(x: StringSlice[_]) -> Tuple[Float64, type_of(x)]:
     if x.startswith("-"):
         return (-1.0, x[byte=1:])
     return (1.0, x)
@@ -308,7 +308,7 @@ def lemire_algorithm(var w: UInt64, var q: Int64) -> Float64:
 comptime _ascii_lower: Byte = Byte(ord("A") ^ ord("a"))
 
 
-@always_inline
+@inline(.always)
 def _is_nan(stripped: StringSlice) -> Bool:
     comptime `n` = Byte(ord("n"))
     comptime `a` = Byte(ord("a"))
@@ -320,7 +320,7 @@ def _is_nan(stripped: StringSlice) -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _is_inf(stripped: StringSlice) -> Bool:
     comptime `i` = Byte(ord("i"))
     comptime `n` = Byte(ord("n"))

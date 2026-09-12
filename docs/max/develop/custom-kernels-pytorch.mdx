@@ -142,7 +142,7 @@ struct Grayscale:
         """
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def color_to_grayscale[
             simd_width: Int
         ](idx: Coord) -> SIMD[.uint8, simd_width]:

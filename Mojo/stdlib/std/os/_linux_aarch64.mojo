@@ -124,22 +124,22 @@ struct _c_stat(Copyable, Defaultable, Writable):
         )
 
 
-@always_inline
+@inline(.always)
 def _stat(var path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__xstat", Int32](
-        Int32(0), path.as_c_string_slice(), Pointer(to=stat)
+        Int32(0), path.as_c_string_span(), Pointer(to=stat)
     )
     if err == -1:
         raise Error("unable to stat '", path, "'")
     return stat^
 
 
-@always_inline
+@inline(.always)
 def _lstat(var path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__lxstat", Int32](
-        Int32(0), path.as_c_string_slice(), Pointer(to=stat)
+        Int32(0), path.as_c_string_span(), Pointer(to=stat)
     )
     if err == -1:
         raise Error("unable to lstat '", path, "'")

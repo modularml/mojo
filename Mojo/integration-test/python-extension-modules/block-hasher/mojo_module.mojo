@@ -65,7 +65,7 @@ struct PyArrayObject[dtype: DType](ImplicitlyCopyable):
         return num_elts
 
 
-@always_inline
+@inline(.always)
 def _mojo_block_hasher[
     dtype: DType,
     //,

@@ -119,7 +119,7 @@ def run_rms_norm_fused_residual_gpu[
 
     # Define input functions
     @__copy_capture(input_tensor)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[
         width: Int, _rank: Int
@@ -127,7 +127,7 @@ def run_rms_norm_fused_residual_gpu[
         return input_tensor.load[width=width](rebind[IndexList[rank]](coords))
 
     @__copy_capture(residual_tensor)
-    @always_inline
+    @inline(.always)
     @__parameter
     def residual_input_fn[
         width: Int, _rank: Int
@@ -138,7 +138,7 @@ def run_rms_norm_fused_residual_gpu[
 
     # Define output functions
     @__copy_capture(output_tensor)
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_fn[
         width: SIMDLength, alignment: Int
@@ -146,7 +146,7 @@ def run_rms_norm_fused_residual_gpu[
         output_tensor.store[width=width](coords, val)
 
     @__copy_capture(residual_output_tensor)
-    @always_inline
+    @inline(.always)
     @__parameter
     def residual_output_fn[
         width: SIMDLength, alignment: Int

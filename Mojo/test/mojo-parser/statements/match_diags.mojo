@@ -194,15 +194,22 @@ def match_struct_pattern_diags(v: Vec3):
         pass
 
     __match v:
-    # expected-error @+1 {{duplicate field 'x' in struct pattern}}
-    case Vec3(0, x=1):
+    # expected-error @+1 {{struct patterns do not support positional or unpacked arguments}}
+    case Vec3(0, y=1):
         pass
     case _:
         pass
 
     __match v:
-    # expected-error @+1 {{too many positional subpatterns for 'Vec3' which has 3 fields}}
-    case Vec3(0, 0, 0, 0):
+    # expected-error @+1 {{struct patterns do not support positional or unpacked arguments}}
+    case Vec3(x=0, *y):
+        pass
+    case _:
+        pass
+
+    __match v:
+    # expected-error @+1 {{struct patterns do not support positional or unpacked arguments}}
+    case Vec3(x=0, **y):
         pass
     case _:
         pass

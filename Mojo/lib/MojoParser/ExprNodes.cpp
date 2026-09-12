@@ -4409,156 +4409,6 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     return emitter.emitCValue(value, EC_CondExpr);
   };
 
-  // Returns true if `origin` is defined in a block that dominates `anchorOp`
-  // (i.e., `anchorOp` or one of its ancestors lives in the same block as the
-  // origin). Used to decide whether it is safe to union two MValue lifetimes
-  // across an if-like op.
-  auto isAcceptableSource = [&](Value origin, Operation *anchorOp) -> bool {
-    // Strip off GERs and Rebinds and RefImmutOp, and get the block that
-    // defines the operation or block argument.
-    origin = OriginTrackable::findUnderlyingValueFromField(origin);
-    if (!origin)
-      return false;
-    Block *originBlock = origin.getParentBlock();
-    Operation *curOp = anchorOp;
-    // Scan up the region tree.
-    do {
-      if (curOp->getBlock() == originBlock)
-        return true; // Found a dominating block containing the origin.
-      curOp = curOp->getParentOp();
-    } while (curOp);
-    return false;
-  };
-
-  // Handles the "both sides are MValues" case for an if-like op (HLCF::ElifOp
-  // or ParamIfOp). `yieldValue(v)` emits the branch terminator that yields
-  // the converted SSA value.
-  auto handleTwoMValuesForIfOp =
-      [&](Operation *ifLikeOp, CValue trueVal, CValue falseVal,
-          function_ref<void(Value)> yieldValue) -> AnyValue {
-    // This only applies to things that are already memory references.
-    if (!falseVal.isMValue() || !trueVal.isMValue())
-      return {};
-
-    // If both operands are MRValues then we can move the value into the
-    // destination instead of forming a reference that requires a copy. Maintain
-    // RValues.
-    if (falseVal.getIfMRValue() && trueVal.getIfMRValue())
-      return {};
-
-    // See if the true and false values directly union together.  This
-    // requires the rvalue types to be the same but allows the reference
-    // types to be different.
-    RefType commonRefType = emitter.getCommonRefType(falseVal.getMValueType(),
-                                                     trueVal.getMValueType());
-    if (!commonRefType)
-      return {};
-
-    // Check to see if the two values dominate the 'if'.  We don't want to
-    // form a union'ed origin that includes an origin for something in the
-    // else block, like an RValue temporary.  Such things will require a copy.
-    //
-    // The ideal thing to do would be to have use-def chains on the origin
-    // itself, which would allow us to handle ref results from functions, but
-    // we don't have that.  Instead, find the underlying values and see if we
-    // can reason about them from the IR tree.
-    Value falseMVal = falseVal.getMValueReference();
-    Value trueMVal = trueVal.getMValueReference();
-    if (!isAcceptableSource(trueMVal, ifLikeOp) ||
-        !isAcceptableSource(falseMVal, ifLikeOp))
-      return {};
-
-    // Ok, at this point we are committed. Emit a conversion to the common
-    // type in each branch and produce the result as the right MValue type.
-    // ifLikeOp->getRegion(0) is the then-region, getRegion(1) the else-region
-    // for both HLCF::ElifOp and ParamIfOp.
-    auto emitBranch = [&](Region &region, const ExprNode *expr, Value value) {
-      emitter.builder->setInsertionPointToEnd(&region.front());
-      auto conv =
-          emitter.emitZeroCostConvert({SRValue(value), expr}, commonRefType);
-      assert(conv && "getCommonRefType failed");
-      auto convVal = conv.getIfSRValue();
-      assert(convVal && "zero cost convert changed value type");
-      yieldValue(convVal);
-    };
-    emitBranch(ifLikeOp->getRegion(0), trueExpr, trueMVal);
-    emitBranch(ifLikeOp->getRegion(1), falseExpr, falseMVal);
-    emitter.builder->setInsertionPointAfter(ifLikeOp);
-
-    // Ensure the correct type is used.
-    ifLikeOp->getResult(0).setType(commonRefType);
-
-    // Compute the right IRValue type based on what we were given, we know the
-    // inputs are some kind of MValue.
-    AnyValue result;
-    // TODO: CheckLifetimes cannot handle consumption of indirect RValues.
-    // if (falseVal.getIfMRValue() && trueVal.getIfMRValue())
-    //   result = MRValue(ifLikeOp->getResult(0));
-    if (falseVal.getIfMLValue() && trueVal.getIfMLValue())
-      result = MLValue(ifLikeOp->getResult(0));
-    else if (falseVal.getIfMBPValue() && trueVal.getIfMBPValue())
-      result = MBPValue(ifLikeOp->getResult(0));
-    else
-      result = MBValue(ifLikeOp->getResult(0));
-    return emitter.emitResult(result, this, dest);
-  };
-
-  // Handles the register-passable case for an if-like op (HLCF::ElifOp or
-  // ParamIfOp). Emits SRValue conversions in each branch, yields them, and
-  // fixes up the op result type. Returns {} if not register-passable.
-  auto handleRegPassableForIfOp =
-      [&](Operation *ifLikeOp, CValue trueVal, CValue falseVal,
-          function_ref<void(Value)> yieldValue) -> AnyValue {
-    if (!trueVal.getRValueType().isRegisterPassable(trueExpr->getLoc(),
-                                                    emitter.shared))
-      return {};
-    emitter.builder->setInsertionPointToEnd(&ifLikeOp->getRegion(1).front());
-    auto falseSR = emitter.emitSRValue({falseVal, falseExpr}, EC_CondExpr);
-    if (!falseSR)
-      return {};
-    yieldValue(falseSR);
-    emitter.builder->setInsertionPointToEnd(&ifLikeOp->getRegion(0).front());
-    auto trueSR = emitter.emitSRValue({trueVal, trueExpr}, EC_CondExpr);
-    if (!trueSR)
-      return {};
-    yieldValue(trueSR);
-    emitter.builder->setInsertionPointAfter(ifLikeOp);
-    ifLikeOp->getResult(0).setType(trueSR.getType());
-    return emitter.emitResult(SRValue(ifLikeOp->getResult(0)), this, dest);
-  };
-
-  // Handles the memory-only case for an if-like op. Emits stores into a shared
-  // scratch buffer from each branch, then recreates the op without a result
-  // (there is no way to remove results after op creation). `yieldEmpty()`
-  // emits the empty branch terminator; `recreate()` creates the result-free
-  // replacement op.
-  auto handleMemoryOnlyForIfOp =
-      [&](Operation *ifLikeOp, CValue trueVal, CValue falseVal,
-          function_ref<void()> yieldEmpty,
-          function_ref<Operation *()> recreate) -> AnyValue {
-    emitter.builder->setInsertionPoint(ifLikeOp);
-    MLValue destBuffer =
-        dest.getMLValueForResult(getLoc(), trueVal.getRValueType(), emitter);
-
-    emitter.builder->setInsertionPointToEnd(&ifLikeOp->getRegion(1).front());
-    ExprDest falseDest(destBuffer, EC_CondExpr);
-    (void)emitter.emitResult(falseVal, falseExpr, falseDest);
-    yieldEmpty();
-
-    emitter.builder->setInsertionPointToEnd(&ifLikeOp->getRegion(0).front());
-    ExprDest trueDest(destBuffer, EC_CondExpr);
-    (void)emitter.emitResult(trueVal, trueExpr, trueDest);
-    yieldEmpty();
-
-    emitter.builder->setInsertionPointAfter(ifLikeOp);
-    Operation *newOp = recreate();
-    newOp->getRegion(0).takeBody(ifLikeOp->getRegion(0));
-    newOp->getRegion(1).takeBody(ifLikeOp->getRegion(1));
-    ifLikeOp->erase();
-
-    return emitter.emitCResult(MRValue(destBuffer), this, dest);
-  };
-
   // Emit a branch expression under `assumption`, inserted into a fresh child
   // scope of the emitter's declScope so that `conforms_to`-based type
   // refinement applies within the branch without leaking the assumption to
@@ -4660,38 +4510,9 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
       return {};
     }
 
-    if (AnyValue result =
-            handleTwoMValuesForIfOp(paramIfOp, trueVal, falseVal, [&](Value v) {
-              ParamYieldOp::create(*emitter.builder, ifLoc, ValueRange{v});
-            }))
-      return result;
-
-    auto configEmitter = [&](bool isLHS) {
-      Block &b = isLHS ? paramIfOp.getThenRegion().front()
-                       : paramIfOp.getElseRegion().front();
-      emitter.builder->setInsertionPointToEnd(&b);
-    };
-    if (emitter.coerceTypesToEachOther(getLoc(), trueVal, trueExpr, falseVal,
-                                       falseExpr, configEmitter,
-                                       dest.getExpectedTypeIfSpecified())) {
-      dest.resetForError(emitter);
-      return {};
-    }
-
-    if (AnyValue result = handleRegPassableForIfOp(
-            paramIfOp, trueVal, falseVal, [&](Value v) {
-              ParamYieldOp::create(*emitter.builder, ifLoc, ValueRange{v});
-            }))
-      return result;
-
-    // Memory-only: allocate a destBuffer and store into it from each branch.
-    // The paramIfOp carries no result value; recreate it without one.
-    return handleMemoryOnlyForIfOp(
-        paramIfOp, trueVal, falseVal,
-        [&] { ParamYieldOp::create(*emitter.builder, ifLoc); },
-        [&]() -> Operation * {
-          return ParamIfOp::create(*emitter.builder, ifLoc, condPVal.get());
-        });
+    return emitter.mergeCValuesAcrossIfLikeOp(paramIfOp, ifLoc, getLoc(),
+                                              trueVal, trueExpr, falseVal,
+                                              falseExpr, this, dest);
   }
 
   Value condValue =
@@ -4725,47 +4546,9 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     return {};
   }
 
-  // If both results were M values and both sides agree with the result type,
-  // then we can propagate the result as an MValue that has a merged lifetime.
-  if (AnyValue result =
-          handleTwoMValuesForIfOp(ifOp, trueVal, falseVal, [&](Value v) {
-            HLCF::YieldOp::create(*emitter.builder, ifLoc, v);
-          }))
-    return result;
-
-  /// If the types disagree, then we need to emit a conversion to a common
-  /// type. See if one is convertible to the other, and if so, emit a
-  /// conversion to get to a common type.
-  auto configEmitter = [&](bool isLHS) {
-    Block &b = isLHS ? ifOp.getThenBlock() : ifOp.getElseBlock();
-    emitter.builder->setInsertionPointToEnd(&b);
-  };
-  if (emitter.coerceTypesToEachOther(getLoc(), trueVal, trueExpr, falseVal,
-                                     falseExpr, configEmitter,
-                                     dest.getExpectedTypeIfSpecified())) {
-    dest.resetForError(emitter);
-    return {};
-  }
-
-  // RegisterPassable values get merged together as SSA registers in the result.
-  if (AnyValue result =
-          handleRegPassableForIfOp(ifOp, trueVal, falseVal, [&](Value v) {
-            HLCF::YieldOp::create(*emitter.builder, ifLoc, v);
-          }))
-    return result;
-
-  // If we have a memory only type, we have to handle the various issues with
-  // the ExprDest.  It may specify an MLValue to emit into, it may be
-  // ambiguous (like a call argument) or it may even be something like a
-  // DLValue.  We handle this by projecting the ExprDest to an MLValue if we
-  // can, but otherwise using a scratch buffer if not.
-  return handleMemoryOnlyForIfOp(
-      ifOp, trueVal, falseVal,
-      [&] { HLCF::YieldOp::create(*emitter.builder, ifLoc); },
-      [&]() -> Operation * {
-        return HLCF::ElifOp::create(*emitter.builder, ifLoc, TypeRange{},
-                                    condValue);
-      });
+  return emitter.mergeCValuesAcrossIfLikeOp(ifOp, ifLoc, getLoc(), trueVal,
+                                            trueExpr, falseVal, falseExpr, this,
+                                            dest);
 }
 
 /// Emit the comparison expression with operator ops[opIdx] and operands:

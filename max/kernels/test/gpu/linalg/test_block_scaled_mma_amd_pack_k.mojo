@@ -31,7 +31,7 @@ routed FP4 MoE kernel's inner-loop scale amortization relies on
 selectors per scale word).
 """
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE, lane_id
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import MI355X
@@ -46,7 +46,7 @@ from linalg.arch.amd.block_scaled_mma import (
 )
 
 
-@always_inline
+@inline(.always)
 def _broadcast_scale_word(value: Float32) -> Int32:
     """Pack one E8M0 scale across all 4 bytes of an Int32."""
     var scale_byte = bitcast[.uint8](
@@ -60,7 +60,7 @@ def _broadcast_scale_word(value: Float32) -> Int32:
     )
 
 
-@always_inline
+@inline(.always)
 def _packed_scale_word(
     b0: Float32, b1: Float32, b2: Float32, b3: Float32
 ) -> Int32:

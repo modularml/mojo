@@ -131,14 +131,14 @@ struct BlockingScopedLock[origin: MutOrigin, //]:
 
         self.lock = Pointer(to=lock)
 
-    @no_inline
+    @inline(.never)
     def __enter__(mut self):
         """Acquire the lock on entry.
         This is done by setting the owner of the lock to own address."""
         var address = Pointer(to=self)
         self.lock[].lock(Int(address))
 
-    @no_inline
+    @inline(.never)
     def __exit__(mut self):
         """Release the lock on exit.
         Reset the address on the underlying lock."""

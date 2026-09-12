@@ -75,44 +75,44 @@ struct WarpRole(TrivialRegisterPassable):
     comptime Scheduler = Self(4)
     comptime Epilogue = Self(3)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self._role == Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._role == other._role
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._role != other._role
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Int) -> Bool:
         return self._role >= Int32(other)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_main_load() -> Bool:
         return Self.MainLoad == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         return Self.Mma == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         return Self.Epilogue >= get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_scheduler() -> Bool:
         return Self.Scheduler == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue_load() -> Bool:
         """Check if current warp is the epilogue load warp (loads source C)."""
         return Self.EpilogueLoad == get_warp_id()
@@ -123,9 +123,9 @@ struct WarpRole(TrivialRegisterPassable):
 # =============================================================================
 
 
-struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
-    TrivialRegisterPassable
-):
+struct WarpRole1D1D[
+    has_sfb: Bool = False, num_epi_warps: Int = 4, num_send_warps: Int = 0
+](TrivialRegisterPassable):
     """Warp role for 1D-1D kernels with warp specialization.
 
     Parameterized on `has_sfb` so the SFB TMA-load / TMEM-load warps (and the
@@ -157,6 +157,10 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
             enabled on the MMA_N < 64 path (defaults to `False`).
         num_epi_warps: Number of epilogue warps in the warp pool, grown
             for kernels with heavier consumer phases (defaults to 4).
+        num_send_warps: Number of extra warps appended ABOVE the scheduler
+            for a second consumer of the epilogue's SMEM output tile
+            (defaults to 0, which leaves every other role's thread range
+            byte-identical).
     """
 
     comptime NUM_EPILOGUE_THREADS = Self.num_epi_warps * 32
@@ -165,6 +169,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
     comptime NUM_SFB_TMA_LOAD_THREADS = 32  # 1 warp
     comptime NUM_SFB_LOAD_THREADS = 128  # 4 warps
     comptime NUM_SCHEDULER_THREADS = 32
+    comptime NUM_SEND_THREADS = Self.num_send_warps * 32
 
     comptime EPILOGUE_WARP_START = 0
     comptime LOAD_WARP_START = Self.NUM_EPILOGUE_THREADS
@@ -192,18 +197,24 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         + Self.NUM_SFB_TMA_LOAD_THREADS
         + Self.NUM_SFB_LOAD_THREADS
     )
-    comptime TOTAL_THREADS_WITH_SCHED = (
+    # Send warps sit at the TOP of the thread space so every role below keeps
+    # its exact thread range: at `num_send_warps == 0` this is a no-op and
+    # `TOTAL_THREADS_WITH_SCHED` is unchanged.
+    comptime SEND_WARP_START = (
         Self.SCHEDULER_WARP_START + Self.NUM_SCHEDULER_THREADS
+    )
+    comptime TOTAL_THREADS_WITH_SCHED = (
+        Self.SEND_WARP_START + Self.NUM_SEND_THREADS
     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         """Returns True if current thread is in an epilogue warp (warps 0-3)."""
         return thread_idx.x < Self.LOAD_WARP_START
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_load() -> Bool:
         """Returns True if current thread is in the TMA load warp (warp 4)."""
         return (
@@ -212,7 +223,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         """Returns True if current thread is in the MMA warp (warp 5)."""
         return (
@@ -221,7 +232,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_sfb_tma_load() -> Bool:
         """Returns True if current thread is in the SFB TMA load warp (warp 6).
 
@@ -235,7 +246,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_sfb_load() -> Bool:
         """Returns True if current thread is in an SFB TMEM load warp (warps 7-10).
 
@@ -248,17 +259,38 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_scheduler() -> Bool:
         """Returns True if current thread is in the scheduler warp.
 
         Scheduler = warp 6 when `has_sfb = False`, else warp 11. The scheduler
         warp precomputes tile info into SMEM for consumer warps.
         """
-        return thread_idx.x >= Self.SCHEDULER_WARP_START
+        # This boundary is open-ended above by design (callers rely on it), so
+        # it has to be closed explicitly once send warps exist above it.
+        comptime if Self.num_send_warps > 0:
+            return (
+                thread_idx.x >= Self.SCHEDULER_WARP_START
+                and thread_idx.x < Self.SEND_WARP_START
+            )
+        else:
+            return thread_idx.x >= Self.SCHEDULER_WARP_START
 
     @staticmethod
-    @always_inline
+    @inline(.always)
+    def is_send() -> Bool:
+        """Returns True if current thread is in a send warp.
+
+        Bounded above because a co-resident comm class, when present, is
+        partitioned above `TOTAL_THREADS_WITH_SCHED`.
+        """
+        return (
+            thread_idx.x >= Self.SEND_WARP_START
+            and thread_idx.x < Self.TOTAL_THREADS_WITH_SCHED
+        )
+
+    @staticmethod
+    @inline(.always)
     def epilogue_role_index() -> Int:
         """Returns this thread's warp index WITHIN the epilogue pool.
 
@@ -269,7 +301,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         return ufloordiv(thread_idx.x - Self.EPILOGUE_WARP_START, WARP_SIZE)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue_leader() -> Bool:
         """Returns True for the single leader thread of the epilogue pool.
 
@@ -331,7 +363,7 @@ struct KernelContext[
     comptime TmemAddrArray = SMemArray[UInt32, 1]
     var ptr_tmem_addr: SMemPtr[UInt32]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr_tmem_addr: SMemPtr[UInt32]):
         """Initialize context from TMEM pointer; computes all derived state.
 
@@ -387,7 +419,7 @@ struct KernelContext[
         # TMEM pointer
         self.ptr_tmem_addr = ptr_tmem_addr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, tmem_addr: Self.TmemAddrArray):
         """Initialize context from typed TMEM address array.
 
@@ -403,7 +435,7 @@ struct KernelContext[
 # =============================================================================
 
 
-@always_inline
+@inline(.always)
 def compute_tma_tile_dims[
     BM: Int,
     BN: Int,
@@ -441,7 +473,7 @@ def compute_tma_tile_dims[
     return StaticTuple[Int, 3](a_tile_dim0, b_tile_dim0, c_tile_dim0)
 
 
-@always_inline
+@inline(.always)
 def compute_clc_barrier_counts[
     SCHEDULER_THREADS: Int,
     TMA_LOAD_THREADS: Int,
@@ -475,7 +507,7 @@ def compute_clc_barrier_counts[
     )
 
 
-@always_inline
+@inline(.always)
 def compute_accum_barrier_counts[
     EPILOGUE_THREADS: Int,
     cta_group: Int,
@@ -500,7 +532,7 @@ def compute_accum_barrier_counts[
 # =============================================================================
 
 
-@always_inline
+@inline(.always)
 def compute_input_consumer_count[
     CLUSTER_M: Int,
     CLUSTER_N: Int,
@@ -530,7 +562,7 @@ def compute_input_consumer_count[
         return base
 
 
-@always_inline
+@inline(.always)
 def init_core_barriers[
     num_input_stages: Int,
     num_accum_stages: Int,
@@ -579,7 +611,7 @@ def init_core_barriers[
     tmem_dealloc_ptr[].init(tmem_dealloc_thread_count)
 
 
-@always_inline
+@inline(.always)
 def init_clc_barriers[
     num_clc_stages: Int
 ](

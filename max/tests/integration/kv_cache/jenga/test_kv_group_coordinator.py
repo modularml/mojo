@@ -30,15 +30,17 @@ from max.pipelines.kv_cache.paged_kv_cache.kv_group_coordinator import (
     KVGroupCoordinatorInterface,
     SlidingWindowKVGroupCoordinator,
 )
+from max.pipelines.request.base import RequestID
 
 BLOCK_SIZE = 4
 
 VALUES = "attn/values"
 SCALES = "attn/scales"
-RATIOS = {VALUES: 8, SCALES: 32}
+STATE = "recurrent"
+RATIOS = {VALUES: 8, SCALES: 32, STATE: 2}
 
 # Deliberately not a multiple of the block size: the window a model asks for
-# rarely lands on a page boundary.
+# rarely lands on a block boundary.
 WINDOW = 17
 WINDOW_BLOCKS = 4
 
@@ -68,11 +70,33 @@ def commit(
             pool.free_block(block)
 
 
+def full_group_across(
+    pools: Sequence[JengaBlockPool], leaf_ids: Sequence[str] = (VALUES,)
+) -> KVGroupCoordinatorInterface:
+    """A full group whose pools are one per data-parallel replica."""
+    return create_kv_group_coordinator(
+        list(pools), list(leaf_ids), KVCacheGroupId.full(), BLOCK_SIZE
+    )
+
+
 def full_group(
     pool: JengaBlockPool, leaf_ids: Sequence[str] = (VALUES,)
 ) -> KVGroupCoordinatorInterface:
+    return full_group_across([pool], leaf_ids)
+
+
+def sliding_group_across(
+    pools: Sequence[JengaBlockPool],
+    window: int = WINDOW,
+    block_size: int = BLOCK_SIZE,
+    leaf_ids: Sequence[str] = (VALUES,),
+) -> KVGroupCoordinatorInterface:
+    """A sliding group whose pools are one per data-parallel replica."""
     return create_kv_group_coordinator(
-        [pool], list(leaf_ids), KVCacheGroupId.full(), BLOCK_SIZE
+        list(pools),
+        list(leaf_ids),
+        KVCacheGroupId("sliding_window", window),
+        block_size,
     )
 
 
@@ -82,12 +106,16 @@ def sliding_group(
     block_size: int = BLOCK_SIZE,
     leaf_ids: Sequence[str] = (VALUES,),
 ) -> KVGroupCoordinatorInterface:
-    return create_kv_group_coordinator(
-        [pool],
-        list(leaf_ids),
-        KVCacheGroupId("sliding_window", window),
-        block_size,
-    )
+    return sliding_group_across([pool], window, block_size, leaf_ids)
+
+
+def with_row(
+    group: KVGroupCoordinatorInterface, blocks: Sequence[LittleKVCacheBlock]
+) -> tuple[RequestID, list[LittleKVCacheBlock]]:
+    """Seeds one request's row and returns the list the group mutates."""
+    req_id = RequestID()
+    group.rows[req_id] = {leaf_id: list(blocks) for leaf_id in group.leaf_ids}
+    return req_id, group.rows[req_id][group.leaf_ids[0]]
 
 
 def bids(blocks: Sequence[LittleKVCacheBlock]) -> list[int]:
@@ -139,10 +167,10 @@ def test_a_hash_is_present_only_when_every_leaf_holds_it() -> None:
     group = full_group(pool, [VALUES, SCALES])
 
     commit(pool, [VALUES], keys)
-    assert not group.is_in_prefix_cache(keys[0], 0)
+    assert group.find_replica_with_hash(keys[0], 0) is None
 
     commit(pool, [SCALES], keys)
-    assert group.is_in_prefix_cache(keys[0], 0)
+    assert group.find_replica_with_hash(keys[0], 0) == 0
 
 
 def test_full_hit_is_the_run_from_the_root() -> None:
@@ -259,8 +287,7 @@ def test_sliding_claim_refuses_a_window_it_did_not_validate() -> None:
     assert all(block.is_null for block in row)
 
 
-def test_claiming_revives_parked_pages() -> None:
-    """A hit takes back bytes that were up for grabs."""
+def test_claiming_revives_parked_blocks() -> None:
     pool = make_pool()
     keys = block_keys(3)
     commit(pool, [VALUES], keys)
@@ -272,58 +299,87 @@ def test_claiming_revives_parked_pages() -> None:
     assert all(block.ref_cnt == 1 for block in row[VALUES])
 
 
-def test_null_pad_is_a_no_op_for_an_unbounded_group() -> None:
+def test_extend_appends_device_blocks_then_loaded_ones() -> None:
     pool = make_pool()
-    rows = {VALUES: [pool.alloc_block(VALUES) for _ in range(6)]}
-    before = list(rows[VALUES])
+    group = full_group(pool)
+    req_id, row = with_row(group, [])
+    hit = [pool.alloc_block(VALUES) for _ in range(2)]
+    loaded = [pool.alloc_block(VALUES) for _ in range(2)]
 
-    full_group(pool).null_pad_blocks(
-        rows, num_committed_blocks=6, replica_idx=0
+    group.extend(req_id, {VALUES: hit}, {VALUES: loaded}, 0)
+
+    assert bids(row) == bids([*hit, *loaded])
+
+
+def test_a_null_first_loaded_block_drops_the_device_blocks() -> None:
+    # A null first loaded block means the window has slid past every
+    # earlier block, so the device ones are dead and should be freed.
+    pool = make_pool()
+    group = sliding_group(pool)
+    req_id, row = with_row(group, [])
+    hit = [pool.alloc_block(VALUES) for _ in range(2)]
+    free_before = pool.num_free_blocks(VALUES)
+    loaded = [pool.null_little_blocks[VALUES], pool.alloc_block(VALUES)]
+
+    group.extend(req_id, {VALUES: hit}, {VALUES: loaded}, 0)
+
+    assert all(block.is_null for block in row[:2]), "device blocks dropped"
+    assert pool.num_free_blocks(VALUES) > free_before - len(loaded), (
+        "the device blocks went back to the pool"
     )
 
-    assert rows[VALUES] == before
 
-
-def test_null_pad_returns_the_pages_below_the_window() -> None:
+def test_advance_is_a_no_op_for_an_unbounded_group() -> None:
     pool = make_pool()
-    rows = {VALUES: [pool.alloc_block(VALUES) for _ in range(10)]}
+    group = full_group(pool)
+    req_id, row = with_row(group, [pool.alloc_block(VALUES) for _ in range(6)])
+    before = list(row)
+
+    group.advance(req_id, num_committed_blocks=6, replica_idx=0)
+
+    assert row == before
+
+
+def test_advance_returns_the_blocks_below_the_window() -> None:
+    pool = make_pool()
+    group = sliding_group(pool)
+    req_id, row = with_row(group, [pool.alloc_block(VALUES) for _ in range(10)])
     free_before = pool.num_free_blocks(VALUES)
 
-    sliding_group(pool).null_pad_blocks(
-        rows, num_committed_blocks=10, replica_idx=0
-    )
+    group.advance(req_id, num_committed_blocks=10, replica_idx=0)
 
     slid_past = 10 - WINDOW_BLOCKS
-    assert [block.is_null for block in rows[VALUES]] == [True] * slid_past + [
+    assert [block.is_null for block in row] == [True] * slid_past + [
         False
     ] * WINDOW_BLOCKS
     assert pool.num_free_blocks(VALUES) == free_before + slid_past
 
 
-def test_null_pad_keeps_a_window_that_has_not_slid() -> None:
+def test_advance_keeps_a_window_that_has_not_slid() -> None:
     pool = make_pool()
-    rows = {VALUES: [pool.alloc_block(VALUES) for _ in range(WINDOW_BLOCKS)]}
-
-    sliding_group(pool).null_pad_blocks(
-        rows, num_committed_blocks=WINDOW_BLOCKS, replica_idx=0
+    group = sliding_group(pool)
+    req_id, row = with_row(
+        group, [pool.alloc_block(VALUES) for _ in range(WINDOW_BLOCKS)]
     )
 
-    assert not any(block.is_null for block in rows[VALUES])
+    group.advance(req_id, num_committed_blocks=WINDOW_BLOCKS, replica_idx=0)
+
+    assert not any(block.is_null for block in row)
 
 
-def test_null_pad_stops_at_the_first_null() -> None:
-    """Running twice must not hand the same page back twice."""
+def test_advance_stops_at_the_first_null() -> None:
+    """Running twice must not hand the same block back twice."""
     pool = make_pool()
-    rows = {VALUES: [pool.alloc_block(VALUES) for _ in range(10)]}
     group = sliding_group(pool)
+    req_id, row = with_row(group, [pool.alloc_block(VALUES) for _ in range(10)])
 
-    group.null_pad_blocks(rows, num_committed_blocks=10, replica_idx=0)
-    settled = list(rows[VALUES])
+    group.advance(req_id, num_committed_blocks=10, replica_idx=0)
+    settled = list(row)
     free_after_first = pool.num_free_blocks(VALUES)
 
-    group.null_pad_blocks(rows, num_committed_blocks=10, replica_idx=0)
+    group.advance(req_id, num_committed_blocks=10, replica_idx=0)
 
-    assert rows[VALUES] == settled
+    assert row == settled
     assert pool.num_free_blocks(VALUES) == free_after_first
 
 
@@ -337,3 +393,95 @@ def test_only_the_group_leaves_are_touched() -> None:
 
     assert set(rows) == {VALUES}
     assert all(pool.prefix_caches[SCALES][key].ref_cnt == 0 for key in keys)
+
+
+def test_find_replica_prefers_local_even_when_peers_are_searchable() -> None:
+    """A block the replica already holds must never source a copy."""
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[0], [VALUES], keys)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert (
+        group.find_replica_with_hash(keys[0], 0, allow_cross_replica=True) == 0
+    )
+    assert (
+        group.find_replica_with_hash(keys[0], 1, allow_cross_replica=True) == 1
+    )
+
+
+def test_find_replica_falls_back_to_a_peer_when_allowed() -> None:
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert (
+        group.find_replica_with_hash(keys[0], 0, allow_cross_replica=True) == 1
+    )
+
+
+def test_find_replica_ignores_a_peer_when_not_allowed() -> None:
+    """Peer search is opt-in, so a local miss stays a miss by default."""
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert group.find_replica_with_hash(keys[0], 0) is None
+
+
+def test_find_replica_spreads_peer_reads_across_holders() -> None:
+    """Two ranks wanting one block read from different holders.
+
+    Taking the first holder would put every copy of a popular prefix on the
+    lowest-indexed replica and leave the others' links idle.
+    """
+    pools = [make_pool() for _ in range(4)]
+    keys = block_keys(4)
+    commit(pools[0], [VALUES], keys)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    for key in keys:
+        assert (
+            group.find_replica_with_hash(key, 2, allow_cross_replica=True) == 0
+        )
+        assert (
+            group.find_replica_with_hash(key, 3, allow_cross_replica=True) == 1
+        )
+
+
+def test_find_replica_returns_none_when_absent() -> None:
+    group = full_group_across([make_pool(), make_pool()])
+    key = block_keys(1)[0]
+
+    assert group.find_replica_with_hash(key, 0) is None
+    assert (
+        group.find_replica_with_hash(key, 0, allow_cross_replica=True) is None
+    )
+
+
+def test_full_claims_every_hash() -> None:
+    """The whole prefix is claimed, so every hash is worth copying."""
+    keys = block_keys(3)
+    group = full_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys
+
+
+def test_sliding_claims_only_its_window() -> None:
+    """Blocks below the window are nulled, so copying them would be waste."""
+    keys = block_keys(8)
+    group = sliding_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys[-WINDOW_BLOCKS:]
+
+
+def test_sliding_claims_a_prefix_shorter_than_its_window() -> None:
+    """A run reaching the root is claimable however short it is."""
+    keys = block_keys(2)
+    group = sliding_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys

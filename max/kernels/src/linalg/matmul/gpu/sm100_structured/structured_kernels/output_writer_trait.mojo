@@ -42,7 +42,7 @@ trait-typed writer *value*:
 - A trait *associated* type / value erases to its declared bound, so a writer
   obtained as a trait-typed value cannot have `write_batched` called on it
   (its associated `CTileArray` / `Stage` arg types are opaque, and matching a
-  by-value-`Tuple` requirement against an `@always_inline` impl trips a
+  by-value-`Tuple` requirement against an `@inline(.always)` impl trips a
   parameter-origin mismatch). Keeping the construct-and-write step *inside* the
   policy static method dodges erasure entirely: there the writer is concrete,
   and `c_tiles` / `stage` are the shared `SMemTileArray2DRowMajor[...]` /

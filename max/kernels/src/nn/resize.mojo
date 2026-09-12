@@ -40,17 +40,17 @@ struct CoordinateTransformationMode(ImplicitlyCopyable):
     comptime Asymmetric = CoordinateTransformationMode(2)
     comptime HalfPixel1D = CoordinateTransformationMode(3)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, value: Int):
         self.value = value
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: CoordinateTransformationMode) -> Bool:
         return self.value == other.value
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def coord_transform[
     mode: CoordinateTransformationMode
 ](out_coord: Int, in_dim: Int, out_dim: Int, scale: Float32) -> Float32:
@@ -107,11 +107,11 @@ struct RoundMode(ImplicitlyCopyable):
     comptime Floor = RoundMode(2)
     comptime Ceil = RoundMode(3)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, value: Int):
         self.value = value
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: RoundMode) -> Bool:
         return self.value == other.value
 
@@ -123,7 +123,7 @@ struct InterpolationMode(ImplicitlyCopyable):
     var value: Int
     comptime Linear = InterpolationMode(0)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: InterpolationMode) -> Bool:
         return self.value == other.value
 
@@ -136,23 +136,23 @@ struct Interpolator[mode: InterpolationMode](
 
     var cubic_coeff: Float32
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, cubic_coeff: Float32):
         self.cubic_coeff = cubic_coeff
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.cubic_coeff = 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def filter_length() -> Int:
         comptime assert (
             Self.mode == InterpolationMode.Linear
         ), "InterpolationMode not supported"
         return 1
 
-    @always_inline
+    @inline(.always)
     def filter(self, x: Float32) -> Float32:
         comptime assert (
             Self.mode == InterpolationMode.Linear
@@ -191,7 +191,7 @@ def resize_nearest_neighbor[
         ]()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def round[dtype: DType](val: Scalar[dtype]) -> Scalar[dtype]:
         comptime if round_mode == RoundMode.HalfDown:
             return ceil(val - 0.5)
@@ -233,7 +233,7 @@ def resize_nearest_neighbor[
     elementwise[1](nn_interpolate, output.layout.shape_coord(), ctx)
 
 
-@always_inline
+@inline(.always)
 def linear_filter(x: Float32) -> Float32:
     """This is a tent filter.
 
@@ -251,7 +251,7 @@ def linear_filter(x: Float32) -> Float32:
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def interpolate_point_1d[
     InputLayoutType: TensorLayout,
     //,

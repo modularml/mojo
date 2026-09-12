@@ -35,7 +35,7 @@ from std.memory import (
 # where `op` is the operation and `operand` is the register to operate on.
 
 
-@always_inline
+@inline(.always)
 def _no_op_imms[op: Int32, imm: Int32]():
     # In Apple's Accelerate, instruction 17 is apparently always prefixed by
     # three nops.
@@ -47,7 +47,7 @@ def _no_op_imms[op: Int32, imm: Int32]():
     ](op, imm)
 
 
-@always_inline
+@inline(.always)
 def _op_gpr[op: Int32](gpr: Int64):
     inlined_assembly[
         ".word (0x201000 + ($0 << 5) + 0$1 - ((0$1 >> 4) * 6))",
@@ -59,17 +59,17 @@ def _op_gpr[op: Int32](gpr: Int64):
 
 # The `set` and `clr` take no non-constant operands, and so we pass them as
 # immediate values via meta parameters.
-@always_inline
+@inline(.always)
 def _set():
     _no_op_imms[17, 0]()
 
 
-@always_inline
+@inline(.always)
 def _clr():
     _no_op_imms[17, 1]()
 
 
-@always_inline
+@inline(.always)
 def ldx(gpr: Int):
     """Loads data from the memory address encoded in gpr into an AMX X register row.
 
@@ -79,7 +79,7 @@ def ldx(gpr: Int):
     _op_gpr[0](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def ldy(gpr: Int):
     """Loads data from the memory address encoded in gpr into an AMX Y register row.
 
@@ -89,7 +89,7 @@ def ldy(gpr: Int):
     _op_gpr[1](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def stx(gpr: Int):
     """Stores an AMX X register row to the memory address encoded in gpr.
 
@@ -99,7 +99,7 @@ def stx(gpr: Int):
     _op_gpr[2](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def sty(gpr: Int):
     """Stores an AMX Y register row to the memory address encoded in gpr.
 
@@ -109,7 +109,7 @@ def sty(gpr: Int):
     _op_gpr[3](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def ldz(gpr: Int):
     """Loads data from the memory address encoded in gpr into an AMX Z accumulator row.
 
@@ -119,7 +119,7 @@ def ldz(gpr: Int):
     _op_gpr[4](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def stz(gpr: Int):
     """Stores an AMX Z accumulator row to the memory address encoded in gpr.
 
@@ -129,7 +129,7 @@ def stz(gpr: Int):
     _op_gpr[5](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def ldzi(gpr: Int):
     """Loads data from the memory address encoded in gpr into an AMX Z accumulator row using interleaved layout.
 
@@ -140,7 +140,7 @@ def ldzi(gpr: Int):
     _op_gpr[6](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def stzi(gpr: Int):
     """Stores an AMX Z accumulator row to the memory address encoded in gpr using interleaved layout.
 
@@ -151,7 +151,7 @@ def stzi(gpr: Int):
     _op_gpr[7](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def extrx(gpr: Int):
     """
     Extracts a row or moves it to x, result in amx0.
@@ -162,7 +162,7 @@ def extrx(gpr: Int):
     _op_gpr[8](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def extry(gpr: Int):
     """
     Extracts a row or moves it to y, result in amx0.
@@ -173,7 +173,7 @@ def extry(gpr: Int):
     _op_gpr[9](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fma64(gpr: Int):
     """
     Float64 matrix multiply and add.
@@ -184,7 +184,7 @@ def fma64(gpr: Int):
     _op_gpr[10](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fsm64(gpr: Int):
     """
     Float64 matrix multiply and subtract.
@@ -195,7 +195,7 @@ def fsm64(gpr: Int):
     _op_gpr[11](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fma32(gpr: Int):
     """
     Float32 matrix multiply and add.
@@ -206,7 +206,7 @@ def fma32(gpr: Int):
     _op_gpr[12](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fsm32(gpr: Int):
     """
     Float32 matrix multiply and subtract.
@@ -217,7 +217,7 @@ def fsm32(gpr: Int):
     _op_gpr[13](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def mac16(gpr: Int):
     """
     SI16 matrix multiply and add.
@@ -228,7 +228,7 @@ def mac16(gpr: Int):
     _op_gpr[14](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fma16(gpr: Int):
     """
     Float16 matrix multiply and subtract.
@@ -239,7 +239,7 @@ def fma16(gpr: Int):
     _op_gpr[15](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def fms16(gpr: Int):
     """
     Float16 matrix multiply and add.
@@ -250,7 +250,7 @@ def fms16(gpr: Int):
     _op_gpr[16](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def vec_int__(gpr: Int):
     """
     Horizontal ui16 multiply `z0[i] += x0[i] + y0[i]`.
@@ -258,7 +258,7 @@ def vec_int__(gpr: Int):
     _op_gpr[18](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def vecfp(gpr: Int):
     """
     Horizontal float16 multiply `z0[i] += x0[i] + y0[i]`.
@@ -266,7 +266,7 @@ def vecfp(gpr: Int):
     _op_gpr[19](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def max_int__(gpr: Int):
     """
     UI16 matrix multiply.
@@ -277,7 +277,7 @@ def max_int__(gpr: Int):
     _op_gpr[20](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def matfp(gpr: Int):
     """
     Float16 matrix multiply.
@@ -288,7 +288,7 @@ def matfp(gpr: Int):
     _op_gpr[21](Int64(gpr))
 
 
-@always_inline
+@inline(.always)
 def genlut(gpr: Int):
     """Issues the Apple AMX genlut instruction using the address encoded in gpr.
 
@@ -322,7 +322,7 @@ def genlut(gpr: Int):
 #   is the opposite, taking X[idx][:] and write to the memory location `ptr`.
 
 
-@always_inline
+@inline(.always)
 def _encode_load_store[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[Scalar[dtype], _], start_index: Int) -> Int:
@@ -336,7 +336,7 @@ def _encode_load_store[
     return src_idx
 
 
-@always_inline
+@inline(.always)
 def store_x[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[Scalar[dtype], _], start_index: Int):
@@ -353,7 +353,7 @@ def store_x[
     ldx(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def store_y[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[Scalar[dtype], _], start_index: Int):
@@ -370,7 +370,7 @@ def store_y[
     ldy(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def store_z[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[Scalar[dtype], _], start_index: Int):
@@ -387,7 +387,7 @@ def store_z[
     ldz(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def read_x[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[mut=True, Scalar[dtype], _], start_index: Int):
@@ -404,7 +404,7 @@ def read_x[
     stx(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def read_y[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[mut=True, Scalar[dtype], _], start_index: Int):
@@ -421,7 +421,7 @@ def read_y[
     sty(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def load_z[
     row_count: Int, dtype: DType
 ](src: UnsafePointer[mut=True, Scalar[dtype], _], start_index: Int):
@@ -438,7 +438,7 @@ def load_z[
     stz(_encode_load_store[row_count, dtype](src, start_index))
 
 
-@always_inline
+@inline(.always)
 def transpose_z_to_x_or_y[
     destination: StaticString, dtype: DType
 ](z_col_index: Int, xy_row_index: Int, z_row_suboffset: Int):
@@ -506,7 +506,7 @@ def transpose_z_to_x_or_y[
     extry(operand)
 
 
-@always_inline
+@inline(.always)
 def fma[
     mode: StaticString, dtype: DType
 ](z_row_index: Int, x_row_index: Int, y_row_index: Int, clear_z: Bool):
@@ -564,7 +564,7 @@ def fma[
     fma32(operand)
 
 
-@always_inline
+@inline(.always)
 def dot_at_b(
     c: TileTensor[mut=True, address_space=.GENERIC, ...],
     a: type_of(c),

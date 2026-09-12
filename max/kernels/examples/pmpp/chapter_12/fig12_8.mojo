@@ -28,7 +28,7 @@ comptime NUM_WARPS = BLOCK_DIM // WARP_SIZE
 
 
 # ========================== DEVICE FUNCTIONS ==========================
-@always_inline
+@inline(.always)
 def cond(val: UInt32) -> Bool:
     """Filter: keep only even numbers.
 

@@ -72,7 +72,7 @@ def _test_exception_handling_api(cpy: CPython) raises:
     cpy.PyErr_Clear()
 
     cpy.PyErr_SetString(
-        ValueError, msg.as_c_string_slice().ptr().as_unsafe_any_origin()
+        ValueError, msg.as_c_string_span().ptr().as_unsafe_any_origin()
     )
     assert_true(cpy.PyErr_Occurred())
 
@@ -340,7 +340,7 @@ def _test_module_object_api(cpy: CPython) raises:
     # returns 0 on success, -1 on failure
     assert_equal(
         cpy.PyModule_AddObjectRef(
-            mod, name.as_c_string_slice().ptr().as_unsafe_any_origin(), n
+            mod, name.as_c_string_span().ptr().as_unsafe_any_origin(), n
         ),
         0,
     )

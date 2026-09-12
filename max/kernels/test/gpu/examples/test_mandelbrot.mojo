@@ -38,7 +38,7 @@ comptime min_y = -1.12
 comptime max_y = 1.12
 
 
-@always_inline
+@inline(.always)
 def mandelbrot_kernel[
     simd_width: SIMDLength
 ](c: ComplexSIMD[float_type, simd_width]) -> SIMD[int_type, simd_width]:
@@ -68,7 +68,7 @@ def mandelbrot(out_ptr: MutPointer[Scalar[int_type], MutAnyOrigin]):
     comptime scale_x = (max_x - min_x) / width
     comptime scale_y = (max_y - min_y) / height
 
-    @always_inline
+    @inline(.always)
     def compute_vector[simd_width: Int](col: Int) {mut}:
         """Each time we operate on a `simd_width` vector of pixels."""
         if col >= width:
@@ -96,7 +96,7 @@ def run_mandelbrot(ctx: DeviceContext) raises:
 
     var out_device = ctx.enqueue_create_buffer[int_type](width * height)
 
-    @always_inline
+    @inline(.always)
     def run_mandelbrot(ctx: DeviceContext) raises {imm}:
         ctx.enqueue_function[mandelbrot](
             out_device,

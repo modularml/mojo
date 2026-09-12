@@ -58,7 +58,7 @@ def bench_copy[
 def bench_fill[
     T: Copyable & Defaultable & Deinitable, size: Int
 ](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var array = Array[T, size](fill=T())
         keep(array)
@@ -69,7 +69,7 @@ def bench_fill[
 def bench_default_init[
     T: Copyable & Defaultable & Deinitable, size: Int
 ](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var array = Array[T, size]()
         keep(array)
@@ -82,7 +82,7 @@ def bench_eq[size: Int](mut b: Bencher) raises:
     var lhs = Array[Int, size](fill=0)
     var rhs = Array[Int, size](fill=0)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm lhs, imm rhs}:
         var res = black_box(lhs) == black_box(rhs)
         keep(res)
@@ -95,7 +95,7 @@ def bench_lt[size: Int](mut b: Bencher) raises:
     var lhs = Array[Int, size](fill=0)
     var rhs = Array[Int, size](fill=0)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm lhs, imm rhs}:
         var res = black_box(lhs) < black_box(rhs)
         keep(res)
@@ -107,7 +107,7 @@ def bench_contains_miss[size: Int](mut b: Bencher) raises:
     """Searches for an absent value, which never short-circuits."""
     var array = Array[Int, size](fill=0)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm array}:
         var res = black_box(1) in black_box(array)
         keep(res)
@@ -118,7 +118,7 @@ def bench_contains_miss[size: Int](mut b: Bencher) raises:
 def bench_iter[size: Int](mut b: Bencher) raises:
     var array = Array[Int, size](fill=1)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm array}:
         var total = 0
         for el in black_box(array):

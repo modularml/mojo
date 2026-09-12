@@ -457,7 +457,7 @@ def dispatch_im2col_matmul_conv3d[
             comptime epilogue_5d = maybe_epilogue_func.value()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(DHW_out, HW_out, H_out, W_out, _m_offset)
             def _gemm_epilogue[
                 _dtype: DType,

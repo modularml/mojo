@@ -27,7 +27,7 @@ comptime epilogue_func_type = def[
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def epilogue_test_fn[
     dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](

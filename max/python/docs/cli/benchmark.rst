@@ -115,9 +115,68 @@
         with `instruct-coder`, `agentic-code`, or `nemotron-opencode`. Turn
         count comes from `--random-num-turns` (see the `random` dataset below).
 
+      - `--agentic-tool-profiles`: Append an agent loop after each human
+        turn, synthesized from per-tool distributions rather than replayed.
+        A profile is the load one tool call produces, not a tool the model may
+        invoke -- nothing here is sent as the OpenAI `tools` field, which is
+        `--tool-calls` / `--no-tool-calls` on `nemotron-opencode`. Requires
+        `--fit-distributions` and `--agentic-rounds-per-turn`. Takes either a
+        path to a YAML file or an inline YAML/JSON mapping -- the inline form
+        is the file's own content, so there is one shape to learn::
+
+          --agentic-tool-profiles '{"tools":[{"input-len":"N(200,80)","output-len":"N(30,10)"}]}'
+
+        A file is easier once there is more than one tool::
+
+          tools:
+            - weight: 5              # a shell-like tool: small result, fast
+              input-len: N(30,20)
+              output-len: N(25,8)
+              delay: N(50,20)
+            - weight: 2              # a file read: large result, slower
+              input-len: LN(7.5,1.2)
+              output-len: N(60,20)
+              delay: N(300,120)
+
+        A session then runs as::
+
+          S U0 (A1* U1*  A2* U2*  ...  Ax* Ux*) A0   U1 A1   ...
+
+        Starred messages are the loop: `Aj*` is the call to tool `j`, `Uj*` is
+        that tool's result. Each `Uj*` is one request. Delete the parentheses
+        and `S U0 A0 U1 A1` is exactly what a turn with no rounds produces.
+        Each round picks a tool by `weight`, which is relative rather than a
+        probability and defaults to 1, so omitting it everywhere gives a fair
+        share and adding a tool never requires rebalancing the others.
+
+        Per tool, `input-len` is the result it returns (`Uj*`) and `delay` is
+        how long it took. `output-len` is the assistant message that *invokes*
+        it (`Aj*`) -- a tool call, so usually small -- because that is where
+        the decode actually sits. `--random-output-len` describes `A0`, the
+        prose answer that closes the block, since that is the reply the human
+        sees.
+
+        Tool results go on the wire as `role: user`, which keeps strict
+        user/assistant alternation and renders on every chat template. Human
+        turns keep using the `random_*` flags, so
+        `--random-input-len "first;rest"` still shapes first-versus-remaining
+        human turns; `;` is rejected inside a per-tool value, where it would
+        rebind on reorder.
+
+        Supported on `instruct-coder`, `agentic-code`, and `nemotron-opencode`
+        with `--fit-distributions` (not on `random` or `synthetic`). On
+        `agentic-code`, rounds draw their bodies from recorded `tool`
+        messages; the other two reuse the user-text pool.
+
+      - `--agentic-rounds-per-turn`: How many agent-loop rounds follow each human
+        turn, sampled once per turn. Accepts a constant or a
+        distribution string. Requires `--agentic-tool-profiles`.
+
       - `--delay-between-chat-turns`: Delay between chat turns in
         milliseconds. Accepts a constant or a distribution string (same format as
-        `--random-input-len`).
+        `--random-input-len`). With `--agentic-tool-profiles`, this is the
+        human think-time: rounds use their own per-tool `delay`, and only the
+        reply that closes a block waits this long.
 
       - `--workload-config`: YAML file specifying benchmark workload options
         (hyphenated keys such as `num-prompts` and `seed`). CLI flags override
@@ -274,7 +333,10 @@
 
       - `--random-input-len`: Input tokens per request. Accepts a constant or a
         distribution string: `N(mean,std)`, `U(lower,upper)`, `DU(lower,upper)`,
-        `NB(n,p)`, `G(shape,scale)`, or `LN(mean,std)`. Use `;` to set
+        `NB(n,p)`, `G(shape,scale)`, `LN(mean,std)`, `Burr12(c,d,scale)`, or
+        `Cat(v1:w1,v2:w2,...)` for an explicit weighted set of values (for
+        example, `Cat(512:0.7,1024:0.2,2048:0.1)`; omit `:weight` for a
+        uniform choice among the listed values). Use `;` to set
         separate distributions for the first and subsequent turns (for example,
         `N(2048,200);N(512,50)`). Default: `1024`.
       - `--random-output-len`: Output tokens per request. Same format as
@@ -294,7 +356,17 @@
       - `--random-image-count`: Images to attach per request (enables vision
         mode on this dataset). Default: `0`.
       - `--random-image-size`: Pixel dimensions of generated images (for
-        example, `512x512`). Used with `--random-image-count`.
+        example, `512,512`). Used with `--random-image-count`.
+      - `--image-fraction`, `--image-count`, `--image-long-side`,
+        `--image-aspect-ratio`, `--image-turn`: Dataset-agnostic image
+        mixing, usable with any text-generation dataset (including
+        `instruct-coder`). See the "Multimodal" flag group. Mutually
+        exclusive with `--random-image-count` / `--random-image-size`.
+        `--image-long-side` and `--image-aspect-ratio` both accept any
+        distribution string, including `Cat(...)`, so you can match an
+        empirical shape distribution measured from real traffic instead of
+        approximating it with a parametric one — for example,
+        `--image-long-side "Cat(1024:0.7,512:0.2,2048:0.1)"`.
 
     - `synthetic`: Synthetic text generation workload that uses the same
       distribution flags as `random`, but generates synthetic token IDs instead

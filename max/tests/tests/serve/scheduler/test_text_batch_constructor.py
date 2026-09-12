@@ -96,6 +96,7 @@ def set_mock_kv_usage(cache: Mock, used_fraction: float) -> None:
 def create_mock_kv_cache() -> Mock:
     """Create a mock paged KV cache manager with minimal interface."""
     cache = Mock()
+    cache.chunk_alignment_tokens = 0
     cache.max_seq_len = 2048
     cache.page_size = 16
     cache.get_total_num_pages = Mock(return_value=128)
@@ -174,6 +175,7 @@ def test_text_batch_constructor__batch_construction_without_chunked_prefill_no_p
     )
 
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock()
     kv_cache.alloc.return_value = CompletedTransfer.load()
     kv_cache.claim = Mock()
@@ -276,6 +278,7 @@ def test_text_batch_constructor__batch_construction_no_requests(
     )
 
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock()
     kv_cache.alloc.return_value = CompletedTransfer.load()
     kv_cache.claim = Mock()
@@ -333,6 +336,7 @@ def test_text_batch_constructor__batch_construction_no_room_in_cache(
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock(side_effect=InsufficientBlocksError)
     kv_cache.claim = Mock()
     kv_cache.contains = Mock()
@@ -375,6 +379,7 @@ def test_text_batch_constructor__insufficient_blocks_defers_then_retries(
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock(
         side_effect=[
             InsufficientBlocksError("insufficient blocks"),
@@ -430,6 +435,7 @@ def _presence_test_setup(
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock(
         side_effect=InsufficientBlocksError("insufficient blocks")
     )
@@ -484,6 +490,7 @@ def _fatal_test_batch_constructor(
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.pending_transfers_exist = Mock(
         return_value=pending_transfers_exist
     )
@@ -585,6 +592,7 @@ def test_text_batch_constructor__tg_insufficient_blocks_preempts_ce_block_holder
         return CompletedTransfer.load()
 
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock(side_effect=alloc)
     kv_cache.claim = Mock()
     kv_cache.release = Mock(side_effect=release)
@@ -633,6 +641,7 @@ def test_text_batch_constructor__batch_construction_with_chunked_prefill_and_pre
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock()
     kv_cache.alloc.return_value = CompletedTransfer.load()
     kv_cache.claim = Mock()
@@ -759,6 +768,7 @@ def test_text_batch_constructor__batch_construction_with_chunked_prefill_and_inf
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock()
     kv_cache.alloc.return_value = CompletedTransfer.load()
     kv_cache.claim = Mock()
@@ -823,6 +833,7 @@ def test_text_batch_constructor__batch_construction_without_chunked_prefill_and_
         target_tokens_per_batch_ce=30,
     )
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = Mock()
     kv_cache.alloc.return_value = CompletedTransfer.load()
     kv_cache.claim = Mock()
@@ -2251,6 +2262,7 @@ class _IncompleteOnload:
 def _make_cordon_kv_cache(alloc: Mock) -> Mock:
     """A minimal KV cache mock for the cordon path with a custom ``alloc``."""
     kv_cache = Mock()
+    kv_cache.chunk_alignment_tokens = 0
     kv_cache.alloc = alloc
     kv_cache.claim = Mock()
     kv_cache.contains = Mock(return_value=False)

@@ -456,6 +456,99 @@ def test_dkv_read_counts_follow_the_console_clause_on_a_write_only_batch() -> (
     assert extra["dkv_read_bytes"] == 0
 
 
+def test_dkv_peer_counters_report_zero_while_a_tier_is_attached() -> None:
+    """An attached tier that pulled from no peer still reports all five zeros.
+
+    This is the whole point of the counters: a flat zero says no cache hint
+    reached the connector, which is a different fault from hints arriving and
+    being rejected, and a missing series distinguishes neither.
+    """
+    metrics = _make_metrics(dkv_connected_clients=1, dkv_total_clients=1)
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_called_once_with(0)
+    mock_metrics.dkv_peer_attach_failures.assert_called_once_with(0)
+    mock_metrics.dkv_peers_dropped.assert_called_once_with(0)
+    mock_metrics.dkv_peer_loads.assert_called_once_with(0)
+    mock_metrics.dkv_peer_load_failures.assert_called_once_with(0)
+    mock_metrics.dkv_hints_rejected.assert_called_once_with(0)
+
+    extra = metrics.to_log_extra()
+    assert extra["dkv_peer_loads"] == 0
+    assert extra["dkv_hints_rejected"] == 0
+
+    # the console line stays quiet, since there is nothing to say about peers
+    assert "dKV peers" not in metrics.pretty_format()
+
+
+def test_dkv_peer_counters_are_silent_without_a_tier() -> None:
+    """No dKV tier attached publishes nothing and logs nothing."""
+    metrics = _make_metrics()
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_not_called()
+    mock_metrics.dkv_peer_loads.assert_not_called()
+    mock_metrics.dkv_hints_rejected.assert_not_called()
+
+    extra = metrics.to_log_extra()
+    assert "dkv_peer_loads" not in extra
+    assert "dkv_hints_rejected" not in extra
+
+
+def test_dkv_peer_counters_carry_their_values_to_every_surface() -> None:
+    """A batch that pulled cross-node reports it on the line, log, and counters."""
+    metrics = _make_metrics(
+        dkv_connected_clients=2,
+        dkv_total_clients=2,
+        dkv_peer_attaches=1,
+        dkv_peer_attach_failures=2,
+        dkv_peers_dropped=6,
+        dkv_peer_loads=3,
+        dkv_peer_load_failures=4,
+        dkv_hints_rejected=5,
+    )
+
+    assert (
+        "dKV peers: 3 loads (4 failed), 1 attaches (2 failed, 6 dropped), "
+        "5 hints rejected" in metrics.pretty_format()
+    )
+
+    extra = metrics.to_log_extra()
+    assert extra["dkv_peer_attaches"] == 1
+    assert extra["dkv_peer_attach_failures"] == 2
+    assert extra["dkv_peers_dropped"] == 6
+    assert extra["dkv_peer_loads"] == 3
+    assert extra["dkv_peer_load_failures"] == 4
+    assert extra["dkv_hints_rejected"] == 5
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_called_once_with(1)
+    mock_metrics.dkv_peer_attach_failures.assert_called_once_with(2)
+    mock_metrics.dkv_peers_dropped.assert_called_once_with(6)
+    mock_metrics.dkv_peer_loads.assert_called_once_with(3)
+    mock_metrics.dkv_peer_load_failures.assert_called_once_with(4)
+    mock_metrics.dkv_hints_rejected.assert_called_once_with(5)
+
+
+def test_dkv_peer_clause_appears_on_rejected_hints_alone() -> None:
+    """Rejected hints with no successful pull still print the clause.
+
+    The gate is any peer activity, not a successful one: a batch whose every
+    hint was rejected is exactly the batch an operator needs the line for.
+    """
+    metrics = _make_metrics(
+        dkv_connected_clients=1, dkv_total_clients=1, dkv_hints_rejected=7
+    )
+
+    assert "7 hints rejected" in metrics.pretty_format()
+
+
 def test_to_log_extra_required_fields() -> None:
     extra = _make_metrics().to_log_extra()
 
@@ -1053,10 +1146,15 @@ def test_batch_metrics_create_tg_with_spec_decode() -> None:
     )
 
 
-def test_batch_metrics_create_ce_with_spec_decode_uses_standard_formula() -> (
-    None
-):
-    """CE batch uses standard throughput formula even when stale spec_metrics leak from a previous TG batch."""
+def test_batch_metrics_create_ce_reports_verified_spec_metrics() -> None:
+    """A CE-labeled iteration reports spec metrics that carry verifications.
+
+    Under the overlap pipeline the spec metrics describe the previously
+    synced batch, not this iteration's batch. Gating on the current batch's
+    type dropped every verify observation followed by a CE iteration, and
+    mixed prefill+decode batches (labeled CE) that verified drafts were
+    never counted at all.
+    """
     inputs = _mock_inputs(batch_size=2, batch_type=BatchType.CE)
     spec_metrics = _make_spec_metrics(
         num_speculative_tokens=3,
@@ -1074,12 +1172,35 @@ def test_batch_metrics_create_ce_with_spec_decode_uses_standard_formula() -> (
         total_preemption_count=0,
         batch_spec_decode_metrics=spec_metrics,
     )
-    assert metrics.generation_throughput == 2 * 1 / 0.1
+    # output_tokens = 8 accepted + 4 bonus = 12
+    assert metrics.generation_throughput == 12 / 0.1
+    assert metrics.draft_tokens_generated == spec_metrics.draft_tokens_generated
+    assert metrics.draft_tokens_accepted == spec_metrics.draft_tokens_accepted
+    assert metrics.avg_acceptance_length == spec_metrics.avg_acceptance_length
+    assert metrics.max_acceptance_length == 3
 
-    # Acceptance metrics describe the decode/verify step, so a CE batch must
-    # not report them even when stale spec_metrics leak from a previous TG
-    # batch. The zeroed draft fields make every downstream consumer drop the
-    # spec-decode info.
+
+def test_batch_metrics_create_unverified_spec_metrics_stay_zeroed() -> None:
+    """Metrics without verifications (pure-prefill producing batch) stay
+    zeroed even on a TG iteration, and throughput falls back to batch_size."""
+    inputs = _mock_inputs(batch_size=2, batch_type=BatchType.TG)
+    spec_metrics = _make_spec_metrics(
+        num_speculative_tokens=3,
+        accepted_per_position=[0, 0, 0],
+        num_verifications=0,
+    )
+    metrics = BatchMetrics.create(
+        sch_config=_mock_sch_config(),
+        inputs=inputs,
+        kv_cache=None,
+        batch_creation_time_s=0.001,
+        batch_execution_time_s=0.1,
+        num_pending_reqs=0,
+        num_terminated_reqs=0,
+        total_preemption_count=0,
+        batch_spec_decode_metrics=spec_metrics,
+    )
+    assert metrics.generation_throughput == 2 * 1 / 0.1
     assert metrics.draft_tokens_generated == 0
     assert metrics.draft_tokens_accepted == 0
     assert metrics.avg_acceptance_length == 0.0

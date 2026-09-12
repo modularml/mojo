@@ -100,7 +100,7 @@ def random_normal[
     else:
         grid_block = numel
 
-    @always_inline
+    @inline(.always)
     def generate[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert (
             width == 1

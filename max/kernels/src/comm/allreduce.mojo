@@ -102,6 +102,7 @@ For the naive allreduce (no P2P) per-device flow and staging details, see the
 
 from std.atomic import Atomic, Ordering, fence
 from std.collections import Array
+from std.math.uutils import ualign_down
 from std.math import ceildiv, clamp
 from std.sys import align_of, is_amd_gpu, is_nvidia_gpu, simd_width_of, size_of
 
@@ -182,11 +183,11 @@ struct AllReduceAlgorithm(TrivialRegisterPassable, Writable):
     comptime LAMPORT = Self(2)
     """Barrier-free negative-zero sentinel path (small messages only)."""
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
@@ -542,7 +543,7 @@ def _naive_reduce_kernel_with_lambda[
             )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_naive_single[
     dtype: DType,
     ngpus: Int,
@@ -781,7 +782,7 @@ def _allreduce_2stage_kernel[
             tmp_out, row_major(rs_config.rank_part(_my_rank))
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(tmp_buff)
         def rs_output_lambda[
@@ -868,7 +869,7 @@ def _allreduce_2stage_kernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_1stage_reduce_store_one[
     dtype: DType,
     in_layout: TensorLayout,
@@ -1043,7 +1044,7 @@ def _allreduce_1stage_kernel[
         )
 
 
-@always_inline
+@inline(.always)
 def _lamport_supported() -> Bool:
     """Whether the current GPU target is cleared for the Lamport protocol.
 
@@ -1282,7 +1283,7 @@ def _allreduce_lamport_kernel[
                 state.store[volatile=True](Lamport.STATE_ARRIVAL, UInt32(0))
 
 
-@always_inline
+@inline(.always)
 def _allreduce_lamport_p2p[
     dtype: DType,
     ngpus: Int,
@@ -1371,7 +1372,7 @@ def _allreduce_lamport_p2p[
     )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_p2p[
     dtype: DType,
     ngpus: Int,
@@ -1381,7 +1382,7 @@ def _allreduce_p2p[
     output_lambda: elementwise_epilogue_type,
     pdl_level: PDLLevel,
     use_multimem: Bool = False,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
 ](
     list_of_in_tensors: Array[
         TileTensor[dtype, in_layout, in_origin],
@@ -1396,31 +1397,59 @@ def _allreduce_p2p[
     """
     Performs allreduce using peer-to-peer access for a single GPU.
 
+    World view vs. group: `ngpus` is the total number of devices in the
+    world; `list_of_in_tensors` and `rank_sigs` carry every device's data,
+    indexed by GLOBAL device rank (unless `use_multimem`, which is
+    full-world only). `group_size` (defaults to `ngpus`) is the number of
+    devices that actually cooperate on this allreduce; it must evenly
+    divide `ngpus`. `my_rank` is this device's GLOBAL rank in `[0, ngpus)`
+    -- the group-local rank and this device's own group's slice of the
+    world arrays are derived here, so the whole world stays addressable
+    from this function (a future relay hop can read another group's slice
+    before this point without new peer-pointer parameters).
+
     Parameters:
         dtype: Data dtype of tensor elements.
-        ngpus: Number of GPUs participating.
+        ngpus: Total number of devices in the world.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
         out_layout: Layout of the output TileTensor.
         output_lambda: An output elementwise lambda.
         pdl_level: Control PDL behavior for the kernel.
         use_multimem: If True, use multi-memory space buffers for input.
-        domain_id: Barrier counter bank to use (0 for full-world; a distinct
-            nonzero value for grouped collectives). See `_multi_gpu_barrier`.
+            Only valid for a full-world collective (`group_size == ngpus`).
+        group_size: Number of devices per independent allreduce group. Must
+            evenly divide `ngpus`. Defaults to `ngpus`.
 
     Args:
-        list_of_in_tensors: Input buffers from ALL GPUs (peer access required)
-        out_tensor: Output buffer for THIS GPU
-        rank_sigs: Signal pointers for synchronization
+        list_of_in_tensors: Input buffers from ALL `ngpus` devices (peer
+            access required), indexed by GLOBAL device rank.
+        out_tensor: Output buffer for THIS GPU.
+        rank_sigs: All `ngpus` devices' Signal pointers, indexed by GLOBAL
+            device rank.
         dispatch_config: Dispatch configuration defining block count, algorithm selection
-        ctx: Device context for THIS GPU
-        my_rank: Rank of THIS GPU within the allreduce group.
+        ctx: Device context for THIS GPU.
+        my_rank: GLOBAL rank of THIS GPU in `[0, ngpus)`.
 
     Launches P2P reduction kernel on the current GPU to perform direct reduction.
     """
-    comptime num_tensors = 1 if use_multimem else ngpus
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
+    comptime domain_id = 0 if group_size == ngpus else group_size
+    comptime if use_multimem:
+        comptime assert (
+            group_size == ngpus
+        ), "grouped allreduce (group_size != ngpus) does not support multimem"
+
+    # This device's group. `group_start` is 0 for a full-world collective, so
+    # every group_start-relative read below is byte-identical to the
+    # pre-grouping code path in that case.
+    var group_start = ualign_down(my_rank, group_size)
+    var loc_rank = my_rank - group_start
+
     comptime simd_width = simd_width_of[dtype, target=get_gpu_target()]()
-    var num_elements = list_of_in_tensors[0].num_elements()
+    var num_elements = list_of_in_tensors[group_start].num_elements()
 
     # Do nothing if there are no elements to reduce.
     if num_elements == 0:
@@ -1432,17 +1461,29 @@ def _allreduce_p2p[
             " SIMD width"
         )
 
-    # Flatten inputs to 1D - allreduce does not need dimension info
+    # Flatten this device's GROUP's inputs to 1D -- allreduce does not need
+    # dimension info.
+    comptime num_tensors = 1 if use_multimem else group_size
     comptime FlatLayout = type_of(row_major(num_elements))
     comptime FlatIn = TileTensor[dtype, FlatLayout, ImmutAnyOrigin]
     var flat_inputs = Array[_, num_tensors](
         fill_with=lambda (i: Int) -> FlatIn: FlatIn(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
-                list_of_in_tensors[i]._storage
+                list_of_in_tensors[
+                    0 if use_multimem else group_start + i
+                ]._storage
             ),
             row_major(num_elements),
         )
     )
+
+    # This device's GROUP's signal pointers, re-indexed to [0, group_size).
+    # Byte-identical to `rank_sigs` for a full-world collective.
+    var group_sigs = Array[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS](
+        uninitialized=True
+    )
+    comptime for i in range(group_size):
+        group_sigs[i] = rank_sigs[group_start + i]
 
     var max_num_blocks = dispatch_config.num_blocks
 
@@ -1453,7 +1494,9 @@ def _allreduce_p2p[
     # excluded: the per-device Lamport generation state is shared with
     # full-world collectives, and mixing group sizes would skew generations
     # across devices. Grouped allreduces take the barrier-based kernels,
-    # whose domain banks isolate them.
+    # whose domain banks isolate them. `domain_id == 0` implies
+    # `group_size == ngpus`, so `list_of_in_tensors`/`my_rank` are already
+    # this device's own -- no group slice needed on this path.
     comptime lamport_atomic_width = Lamport.ATOMIC_BYTES // size_of[dtype]()
     comptime if not use_multimem and domain_id == 0:
         if (
@@ -1513,7 +1556,7 @@ def _allreduce_p2p[
         # Use the 1-stage allreduce when transfer is latency bound.
         comptime allreduce_1stage_kernel = _allreduce_1stage_kernel[
             dtype,
-            ngpus,
+            group_size,
             FlatLayout,
             out_layout,
             BLOCK_SIZE=BLOCK_SIZE,
@@ -1524,18 +1567,18 @@ def _allreduce_p2p[
         ctx.enqueue_function[allreduce_1stage_kernel](
             rebind[TileTensor[dtype, out_layout, MutAnyOrigin]](out_tensor),
             flat_inputs,
-            rank_sigs,
+            group_sigs,
             Int32(num_elements),
-            Int32(my_rank),
+            Int32(loc_rank),
             grid_dim=grid_size,
             block_dim=BLOCK_SIZE,
             attributes=pdl_launch_attributes(pdl_level),
         )
     else:
-        # Define grid size for 2-stage, which processes 1/ngpus of the
+        # Define grid size for 2-stage, which processes 1/group_size of the
         # number of elements.
         var grid_size = clamp(
-            ceildiv(num_elements // (simd_width * ngpus), BLOCK_SIZE),
+            ceildiv(num_elements // (simd_width * group_size), BLOCK_SIZE),
             1,
             max_num_blocks,
         )
@@ -1543,7 +1586,7 @@ def _allreduce_p2p[
         # Otherwise, use 2-stage allreduce for the bandwidth bound regime.
         comptime kernel = _allreduce_2stage_kernel[
             dtype,
-            ngpus,
+            group_size,
             FlatLayout,
             out_layout,
             BLOCK_SIZE=BLOCK_SIZE,
@@ -1554,9 +1597,9 @@ def _allreduce_p2p[
         ctx.enqueue_function[kernel](
             rebind[TileTensor[dtype, out_layout, MutAnyOrigin]](out_tensor),
             flat_inputs,
-            rank_sigs,
+            group_sigs,
             Int32(num_elements),
-            Int32(my_rank),
+            Int32(loc_rank),
             grid_dim=grid_size,
             block_dim=BLOCK_SIZE,
             attributes=pdl_launch_attributes(pdl_level),
@@ -1574,7 +1617,7 @@ def allreduce[
     pdl_level: PDLLevel = PDLLevel(),
     *,
     use_multimem: Bool = False,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
 ](
     input_tensors: Array[
         TileTensor[dtype, in_layout, in_origin],
@@ -1584,7 +1627,7 @@ def allreduce[
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
     _max_num_blocks: Optional[Int] = None,
-    local_rank: Optional[Int] = None,
+    my_rank: Optional[Int] = None,
 ) raises:
     """Per-device allreduce: one instance per GPU builds its own output.
 
@@ -1592,6 +1635,16 @@ def allreduce[
     - Each GPU runs one instance of this function in parallel with the others.
     - Every instance reads all inputs but writes only its own output buffer.
     - A Python-level fence is inserted across the outputs to prevent reordering.
+
+    World view vs. group
+    - `ngpus` is the TOTAL number of devices in the world; `input_tensors` and
+      `rank_sigs` carry every device's data, indexed by GLOBAL device rank.
+    - `group_size` (defaults to `ngpus`, i.e. a single full-world group) is the
+      number of devices that actually cooperate on one allreduce. It must
+      evenly divide `ngpus`. Devices `[g*group_size, (g+1)*group_size)` form
+      group `g`; this call's group is derived from `my_rank`.
+    - `my_rank` is this device's GLOBAL rank in `[0, ngpus)`, not its rank
+      within the group -- the group-local rank is derived internally.
 
     Two execution paths
     1) P2P fast path (when peer access is available)
@@ -1604,7 +1657,7 @@ def allreduce[
            - Stage 1: write reduced partition r into payload of `rank_sigs[r]`.
            - Stage 2: gather partitions from all peers' payloads into `out_r`.
 
-    2) Naive fallback (no P2P)
+    2) Naive fallback (no P2P, full-world collectives only -- see Raises)
        - For GPU r: create local accumulator A_r, allocate a temporary buffer S_r,
          copy each peer input into S_r and accumulate into A_r, then apply the epilogue
          into `out_r`.
@@ -1614,44 +1667,70 @@ def allreduce[
 
     Parameters:
         dtype: Data type of the tensor elements.
-        ngpus: Number of GPUs participating in the allreduce.
+        ngpus: Total number of devices in the world.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
         out_layout: Layout of the output TileTensor.
         output_lambda: Elementwise epilogue applied on the device result.
         pdl_level: Controls PDL behavior for P2P kernels.
         use_multimem: Whether to use multimem mode for improved performance.
-        domain_id: Barrier counter bank to use (0 for full-world; a distinct
-            nonzero value for grouped collectives sharing the same Signal
-            buffers with full-world ones). See `_multi_gpu_barrier`.
+            Only valid for a full-world collective (`group_size == ngpus`).
+        group_size: Number of devices per independent allreduce group. Must
+            evenly divide `ngpus`. Defaults to `ngpus` (one full-world group,
+            byte-identical to the pre-grouping behavior).
 
     Args:
-        input_tensors: Inputs from ALL GPUs as TileTensors.
-        output_tensor: Output for THIS GPU as a TileTensor.
-        rank_sigs: Per-GPU Signal pointers.
+        input_tensors: Inputs from ALL `ngpus` devices as TileTensors, indexed
+            by GLOBAL device rank.
+        output_tensor: Output for THIS GPU as a TileTensor. NOT widened to a
+            world-view array like `reducescatter`/`allgather`: every device's
+            allreduce result is the identical full reduction (not a shard),
+            and the actual write always goes through `output_lambda` -- this
+            argument is layout metadata only. See `_allreduce_p2p`.
+        rank_sigs: All `ngpus` devices' Signal pointers, indexed by GLOBAL
+            device rank.
         ctx: Device context for THIS GPU.
         _max_num_blocks: Optional grid limit.
-        local_rank: Optional rank of THIS GPU within the allreduce group.
-            Defaults to the device id, which is only correct for a full-world
-            collective over devices 0..ngpus-1.
+        my_rank: Optional GLOBAL rank of THIS GPU in `[0, ngpus)`. Defaults to
+            the physical device id, which is only correct when devices
+            `0..ngpus-1` map 1:1 onto physical device ids.
+
+    Raises:
+        Error: `group_size != ngpus` (a grouped collective) and P2P access is
+            not available -- the non-P2P fallback assumes a full-world,
+            contiguous `0..ngpus-1` device layout and cannot be grouped.
 
     Notes:
       - Inputs must have identical shape/dtype across GPUs.
       - Signal buffers must be sized at least `size_of(Signal) + payload_bytes`
         for the P2P 2-stage path, where `payload_bytes` equals the input
         tensor bytecount.
-      - The naive path is automatically selected if P2P cannot be enabled.
+      - The naive path is automatically selected if P2P cannot be enabled,
+        and only for a full-world collective.
       - The `use_multimem` parameter requires P2P access between GPUs.
     """
-    comptime assert ngpus >= 2, "allreduce requires at least 2 GPUs"
+    comptime assert (
+        group_size >= 2
+    ), "allreduce requires at least 2 GPUs per group"
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
     comptime num_tensors = 1 if use_multimem else ngpus
 
-    # Return early, if the input buffer is empty
-    var num_elements = input_tensors[0].num_elements()
+    # This device's group. `group_start` is 0 for a full-world collective
+    # (group_size == ngpus), so every group_start-relative read below is
+    # byte-identical to the pre-grouping `input_tensors[0]` in that case.
+    var global_rank = my_rank.value() if my_rank else Int(ctx.id())
+    var group_start = ualign_down(global_rank, group_size)
+
+    # Return early, if the input buffer is empty. Read from THIS DEVICE'S
+    # GROUP, not world index 0 -- sibling groups may carry different
+    # (symbolic) shapes.
+    var num_elements = input_tensors[group_start].num_elements()
     if num_elements == 0:
         return
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(output_tensor)
     def default_output_lambda[
@@ -1670,7 +1749,7 @@ def allreduce[
     comptime sm_version = ctx.default_device_info.version
     var num_bytes = num_elements * size_of[dtype]()
     var dispatch_config = dispatch_select_comm_config[
-        ngpus, sm_version, allreduce_tuning_table
+        group_size, sm_version, allreduce_tuning_table
     ](num_bytes)
 
     if _max_num_blocks:
@@ -1684,33 +1763,37 @@ def allreduce[
             + String(dispatch_config.num_blocks)
         )
 
-    var my_rank = local_rank.value() if local_rank else Int(ctx.id())
-
-    # Check P2P availability.
+    # Check P2P availability. The non-P2P fallback assumes a full-world,
+    # contiguous 0..ngpus-1 device layout, so it cannot be grouped.
     if not is_p2p_enabled():
         comptime if use_multimem:
             raise Error(
                 "Allreduce with multimem requires P2P access between GPUs"
             )
-        comptime if domain_id != 0:
-            # The naive fallback assumes the participating devices are
-            # 0..ngpus-1; a grouped collective's devices are an arbitrary
-            # contiguous run, so it would copy from the wrong peers.
+        comptime if group_size != ngpus:
             raise Error(
-                "grouped allreduce (nonzero domain_id) requires P2P access"
+                "grouped allreduce (group_size != ngpus) requires P2P access"
                 " between GPUs"
             )
         return _allreduce_naive_single[
             ngpus=ngpus,
             output_lambda=actual_output_lambda,
-            num_tensors=1 if use_multimem else ngpus,
+            num_tensors=num_tensors,
         ](input_tensors, output_tensor, dispatch_config.num_blocks, ctx)
 
-    # P2P path.
+    # P2P path: hand the collective the whole world plus the group width, and
+    # let it derive the group-local slice, rank, and barrier domain itself.
     return _allreduce_p2p[
         ngpus=ngpus,
+        group_size=group_size,
         output_lambda=actual_output_lambda,
         pdl_level=pdl_level,
         use_multimem=use_multimem,
-        domain_id=domain_id,
-    ](input_tensors, output_tensor, rank_sigs, dispatch_config, ctx, my_rank)
+    ](
+        input_tensors,
+        output_tensor,
+        rank_sigs,
+        dispatch_config,
+        ctx,
+        global_rank,
+    )

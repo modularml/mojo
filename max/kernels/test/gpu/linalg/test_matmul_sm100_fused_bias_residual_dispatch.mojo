@@ -47,7 +47,7 @@ comptime EpilogueTile[c_type: DType] = TileTensor[
 ]
 
 
-@always_inline
+@inline(.always)
 def _make_epilogue[
     c_type: DType, //
 ](resid_dev_buf: DeviceBuffer[c_type], epi_m: Int, epi_n: Int) -> EpilogueTile[
@@ -67,7 +67,7 @@ def _make_epilogue[
     )
 
 
-@always_inline
+@inline(.always)
 def _add_residual_and_assert[
     c_type: DType, //
 ](

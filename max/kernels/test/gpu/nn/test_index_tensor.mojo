@@ -114,7 +114,7 @@ def test_advanced_indexing_getitem_gpu(ctx: DeviceContext) raises:
 
     # Copy-capture the DEVICE views (`{var ...}`) so the GPU kernel dereferences
     # device memory; the index is rebuilt in-kernel from the `IndexList` arg.
-    @always_inline
+    @inline(.always)
     def input_tensor_fn[
         dtype: DType, width: Int
     ](idx: IndexList[input_rank]) {var input_dyn} -> SIMD[dtype, width]:
@@ -122,7 +122,7 @@ def test_advanced_indexing_getitem_gpu(ctx: DeviceContext) raises:
             input_dyn.load[width=width, alignment=1](Coord(idx))
         )
 
-    @always_inline
+    @inline(.always)
     def indices_fn[
         indices_index: Int,
     ](coordinates: IndexList[index_rank]) {
@@ -295,7 +295,7 @@ def test_advanced_indexing_setitem_inplace_gpu(ctx: DeviceContext) raises:
         updates_dev, updates_static_layout
     ).make_dynamic[.int64]()
 
-    @always_inline
+    @inline(.always)
     def updates_tensor_fn[
         dtype: DType, width: Int
     ](idx: IndexList[updates_rank]) {var updates_dyn} -> SIMD[dtype, width]:
@@ -303,7 +303,7 @@ def test_advanced_indexing_setitem_inplace_gpu(ctx: DeviceContext) raises:
             updates_dyn.load[width=width, alignment=1](Coord(idx))
         )
 
-    @always_inline
+    @inline(.always)
     def indices_fn[
         indices_index: Int,
     ](coordinates: IndexList[index_rank]) {

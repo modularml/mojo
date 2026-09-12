@@ -28,7 +28,7 @@ def main():
 ```
 """
 
-from std.sys.info import _TargetType, _current_target
+from std.sys.info import CompilationTarget
 
 
 # FIXME(MOCO-3929): Merge with `reflect` once function types are better
@@ -105,7 +105,7 @@ struct ReflectedFn[func_type: AnyType, //, func: func_type]:
 
     @staticmethod
     def linkage_name[
-        *, target: _TargetType = _current_target()
+        *, target: CompilationTarget = CompilationTarget.current()
     ]() -> StaticString:
         """Returns the function's mangled linkage / symbol name.
 
@@ -117,7 +117,7 @@ struct ReflectedFn[func_type: AnyType, //, func: func_type]:
         """
         var res = __mlir_attr[
             `#kgen.get_linkage_name<`,
-            target,
+            target._mlir_value,
             `,`,
             Self.func,
             `> : !kgen.string`,

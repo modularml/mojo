@@ -142,7 +142,7 @@ struct SplitKWorkspace[num_splits: Int](ImplicitlyCopyable, Movable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def amd_4wave_split_k_matmul[
     a_type: DType,
     b_type: DType,
@@ -271,7 +271,7 @@ def amd_4wave_split_k_matmul[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def launch_split_k[config: KernelConfig]() raises:
         # Workspace is row-major (num_splits * M, N) — split_id selects
         # the M-band inside the kernel via `pid_m + split_id*num_pid_m`.

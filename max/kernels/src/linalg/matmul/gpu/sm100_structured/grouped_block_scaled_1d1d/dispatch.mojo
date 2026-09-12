@@ -376,7 +376,7 @@ def grouped_matmul_nvfp4_dispatch[
         # the swiglu knobs, the trace knobs) to the launcher; only
         # (mma_bn, cta_group, stages) vary. Factoring the call here keeps
         # the regime selection below a one-liner per regime.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _regime[
             mma_bn: Int,
@@ -421,7 +421,7 @@ def grouped_matmul_nvfp4_dispatch[
         # `_launch_grouped_block_scaled` with an explicit stages=6, since
         # the two-way split it needs doesn't fit the three-regime rows
         # `_regime` iterates.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _launch512[mma_bn: Int, cta_group: Int]() raises:
             _launch_grouped_block_scaled[
@@ -597,7 +597,7 @@ def grouped_matmul_mxfp8_dispatch[
     # Factor the call here and select via the same ordered (upper-bound,
     # config) table as the NVFP4 path. Stages travel per-row as an Int with
     # -1 = auto (the classifier's pick), mirroring the NVFP4 table sentinel.
-    @always_inline
+    @inline(.always)
     @__parameter
     def _go[mma_bn: Int, cta_group: Int, stages: Optional[Int]]() raises:
         _launch_grouped_block_scaled[

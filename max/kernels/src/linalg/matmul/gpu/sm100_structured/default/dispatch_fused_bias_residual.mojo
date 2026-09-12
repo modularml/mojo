@@ -49,7 +49,7 @@ from .tuning_configs import (
 comptime logger = Logger()
 
 
-@always_inline
+@inline(.always)
 def fused_bias_residual_matmul_dispatch_sm100[
     c_type: DType,
     a_type: DType,
@@ -120,7 +120,7 @@ def fused_bias_residual_matmul_dispatch_sm100[
     # broadcasting row 0 for a 1D bias. Every non-TMA kernel (GEMV, small-MN,
     # cuBLAS) applies this exactly once.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c, epilogue_tensor)
     def bias_residual_elementwise_lambda[
         _dtype: DType, _width: SIMDLength, *, alignment: Int = 1

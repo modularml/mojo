@@ -23,25 +23,29 @@ from std.sys.compile import SanitizeAddress
 from max.gpu import barrier
 from max.gpu.host import get_gpu_target
 
-comptime target_short_ptr = __mlir_attr[
-    `#kgen.target<triple = "nvptx64-nvidia-cuda", `,
-    `arch = "sm_80", `,
-    `features = "+ptx81", `,
-    `data_layout = "e-p3:32:32-p4:32:32-p5:32:32-p6:32:32-p7:32:32-p101:32:32-i64:64-i128:128-i256:256-v16:16-v32:32-n16:32:64",`,
-    `simd_bit_width = 128,`,
-    `index_bit_width = 64`,
-    `> : !kgen.target`,
-]
+comptime target_short_ptr = CompilationTarget[
+    _mlir_value=__mlir_attr[
+        `#kgen.target<triple = "nvptx64-nvidia-cuda", `,
+        `arch = "sm_80", `,
+        `features = "+ptx81", `,
+        `data_layout = "e-p3:32:32-p4:32:32-p5:32:32-p6:32:32-p7:32:32-p101:32:32-i64:64-i128:128-i256:256-v16:16-v32:32-n16:32:64",`,
+        `simd_bit_width = 128,`,
+        `index_bit_width = 64`,
+        `> : !kgen.target`,
+    ]
+]()
 
-comptime target_regular = __mlir_attr[
-    `#kgen.target<triple = "nvptx64-nvidia-cuda", `,
-    `arch = "sm_80", `,
-    `features = "+ptx81", `,
-    `data_layout = "e-p6:32:32-i64:64-i128:128-i256:256-v16:16-v32:32-n16:32:64",`,
-    `simd_bit_width = 128,`,
-    `index_bit_width = 64`,
-    `> : !kgen.target`,
-]
+comptime target_regular = CompilationTarget[
+    _mlir_value=__mlir_attr[
+        `#kgen.target<triple = "nvptx64-nvidia-cuda", `,
+        `arch = "sm_80", `,
+        `features = "+ptx81", `,
+        `data_layout = "e-p6:32:32-i64:64-i128:128-i256:256-v16:16-v32:32-n16:32:64",`,
+        `simd_bit_width = 128,`,
+        `index_bit_width = 64`,
+        `> : !kgen.target`,
+    ]
+]()
 
 
 def _test_data_layout_llvm[emission_kind: StaticString]() raises:

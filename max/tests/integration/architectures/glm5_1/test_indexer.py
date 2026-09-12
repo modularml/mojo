@@ -32,11 +32,7 @@ from max.nn import (
     WeightScaleSpec,
 )
 from max.nn.attention.mask_config import MHAMaskVariant
-from max.nn.kv_cache import (
-    KVCacheQuantizationConfig,
-    MHAKVCacheParams,
-    PagedCacheValues,
-)
+from max.nn.kv_cache import KVCacheQuantizationConfig, MHAKVCacheParams
 from max.nn.rotary_embedding import RotaryEmbedding
 from max.pipelines.architectures.deepseekV3_2.layers import Indexer
 from max.pipelines.kv_cache import PagedKVCacheManager
@@ -279,14 +275,9 @@ def run_max_indexer(
         qr_in = graph.inputs[1].tensor
         input_row_offsets_in = graph.inputs[2].tensor
 
-        indexer_k_collection = PagedCacheValues(
-            kv_blocks=graph.inputs[3].buffer,
-            cache_lengths=graph.inputs[4].tensor,
-            lookup_table=graph.inputs[5].tensor,
-            max_prompt_length=graph.inputs[6].tensor,
-            max_cache_length=graph.inputs[7].tensor,
-            kv_scales=graph.inputs[8].buffer,
-        )
+        indexer_k_collection = kv_params.unflatten_kv_inputs(
+            iter(graph.inputs[3:])
+        ).inputs[0]
 
         layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
 

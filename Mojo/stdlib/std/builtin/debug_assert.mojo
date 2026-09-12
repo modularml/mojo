@@ -47,7 +47,7 @@ comptime _NO_MESSAGE = "assertion failed"
 and relies on the trailing nul in static memory."""
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _string_free_comptime_assert[
     cond: Bool, msg: StaticString, *extra: StaticString
 ]():
@@ -64,7 +64,7 @@ def _string_free_comptime_assert[
     ]()
 
 
-@no_inline
+@inline(.never)
 def _assert_enabled[assert_mode: StaticString, cpu_only: Bool]() -> Bool:
     _string_free_comptime_assert[
         ASSERT_MODE == "none"
@@ -93,7 +93,7 @@ def _assert_enabled[assert_mode: StaticString, cpu_only: Bool]() -> Bool:
         return ASSERT_MODE == assert_mode
 
 
-@no_inline
+@inline(.never)
 def _debug_assert_fail_format[
     *Ts: Writable
 ](location: SourceLocation, *messages: *Ts):
@@ -109,7 +109,7 @@ def _debug_assert_fail_format[
     )
 
 
-@always_inline
+@inline(.always)
 def _debug_assert_fail[*Ts: Writable](*messages: *Ts, location: SourceLocation):
     """Reports a failed assertion, formatting the message if there is one."""
 
@@ -121,7 +121,7 @@ def _debug_assert_fail[*Ts: Writable](*messages: *Ts, location: SourceLocation):
         _debug_assert_fail_format(location, *messages)
 
 
-@always_inline
+@inline(.always)
 def debug_assert[
     Cond: def() -> Bool,
     assert_mode: StaticString = "none",
@@ -238,7 +238,7 @@ def debug_assert[
         )
 
 
-@always_inline
+@inline(.always)
 def debug_assert[
     assert_mode: StaticString = "none",
     *Ts: Writable,
@@ -360,7 +360,7 @@ def debug_assert[
 # optimized for fast compile time, because they are used frequently. An
 # `Optional[SourceLocation]` and an `or_else` call generate extra IR and thus
 # slow compilation down.
-@always_inline
+@inline(.always)
 def debug_assert[
     Cond: def() -> Bool,
     assert_mode: StaticString = "none",
@@ -397,7 +397,7 @@ def debug_assert[
         _debug_assert_fail(location=call_location())
 
 
-@always_inline
+@inline(.always)
 def debug_assert[
     assert_mode: StaticString = "none",
     cpu_only: Bool = False,
@@ -432,7 +432,7 @@ def debug_assert[
         assume(cond)
 
 
-@always_inline
+@inline(.always)
 def debug_assert[
     assert_mode: StaticString = "none",
     cpu_only: Bool = False,
@@ -545,7 +545,7 @@ def debug_assert[
         assume(cond)
 
 
-@no_inline
+@inline(.never)
 def _debug_assert_msg(
     message: ImmPointer[Byte, _], length: Int, loc: SourceLocation
 ):
@@ -554,7 +554,7 @@ def _debug_assert_msg(
     This function is intentionally marked as no_inline to reduce binary size.
 
     Note that it's important that this function doesn't get inlined; otherwise,
-    an indirect recursion of @always_inline functions is possible (e.g. because
+    an indirect recursion of @inline(.always) functions is possible (e.g. because
     abort's implementation could use debug_assert)
     """
 
@@ -585,7 +585,7 @@ def _debug_assert_msg(
             from std._gpu.primitives.id import block_idx, thread_idx
 
             _printf[fmt](
-                loc.file_name().as_c_string_slice(),
+                loc.file_name().as_c_string_span(),
                 loc.line(),
                 loc.column(),
                 UInt(block_idx.x),
@@ -651,7 +651,7 @@ def _debug_assert_msg(
             )
         else:
             _printf["At: %s:%llu:%llu: Assert Error: %s\n"](
-                loc.file_name().as_c_string_slice(),
+                loc.file_name().as_c_string_span(),
                 loc.line(),
                 loc.column(),
                 message,

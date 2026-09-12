@@ -107,7 +107,7 @@ trait AOperandLoader:
     comptime num_m_mmas: Int
     comptime num_n_mmas: Int
 
-    @always_inline
+    @inline(.always)
     def accumulate_strip[
         bounded: Bool, b_layout: TensorLayout
     ](
@@ -191,7 +191,7 @@ struct DenseALoader[
 
     var a_slab: TileTensor[Self.dtype, Self.a_layout, ImmUntrackedOrigin]
 
-    @always_inline
+    @inline(.always)
     def accumulate_strip[
         bounded: Bool, b_layout: TensorLayout
     ](
@@ -300,7 +300,7 @@ struct Im2colALoader[
         self.s = copy.s
         self.k_total = copy.k_total
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         input_ptr: UnsafePointer[Scalar[Self.dtype], ImmUntrackedOrigin],
@@ -332,33 +332,22 @@ struct Im2colALoader[
                 addrspace reason).
         """
         self.input_ptr = input_ptr
+        self.h_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
+        self.w_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
+        self.batch_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
         var HW_out = conv.H_out * conv.W_out
         var hwc = conv.H * conv.W * conv.C
-
-        def row_m[ri: Int]() {imm} -> Int32:
+        comptime for ri in range(Self.NUM_ROWS):
             comptime mi = ri // 2
             comptime half = ri % 2
-            return row_base + Int32(mi * 16 + half * 8) + rb
-
-        def h_base_at[ri: Int]() {imm} -> Int32:
-            var spatial = row_m[ri]() % HW_out
+            var m = row_base + Int32(mi * 16 + half * 8) + rb
+            var batch = m // HW_out
+            var spatial = m % HW_out
             var h_out = spatial // conv.W_out
-            return h_out * conv.stride_h - conv.pad_h
-
-        def w_base_at[ri: Int]() {imm} -> Int32:
-            var spatial = row_m[ri]() % HW_out
             var w_out = spatial % conv.W_out
-            return w_out * conv.stride_w - conv.pad_w
-
-        def batch_base_at[ri: Int]() {imm} -> Int32:
-            var batch = row_m[ri]() // HW_out
-            return batch * hwc
-
-        self.h_base = Array[Int32, Self.NUM_ROWS](fill_with_unrolled=h_base_at)
-        self.w_base = Array[Int32, Self.NUM_ROWS](fill_with_unrolled=w_base_at)
-        self.batch_base = Array[Int32, Self.NUM_ROWS](
-            fill_with_unrolled=batch_base_at
-        )
+            self.h_base[ri] = h_out * conv.stride_h - conv.pad_h
+            self.w_base[ri] = w_out * conv.stride_w - conv.pad_w
+            self.batch_base[ri] = batch * hwc
 
         # Seed the K-state for k_strip=0: k0base = 2*cb. These are the ONLY
         # divides on the K axis -- later strips advance by add+carry.
@@ -370,7 +359,7 @@ struct Im2colALoader[
         self.s = sc // conv.C
         self.c0 = sc % conv.C
 
-    @always_inline
+    @inline(.always)
     def accumulate_strip[
         bounded: Bool, b_layout: TensorLayout
     ](
@@ -687,7 +676,7 @@ struct AppleM5MatMul[
     # `loader.accumulate_strip(...)` seam in the K-loop is the only divergence
     # (see the "A-operand loader abstraction" header above).
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _sg_row_base(log2_grid_m: UInt32, log2_grid_n: UInt32) -> Int32:
         """This simdgroup's absolute M-row base: `tile_m*BM + sg_m_idx*SG_M`.
@@ -708,7 +697,7 @@ struct AppleM5MatMul[
         var sg_m_idx = sg_id // Int32(Self.NUM_SG_N)
         return tile_m * Int32(Self.BM) + sg_m_idx * Int32(Self.SG_M)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _run_gemm_body[
         L: AOperandLoader,
@@ -960,7 +949,7 @@ struct AppleM5MatMul[
         # `elementwise_lambda_fn`). Writes through a `.tile`-derived simdgroup
         # view of C -- no pointer arithmetic. The lambda contract matches AMD's:
         # it receives `SIMD[c_type, width]` at absolute (row, col).
-        @always_inline
+        @inline(.always)
         @__parameter
         def _apply_epilogue[
             bounded: Bool
@@ -974,7 +963,7 @@ struct AppleM5MatMul[
             comptime elem_align = align_of[Scalar[Self.c_type]]()
             var c_vec = c_sub.vectorize[1, 4]()
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _write4(
                 lrow: Int,
@@ -1059,7 +1048,7 @@ struct AppleM5MatMul[
         # `rebind` to fp32 so `mma_op.store{,_bounded}` typechecks; this branch
         # is only entered when `c_type == fp32` (use_epilogue_path is False),
         # so the rebind is a no-op at runtime.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _fast_path_store[
             bounded: Bool
@@ -1124,7 +1113,7 @@ struct AppleM5MatMul[
                 _fast_path_store[bounded=True](Int(valid_rows), Int(valid_cols))
         else:
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _full_strip(k_strip: Int32):
                 var b_sub = b_slab.tile[BK, SG_N](Int(k_strip), 0)
@@ -1620,7 +1609,7 @@ struct AppleM5MatMul[
             )
         else:
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _full_strip(gstrip: Int32):
                 var a_sub = a_slab.tile[SG_M, BK](0, Int(gstrip))
@@ -1716,7 +1705,7 @@ struct AppleM5MatMul[
 # === Host-side launchers (standalone for testing) ========================== #
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_matmul[
     in_type: DType,
     c_type: DType = .float32,
@@ -1964,7 +1953,7 @@ def enqueue_apple_matmul[
     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_conv2d[
     in_type: DType,
     c_type: DType = .float32,
@@ -2117,7 +2106,7 @@ def enqueue_apple_conv2d[
         _launch[False]()
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_matmul_split_k[
     in_type: DType,
     c_type: DType = .float32,
@@ -2297,7 +2286,7 @@ def enqueue_apple_matmul_split_k[
     _ = partials^
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_matmul_clamp_chain[
     in_type: DType,
     c_type: DType = .float32,

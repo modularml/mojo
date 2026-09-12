@@ -30,11 +30,11 @@ from .mma import rdna_mma
 
 
 __extension AttentionRDNA:
-    @always_inline
+    @inline(.always)
     def mha_prefill(mut self):
         comptime assert Self.BK == 32, "BK must be 32 for RDNA"
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def loop_over_kvcache[
             tile_size: Int

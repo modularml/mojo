@@ -91,19 +91,19 @@ def bench_conv(mut m: Bench, spec: ConvSpec) raises:
 
     # Allocate input and output buffers.
     var input_alloc = alloc(
-        AllocLayout[Scalar[input_type]].aligned[alignment](
+        AllocLayout[Scalar[input_type], alignment=.of_bytes[alignment]()](
             count=num_copies * input_alloc_size
         )
     ).into_managed()
     var input_ptr = input_alloc.unsafe_ptr()
     var filter_alloc = alloc(
-        AllocLayout[Scalar[filter_type]].aligned[alignment](
+        AllocLayout[Scalar[filter_type], alignment=.of_bytes[alignment]()](
             count=num_copies * filter_alloc_size
         )
     ).into_managed()
     var filter_ptr = filter_alloc.unsafe_ptr()
     var output_alloc = alloc(
-        AllocLayout[Scalar[output_type]].aligned[alignment](
+        AllocLayout[Scalar[output_type], alignment=.of_bytes[alignment]()](
             count=num_copies * output_alloc_size
         )
     ).into_managed()
@@ -141,14 +141,14 @@ def bench_conv(mut m: Bench, spec: ConvSpec) raises:
         num_groups=spec.num_groups,
     )
 
-    @always_inline
+    @inline(.always)
     def bench_conv_wrapper(
         mut b: Bencher, concrete_spec: ConvSpec[spec.static_info]
     ) raises {imm}:
         # Count the iteration to decide which input copy to use.
         var counter = 0
 
-        @always_inline
+        @inline(.always)
         def bench_fn() {mut counter, imm}:
             comptime layout_2 = Layout.row_major[spec.static_info.rank + 2]()
             comptime layout_3 = Layout.row_major[spec.static_info.rank + 3]()
@@ -276,16 +276,16 @@ def main() raises:
         output_type=DType.float32,
     )
 
-    @always_inline
+    @inline(.always)
     def rebind1d(idx: IndexList[1]) -> IndexList[fp32_1d.rank]:
         return rebind[IndexList[fp32_1d.rank]](idx)
 
-    @always_inline
+    @inline(.always)
     def rebind1d_pad(idx: IndexList[2]) -> IndexList[2 * fp32_1d.rank]:
         return rebind[IndexList[2 * fp32_1d.rank]](idx)
 
     # fmt: off
-    @always_inline
+    @inline(.always)
     def spec1d(N: Int, W: Int, C: Int, S: Int, F: Int, st: Int, di: Int, \
         pa: IndexList[2], ng: Int
     ) -> ConvSpec[fp32_1d]:
@@ -311,15 +311,15 @@ def main() raises:
         output_type=DType.float32,
     )
 
-    @always_inline
+    @inline(.always)
     def rebind2d(idx: IndexList[2]) -> IndexList[fp32_2d.rank]:
         return rebind[IndexList[fp32_2d.rank]](idx)
 
-    @always_inline
+    @inline(.always)
     def rebind2d_pad(idx: IndexList[4]) -> IndexList[2 * fp32_2d.rank]:
         return rebind[IndexList[2 * fp32_2d.rank]](idx)
 
-    @always_inline
+    @inline(.always)
     def spec2d(
         N: Int,
         H: Int,
@@ -352,11 +352,11 @@ def main() raises:
         output_type=DType.float32,
     )
 
-    @always_inline
+    @inline(.always)
     def rebind3d(idx: IndexList[3]) -> IndexList[fp32_3d.rank]:
         return rebind[IndexList[fp32_3d.rank]](idx)
 
-    @always_inline
+    @inline(.always)
     def rebind3d_pad(idx: IndexList[6]) -> IndexList[3 * fp32_3d.rank]:
         return rebind[IndexList[3 * fp32_3d.rank]](idx)
 

@@ -59,12 +59,12 @@ struct TmemAllocation[
 
     var addr: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: UInt32):
         self.addr = addr
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def allocate(smem_addr: Self.SmemAddrStorage) -> Self:
         """Allocate TMEM (MMA warp). Address stored in smem for epilogue.
 
@@ -79,7 +79,7 @@ struct TmemAllocation[
         return Self(smem_addr.ptr[0])
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def from_shared(smem_addr: Self.SmemAddrStorage) -> Self:
         """Get handle from existing allocation (epilogue warp).
 
@@ -89,12 +89,12 @@ struct TmemAllocation[
         """
         return Self(smem_addr.ptr[0])
 
-    @always_inline
+    @inline(.always)
     def release_lock(self):
         """Release allocation lock before waiting for epilogue."""
         tcgen05_release_allocation_lock[Int32(Self.cta_group)]()
 
-    @always_inline
+    @inline(.always)
     def deallocate(self):
         """Free TMEM after epilogue completion."""
         tcgen05_dealloc[Int32(Self.cta_group)](self.addr, UInt32(Self.max_cols))
@@ -146,7 +146,7 @@ struct TmemAddress(TrivialRegisterPassable):
 
     var addr: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: Int):
         """Create TmemAddress from integer column address.
 
@@ -155,7 +155,7 @@ struct TmemAddress(TrivialRegisterPassable):
         """
         self.addr = UInt32(addr)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: UInt32):
         """Create TmemAddress from hardware address (UInt32).
 
@@ -165,7 +165,7 @@ struct TmemAddress(TrivialRegisterPassable):
         """
         self.addr = addr
 
-    @always_inline
+    @inline(.always)
     def __add__(self, offset: Int) -> Self:
         """Create new TmemAddress with column offset added.
 
@@ -174,17 +174,17 @@ struct TmemAddress(TrivialRegisterPassable):
         """
         return Self(Int(self.addr) + offset)
 
-    @always_inline
+    @inline(.always)
     def upper_addr(self) -> UInt32:
         """Raw address for upper fragment (rows 0-15)."""
         return self.addr
 
-    @always_inline
+    @inline(.always)
     def lower_addr(self) -> UInt32:
         """Raw address for lower fragment (rows 16-31)."""
         return self.addr + TMEM_LOWER_ROW_OFFSET
 
-    @always_inline
+    @inline(.always)
     def load_upper[
         dtype: DType,
         width: Int,
@@ -212,7 +212,7 @@ struct TmemAddress(TrivialRegisterPassable):
             width=width,
         ](self.upper_addr())
 
-    @always_inline
+    @inline(.always)
     def load_lower[
         dtype: DType,
         width: Int,
@@ -240,7 +240,7 @@ struct TmemAddress(TrivialRegisterPassable):
             width=width,
         ](self.lower_addr())
 
-    @always_inline
+    @inline(.always)
     def store_upper[
         dtype: DType,
         width: Int,
@@ -269,7 +269,7 @@ struct TmemAddress(TrivialRegisterPassable):
             pack=False,
         ](self.upper_addr(), data)
 
-    @always_inline
+    @inline(.always)
     def store_lower[
         dtype: DType,
         width: Int,
@@ -299,13 +299,13 @@ struct TmemAddress(TrivialRegisterPassable):
         ](self.lower_addr(), data)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_store():
         """Wait for TMEM store operations to complete."""
         tcgen05_store_wait()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_load():
         """Wait for TMEM load operations to complete."""
         tcgen05_load_wait()
@@ -363,7 +363,7 @@ struct TmemTensor[
 
     var col_addr: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, col_addr: Int):
         """Create TMEM tensor view at the given column address.
 
@@ -372,7 +372,7 @@ struct TmemTensor[
         """
         self.col_addr = col_addr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: TmemAddress):
         """Create TMEM tensor view from a TmemAddress.
 
@@ -382,17 +382,17 @@ struct TmemTensor[
         """
         self.col_addr = Int(addr.addr)
 
-    @always_inline
+    @inline(.always)
     def offset(self) -> Int:
         """TMEM column address for this tensor."""
         return self.col_addr
 
-    @always_inline
+    @inline(.always)
     def address(self) -> TmemAddress:
         """Get TmemAddress for low-level fragment operations."""
         return TmemAddress(self.col_addr)
 
-    @always_inline
+    @inline(.always)
     def load_upper[
         repeat: Int = 1,
     ](self) -> Array[Scalar[Self.dtype], Self.frag_size * repeat]:
@@ -412,7 +412,7 @@ struct TmemTensor[
             repeat,
         ]()
 
-    @always_inline
+    @inline(.always)
     def load_lower[
         repeat: Int = 1,
     ](self) -> Array[Scalar[Self.dtype], Self.frag_size * repeat]:
@@ -432,7 +432,7 @@ struct TmemTensor[
             repeat,
         ]()
 
-    @always_inline
+    @inline(.always)
     def store_upper[
         repeat: Int = 1,
     ](self, data: Array[Scalar[Self.dtype], Self.frag_size * repeat]):
@@ -452,7 +452,7 @@ struct TmemTensor[
             repeat,
         ](data)
 
-    @always_inline
+    @inline(.always)
     def store_lower[
         repeat: Int = 1,
     ](self, data: Array[Scalar[Self.dtype], Self.frag_size * repeat]):
@@ -482,7 +482,7 @@ struct TmemTensor[
         bits=Self.bits,
     ]
 
-    @always_inline
+    @inline(.always)
     def load_fragments[
         repeat: Int = 1,
     ](self) -> TmemFragments[
@@ -506,7 +506,7 @@ struct TmemTensor[
             is_lower_required=Self.is_lower_required,
         ].load[repeat](self.address())
 
-    @always_inline
+    @inline(.always)
     def store_fragments[
         repeat: Int = 1,
     ](
@@ -530,13 +530,13 @@ struct TmemTensor[
         frags.store[repeat](self.address())
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_load():
         """Wait for TMEM load operations to complete."""
         TmemAddress.wait_load()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_store():
         """Wait for TMEM store operations to complete."""
         TmemAddress.wait_store()
@@ -588,7 +588,7 @@ struct TmemFragments[
     var upper: Array[Scalar[Self.dtype], Self.frag_size]
     var lower: Array[Scalar[Self.dtype], Self.frag_size]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize with zero fragments."""
         self.upper = Array[Scalar[Self.dtype], Self.frag_size](
@@ -598,7 +598,7 @@ struct TmemFragments[
             fill=Scalar[Self.dtype](0)
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         upper: Array[Scalar[Self.dtype], Self.frag_size],
@@ -614,7 +614,7 @@ struct TmemFragments[
         self.lower = lower.copy()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         repeat: Int = 1
     ](tmem: TmemAddress) -> TmemFragments[
@@ -650,7 +650,7 @@ struct TmemFragments[
 
         return result^
 
-    @always_inline
+    @inline(.always)
     def store[repeat: Int = 1](self, tmem: TmemAddress):
         """Store fragments to TMEM address.
 
@@ -671,7 +671,7 @@ struct TmemFragments[
                 Self.dtype, Self.frag_size, Self.data_paths, Self.bits, repeat
             ](self.lower)
 
-    @always_inline
+    @inline(.always)
     def cast[
         target_dtype: DType
     ](self) -> TmemFragments[
@@ -713,13 +713,13 @@ struct TmemFragments[
         return result^
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_load():
         """Wait for TMEM load operations to complete."""
         TmemAddress.wait_load()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_store():
         """Wait for TMEM store operations to complete."""
         TmemAddress.wait_store()
@@ -763,7 +763,7 @@ struct TmemArrayType[
 
     var base_addr: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, base_addr: Int):
         """Initialize array at the given TMEM base address.
 
@@ -772,7 +772,7 @@ struct TmemArrayType[
         """
         self.base_addr = base_addr
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at the given index.
 
@@ -884,7 +884,7 @@ struct BlockScaledTmem[
 
     var base_addr: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, base_addr: Int):
         """Create TMEM region view at the given base address.
 
@@ -896,7 +896,7 @@ struct BlockScaledTmem[
         ), "Block-scaled TMEM region exceeds capacity"
         self.base_addr = base_addr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: TmemAddress):
         """Create TMEM region view from a TmemAddress.
 
@@ -909,7 +909,7 @@ struct BlockScaledTmem[
         ), "Block-scaled TMEM region exceeds capacity"
         self.base_addr = Int(addr.addr)
 
-    @always_inline
+    @inline(.always)
     def __init__[
         cta: Int, max_cols: Int
     ](out self, alloc: TmemAllocation[cta, max_cols]):
@@ -929,23 +929,23 @@ struct BlockScaledTmem[
         ), "Block-scaled TMEM region exceeds capacity"
         self.base_addr = Int(alloc.addr)
 
-    @always_inline
+    @inline(.always)
     def accum_tiles(self) -> Self.AccumArray:
         """Get array of accumulator tiles."""
         return Self.AccumArray(self.base_addr + Self.accum_offset)
 
-    @always_inline
+    @inline(.always)
     def sfa_tiles(self) -> Self.SFAArray:
         """Get array of SFA scaling factor tiles."""
         return Self.SFAArray(self.base_addr + Self.sfa_offset)
 
-    @always_inline
+    @inline(.always)
     def sfb_tiles(self) -> Self.SFBArray:
         """Get array of SFB scaling factor tiles."""
         return Self.SFBArray(self.base_addr + Self.sfb_offset)
 
     # Convenience accessors (delegate to arrays)
-    @always_inline
+    @inline(.always)
     def accum[T: Intable](self, stage: T) -> Self.AccumTile:
         """Get accumulator tile for the given pipeline stage.
 
@@ -957,7 +957,7 @@ struct BlockScaledTmem[
         """
         return self.accum_tiles()[stage]
 
-    @always_inline
+    @inline(.always)
     def sfa[T: Intable](self, index: T) -> Self.SFATile:
         """Get SFA scaling factor tile for the given k-iteration index.
 
@@ -969,7 +969,7 @@ struct BlockScaledTmem[
         """
         return self.sfa_tiles()[index]
 
-    @always_inline
+    @inline(.always)
     def sfb[T: Intable](self, index: T) -> Self.SFBTile:
         """Get SFB scaling factor tile for the given k-iteration index.
 
@@ -1011,12 +1011,12 @@ struct TmemStage[
     var base_addr: Int
     var index: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, base_addr: Int, index: Int):
         self.base_addr = base_addr
         self.index = index
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, addr: TmemAddress, index: Int):
         """Create stage from TmemAddress and stage index.
 
@@ -1028,7 +1028,7 @@ struct TmemStage[
         self.base_addr = Int(addr.addr)
         self.index = index
 
-    @always_inline
+    @inline(.always)
     def __init__[
         cta: Int, max_cols: Int
     ](out self, alloc: TmemAllocation[cta, max_cols], index: Int):
@@ -1047,7 +1047,7 @@ struct TmemStage[
         self.index = index
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def from_offset(offset: Int, index: Int) -> Self:
         """Create stage from pre-computed offset (for legacy pipeline compatibility).
 
@@ -1069,17 +1069,17 @@ struct TmemStage[
         var base_addr = offset - index * Self.stage_stride
         return Self(base_addr, index)
 
-    @always_inline
+    @inline(.always)
     def offset(self) -> Int:
         """TMEM column address for this stage."""
         return self.base_addr + self.index * Self.stage_stride
 
-    @always_inline
+    @inline(.always)
     def address(self) -> TmemAddress:
         """Get TmemAddress for this stage's offset."""
         return TmemAddress(self.offset())
 
-    @always_inline
+    @inline(.always)
     def tensor[
         accum_dtype: DType,
         accum_layout: Layout,
@@ -1097,7 +1097,7 @@ struct TmemStage[
             self.base_addr + self.index * Self.stage_stride
         )
 
-    @always_inline
+    @inline(.always)
     def load_upper[
         dtype: DType,
         frag_size: Int,
@@ -1120,7 +1120,7 @@ struct TmemStage[
             dtype, frag_size, data_paths, bits, repeat
         ]()
 
-    @always_inline
+    @inline(.always)
     def load_lower[
         dtype: DType,
         frag_size: Int,
@@ -1144,7 +1144,7 @@ struct TmemStage[
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_load():
         """Wait for TMEM load operations to complete."""
         TmemAddress.wait_load()
@@ -1178,19 +1178,19 @@ struct TmemDeallocBarrier[cta_group: Int](TrivialRegisterPassable):
         """
         self.barrier = barrier
 
-    @always_inline
+    @inline(.always)
     def signal_peer(self):
         """Signal peer CTA in cluster (cta_group=2 only)."""
 
         comptime if Self.cta_group == 2:
             _ = self.barrier.ptr[].arrive_cluster(block_rank_in_cluster() ^ 1)
 
-    @always_inline
+    @inline(.always)
     def signal_self(self):
         """Signal own arrival at barrier."""
         _ = self.barrier.ptr[].arrive()
 
-    @always_inline
+    @inline(.always)
     def wait[ticks: Optional[UInt32] = None](self):
         """Wait for barrier completion.
 
@@ -1201,7 +1201,7 @@ struct TmemDeallocBarrier[cta_group: Int](TrivialRegisterPassable):
         """
         self.barrier.ptr[].wait[ticks=ticks]()
 
-    @always_inline
+    @inline(.always)
     def complete_dealloc[
         max_cols: Int = 512
     ](self, tmem: TmemAllocation[Self.cta_group, max_cols]):
@@ -1224,7 +1224,7 @@ struct TmemDeallocBarrier[cta_group: Int](TrivialRegisterPassable):
         self.wait[ticks=SM100_PIPELINE_WAIT_TICKS]()
         tmem.deallocate()
 
-    @always_inline
+    @inline(.always)
     def signal_complete(self):
         """Signal TMEM consumption complete (Epilogue warp side).
 

@@ -25,6 +25,7 @@ from scenarios import BaseScenario, ScenarioResult, Verdict, register_scenario
 from scenarios._constrained_stream import (
     accumulate_stream,
     constrained_document_errors,
+    enforcement_overrun,
 )
 
 if TYPE_CHECKING:
@@ -160,7 +161,7 @@ class ReasoningUnderConstraint(BaseScenario):
         summary_parts: list[str] = []
 
         for case in CASES:
-            reasoned = conformant = truncated = 0
+            reasoned = conformant = truncated = overrun = 0
             attempts = 0
             notes: list[str] = []
             for _ in range(_N_PER_CASE):
@@ -178,6 +179,13 @@ class ReasoningUnderConstraint(BaseScenario):
                     continue
                 response = accumulate_stream(resp.chunks or [])
                 if response.finish_reason == "length":
+                    # A complete document plus trailing text is a dropped
+                    # constraint, not a tight budget: it stays in ``judged``.
+                    if note := enforcement_overrun(response.content):
+                        overrun += 1
+                        if len(notes) < 2:
+                            notes.append(note)
+                        continue
                     truncated += 1
                     continue
                 if response.reasoning.strip():
@@ -202,7 +210,8 @@ class ReasoningUnderConstraint(BaseScenario):
             judged = attempts - truncated
             detail = (
                 f"{case.name}: reasoned {reasoned}/{judged},"
-                f" conformant {conformant}/{judged}, truncated={truncated}"
+                f" conformant {conformant}/{judged}, truncated={truncated},"
+                f" enforcement_overrun={overrun}"
             )
             print(f"    {detail}")
             for note in notes:

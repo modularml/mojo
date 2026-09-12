@@ -37,7 +37,7 @@ comptime LOG2E = 1.4426950408889634
 comptime MAX_DSTATE = 256
 
 
-@always_inline
+@inline(.always)
 def softplus_ref(val: Float32) -> Float32:
     """Reference softplus implementation: log(1 + exp(x))."""
     if val > 20.0:
@@ -47,7 +47,7 @@ def softplus_ref(val: Float32) -> Float32:
     return log(one + exp_val)
 
 
-@always_inline
+@inline(.always)
 def sigmoid_ref(val: Float32) -> Float32:
     """Reference sigmoid implementation."""
     if val < -20.0:
@@ -56,7 +56,7 @@ def sigmoid_ref(val: Float32) -> Float32:
     return 1.0 / (1.0 + exp_neg)
 
 
-@always_inline
+@inline(.always)
 def silu_ref(val: Float32) -> Float32:
     """Reference SiLU implementation."""
     if val < -20.0:

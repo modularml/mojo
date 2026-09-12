@@ -107,7 +107,7 @@ struct PagedKVCache[
     """lookup_table has shape [batch_size, ceildiv(longest_seq_len, page_size)]"""
     var lookup_table: NDBuffer[DType.uint32, 2]
 
-    @always_inline
+    @inline(.always)
     def _get_idx(
         self, bs: Int, head_idx: Int, tok_idx: Int, head_dim_idx: Int
     ) -> IndexList[6]:
@@ -151,7 +151,7 @@ generic fashion
 #### Kernel Code Example
 
 ```mojo
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_impl[
     ...
     collection_t: KVCollectionT,

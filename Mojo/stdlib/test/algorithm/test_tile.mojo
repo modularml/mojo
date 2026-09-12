@@ -23,7 +23,7 @@ from std.utils.index import Index, IndexList
 
 
 # Helper workgroup function to test dynamic workgroup tiling.
-@always_inline
+@inline(.always)
 def print_number_dynamic(data_idx: Int, tile_size: Int):
     # Print out the range of workload that this launched instance is
     #  processing, in (begin, end).
@@ -31,13 +31,13 @@ def print_number_dynamic(data_idx: Int, tile_size: Int):
 
 
 # Helper workgroup function to test static workgroup tiling.
-@always_inline
+@inline(.always)
 def print_number_static[tile_size: Int](data_idx: Int):
     print_number_dynamic(data_idx, tile_size)
 
 
 # Helper workgroup function to test static workgroup tiling.
-@always_inline
+@inline(.always)
 def print_tile2d_static[
     tile_size_x: Int, tile_size_y: Int
 ](offset_x: Int, offset_y: Int):
@@ -125,11 +125,11 @@ def test_unswitched_tile() raises:
     print("test_unswitched_tile")
 
     # A tiled function that takes a start and a dynamic boundary.
-    @always_inline
+    @inline(.always)
     def switched_tile[tile_size: Int](start: Int, bound: Int):
         # Inside each unit there's either a per-element check or a unswitched
         #  tile level check.
-        @always_inline
+        @inline(.always)
         def switched_tile_unit[static_switch: Bool]() {imm}:
             for i in range(start, start + tile_size):
                 if static_switch or i < bound:
@@ -153,7 +153,7 @@ def test_unswitched_2d_tile() raises:
     print("test_unswitched_2d_tile")
 
     # A tiled function that takes a start and a dynamic boundary.
-    @always_inline
+    @inline(.always)
     def switched_tile[
         tile_size_x: Int, tile_size_y: Int
     ](start: IndexList[2], bound: IndexList[2]):
@@ -161,7 +161,7 @@ def test_unswitched_2d_tile() raises:
 
         # Inside each unit there's either a per-element check or a unswitched
         #  tile level check.
-        @always_inline
+        @inline(.always)
         def switched_tile_unit[
             static_switch0: Bool, static_switch1: Bool
         ]() {var tile_size, imm}:
@@ -195,7 +195,7 @@ def test_tile_and_unswitch() raises:
     print("test_tile_and_unswitch")
 
     # Helper workgroup function to test static workgroup tiling.
-    @always_inline
+    @inline(.always)
     def print_number_static_unswitched[
         tile_size: Int, static_switch: Bool
     ](data_idx: Int, upperbound: Int):
@@ -225,7 +225,7 @@ def test_tile_and_unswitch() raises:
 def test_tile_middle_unswitch_boundaries() raises:
     print("test_tile_middle_unswitch_boundaries")
 
-    @always_inline
+    @inline(.always)
     def print_wrapper[tile_size: Int, switch: Bool](offset: Int):
         print(offset, tile_size, switch)
 
@@ -257,7 +257,7 @@ def test_tile_middle_unswitch_boundaries() raises:
 def test_tile_middle_unswitch_boundaries_static() raises:
     print("test_tile_middle_unswitch_boundaries_static")
 
-    @always_inline
+    @inline(.always)
     def print_wrapper[tile_size: Int, lflag: Bool, rflag: Bool](offset: Int):
         print(offset, tile_size, lflag, rflag)
 

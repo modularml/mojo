@@ -182,11 +182,11 @@ bool M::KGEN::isGPUTriple(const llvm::Triple &triple) {
 }
 
 bool M::KGEN::isMetalTriple(const llvm::Triple &triple) {
-  // Metal GPU targets use ARM64 during compilation, then get converted to AIR
-  // iOS/tvOS/watchOS don't have discrete GPUs suitable for compute kernels
-  StringRef tripleStr = triple.str();
-
-  return tripleStr.starts_with("air64-");
+  // Which triples are Metal's lives in its TargetTraits.
+  ErrorOr<const TargetTraits *> traitsOr =
+      TargetTraitsRegistry::get().lookup(triple);
+  const TargetTraits *traits = traitsOr.isError() ? nullptr : *traitsOr;
+  return traits && traits->name() == "metal";
 }
 
 bool M::KGEN::overrideExported(const llvm::Triple &triple) {

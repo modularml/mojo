@@ -43,7 +43,7 @@ def _collapse_dims_around_axis(
     return IndexList[3](before, split, after)
 
 
-@always_inline
+@inline(.always)
 def repeat_interleave[
     dtype: DType,
     type_repeats: DType,
@@ -124,7 +124,7 @@ def repeat_interleave[
     # original implicit-capture behavior.
     var offset_mapping_view = Span(offset_mapping)
 
-    @always_inline
+    @inline(.always)
     def func[
         width: Int, alignment: Int = 1
     ](idx: Coord) {var offset_mapping_view, mut}:
@@ -143,7 +143,7 @@ def repeat_interleave[
     )
 
 
-@always_inline
+@inline(.always)
 def repeat_interleave_shape[
     type_repeats: DType,
 ](

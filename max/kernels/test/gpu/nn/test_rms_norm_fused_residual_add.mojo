@@ -112,21 +112,21 @@ def run_rms_norm_fused_residual_add_gpu[
     var weight_offset2 = Scalar[dtype](0.0)
 
     # Test fused operation
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
         var idx = data_buf.layout(coords)
         return data_buf.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     def residual_input_fn[
         width: Int
     ](coords: Coord) {var data_buf_res} -> SIMD[dtype, width]:
         var idx = data_buf_res.layout(coords)
         return data_buf_res.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     def fused_output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var result_fused_buf} -> None:
@@ -135,7 +135,7 @@ def run_rms_norm_fused_residual_add_gpu[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx, val)
 
-    @always_inline
+    @inline(.always)
     def fused_residual_output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {
@@ -169,7 +169,7 @@ def run_rms_norm_fused_residual_add_gpu[
     )
 
     # Test unfused operations for comparison
-    @always_inline
+    @inline(.always)
     @__copy_capture(unfused_intermediate_buf)
     @__parameter
     def unfused_output_fn[
@@ -180,7 +180,7 @@ def run_rms_norm_fused_residual_add_gpu[
             idx, val
         )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(data_buf)
     @__parameter
     def rms_input_fn_coord[width: Int](coords: Coord) -> SIMD[dtype, width]:
@@ -192,7 +192,7 @@ def run_rms_norm_fused_residual_add_gpu[
         rank, rms_input_fn_coord, unfused_output_fn, multiply_before_cast=True
     ](Coord(shape), gamma1, epsilon1, weight_offset1, ctx)
 
-    @always_inline
+    @inline(.always)
     def sum_fn[width: Int, alignment: Int = 1](coords: Coord) {var}:
         var data_idx = data_buf.layout(coords)
         var residual_val = data_buf.raw_load[width=width](data_idx)
@@ -211,14 +211,14 @@ def run_rms_norm_fused_residual_add_gpu[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(unfused_intermediate_buf)
     def unfused_input2_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = unfused_intermediate_buf.layout(coords)
         return unfused_intermediate_buf.raw_load[width=width](idx)
 
     # Test unfused operations for comparison
-    @always_inline
+    @inline(.always)
     @__copy_capture(result_unfused_buf)
     @__parameter
     def unfused_output2_fn[

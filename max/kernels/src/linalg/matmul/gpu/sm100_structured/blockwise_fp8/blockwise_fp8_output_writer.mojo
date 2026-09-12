@@ -152,7 +152,7 @@ struct BlockwiseFP8TileWriter[
     # ========== Public Write Method ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def write[
         c_rank: Int,
         c_tile_shape: IndexList[c_rank],
@@ -196,7 +196,7 @@ struct BlockwiseFP8TileWriter[
     # ========== Internal Implementation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _write_impl[
         c_rank: Int,
         c_tile_shape: IndexList[c_rank],
@@ -306,7 +306,7 @@ struct BlockwiseFP8TileWriter[
     # ========== Bounds-Checked Write for 1D2D Grouped Matmul ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def write_absolute_with_bounds_check[
         c_tensor_layout: TensorLayout,
         cluster_size: Int,
@@ -352,7 +352,7 @@ struct BlockwiseFP8TileWriter[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _write_absolute_impl[
         c_tensor_layout: TensorLayout,
         cluster_size: Int,
@@ -470,7 +470,7 @@ struct BlockwiseFP8TileWriter[
                 named_barrier[Int32(Self.num_output_warps * WARP_SIZE)]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _store_with_bounds_check[
         c_tensor_layout: TensorLayout,
         c_smem_layout: TensorLayout,

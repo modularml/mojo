@@ -46,7 +46,7 @@ struct OpNode(ImplicitlyCopyable, Movable):
     var latency: Int
     """Estimated cycles until the result is available."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -95,7 +95,7 @@ struct LoopBody(Copyable, Movable):
     var ops: List[OpNode]
     var edges: List[DepEdge]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.ops = List[OpNode]()
         self.edges = List[DepEdge]()

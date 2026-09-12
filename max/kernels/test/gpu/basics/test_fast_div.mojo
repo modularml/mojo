@@ -95,7 +95,7 @@ def run_elementwise[type: DType](ctx: DeviceContext) raises:
     var out_divisors_buffer = TileTensor(out_divisors, row_major(length))
     var out_remainders_buffer = TileTensor(out_remainders, row_major(length))
 
-    @always_inline
+    @inline(.always)
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
         comptime fast_div = FastDiv[type](4)
         var idx = idx0[0].value()

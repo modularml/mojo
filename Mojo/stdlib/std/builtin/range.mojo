@@ -50,16 +50,16 @@ struct _ZeroStartingRange[dtype: DType = .int](
     var curr: Scalar[Self.dtype]
     var end: Scalar[Self.dtype]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, end: Scalar[Self.dtype]):
         self.curr = 0
         self.end = max(end, 0)
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Scalar[Self.dtype]:
         var curr = self.curr
         if curr == self.end:
@@ -67,21 +67,21 @@ struct _ZeroStartingRange[dtype: DType = .int](
         self.curr = curr + 1
         return curr
 
-    @always_inline
+    @inline(.always)
     def __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         return _len_as_int(self.end - self.curr)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[I: Indexer](self, idx: I) -> Scalar[Self.dtype]:
         var i = index(idx)
         assert i < self.__len__(), "index out of range"
         return Scalar[Self.dtype](i)
 
-    @always_inline
+    @inline(.always)
     def __reversed__(self) -> Self.ReversedType:
         comptime assert (
             not Self.dtype.is_unsigned()
@@ -95,7 +95,7 @@ struct _ZeroStartingRange[dtype: DType = .int](
             1 if self.end == 0 else 0,
         )
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return _scalar_range_bounds(self.end - self.curr)
 
@@ -116,16 +116,16 @@ struct _SequentialRange[dtype: DType = .int](
     var start: Scalar[Self.dtype]
     var end: Scalar[Self.dtype]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, start: Scalar[Self.dtype], end: Scalar[Self.dtype]):
         self.start = start
         self.end = max(start, end)
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Scalar[Self.dtype]:
         var start = self.start
         if start == self.end:
@@ -133,17 +133,17 @@ struct _SequentialRange[dtype: DType = .int](
         self.start = start + 1
         return start
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         return _len_as_int(self.end - self.start)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[I: Indexer](self, idx: I) -> Scalar[Self.dtype]:
         var i = index(idx)
         assert i < self.__len__(), "index out of range"
         return self.start + Scalar[Self.dtype](i)
 
-    @always_inline
+    @inline(.always)
     def __reversed__(self) -> Self.ReversedType:
         comptime assert (
             not Self.dtype.is_unsigned()
@@ -158,12 +158,12 @@ struct _SequentialRange[dtype: DType = .int](
             1 if self.start == self.end else 0,
         )
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return _scalar_range_bounds(self.end - self.start)
 
 
-@always_inline
+@inline(.always)
 def _fp_range_count[
     dtype: DType, //
 ](start: Scalar[dtype], end: Scalar[dtype], step: Scalar[dtype]) -> Int:
@@ -214,7 +214,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
     one to hand back an iterator that is already exhausted, a floating-point one
     to seat the cursor."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         start: Scalar[Self.dtype],
@@ -244,11 +244,11 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
             self.step = step
         self.idx = idx
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Scalar[Self.dtype]:
         comptime if Self.dtype.is_floating_point():
             var count = _fp_range_count(self.start, self.end, self.step)
@@ -327,7 +327,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
                 self.start -= self.step
             return result
 
-    @always_inline
+    @inline(.always)
     def _unsigned_count(self) -> Scalar[Self.dtype]:
         """Returns the number of elements left, in the range's own dtype.
 
@@ -351,7 +351,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
             # negative, so the reversed walk always has `start >= end`.
             return (self.start - self.end) // self.step + 1
 
-    @always_inline
+    @inline(.always)
     def _signed_count(self) -> Int:
         """Returns the number of elements left."""
         # Compute the length using `Int` so small signed dtypes whose element
@@ -385,7 +385,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
             # `end` is inclusive, hence the `+ 1`.
             return abs(start - end) // abs(step) + 1
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         comptime if Self.dtype.is_unsigned():
             # `bounds()` clamps an unsigned count > `Int.MAX` for the size
@@ -398,7 +398,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
             # intended.)
             return self._signed_count()
 
-    @always_inline
+    @inline(.always)
     def __getitem__[I: Indexer](self, idx: I) -> Scalar[Self.dtype]:
         var i = index(idx)
         assert i < self.__len__(), "index out of range"
@@ -407,7 +407,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
         else:
             return self.start - Scalar[Self.dtype](i) * self.step
 
-    @always_inline
+    @inline(.always)
     def __reversed__(self) -> Self.ReversedType:
         # Reversing back would have to rebuild the forward range's exclusive
         # `end`, one step past the last element, which is exactly the value
@@ -449,7 +449,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
                 1 if count == 0 else 0,
             )
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         comptime assert Self.dtype.is_integral(), "dtype must be integral"
 
@@ -463,7 +463,7 @@ struct _StridedRange[dtype: DType = .int, forward: Bool = True](
             return (length, {length})
 
 
-@always_inline
+@inline(.always)
 def range[T: Indexer, //](end: T) -> _ZeroStartingRange[.int]:
     """Returns the integer sequence `[0, end)`.
 
@@ -500,7 +500,7 @@ def range[T: Indexer, //](end: T) -> _ZeroStartingRange[.int]:
     return _ZeroStartingRange(index(end))
 
 
-@always_inline
+@inline(.always)
 def range[T: Indexer, //](start: T, end: T) -> _SequentialRange[.int]:
     """Returns the integer sequence `[start, end)`.
 
@@ -537,7 +537,7 @@ def range[T: Indexer, //](start: T, end: T) -> _SequentialRange[.int]:
     return _SequentialRange(index(start), index(end))
 
 
-@always_inline
+@inline(.always)
 def range[T: Indexer, //](start: T, end: T, step: T) -> _StridedRange[.int]:
     """Returns the integer sequence `[start, end)` with a given step.
 
@@ -614,7 +614,7 @@ def _scalar_range_bounds[
     return (Int(len), {Int(len)})
 
 
-@always_inline
+@inline(.always)
 def range[dtype: DType, //](end: Scalar[dtype]) -> _ZeroStartingRange[dtype]:
     """Returns the scalar sequence `[0, end)` with elements of type `dtype`.
 
@@ -653,7 +653,7 @@ def range[dtype: DType, //](end: Scalar[dtype]) -> _ZeroStartingRange[dtype]:
     return _ZeroStartingRange[dtype](end)
 
 
-@always_inline
+@inline(.always)
 def range[
     dtype: DType, //
 ](start: Scalar[dtype], end: Scalar[dtype]) -> _SequentialRange[dtype]:
@@ -694,7 +694,7 @@ def range[
     return _SequentialRange[dtype](start, end)
 
 
-@always_inline
+@inline(.always)
 def range[
     dtype: DType, //
 ](

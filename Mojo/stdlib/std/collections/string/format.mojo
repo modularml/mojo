@@ -128,7 +128,7 @@ struct _PrecompiledEntriesRuntime[format_origin: ImmOrigin, //, *Ts: Writable](
     var format: StringSlice[Self.format_origin]
 
 
-@always_inline
+@inline(.always)
 def _comptime_list_to_span[
     T: Deinitable & Copyable, //, list: List[T]
 ]() -> Span[T, ImmStaticOrigin]:
@@ -162,7 +162,7 @@ struct _FormatUtils:
         var ptr = compiled.format.as_bytes().unsafe_ptr()
         var fmt_len = compiled.format.byte_length()
 
-        @always_inline
+        @inline(.always)
         def _build_slice(
             p: ImmPointer[UInt8, _], start: Int, end: Int
         ) -> StringSlice[p.origin]:
@@ -476,7 +476,7 @@ struct _FormatCurlyEntry[origin: ImmOrigin](ImplicitlyCopyable):
         self.field = field
         self.conversion_flag = conversion_flag
 
-    @always_inline
+    @inline(.always)
     def is_escaped_brace(ref self) -> Bool:
         """Whether the field is escaped_brace.
 
@@ -485,7 +485,7 @@ struct _FormatCurlyEntry[origin: ImmOrigin](ImplicitlyCopyable):
         """
         return self.field.isa[Bool]()
 
-    @always_inline
+    @inline(.always)
     def is_kwargs_field(ref self) -> Bool:
         """Whether the field is kwargs_field.
 
@@ -494,7 +494,7 @@ struct _FormatCurlyEntry[origin: ImmOrigin](ImplicitlyCopyable):
         """
         return self.field.isa[String]()
 
-    @always_inline
+    @inline(.always)
     def is_automatic_indexing(ref self) -> Bool:
         """Whether the field is automatic_indexing.
 
@@ -503,7 +503,7 @@ struct _FormatCurlyEntry[origin: ImmOrigin](ImplicitlyCopyable):
         """
         return self.field.isa[NoneType]()
 
-    @always_inline
+    @inline(.always)
     def is_manual_indexing(ref self) -> Bool:
         """Whether the field is manual_indexing.
 
@@ -525,7 +525,7 @@ struct _FormatCurlyEntry[origin: ImmOrigin](ImplicitlyCopyable):
         mut raised_kwarg_field: Optional[StringSlice[Self.origin]],
         mut total_estimated_entry_byte_width: Int,
     ) raises -> Bool:
-        @always_inline("nodebug")
+        @inline(.nodebug)
         def _build_slice(
             p: ImmPointer[UInt8, _], start: Int, end: Int
         ) -> StringSlice[p.origin]:

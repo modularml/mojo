@@ -51,7 +51,7 @@ def block_scaled_matmul_ref[
     var N = Int(N_dev)
     var K = Int(K_dev)
 
-    @always_inline
+    @inline(.always)
     def cast_fp2em1x2_to_fp32x2[
         byte_select: Int
     ](packed: Int32, scale: Float32) -> SIMD[.float32, 2]:

@@ -454,8 +454,9 @@ async def test_ssrf_disabled_skips_validation() -> None:
 
 @pytest.mark.asyncio
 async def test_ssrf_enforces_size_cap_on_streamed_body() -> None:
-    # The guarded path streams under the byte cap exactly like the legacy path:
-    # a body whose running total crosses the cap is aborted with a clean 400.
+    # The guarded path streams under the request media budget exactly like the
+    # legacy path: a body whose running total crosses the aggregate
+    # ``max_media_bytes`` limit is aborted with a clean 400.
     client = _RecordingStreamClient(
         {"93.184.216.34": _FakeStreamResponse(chunks=[b"a" * 60] * 10)}
     )
@@ -466,11 +467,10 @@ async def test_ssrf_enforces_size_cap_on_streamed_body() -> None:
         ),
         _patch_stream_client(client),
     ):
-        with pytest.raises(InputError, match="image exceeds the maximum"):
+        with pytest.raises(InputError, match="exceeds the maximum media size"):
             await resolve_image_from_url(
                 AnyUrl("https://host.example/big.png"),
-                settings=_resolver_settings(),
-                max_bytes=100,
+                settings=_resolver_settings(max_media_bytes=100),
             )
 
 

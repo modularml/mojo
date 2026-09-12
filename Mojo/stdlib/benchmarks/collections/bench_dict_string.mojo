@@ -131,7 +131,7 @@ struct KeysContainer[KeyEndType: DType = .uint32](ImplicitlyCopyable, Sized):
             )
         )
 
-    @always_inline
+    @inline(.always)
     def add(mut self, key: StringSlice):
         var prev_end = (
             0 if self.count
@@ -183,7 +183,7 @@ struct KeysContainer[KeyEndType: DType = .uint32](ImplicitlyCopyable, Sized):
         self.keys_end.unsafe_store(self.count, new_end)
         self.count = count
 
-    @always_inline
+    @inline(.always)
     def get(self, index: Int) -> StringSlice[ImmOrigin(origin_of(self))]:
         var keys_ptr = self.keys.as_imm().unsafe_origin_cast[origin_of(self)]()
         if index < 0 or index >= self.count:
@@ -200,17 +200,17 @@ struct KeysContainer[KeyEndType: DType = .uint32](ImplicitlyCopyable, Sized):
             )
         )
 
-    @always_inline
+    @inline(.always)
     def clear(mut self):
         self.count = 0
 
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, index: Int
     ) -> StringSlice[ImmOrigin(origin_of(self))]:
         return self.get(index)
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         return self.count
 
@@ -345,7 +345,7 @@ struct StringDict[
     def __len__(self) -> Int:
         return self.count
 
-    @always_inline
+    @inline(.always)
     def __contains__(self, key: StringSlice) -> Bool:
         return self._find_key_index(key) != 0
 
@@ -397,7 +397,7 @@ struct StringDict[
 
             slot = (slot + 1) & modulo_mask
 
-    @always_inline
+    @inline(.always)
     def _is_deleted(self, index: Int) -> Bool:
         var offset = index >> 3
         var bit_index = index & 7
@@ -407,7 +407,7 @@ struct StringDict[
             != 0
         )
 
-    @always_inline
+    @inline(.always)
     def _deleted(self, index: Int):
         var offset = index >> 3
         var bit_index = index & 7
@@ -415,7 +415,7 @@ struct StringDict[
         var mask = p.unsafe_load()
         p.unsafe_store(mask | UInt8((1 << bit_index)))
 
-    @always_inline
+    @inline(.always)
     def _not_deleted(self, index: Int):
         var offset = index >> 3
         var bit_index = index & 7
@@ -423,7 +423,7 @@ struct StringDict[
         var mask = p.unsafe_load()
         p.unsafe_store(mask & UInt8(~(1 << bit_index)))
 
-    @always_inline
+    @inline(.always)
     def _rehash(mut self):
         var old_slot_to_index = self.slot_to_index
         var old_capacity = self.capacity
@@ -557,7 +557,7 @@ struct StringDict[
             unsafe_memset_zero(self.deleted_mask, self.capacity >> 3)
         self.count = 0
 
-    @always_inline
+    @inline(.always)
     def _find_key_index(self, key: StringSlice) -> Int:
         var key_hash = hash(key).cast[Self.KeyCountType]()
         var modulo_mask = self.capacity - 1
@@ -588,7 +588,7 @@ struct StringDict[
 def bench_dict_init_with_short_keys[file_name: String](mut b: Bencher) raises:
     var keys = make_small_keys(file_name)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var d = Dict[String, Int]()
         for i, key in enumerate(keys):
@@ -601,7 +601,7 @@ def bench_dict_init_with_short_keys[file_name: String](mut b: Bencher) raises:
 def bench_dict_init_with_long_keys[file_name: String](mut b: Bencher) raises:
     var keys = make_long_keys(file_name)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var d = Dict[String, Int, default_hasher]()
         for i, key in enumerate(keys):
@@ -619,7 +619,7 @@ def bench_string_dict_init_with_short_keys[
 ](mut b: Bencher) raises:
     var keys = make_small_keys(file_name)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var d = StringDict[Int]()
         for i, key in enumerate(keys):
@@ -634,7 +634,7 @@ def bench_string_dict_init_with_long_keys[
 ](mut b: Bencher) raises:
     var keys = make_long_keys(file_name)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var d = StringDict[Int]()
         for i, key in enumerate(keys):

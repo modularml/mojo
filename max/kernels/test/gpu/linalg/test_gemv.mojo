@@ -73,7 +73,7 @@ def run_matvec[
 
     comptime WARPS_PER_BLOCK = 1024 // WARP_SIZE
 
-    @always_inline
+    @inline(.always)
     def run_func_gemv(ctx: DeviceContext) raises {imm}:
         comptime kernel = gemv_kernel[c_type, a_type, b_type]
 
@@ -88,7 +88,7 @@ def run_matvec[
             block_dim=WARP_SIZE * WARPS_PER_BLOCK,
         )
 
-    @always_inline
+    @inline(.always)
     def run_func_gevm(ctx: DeviceContext) raises {imm}:
         comptime kernel = gevm_kernel[
             c_type,
@@ -214,7 +214,7 @@ def run_matvec_with_epilogue_fn(
     var const_val: Float32 = 4.0
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_device_nd, const_val)
     def epilogue_fn[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
@@ -226,7 +226,7 @@ def run_matvec_with_epilogue_fn(
 
     comptime WARPS_PER_BLOCK = 1024 // WARP_SIZE
 
-    @always_inline
+    @inline(.always)
     def run_func_gemv(ctx: DeviceContext) raises {mut c_device, imm}:
         comptime kernel = gemv_kernel[
             .float32,
@@ -247,7 +247,7 @@ def run_matvec_with_epilogue_fn(
             block_dim=WARP_SIZE * WARPS_PER_BLOCK,
         )
 
-    @always_inline
+    @inline(.always)
     def run_func_gevm(ctx: DeviceContext) raises {mut c_device, imm}:
         comptime kernel = gevm_kernel[
             .float32,
@@ -301,7 +301,7 @@ def run_matvec_with_epilogue_fn(
 
     comptime BLOCK_DIM = 16
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {mut c_device, imm}:
         comptime kernel = matmul_kernel[
             .float32,
@@ -405,7 +405,7 @@ def run_split_k_gemm[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(c_nd)
         def epilogue_fn[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1

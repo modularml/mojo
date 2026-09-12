@@ -22,7 +22,7 @@ from std.utils.numerics import get_accum_type
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _is_neg[
     dtype: DType, simd_width: SIMDLength
 ](val: SIMD[dtype, simd_width]) -> SIMD[.bool, simd_width]:
@@ -48,7 +48,7 @@ def _is_neg[
     return val.lt(0)
 
 
-@always_inline
+@inline(.always)
 def sign[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -74,7 +74,7 @@ def sign[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def elu[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -99,7 +99,7 @@ def elu[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def relu[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -123,7 +123,7 @@ def relu[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def relu_n1[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -147,7 +147,7 @@ def relu_n1[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def leaky_relu[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width], negative_slope: Scalar[dtype]) -> SIMD[
@@ -181,7 +181,7 @@ def leaky_relu[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def sigmoid[
     dtype: DType,
     simd_width: SIMDLength,
@@ -219,7 +219,7 @@ def sigmoid[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def silu[
     dtype: DType,
     simd_width: SIMDLength,
@@ -254,7 +254,7 @@ def silu[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def gelu[
     dtype: DType,
     simd_width: SIMDLength,
@@ -286,7 +286,7 @@ def gelu[
     ).cast[dtype]()
 
 
-@always_inline
+@inline(.always)
 def gelu_tanh[
     dtype: DType,
     simd_width: SIMDLength,
@@ -326,7 +326,7 @@ def gelu_tanh[
     ).cast[dtype]()
 
 
-@always_inline
+@inline(.always)
 def gelu_quick[
     dtype: DType,
     simd_width: SIMDLength,

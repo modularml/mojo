@@ -60,7 +60,7 @@ def bench_math[
 ](mut b: Bencher) raises:
     var inputs = make_inputs(0, 10_000, 1_000_000)
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm inputs}:
         for input in inputs:
             var result = math_f1p(input)
@@ -79,7 +79,7 @@ def bench_math3[
 ](mut b: Bencher) raises:
     var inputs = make_inputs(0, 10_000, 1_000_000)
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm inputs}:
         for input in inputs:
             var result = math_f3p(input, input, input)
@@ -94,7 +94,7 @@ def bench_math3[
 def bench_math2[math_f2p: def(Int, Int, /) thin -> Int](mut b: Bencher) raises:
     var int_inputs = make_int_inputs(0, 10_000_000, 1_000_000)
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm int_inputs}:
         for i, input_val in enumerate(List(int_inputs[: len(int_inputs) // 2])):
             var result = keep(

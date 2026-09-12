@@ -39,7 +39,7 @@ comptime _DEFAULT_TIMEOUT = 30.0
 comptime _POLL_INTERVAL = 0.01
 
 
-@always_inline
+@inline(.always)
 def _assert_aborts(
     f: Some[def() raises],
     *,
@@ -93,7 +93,7 @@ def _assert_aborts(
     )
 
 
-@no_inline
+@inline(.never)
 def _assert_aborts_impl(
     f: Some[def() raises],
     *,

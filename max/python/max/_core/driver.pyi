@@ -986,11 +986,11 @@ class Usage(enum.Flag):
 
     _boundary_: enum.FlagBoundary = ...
 
-    _flag_mask_: int = 1
+    _flag_mask_: int = 3
 
-    _singles_mask_: int = 1
+    _singles_mask_: int = 3
 
-    _all_bits_: int = 3
+    _all_bits_: int = 7
 
     _inverted_: None = None
 
@@ -1003,6 +1003,99 @@ class Usage(enum.Flag):
     """
     Host memory for staging transfers to and from the given device. May be page-locked, depending on the backend.
     """
+
+    UNTRACKED = 2
+    """
+    Memory opting out of host side hazard tracking. Useless unless paired with STAGING.
+    """
+
+class HostHazardError(RuntimeError): ...
+
+class HostHazardCompletion:
+    """
+    A completion shared by host hazard tracked resources.
+
+    Internal to max.driver's hazard tracking. Facilitates ordering of host
+    access to resources.
+
+    .. code-block:: python
+
+        import numpy as np
+
+        from max import driver
+        from max.dtype import DType
+
+        gpu = driver.Accelerator()
+        staging = driver.Buffer(
+            DType.float32, [4], device=gpu, usage=driver.Usage.STAGING
+        )
+        host = np.zeros(4, dtype=np.float32)
+        source = driver.Buffer.from_numpy(host).to(gpu)
+
+        # Record a token on the queue that will signal the copy, then
+        # stamp it onto every buffer that submission touched.
+        staging.inplace_copy_from(source)
+
+        # The host read waits on that token instead of draining `gpu`.
+        value = staging[0].item()
+    """
+
+    @staticmethod
+    def record_on(queue: DeviceQueue) -> HostHazardCompletion:
+        """
+        Records an event on ``queue`` for the work already submitted to it.
+
+        Args:
+            queue (DeviceQueue): The queue whose submitted work to record.
+
+        Returns:
+            HostHazardCompletion: A completion that resolves when that work
+            finishes.
+        """
+
+    @staticmethod
+    def poisoned(queue: DeviceQueue, error: str) -> HostHazardCompletion:
+        """
+        Creates a completion that raises instead of waiting.
+
+        For a producer that failed after enqueuing work, so a later host
+        access reports the failure rather than trusting unfinished bytes.
+
+        Args:
+            queue (DeviceQueue): The queue the failed work was submitted to.
+            error (str): The producer's rendered error.
+
+        Returns:
+            HostHazardCompletion: A poisoned completion.
+        """
+
+    def is_ready(self) -> bool:
+        """
+        Returns whether the recorded work has finished.
+
+        A poisoned completion reports ready: waiting on it raises rather
+        than blocking, so it can never hold up a caller.
+
+        Returns:
+            bool: Whether the work has finished.
+        """
+
+    def wait(self) -> None:
+        """
+        Blocks until the recorded work finishes.
+
+        Raises:
+            HostHazardError: If the completion is poisoned, carrying the
+                producer's error.
+        """
+
+    def poison(self, message: str) -> None:
+        """
+        Marks the completion failed, so every later wait raises.
+
+        Args:
+            message (str): The producer's error, reported by the raise.
+        """
 
 class Buffer:
     """
@@ -1082,6 +1175,28 @@ class Buffer:
         Currently, we consider certain situations that are contiguous as
         non-contiguous for the purposes of our engine, such as when a buffer
         has negative steps.
+        """
+
+    @property
+    def strides(self) -> tuple:
+        """
+        How far apart consecutive elements are, per dimension.
+
+        Counted in elements, not bytes.
+
+        Slicing does not move any data, so a slice keeps its parent's
+        strides. Narrow a 10-wide buffer to 6 columns and it still takes
+        10 elements to reach the next row:
+
+        .. code-block:: python
+
+            parent = driver.Buffer(shape=[8, 10], dtype=DType.uint8)
+            rows = parent[:, :6]
+            rows.shape          # (8, 6)
+            rows.strides        # (10, 1) -- still 10 to the next row
+            rows.is_contiguous  # False
+
+        A buffer must be contiguous to be passed into model execution.
         """
 
     @property
@@ -1290,6 +1405,10 @@ class Buffer:
     def usage(self) -> Usage:
         """Allocation intent. Slices and views report their parent's usage."""
 
+    @property
+    def _host_hazard_tracked(self) -> bool:
+        """Whether the allocation is instrumented for host hazard tracking."""
+
     def view(
         self, dtype: max._core.dtype.DType, shape: Sequence[int] | None = None
     ) -> Buffer:
@@ -1361,6 +1480,12 @@ class Buffer:
     def _inplace_copy_from(self, src: Buffer) -> None: ...
     def _data_ptr(self) -> int:
         """Gets the memory address of the buffer data. Internal use only."""
+
+    def _stamp_read(self, completion: HostHazardCompletion) -> None:
+        """Add a read completion to the buffer. Internal use only."""
+
+    def _stamp_write(self, completion: HostHazardCompletion) -> None:
+        """Add a write completion to the buffer. Internal use only."""
 
 def _batch_inplace_copy(dsts: Sequence[Buffer], srcs: Sequence[Buffer]) -> None:
     """

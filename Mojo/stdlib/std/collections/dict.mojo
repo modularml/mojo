@@ -181,7 +181,7 @@ struct _DictEntryIter[
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> ref[Self.origin] Self.Element:
@@ -210,7 +210,7 @@ struct _DictEntryIter[
         ), "_order exhausted but not all entries seen: _len out of sync"
         raise StopIteration()
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var len = len(self.src[]) - self.seen
         return (len, {len})
@@ -244,11 +244,11 @@ struct _TakeDictEntryIter[
         self.index = 0
         self.src = Pointer(to=dict)
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> Self.Element:
@@ -293,16 +293,16 @@ struct _DictEntryIterOwned[
     var _dict: Dict[Self.K, Self.V, Self.H]
     var _index: Int
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         # Dict.__deinit__ handles destroying remaining occupied slots.
         pass
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         while self._index < len(self._dict._order):
             var slot = Int(self._dict._order[self._index])
@@ -322,7 +322,7 @@ struct _DictEntryIterOwned[
         )
         raise StopIteration()
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return (self._dict._table._len, {self._dict._table._len})
 
@@ -346,15 +346,15 @@ struct _DictKeyIterOwned[
 
     var _inner: _DictEntryIterOwned[Self.K, Self.V, Self.H]
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         return self._inner.__next__().reap_key()
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return self._inner.bounds()
 
@@ -390,17 +390,17 @@ struct _DictKeyIter[
 
     var iter: Self.dict_entry_iter
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> ref[self.iter.__next__().key] Self.Element:
         return self.iter.__next__().key
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return self.iter.bounds()
 
@@ -454,7 +454,7 @@ struct _DictValueIter[
         # _DictEntryIter.next erases it.
         return Pointer(to=entry_ref.value).unsafe_origin_cast[Self.origin]()[]
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return self.iter.bounds()
 
@@ -719,13 +719,13 @@ struct Dict[
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize an empty dictionary."""
         self._table = SwissTable[Self.K, Self.V, Self.H]()
         self._order = List[Int32]()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, capacity: Int):
         """Initialize an empty dictionary with a pre-reserved capacity.
 
@@ -746,7 +746,7 @@ struct Dict[
         self._table = SwissTable[Self.K, Self.V, Self.H](capacity=capacity)
         self._order = List[Int32](capacity=self._table._capacity * 7 // 8)
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         var keys: List[Self.K],
@@ -774,7 +774,7 @@ struct Dict[
 
     # TODO: add @property when Mojo supports it to make
     # it possible to do `self._reserved`.
-    @always_inline
+    @inline(.always)
     def _reserved(self) -> Int:
         return self._table._capacity
 
@@ -907,7 +907,7 @@ struct Dict[
         """
         return self._find_ref(key)
 
-    @always_inline
+    @inline(.always)
     def __setitem__(
         mut self, var key: Self.K, var value: Self.V
     ) where conforms_to(Self.K, Deinitable) and conforms_to(Self.V, Deinitable):
@@ -959,7 +959,7 @@ struct Dict[
         self._place_new_entry(slot_idx, entry^)
         return None
 
-    @always_inline
+    @inline(.always)
     def __contains__(self, key: Self.K) -> Bool:
         """Check if a given key is in the dictionary or not.
 
@@ -1168,7 +1168,7 @@ struct Dict[
 
         writer.write_string("}")
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where (
@@ -1186,7 +1186,7 @@ struct Dict[
             f_val=fmt.write_to[Self.V],
         ](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where (
@@ -1322,7 +1322,7 @@ struct Dict[
 
         raise DictKeyError[Self.K]()
 
-    @always_inline
+    @inline(.always)
     def get(
         self, key: Self.K
     ) -> Optional[Self.V] where conforms_to(Self.V, Copyable):
@@ -1353,7 +1353,7 @@ struct Dict[
         """
         return self.find(key)
 
-    @always_inline
+    @inline(.always)
     def get(
         self, key: Self.K, var default: Self.V
     ) -> Self.V where conforms_to(Self.V, Copyable & Deinitable):
@@ -1767,7 +1767,7 @@ struct Dict[
         self._table.clear_with(destroy_func)
         self._order.clear()
 
-    @always_inline
+    @inline(.always)
     def setdefault(
         mut self, var key: Self.K, var default: Self.V
     ) -> ref[
@@ -1824,7 +1824,7 @@ struct Dict[
     # Internal methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def _find_slot(self, hash: UInt64, key: Self.K) -> Tuple[Bool, Int]:
         """Find a slot matching the given key, or an empty slot for insertion.
 
@@ -1840,7 +1840,7 @@ struct Dict[
         """
         return self._table.find_slot(hash, key)
 
-    @always_inline
+    @inline(.always)
     def _set_ctrl(mut self, index: Int, value: UInt8):
         """Set a control byte. Forwards to the underlying SwissTable.
 
@@ -1850,7 +1850,7 @@ struct Dict[
         """
         self._table.set_ctrl(index, value)
 
-    @always_inline
+    @inline(.always)
     def _place_new_entry(
         mut self, slot_idx: Int, var entry: DictEntry[Self.K, Self.V, Self.H]
     ):
@@ -1874,13 +1874,13 @@ struct Dict[
             self._table._growth_left >= 0
         ), "_growth_left went negative after insert"
 
-    @always_inline
+    @inline(.always)
     def _insert(
         mut self, var key: Self.K, var value: Self.V
     ) where conforms_to(Self.K, Deinitable) and conforms_to(Self.V, Deinitable):
         self._insert(DictEntry[Self.K, Self.V, Self.H](key^, value^))
 
-    @always_inline
+    @inline(.always)
     def _insert[
         safe_context: Bool = False
     ](mut self, var entry: DictEntry[Self.K, Self.V, Self.H]) where conforms_to(
@@ -1898,7 +1898,7 @@ struct Dict[
             # New entry
             self._place_new_entry(slot_idx, entry^)
 
-    @always_inline
+    @inline(.always)
     def _ensure_capacity(mut self):
         """Ensures the table has room for one more insertion.
 
@@ -1927,7 +1927,7 @@ struct Dict[
         else:
             self._maybe_compact_order()
 
-    @no_inline
+    @inline(.never)
     def _grow_slow(mut self):
         """Grows or rehashes the table. See `_ensure_capacity`."""
         # First allocation from the lazy empty state: no entries to rehash and
@@ -1985,7 +1985,7 @@ struct Dict[
             )
         )
 
-    @no_inline
+    @inline(.never)
     def _rehash_in_place(mut self):
         """Rehash the table in place without changing capacity."""
         # Compact _order to remove stale entries before we lose
@@ -2096,7 +2096,7 @@ struct StringDict[V: Movable](
     # ===-------------------------------------------------------------------===#
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, ref key: Self.key_type
     ) raises DictKeyError[Self.key_type] -> ref[self._dict[key]] Self.V:
@@ -2114,9 +2114,9 @@ struct StringDict[V: Movable](
         return self._dict[key]
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
-        ref self, key: ImmStringSpan
+        ref self, key: StringSpan
     ) raises DictKeyError[Self.key_type] -> ref[
         origin_of(self._dict)._get_owned_interior["value"]
     ] Self.V:
@@ -2139,7 +2139,7 @@ struct StringDict[V: Movable](
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def __setitem__(
         mut self, key: Self.key_type, var value: Self.V
     ) where conforms_to(Self.V, Deinitable):
@@ -2160,7 +2160,7 @@ struct StringDict[V: Movable](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __contains__(self, key: Self.key_type) -> Bool:
         """Check if a given key is in the keyword dictionary or not.
 
@@ -2173,7 +2173,7 @@ struct StringDict[V: Movable](
         """
         return key in self._dict
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """The number of elements currently stored in the keyword dictionary.
 
@@ -2182,7 +2182,7 @@ struct StringDict[V: Movable](
         """
         return len(self._dict)
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.V, Writable):
@@ -2193,7 +2193,7 @@ struct StringDict[V: Movable](
         """
         self._dict.write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.V, Writable):
@@ -2219,7 +2219,7 @@ struct StringDict[V: Movable](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def find(
         self, key: Self.key_type
     ) -> Optional[Self.V] where conforms_to(Self.V, Copyable):
@@ -2234,7 +2234,7 @@ struct StringDict[V: Movable](
         """
         return self._dict.find(key)
 
-    @always_inline
+    @inline(.always)
     def insert(
         mut self, var key: Self.key_type, var value: Self.V
     ) -> Optional[DictEntry[Self.key_type, Self.V, default_comp_time_hasher]]:
@@ -2256,7 +2256,7 @@ struct StringDict[V: Movable](
         """
         return self._dict.insert(key^, value^)
 
-    @always_inline
+    @inline(.always)
     def popitem(
         mut self,
     ) raises EmptyDictError -> DictEntry[
@@ -2276,7 +2276,7 @@ struct StringDict[V: Movable](
         """
         return self._dict.popitem()
 
-    @always_inline
+    @inline(.always)
     def pop(
         mut self, key: self.key_type, var default: Self.V
     ) -> Self.V where conforms_to(Self.V, Deinitable):
@@ -2298,7 +2298,7 @@ struct StringDict[V: Movable](
         """
         return self._dict.pop(key, default^)
 
-    @always_inline
+    @inline(.always)
     def pop(
         mut self, ref key: self.key_type
     ) raises DictKeyError[Self.key_type] -> Self.V:
@@ -2390,13 +2390,13 @@ struct StringDict[V: Movable](
         # return self[]._dict.items()
         return self._dict.items()
 
-    @always_inline
+    @inline(.always)
     def _insert(
         mut self, var key: Self.key_type, var value: Self.V
     ) where conforms_to(Self.V, Deinitable):
         self._dict._insert(key^, value^)
 
-    @always_inline
+    @inline(.always)
     def _insert(
         mut self, key: StringLiteral, var value: Self.V
     ) where conforms_to(Self.V, Deinitable):

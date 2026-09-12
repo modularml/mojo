@@ -27,7 +27,10 @@ from __future__ import annotations
 
 import pytest
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_pool import (
+    JengaGeometry,
     compute_jenga_ratios,
+    lcm,
+    plan_jenga_geometry,
 )
 
 MIB = 1024**2
@@ -299,3 +302,143 @@ def test_invalid_arguments() -> None:
         compute_jenga_ratios(120 * GIB, {"values": page, "scales": 0})
     with pytest.raises(ValueError, match="available_bytes must be positive"):
         compute_jenga_ratios(0, {"values": page})
+
+
+def mha_row_bytes(
+    n_kv_heads: int, head_dim: int, dtype_bytes: int = BF16
+) -> int:
+    """Returns the bytes one row of an MHA cache holds, the unit TMA indexes."""
+    return n_kv_heads * head_dim * dtype_bytes
+
+
+def check_row_aligned_and_tiling(
+    geometry: JengaGeometry, row_sizes: dict[str, int]
+) -> None:
+    """Asserts the allocator invariants every padded geometry owes the kernel.
+
+    A padded page must still divide the huge block, or a huge block does not
+    hold a whole number of them, and must still be a whole number of rows, or
+    ``PagedKVCache._stride()`` has no exact row index for the start of a page.
+    """
+    for cache_id, page in geometry.padded_sizes.items():
+        assert geometry.huge_page_bytes % page == 0, cache_id
+        assert geometry.huge_page_bytes // page == geometry.ratios[cache_id]
+        assert page % row_sizes[cache_id] == 0, cache_id
+
+
+def test_padding_is_not_spent_when_pages_already_divide() -> None:
+    # gemma4's global page is exactly a tenth of its sliding one, so exact
+    # tiling is already cheap and the search must not pad to beat it.
+    cache_sizes = {
+        "sliding_attention/values": mha_page_bytes(50, 16, 256),
+        "full_attention/values": mha_page_bytes(10, 4, 512),
+    }
+    row_sizes = {
+        "sliding_attention/values": mha_row_bytes(16, 256),
+        "full_attention/values": mha_row_bytes(4, 512),
+    }
+    geometry = plan_jenga_geometry(120 * GIB, cache_sizes, row_sizes)
+
+    # Identical to the exact path, down to the block count.
+    num_huge_blocks, huge_page_bytes, ratios = compute_jenga_ratios(
+        120 * GIB, cache_sizes
+    )
+    assert geometry.padded_sizes == cache_sizes
+    assert geometry.ratios == ratios
+    assert geometry.huge_page_bytes == huge_page_bytes
+    assert geometry.num_huge_blocks == num_huge_blocks
+    assert all(
+        geometry.padding_fraction(cache_id, size) == 0
+        for cache_id, size in cache_sizes.items()
+    )
+    check_row_aligned_and_tiling(geometry, row_sizes)
+
+
+def test_vision_encoder_stops_exploding_the_huge_block() -> None:
+    # The case the exact path cannot serve: the tower's 243 = 27 * 9 odd part
+    # against the text caches' 25 forces a 23.7 GiB huge block, of which a
+    # 120 GiB budget holds five -- four allocatable. Padding buys it back.
+    cache_sizes = {
+        "sliding_attention/values": mha_page_bytes(50, 16, 256),
+        "full_attention/values": mha_page_bytes(10, 4, 512),
+        "vision/values": siglip_vision_page_bytes(),
+    }
+    row_sizes = {
+        "sliding_attention/values": mha_row_bytes(16, 256),
+        "full_attention/values": mha_row_bytes(4, 512),
+        "vision/values": mha_row_bytes(16, 1152 // 16),
+    }
+    _, exact_huge_page, _ = compute_jenga_ratios(120 * GIB, cache_sizes)
+    geometry = plan_jenga_geometry(120 * GIB, cache_sizes, row_sizes)
+
+    assert exact_huge_page == 24300 * MIB
+    # Three orders of magnitude off the exact block, and the block count goes
+    # from unusable to a real pool.
+    assert geometry.huge_page_bytes < 128 * MIB
+    assert geometry.num_huge_blocks > 1000
+    check_row_aligned_and_tiling(geometry, row_sizes)
+    # Nothing pays more than the cap for it.
+    assert all(
+        geometry.padding_fraction(cache_id, size) <= 0.25
+        for cache_id, size in cache_sizes.items()
+    )
+
+
+def test_v4_pro_seven_leaf_geometry() -> None:
+    # DeepSeek-V4-Pro is the case that motivated padding: seven cache kinds
+    # whose layer counts (30, 31, 61) are pairwise coprime, so every one of
+    # those primes survives into the exact lcm and none of them cancel.
+    cache_sizes = {
+        "swa/values": 61 * 64 * 576,
+        "c4a/values": 30 * 64 * 576,
+        "c128a/values": 31 * 2 * 576,
+        "c4a/indexer": 30 * 64 * 68,
+        "c4a/state": 30 * 4 * 8192,
+        "c128a/state": 31 * 8 * 4096,
+        "c4a/indexer_state": 30 * 4 * 2048,
+    }
+    row_sizes = {
+        "swa/values": 576,
+        "c4a/values": 576,
+        "c128a/values": 576,
+        "c4a/indexer": 68,
+        "c4a/state": 8192,
+        "c128a/state": 4096,
+        "c4a/indexer_state": 2048,
+    }
+    # Exact tiling wants a quarter of a terabyte for one huge block, so the
+    # exact path cannot even return a geometry here -- it rejects the budget.
+    assert lcm(*cache_sizes.values()) > 200 * GIB
+    with pytest.raises(ValueError, match="too small to build a pool"):
+        compute_jenga_ratios(100 * GIB, cache_sizes)
+
+    geometry = plan_jenga_geometry(100 * GIB, cache_sizes, row_sizes)
+    assert geometry.huge_page_bytes <= 128 * MIB
+    assert geometry.num_huge_blocks > 2000
+    check_row_aligned_and_tiling(geometry, row_sizes)
+
+
+def test_a_page_that_is_a_fraction_of_a_row_is_rejected() -> None:
+    # Real leaf sizes are a product that includes the row, so this cannot
+    # happen by construction -- it catches a caller mixing conventions, e.g.
+    # sizing pages from a packed 584-byte entry while declaring MAX's 576-byte
+    # value row, which silently breaks the row division in the kernel.
+    with pytest.raises(ValueError, match="not a whole number of its"):
+        plan_jenga_geometry(
+            120 * GIB, {"values": 61 * 64 * 584}, {"values": 576}
+        )
+
+
+def test_padded_invalid_arguments() -> None:
+    page = mha_page_bytes(50, 16, 256)
+    row = mha_row_bytes(16, 256)
+    with pytest.raises(ValueError, match="cache_sizes must be non-empty"):
+        plan_jenga_geometry(120 * GIB, {}, {})
+    with pytest.raises(ValueError, match="row_sizes must be positive"):
+        plan_jenga_geometry(120 * GIB, {"values": page}, {"values": 0})
+    with pytest.raises(ValueError, match="same caches"):
+        plan_jenga_geometry(120 * GIB, {"values": page}, {"scales": row})
+    with pytest.raises(ValueError, match="available_bytes must be positive"):
+        plan_jenga_geometry(0, {"values": page}, {"values": row})
+    with pytest.raises(ValueError, match="too small to build a pool"):
+        plan_jenga_geometry(page, {"values": page}, {"values": row})

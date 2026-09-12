@@ -25,7 +25,7 @@ from std.utils import IndexList
 #       or less elements than the input's rank).
 
 
-@always_inline
+@inline(.always)
 def tile[
     dtype: DType, type_repeats: DType
 ](
@@ -255,7 +255,7 @@ def tile[
             )
 
 
-@always_inline
+@inline(.always)
 def tile_shape[
     input_type: DType,
     repeats_type: DType,

@@ -15,14 +15,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from max.driver import Buffer, Device
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.experimental import functional as F
 from max.experimental.sharding import DeviceMesh
-from max.experimental.tensor import default_dtype
+from max.experimental.tensor import Tensor, default_dtype
 from max.graph import DeviceRef, TensorType
 from max.graph.weights import Weights, WeightsAdapter
 from max.nn.transformer import ReturnLogits
@@ -56,6 +56,11 @@ from .weight_adapters import (
     convert_language_state_dict_for_module,
     convert_vision_state_dict_for_module,
 )
+
+
+def _to_buffer(t: Tensor) -> Buffer:
+    """Extracts a Buffer from a potentially distributed Tensor."""
+    return t.local_shards[0].driver_tensor
 
 
 class Gemma4Model(
@@ -140,6 +145,19 @@ class Gemma4Model(
             state_dict=state_dict,
             return_logits=self.return_logits,
         )
+        n_devices = len(self.devices)
+        text_config = model_config.text_config
+        if n_devices > 1 and (
+            text_config.num_key_value_heads % n_devices
+            or text_config.num_global_key_value_heads % n_devices
+        ):
+            raise ValueError(
+                "Gemma4 ModuleV3 tensor parallelism requires the device"
+                f" count ({n_devices}) to divide both num_key_value_heads"
+                f" ({text_config.num_key_value_heads}) and"
+                " num_global_key_value_heads"
+                f" ({text_config.num_global_key_value_heads})."
+            )
         self.config = model_config
         return model_config
 
@@ -250,9 +268,8 @@ class Gemma4Model(
             packed.max_seq_len,
         )
         first = out[0] if isinstance(out, (tuple, list)) else out
-        return VisionEncodeResult(
-            embeddings=[cast(Buffer, first.driver_tensor)]
-        )
+        device0_embeddings = first.driver_tensor
+        return VisionEncodeResult(embeddings=device0_embeddings.to(devices))
 
     def empty_vision_embeddings(self, devices: list[Device]) -> list[Buffer]:
         """Per-device zero-row image embeddings for cached / text-only batches.
@@ -275,10 +292,8 @@ class Gemma4Model(
         assert isinstance(model_inputs, Gemma4Inputs)
         kv_cache_inputs = model_inputs.kv_cache_inputs
         assert kv_cache_inputs is not None
-        # The pipeline's VisionEncoderCache always finalizes these, falling
-        # back to empty_vision_embeddings() for text-only / decode steps.
-        assert len(model_inputs.vision_embeddings) == 1
-        assert len(model_inputs.vision_scatter_indices) == 1
+        assert len(model_inputs.vision_embeddings) == len(self.devices)
+        assert len(model_inputs.vision_scatter_indices) == len(self.devices)
 
         model_outputs = self.language_model(
             model_inputs.tokens,
@@ -290,12 +305,12 @@ class Gemma4Model(
         )
         if len(model_outputs) == 3:
             return ModelOutputs(
-                logits=cast(Buffer, model_outputs[1].driver_tensor),
-                next_token_logits=cast(Buffer, model_outputs[0].driver_tensor),
-                logit_offsets=cast(Buffer, model_outputs[2].driver_tensor),
+                logits=_to_buffer(model_outputs[1]),
+                next_token_logits=_to_buffer(model_outputs[0]),
+                logit_offsets=_to_buffer(model_outputs[2]),
             )
         else:
             return ModelOutputs(
-                logits=cast(Buffer, model_outputs[0].driver_tensor),
-                next_token_logits=cast(Buffer, model_outputs[0].driver_tensor),
+                logits=_to_buffer(model_outputs[0]),
+                next_token_logits=_to_buffer(model_outputs[0]),
             )

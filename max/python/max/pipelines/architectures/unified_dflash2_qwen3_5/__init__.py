@@ -10,20 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from std.random import seed
-from grid import Grid
-from std.time import sleep
+"""Qwen3.5 fused with a DFlash2 block drafter for speculative decoding."""
 
+from .arch import unified_dflash2_qwen3_5_arch
+from .model import (
+    GRAPH_NAME,
+    UnifiedDflash2Qwen3_5Inputs,
+    UnifiedDflash2Qwen3_5Model,
+)
+from .model_config import UnifiedDflash2Qwen3_5Config
 
-def main():
-    seed()
-
-    var grid = Grid[60, 20].random_grid(240)
-    var gen = 1
-
-    for _ in range(300):
-        print(t"\033[H\033J\nGeneration: {gen}")
-        grid.evolve()
-        grid.print_grid()
-        sleep(0.1)
-        gen += 1
+__all__ = [
+    "GRAPH_NAME",
+    "UnifiedDflash2Qwen3_5Config",
+    "UnifiedDflash2Qwen3_5Inputs",
+    "UnifiedDflash2Qwen3_5Model",
+    "unified_dflash2_qwen3_5_arch",
+]

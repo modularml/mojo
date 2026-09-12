@@ -17,7 +17,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -29,7 +28,6 @@ def kernel_verification_ops_path() -> Path:
     return Path(os.environ["MODULAR_KERNEL_VERIFICATION_OPS_PATH"])
 
 
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_custom_op_with_int_parameter(
     kernel_verification_ops_path: Path,
     session: InferenceSession,
@@ -65,7 +63,6 @@ def test_custom_op_with_int_parameter(
     assert str(expected_int) in execution_output.out
 
 
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_custom_op_with_dtype_parameter(
     kernel_verification_ops_path: Path,
     session: InferenceSession,
@@ -102,7 +99,6 @@ def test_custom_op_with_dtype_parameter(
     assert expected_dtype_str in execution_output.out
 
 
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_custom_op_with_static_string_parameter(
     kernel_verification_ops_path: Path,
     session: InferenceSession,

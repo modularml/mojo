@@ -435,8 +435,8 @@ def KGEN_ParamIndexRefAttr : KGEN_ExprAttr<"ParamIndexRef", "param.index.ref",
     ```mlir
     // Second input parameter of the nearest signature.
     #kgen.param.index.ref<0, 1> : index
-    // First input parameter of next enclosing signature.
-    #kgen.param.index.ref<1, 0> : !lit.struct<@Int>
+    // Second input parameter of next enclosing signature.
+    #kgen.param.index.ref<1, 1> : !lit.struct<@Int>
     ```
 
     The latter would appear in something like this:
@@ -445,11 +445,13 @@ def KGEN_ParamIndexRefAttr : KGEN_ExprAttr<"ParamIndexRef", "param.index.ref",
     comptime bar: def[
       D: DType,
       N: Int,
-      f: def[Y: AnyType](Y, SIMD[N, D])->None
+      f: def[Y: AnyType](Y, SIMD[D, N])->None
     ](...) = ...
     ```
 
-    The `SIMD[N, D]`'s `N` is a #kgen.param.index.ref<1, 0> : !lit.struct<@Int>.
+    The `SIMD[D, N]`'s `N` is a #kgen.param.index.ref<1, 1> : !lit.struct<@Int>,
+    because `N` is declared at index 1 of the signature one level out. `D` is
+    that signature's index 0, so it is a #kgen.param.index.ref<1, 0>.
 
     But, per DCRTODS, it can NOT be used inside a generator's body to refer to
     one of the generator's parameters, like this:
@@ -1990,6 +1992,52 @@ def KGEN_TargetParamAttr : KGEN_ExprAttr<"TargetParam", "target"> {
   ];
 
   let extraClassDeclaration = [{ Type getType() const; }];
+}
+
+//===----------------------------------------------------------------------===//
+// GetTargetPluginAttr
+//===----------------------------------------------------------------------===//
+
+def KGEN_GetTargetPluginAttr : KGEN_ExprAttr<"GetTargetPlugin",
+    "get_target_plugin"> {
+  let summary = "Get the opaque plugin payload carried by a target.";
+  let description = [{
+    The `#kgen.get_target_plugin` attribute returns the `opaque_plugin` payload
+    of a target if the plugin type matches the requested type.
+
+    Example:
+
+    ```mlir
+    kgen.generator @plugin_for<t0: target>() {
+      kgen.param.constant: !kgen.param_list<!kgen.type> =
+        <#kgen.get_target_plugin<t0> : !kgen.param_list<!kgen.type>>
+      kgen.return
+    }
+    ```
+  }];
+
+  let parameters = (ins
+    "TypedAttr":$target,
+    AttributeSelfTypeParameter<"", "Type">:$type
+  );
+
+  let assemblyFormat = [{
+    `<` custom<ParamValue>($target, "TargetType::get($_ctxt)") `>`
+  }];
+
+  let builders = [
+    // Override the default builder used by the generated parser because this
+    // may not return a GetTargetPluginAttr.
+    AttrBuilderWithInferredContext<(ins
+      "TypedAttr":$target, "Type":$type), "", "TypedAttr">,
+
+    // Verbose form with MLIRContext, needed for ODS constructors.
+    AttrBuilder<(ins "TypedAttr":$target, "Type":$type), [{
+      return get(target, type);
+    }], "TypedAttr">,
+  ];
+
+  let skipDefaultBuilders = 1;
 }
 
 //===----------------------------------------------------------------------===//

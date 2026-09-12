@@ -51,7 +51,7 @@ struct ManagedLayoutTensor[
     ]
     var ctx: DeviceContext
 
-    @always_inline
+    @inline(.always)
     def __init__(out self) raises:
         self.ctx = DeviceContext(api="cpu")
         self.runtime_layout = {}
@@ -61,7 +61,7 @@ struct ManagedLayoutTensor[
         )
         self.ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, runtime_layout: RuntimeLayout[Self.layout, ...]
     ) raises:
@@ -84,7 +84,7 @@ struct ManagedLayoutTensor[
         )
         self.ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ctx: DeviceContext) raises:
         self.ctx = ctx
         self.runtime_layout = {}
@@ -96,7 +96,7 @@ struct ManagedLayoutTensor[
         )
         self.ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         runtime_layout: RuntimeLayout[Self.layout, ...],
@@ -177,7 +177,7 @@ struct ManagedLayoutTensor[
             self.ctx.enqueue_copy(self.host_data, self.device_data.value())
             self.ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         pass
 
@@ -195,7 +195,7 @@ def load_to_simd(
     )
 
 
-@always_inline
+@inline(.always)
 def _get_bounds(tensor: LayoutTensor) -> Int:
     comptime assert (
         tensor.element_layout.all_dims_known()
@@ -218,7 +218,7 @@ def _get_bounds(tensor: LayoutTensor) -> Int:
     return offset + 1
 
 
-@always_inline
+@inline(.always)
 def make_amd_buffer_resource(
     tensor: LayoutTensor,
 ) -> AMDBufferResource:
@@ -227,7 +227,7 @@ def make_amd_buffer_resource(
     return AMDBufferResource(readfirstlane(ptr), readfirstlane(size))
 
 
-@always_inline
+@inline(.always)
 def make_amd_buffer_resource(
     tensor_iter: LayoutTensorIter, bound: Int
 ) -> AMDBufferResource:
@@ -236,7 +236,7 @@ def make_amd_buffer_resource(
     )
 
 
-@always_inline
+@inline(.always)
 def _get_bounds(tensor: TileTensor) -> Int:
     """Computes buffer bounds from a rank-2 TileTensor.
 
@@ -253,7 +253,7 @@ def _get_bounds(tensor: TileTensor) -> Int:
     return (dim0 - 1) * stride0 + (dim1 - 1) * stride1 + 1
 
 
-@always_inline
+@inline(.always)
 def make_amd_buffer_resource(
     tensor: TileTensor,
 ) -> AMDBufferResource:
@@ -267,7 +267,7 @@ def make_amd_buffer_resource(
     return AMDBufferResource(readfirstlane(tensor.ptr), readfirstlane(size))
 
 
-@always_inline
+@inline(.always)
 def idx2crd[layout: Layout](idx: Int) -> IndexList[layout.rank()]:
     comptime assert layout.all_dims_known(), "Layout must be known for idx2crd"
     var res = IndexList[layout.rank()]()
@@ -279,7 +279,7 @@ def idx2crd[layout: Layout](idx: Int) -> IndexList[layout.rank()]:
     return res
 
 
-@always_inline
+@inline(.always)
 def hash(tensor: LayoutTensor) -> Int:
     # Calculate hash of the content of the layout tensor, it can be useful for debugging
     comptime assert (

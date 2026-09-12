@@ -92,14 +92,14 @@ def _run_rms_norm_unfused(
     var out_view = TileTensor(out_ptr, row_major(Coord(shape)))
     var gamma_view = TileTensor(gamma_ptr, row_major(Coord(Index(K))))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_view)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = in_view.layout(coords)
         return in_view.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_view)
     @__parameter
     def output_fn[

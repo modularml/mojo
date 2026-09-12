@@ -156,7 +156,7 @@ def _run_case[
         c_sentinel_d, row_major(Coord(M_static, Idx[N_static]))
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_tt)
     def epilogue_fn[
         _dtype: DType,

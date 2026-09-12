@@ -67,7 +67,7 @@ from nn.attention.mha_utils import OptionallyStaticInt, _is_decoding
 from std.utils.index import Index
 
 
-@always_inline
+@inline(.always)
 def depth512_load[
     KVLUTType: MHAOperand,
     MaskType: MHAMask,
@@ -330,7 +330,7 @@ def depth512_load[
     var e = elect()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _kv_num_valid_pages(current_kv_row: UInt32) -> UInt32:
         """Valid paged entries in a BK1-row range starting at `current_kv_row`.
 
@@ -406,7 +406,7 @@ def depth512_load[
     # ---- V load helper (peeled + loop share this) ----------------------------
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _load_v_stage[
         pv_stage: Int
     ](depth_col_offset: Int, v_nvp: UInt32,):
@@ -449,7 +449,7 @@ def depth512_load[
     # ---- K load helper (peeled-first, main, peeled-last share this) ---------
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _produce_k[
         partial: Bool,
         qk_stage: Int = 0,

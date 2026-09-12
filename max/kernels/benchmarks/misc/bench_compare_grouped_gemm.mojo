@@ -157,7 +157,7 @@ def bench_cublas_per_group[
         2 * Int(m.value()) * Int(n.value()) * Int(k.value()) * num_groups
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut bencher: Bencher,
     ) {
@@ -168,7 +168,7 @@ def bench_cublas_per_group[
         var sfb_tensor,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             # Call cuBLAS once per group (sequential)
             for _g in range(num_groups):
@@ -410,7 +410,7 @@ def bench_structured_kernel[
         2 * Int(m.value()) * Int(n.value()) * Int(k.value()) * num_groups
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut bencher: Bencher,
     ) {
@@ -428,7 +428,7 @@ def bench_structured_kernel[
         var total_tiles,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_block_scaled_matmul[
                 transpose_b=transpose_b,

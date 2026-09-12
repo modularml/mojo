@@ -86,45 +86,45 @@ struct WarpRole[has_scheduler: Bool = True](TrivialRegisterPassable):
     comptime Scheduler = Self(4)
     comptime Epilogue = Self(3)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self._role == Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._role == other._role
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._role != other._role
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Int) -> Bool:
         return self._role >= Int32(other)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_main_load() -> Bool:
         return Self.MainLoad == warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         return Self.Mma == warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         return Self.Epilogue >= warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_scheduler() -> Bool:
         comptime assert Self.has_scheduler, "Scheduler warp is not enabled"
         return Self.Scheduler == warp_id()
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -208,7 +208,7 @@ comptime RLayout32Bits[layout: Layout] = RuntimeLayout[
 ]
 
 
-@always_inline
+@inline(.always)
 def f32_frag_to_smem[
     swizzle_mode: TensorMapSwizzle,
     vec_dtype: DType,
@@ -262,7 +262,7 @@ def f32_frag_to_smem[
             (dst.ptr + offset).store(val)
 
 
-@always_inline
+@inline(.always)
 def stsm_helper[
     swizzle: Swizzle,
     stageN: Int,
@@ -365,7 +365,7 @@ def stsm_helper[
         )
 
 
-@always_inline
+@inline(.always)
 def shared_memory_epilogue[
     MMA_M: Int,
     data_paths: Int,
@@ -560,7 +560,7 @@ def shared_memory_epilogue[
     named_barrier[Int32(num_output_warps * WARP_SIZE)]()
 
 
-@always_inline
+@inline(.always)
 def _compute_register_lambda_fn[
     epilogue_dtype: DType,
     frag_size: Int,
@@ -621,7 +621,7 @@ def _compute_register_lambda_fn[
             )
 
 
-@always_inline
+@inline(.always)
 def register_epilogue[
     MMA_M: Int,
     data_paths: Int,
@@ -760,7 +760,7 @@ def register_epilogue[
             )
 
 
-@always_inline
+@inline(.always)
 def accum_arrive[
     cta_group: Int
 ](mma_output_pipeline: ProducerConsumerPipeline, mma_output_stage: UInt32):

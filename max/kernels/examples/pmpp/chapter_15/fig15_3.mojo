@@ -28,7 +28,7 @@ comptime tN = 4
 comptime NUM_THREADS_PER_BLOCK = 128
 
 
-@always_inline
+@inline(.always)
 def loadTile(
     T: UnsafePointer[Float32, _],
     lda: Int,

@@ -11,8 +11,8 @@
 // limitations under the License.
 //===----------------------------------------------------------------------===//
 //
-// This file implements `emitMatch` for expression nodes used as match
-// patterns.
+// This file implements `emitMatch` and `mayContainBindingPatterns` for
+// expression nodes used as match patterns.
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Index/IR/IndexAttrs.h"
 #include "mlir/IR/Builders.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringMap.h"
 
 using namespace M;
 using namespace M::KGEN;
@@ -47,7 +48,8 @@ static CValue emitEnumCaseNameMatch(IREmitter &emitter, CValue subject,
 //===----------------------------------------------------------------------===//
 
 CValue ExprNode::emitMatch(IREmitter &emitter, CValue subject,
-                           PatternDeclKind patternKind) const {
+                           PatternDeclKind patternKind,
+                           SmallVectorImpl<BoundName> &bindings) const {
   emitter.emitError(getLoc(), "expression is not a valid match pattern");
   return {};
 }
@@ -73,37 +75,45 @@ static CValue emitMatchAgainstValue(const ExprNode *expr, IREmitter &emitter,
   return emitter.emitScalarBool({eqResult, expr}, EC_BoolCondition);
 }
 
-CValue SimpleLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
-                                    PatternDeclKind patternKind) const {
+CValue
+SimpleLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
+                             PatternDeclKind patternKind,
+                             SmallVectorImpl<BoundName> &bindings) const {
   // `_` always succeeds and introduces no bindings.
   if (kind == kDiscardLiteral)
     return PValue(SIMDAttr::getScalarBool(emitter.getContext(), true));
 
-  return ExprNode::emitMatch(emitter, subject, patternKind);
+  return ExprNode::emitMatch(emitter, subject, patternKind, bindings);
 }
 
 CValue BoolLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
-                                  PatternDeclKind patternKind) const {
+                                  PatternDeclKind patternKind,
+                                  SmallVectorImpl<BoundName> &bindings) const {
   return emitMatchAgainstValue(this, emitter, subject);
 }
 
 CValue IntLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
-                                 PatternDeclKind patternKind) const {
+                                 PatternDeclKind patternKind,
+                                 SmallVectorImpl<BoundName> &bindings) const {
   return emitMatchAgainstValue(this, emitter, subject);
 }
 
 CValue FloatLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
-                                   PatternDeclKind patternKind) const {
+                                   PatternDeclKind patternKind,
+                                   SmallVectorImpl<BoundName> &bindings) const {
   return emitMatchAgainstValue(this, emitter, subject);
 }
 
-CValue StringLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
-                                    PatternDeclKind patternKind) const {
+CValue
+StringLiteralNode::emitMatch(IREmitter &emitter, CValue subject,
+                             PatternDeclKind patternKind,
+                             SmallVectorImpl<BoundName> &bindings) const {
   return emitMatchAgainstValue(this, emitter, subject);
 }
 
 CValue DeclRefNode::emitMatch(IREmitter &emitter, CValue subject,
-                              PatternDeclKind patternKind) const {
+                              PatternDeclKind patternKind,
+                              SmallVectorImpl<BoundName> &bindings) const {
   // Bare identifiers are only valid match patterns when nested under a `var`
   // or `ref` binding. Do not treat them as "match this existing value" — that
   // would create Python's capture-vs-value ambiguity and consume the syntax
@@ -146,11 +156,13 @@ CValue DeclRefNode::emitMatch(IREmitter &emitter, CValue subject,
   if (!emitter.emitCResult(subject, this, storeDest))
     return {};
 
+  bindings.push_back({spelling, subject, patternKind});
   return PValue(SIMDAttr::getScalarBool(emitter.getContext(), true));
 }
 
 CValue AttributeRefNode::emitMatch(IREmitter &emitter, CValue subject,
-                                   PatternDeclKind patternKind) const {
+                                   PatternDeclKind patternKind,
+                                   SmallVectorImpl<BoundName> &bindings) const {
   // `Optional.None` / `Type.Case` against an EnumLike subject is a discriminant
   // pattern (no payload). Other attribute refs keep value-equality matching.
   ASTType subjectType = subject.getRValueType();
@@ -160,8 +172,9 @@ CValue AttributeRefNode::emitMatch(IREmitter &emitter, CValue subject,
   return emitMatchAgainstValue(this, emitter, subject);
 }
 
-CValue InferredAttributeRefNode::emitMatch(IREmitter &emitter, CValue subject,
-                                           PatternDeclKind patternKind) const {
+CValue InferredAttributeRefNode::emitMatch(
+    IREmitter &emitter, CValue subject, PatternDeclKind patternKind,
+    SmallVectorImpl<BoundName> &bindings) const {
   // `.None` / `.Case` against an EnumLike subject is a discriminant pattern.
   ASTType subjectType = subject.getRValueType();
   if (subjectType.provenConformsToBuiltinTrait("EnumLike", getLoc(),
@@ -174,17 +187,32 @@ CValue InferredAttributeRefNode::emitMatch(IREmitter &emitter, CValue subject,
 }
 
 CValue ParenNode::emitMatch(IREmitter &emitter, CValue subject,
-                            PatternDeclKind patternKind) const {
-  return subExpr->emitMatch(emitter, subject, patternKind);
+                            PatternDeclKind patternKind,
+                            SmallVectorImpl<BoundName> &bindings) const {
+  return subExpr->emitMatch(emitter, subject, patternKind, bindings);
+}
+
+bool ParenNode::mayContainBindingPatterns() const {
+  return subExpr->mayContainBindingPatterns();
 }
 
 CValue BinOpNode::emitMatch(IREmitter &emitter, CValue subject,
-                            PatternDeclKind patternKind) const {
+                            PatternDeclKind patternKind,
+                            SmallVectorImpl<BoundName> &bindings) const {
   if (kind == kOr)
-    return emitOrMatch(emitter, subject, patternKind);
+    return emitOrMatch(emitter, subject, patternKind, bindings);
   if (kind == kAsPat)
-    return emitAsMatch(emitter, subject, patternKind);
-  return ExprNode::emitMatch(emitter, subject, patternKind);
+    return emitAsMatch(emitter, subject, patternKind, bindings);
+  return ExprNode::emitMatch(emitter, subject, patternKind, bindings);
+}
+
+bool BinOpNode::mayContainBindingPatterns() const {
+  if (kind == kOr)
+    return lhs->mayContainBindingPatterns() || rhs->mayContainBindingPatterns();
+  // `pattern as name` always binds `name`.
+  if (kind == kAsPat)
+    return true;
+  return false;
 }
 
 /// Collect VarDeclOps registered in `scope`, keyed by binding name.
@@ -285,8 +313,70 @@ static LogicalResult mergeOrPatternBindings(IREmitter &emitter,
   return success();
 }
 
+/// Merge BoundName sets from or-pattern alternatives into `out`. Both sides
+/// must bind the same names with the same `PatternDeclKind`. The surviving
+/// `CValue` currently comes from the LHS only.
+static LogicalResult mergeOrPatternBoundNames(
+    IREmitter &emitter, SMLoc loc, ArrayRef<ExprNode::BoundName> lhsBindings,
+    ArrayRef<ExprNode::BoundName> rhsBindings, bool rhsEmitted,
+    SmallVectorImpl<ExprNode::BoundName> &out) {
+  if (lhsBindings.empty() && rhsBindings.empty())
+    return success();
+
+  // RHS was never emitted (e.g. LHS constant-folded true). Take LHS only.
+  if (!rhsEmitted) {
+    out.append(lhsBindings.begin(), lhsBindings.end());
+    return success();
+  }
+
+  if (lhsBindings.empty() || rhsBindings.empty()) {
+    StringRef missing = lhsBindings.empty() ? rhsBindings.front().name
+                                            : lhsBindings.front().name;
+    emitter.emitError(loc, "or-pattern alternatives must bind the same names")
+        << "; '" << missing << "' is bound in one alternative but not the "
+        << "other";
+    return failure();
+  }
+
+  llvm::StringMap<const ExprNode::BoundName *> rhsByName;
+  for (const ExprNode::BoundName &bn : rhsBindings)
+    rhsByName[bn.name] = &bn;
+
+  for (const ExprNode::BoundName &lhsBN : lhsBindings) {
+    auto it = rhsByName.find(lhsBN.name);
+    if (it == rhsByName.end()) {
+      emitter.emitError(loc, "or-pattern alternatives must bind the same names")
+          << "; '" << lhsBN.name << "' is bound in one alternative but not "
+          << "the other";
+      return failure();
+    }
+    const ExprNode::BoundName &rhsBN = *it->second;
+    if (lhsBN.patternKind != rhsBN.patternKind) {
+      emitter.emitError(loc, "or-pattern binding '")
+          << lhsBN.name
+          << "' must use the same 'var'/'ref' kind in each alternative";
+      return failure();
+    }
+
+    // FIXME: Merge LHS/RHS CValues (e.g. via select/phi) instead of keeping
+    // only the LHS subject value.
+    (void)rhsBN;
+    out.push_back(lhsBN);
+    rhsByName.erase(it);
+  }
+
+  if (!rhsByName.empty()) {
+    emitter.emitError(loc, "or-pattern alternatives must bind the same names")
+        << "; '" << rhsByName.begin()->first()
+        << "' is bound in one alternative but not the other";
+    return failure();
+  }
+  return success();
+}
+
 CValue BinOpNode::emitOrMatch(IREmitter &emitter, CValue subject,
-                              PatternDeclKind patternKind) const {
+                              PatternDeclKind patternKind,
+                              SmallVectorImpl<BoundName> &bindings) const {
   // `pat1 | pat2` matches if either alternative matches. Bindings introduced
   // by either arm must agree; they are collected in temporary scopes, checked
   // for compatibility, then promoted into the enclosing case scope. This
@@ -303,7 +393,9 @@ CValue BinOpNode::emitOrMatch(IREmitter &emitter, CValue subject,
   // Emit the LHS to catch any nested bindings.
   ASTDecl &lhsScope = createBindingScope(lhs->getLoc());
   IREmitter lhsEmitter(lhsScope, *emitter.builder);
-  CValue lhsMatch = lhs->emitMatch(lhsEmitter, subject, patternKind);
+  SmallVector<BoundName, 4> lhsBindings;
+  CValue lhsMatch =
+      lhs->emitMatch(lhsEmitter, subject, patternKind, lhsBindings);
   emitter.builder = lhsEmitter.builder;
   if (!lhsMatch)
     return {};
@@ -311,17 +403,25 @@ CValue BinOpNode::emitOrMatch(IREmitter &emitter, CValue subject,
   // Emit the RHS to catch any nested bindings - if the LHS is irrefutable, the
   // RHS doesn't get emitted.
   ASTDecl *rhsScope = nullptr;
+  SmallVector<BoundName, 4> rhsBindings;
   CValue result = emitter.emitOrMatchPredicates({lhsMatch, lhs}, [&] {
     rhsScope = &createBindingScope(rhs->getLoc());
     IREmitter rhsEmitter(*rhsScope, *emitter.builder);
-    CValue rhsMatch = rhs->emitMatch(rhsEmitter, subject, patternKind);
+    CValue rhsMatch =
+        rhs->emitMatch(rhsEmitter, subject, patternKind, rhsBindings);
     emitter.builder = rhsEmitter.builder;
     return ASTExprAnd<CValue>{rhsMatch, rhs};
   });
   if (!result)
     return {};
 
-  // Verify that they're compatible.
+  // Merge BoundName sets from both arms into `bindings`.
+  if (failed(mergeOrPatternBoundNames(emitter, getLoc(), lhsBindings,
+                                      rhsBindings, /*rhsEmitted=*/rhsScope,
+                                      bindings)))
+    return {};
+
+  // Verify that VarDecl bindings are compatible.
   if (failed(mergeOrPatternBindings(emitter, emitter.declScope, lhsScope,
                                     rhsScope, getLoc())))
     return {};
@@ -329,7 +429,8 @@ CValue BinOpNode::emitOrMatch(IREmitter &emitter, CValue subject,
 }
 
 CValue BinOpNode::emitAsMatch(IREmitter &emitter, CValue subject,
-                              PatternDeclKind patternKind) const {
+                              PatternDeclKind patternKind,
+                              SmallVectorImpl<BoundName> &bindings) const {
   // `pattern as name` applies `pattern` and binds `name` to the whole
   // subject without copying. Memory values use `ref`; register-passable
   // (trivial) values have no address, so they use `bind` instead.
@@ -343,17 +444,18 @@ CValue BinOpNode::emitAsMatch(IREmitter &emitter, CValue subject,
   // before the enclosing elif and dominates the case body.
   PatternDeclKind bindKind =
       subject.isMValue() ? PatternDeclKind::kRef : PatternDeclKind::kBind;
-  if (!name->emitMatch(emitter, subject, bindKind))
+  if (!name->emitMatch(emitter, subject, bindKind, bindings))
     return {};
-  return lhs->emitMatch(emitter, subject, patternKind);
+  return lhs->emitMatch(emitter, subject, patternKind, bindings);
 }
 
 CValue UnaryOpNode::emitMatch(IREmitter &emitter, CValue subject,
-                              PatternDeclKind patternKind) const {
+                              PatternDeclKind patternKind,
+                              SmallVectorImpl<BoundName> &bindings) const {
   // `var`/`ref` patterns are unary wrappers that set the binding mode for
   // their subpattern (e.g. `case var x:` / `case ref (a, b):`).
   if (kind != kVarPat && kind != kRefPat)
-    return ExprNode::emitMatch(emitter, subject, patternKind);
+    return ExprNode::emitMatch(emitter, subject, patternKind, bindings);
 
   // Nested specifiers like `var ref x` are redundant; keep going with the
   // innermost kind after warning, matching assignment-pattern behavior.
@@ -365,11 +467,18 @@ CValue UnaryOpNode::emitMatch(IREmitter &emitter, CValue subject,
 
   PatternDeclKind subKind =
       kind == kVarPat ? PatternDeclKind::kVar : PatternDeclKind::kRef;
-  return subExpr->emitMatch(emitter, subject, subKind);
+  return subExpr->emitMatch(emitter, subject, subKind, bindings);
+}
+
+bool UnaryOpNode::mayContainBindingPatterns() const {
+  if (kind != kVarPat && kind != kRefPat)
+    return false;
+  return subExpr->mayContainBindingPatterns();
 }
 
 CValue TupleNode::emitMatch(IREmitter &emitter, CValue subject,
-                            PatternDeclKind patternKind) const {
+                            PatternDeclKind patternKind,
+                            SmallVectorImpl<BoundName> &bindings) const {
   ASTType subjectType = subject.getRValueType();
   ASTType tupleType = emitter.shared.lookupBuiltinType(
       "Tuple", emitter.getDeclScope(), getLoc());
@@ -431,7 +540,8 @@ CValue TupleNode::emitMatch(IREmitter &emitter, CValue subject,
     CValue eltVal = getTupleItem(ASTType(vaAttr.getValues()[index]), index);
     if (!eltVal)
       return {};
-    CValue eltMatch = exprs[index]->emitMatch(emitter, eltVal, patternKind);
+    CValue eltMatch =
+        exprs[index]->emitMatch(emitter, eltVal, patternKind, bindings);
     return {eltMatch, exprs[index]};
   };
 
@@ -451,8 +561,16 @@ CValue TupleNode::emitMatch(IREmitter &emitter, CValue subject,
   return combined.ir;
 }
 
+bool TupleNode::mayContainBindingPatterns() const {
+  for (ExprNode *expr : exprs)
+    if (expr->mayContainBindingPatterns())
+      return true;
+  return false;
+}
+
 CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
-                           PatternDeclKind patternKind) const {
+                           PatternDeclKind patternKind,
+                           SmallVectorImpl<BoundName> &bindings) const {
   ASTType subjectType = subject.getRValueType();
 
   // `Optional.Some(ref elt)` / `Type.Case(...)`: when the subject is
@@ -460,7 +578,7 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
   // of treating the call as a struct field pattern.
   if (subjectType.provenConformsToBuiltinTrait("EnumLike", getLoc(),
                                                emitter.shared, {}))
-    return emitEnumMatch(emitter, subject, patternKind);
+    return emitEnumMatch(emitter, subject, patternKind, bindings);
 
   // `Type(field=pat, ...)` is a struct pattern: the callee names the expected
   // type, and each operand is a subpattern for a stored field. Positional
@@ -505,50 +623,35 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
   };
   SmallVector<FieldPattern, 8> fieldPatterns;
   llvm::SmallPtrSet<Attribute, 8> seenFields;
-  unsigned nextPositional = 0;
 
   for (const Operand &operand : operands) {
-    if (operand.unpackStyle != ArgUnpackStyle::kPositional &&
-        operand.unpackStyle != ArgUnpackStyle::kKeyword) {
-      emitter.emitError(operand.getLoc(),
-                        "struct patterns do not support unpacked arguments")
+    if (!operand.isKeyword()) {
+      emitter.emitError(
+          operand.getLoc(),
+          "struct patterns do not support positional or unpacked arguments")
           << operand.expr->getRange();
       return {};
     }
 
-    StructFieldOp fieldOp;
-    StringAttr fieldName;
-    if (operand.isKeyword()) {
-      fieldName = operand.name;
-      LookupResult lookup = emitter.shared.lookupAndResolveDecl(
-          fieldName.getValue(), operand.getLoc(), *typeDecl,
-          /*searchParentScopes=*/false);
-      if (lookup.isErroneous())
-        return {};
-      if (!lookup.isSuccess() || lookup.getIfSuccess().size() != 1) {
-        emitter.emitError(operand.getLoc(), "'")
-            << fieldName.getValue() << "' is not a field of " << subjectType
-            << operand.expr->getRange();
-        return {};
-      }
-      fieldOp = dyn_cast_or_null<StructFieldOp>(
-          lookup.getIfSuccess().front()->getIfOperation());
-      if (!fieldOp) {
-        emitter.emitError(operand.getLoc(), "'")
-            << fieldName.getValue() << "' is not a stored field of "
-            << subjectType << operand.expr->getRange();
-        return {};
-      }
-    } else {
-      if (nextPositional >= storedFields.size()) {
-        emitter.emitError(operand.getLoc(),
-                          "too many positional subpatterns for ")
-            << subjectType << " which has " << storedFields.size() << " field"
-            << plural(storedFields.size()) << operand.expr->getRange();
-        return {};
-      }
-      fieldOp = storedFields[nextPositional++];
-      fieldName = fieldOp.getNameAttr();
+    StringAttr fieldName = operand.name;
+    LookupResult lookup = emitter.shared.lookupAndResolveDecl(
+        fieldName.getValue(), operand.getLoc(), *typeDecl,
+        /*searchParentScopes=*/false);
+    if (lookup.isErroneous())
+      return {};
+    if (!lookup.isSuccess() || lookup.getIfSuccess().size() != 1) {
+      emitter.emitError(operand.getLoc(), "'")
+          << fieldName.getValue() << "' is not a field of " << subjectType
+          << operand.expr->getRange();
+      return {};
+    }
+    auto fieldOp = dyn_cast_or_null<StructFieldOp>(
+        lookup.getIfSuccess().front()->getIfOperation());
+    if (!fieldOp) {
+      emitter.emitError(operand.getLoc(), "'")
+          << fieldName.getValue() << "' is not a stored field of "
+          << subjectType << operand.expr->getRange();
+      return {};
     }
 
     if (!seenFields.insert(fieldName).second) {
@@ -577,7 +680,7 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
     if (!fieldVal)
       return {};
     CValue fieldMatch =
-        fp.operand->expr->emitMatch(emitter, fieldVal, patternKind);
+        fp.operand->expr->emitMatch(emitter, fieldVal, patternKind, bindings);
     return {fieldMatch, fp.operand->expr};
   };
 
@@ -592,6 +695,13 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
     combined.expr = fieldPatterns[i].operand->expr;
   }
   return combined.ir;
+}
+
+bool CallNode::mayContainBindingPatterns() const {
+  for (const Operand &operand : operands)
+    if (operand.expr->mayContainBindingPatterns())
+      return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -747,7 +857,8 @@ static CValue emitEnumCaseNameMatch(IREmitter &emitter, CValue subject,
 //===----------------------------------------------------------------------===//
 
 CValue CallNode::emitEnumMatch(IREmitter &emitter, CValue subject,
-                               PatternDeclKind patternKind) const {
+                               PatternDeclKind patternKind,
+                               SmallVectorImpl<BoundName> &bindings) const {
   // `Optional.Some(ref elt)` / `.Some(pat)`: call form carries payload
   // subpatterns. Cases with no associated value must use `Optional.None` /
   // `.None` without parentheses.
@@ -840,7 +951,7 @@ CValue CallNode::emitEnumMatch(IREmitter &emitter, CValue subject,
       return {};
 
     CValue payloadMatch =
-        operands[0].expr->emitMatch(emitter, payload, patternKind);
+        operands[0].expr->emitMatch(emitter, payload, patternKind, bindings);
     return {payloadMatch, operands[0].expr};
   };
 

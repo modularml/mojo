@@ -229,7 +229,7 @@ trait ReduceOp(TrivialRegisterPassable):
             acc.join(self[j])
         return acc
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Combines `self` across all participants via `reducer`,
         leaving the combined value on every participant (and, for SIMD
@@ -253,7 +253,7 @@ trait ReduceOp(TrivialRegisterPassable):
         reducer.generic(self)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def pad[
         Wout: Int,
         Tout: DType,
@@ -342,7 +342,7 @@ struct OnlineLogSumExp[
     """`W`-lane running `sum exp(x - m)`. Final scalar at `l[0]`
     post-`join_parallel`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: every lane at `(-inf, 0)`."""
         comptime assert (
@@ -351,7 +351,7 @@ struct OnlineLogSumExp[
         self.m = SIMD[Self.dtype, Self.W](min_finite[Self.dtype]())
         self.l = SIMD[Self.dtype, Self.W](0)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -406,7 +406,7 @@ struct OnlineLogSumExp[
         )
         self.m = new_m
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise flash combine.
 
@@ -430,7 +430,7 @@ struct OnlineLogSumExp[
         self.l = self_is_max.select(self.l + other.l * e, self.l * e + other.l)
         self.m = new_m
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
@@ -438,13 +438,13 @@ struct OnlineLogSumExp[
         r.l[0] = self.l[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.m[j] = s.m[0]
         self.l[j] = s.l[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Flash-combines the `W` lane partials into one `(m, l)` via the
         `reduce_max` / `reduce_add` intrinsics.
@@ -467,7 +467,7 @@ struct OnlineLogSumExp[
         r.l[0] = (self.l * exp(diff)).reduce_add()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread flash combine: global `max` on `m[0]`,
         per-participant correction `l *= exp(m[0] - new_m)`, global
@@ -564,7 +564,7 @@ struct Welford[
     combined `M2` (cooperative); on the tiled tier each lane is its
     column's `M2`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: every lane at `(0, 0, 0)`."""
         comptime assert (
@@ -574,7 +574,7 @@ struct Welford[
         self.mean = SIMD[Self.dtype, Self.W](0)
         self.M2 = SIMD[Self.dtype, Self.W](0)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -627,7 +627,7 @@ struct Welford[
         self.M2 = self.M2 + delta * delta * na * inv
         self.count = new_count
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine of two Welford states via Chan's
         formula, lane-wise.
@@ -648,7 +648,7 @@ struct Welford[
         self.mean = self.mean + delta * n_ratio
         self.count = new_count
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
@@ -657,14 +657,14 @@ struct Welford[
         r.M2[0] = self.M2[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.count[j] = s.count[0]
         self.mean[j] = s.mean[0]
         self.M2[j] = s.M2[0]
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine via `reducer.generic` (Welford's combine
         isn't a hardware primitive), then broadcast the result from lane
@@ -718,7 +718,7 @@ struct ReduceSum[
     `reduce` reduces to scalar (placed in `acc[0]`). Bodies read
     `acc[0]`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `acc = 0_W`."""
         comptime assert (
@@ -726,7 +726,7 @@ struct ReduceSum[
         ), "ReduceSum requires a numeric dtype"
         self.acc = SIMD[Self.dtype, Self.W](0)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -752,7 +752,7 @@ struct ReduceSum[
             Scalar[Self.dtype](0),
         ](val)
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise add.
 
@@ -761,19 +761,19 @@ struct ReduceSum[
         """
         self.acc += other.acc
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
         r.acc[0] = self.acc[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc[j] = s.acc[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Sums the `W` lane partials via the `reduce_add` intrinsic.
 
@@ -788,7 +788,7 @@ struct ReduceSum[
         r.acc[0] = self.acc.reduce_add()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine via `reducer.sum`, splatting the scalar
         result across all lanes so bodies read `acc.slice[w]` uniformly.
@@ -849,7 +849,7 @@ struct ReduceMax[
     """Lane-wise SIMD accumulator. `reduce` reduces to scalar (placed
     in `acc[0]`); bodies read `acc[0]`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `acc = MIN_W` (`False` for bool: max is logical OR)."""
         comptime assert (
@@ -857,7 +857,7 @@ struct ReduceMax[
         ), "ReduceMax requires a numeric or bool dtype"
         self.acc = SIMD[Self.dtype, Self.W](min_finite[Self.dtype]())
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -881,7 +881,7 @@ struct ReduceMax[
             Self.pad[Self.W, Self.dtype, min_finite[Self.dtype]()](val),
         )
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise max.
 
@@ -890,19 +890,19 @@ struct ReduceMax[
         """
         self.acc = max(self.acc, other.acc)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
         r.acc[0] = self.acc[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc[j] = s.acc[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Maxes the `W` lane partials via the `reduce_max` intrinsic.
 
@@ -923,7 +923,7 @@ struct ReduceMax[
             r.acc[0] = self.acc.reduce_max()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine via `reducer.max`, splatting the scalar
         result across all lanes so bodies read `acc.slice[w]`
@@ -977,7 +977,7 @@ struct ReduceMin[
     """Lane-wise SIMD accumulator. `reduce` reduces to scalar (placed
     in `acc[0]`); bodies read `acc[0]`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `acc = MAX_W` (`True` for bool: min is logical AND)."""
         comptime assert (
@@ -985,7 +985,7 @@ struct ReduceMin[
         ), "ReduceMin requires a numeric or bool dtype"
         self.acc = SIMD[Self.dtype, Self.W](max_finite[Self.dtype]())
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -1009,7 +1009,7 @@ struct ReduceMin[
             Self.pad[Self.W, Self.dtype, max_finite[Self.dtype]()](val),
         )
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise min.
 
@@ -1018,19 +1018,19 @@ struct ReduceMin[
         """
         self.acc = min(self.acc, other.acc)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
         r.acc[0] = self.acc[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc[j] = s.acc[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Mins the `W` lane partials via the `reduce_min` intrinsic.
 
@@ -1051,7 +1051,7 @@ struct ReduceMin[
             r.acc[0] = self.acc.reduce_min()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine via `reducer.min`, splatting the scalar
         result across all lanes. Runs after `reduce`.
@@ -1106,7 +1106,7 @@ struct ReduceProduct[
     """Lane-wise SIMD accumulator. `reduce` reduces to scalar (placed
     in `acc[0]`); bodies read `acc[0]`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `acc = 1_W`."""
         comptime assert (
@@ -1114,7 +1114,7 @@ struct ReduceProduct[
         ), "ReduceProduct requires a numeric dtype"
         self.acc = SIMD[Self.dtype, Self.W](1)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -1139,7 +1139,7 @@ struct ReduceProduct[
             Scalar[Self.dtype](1),
         ](val)
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise product.
 
@@ -1148,19 +1148,19 @@ struct ReduceProduct[
         """
         self.acc *= other.acc
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
         r.acc[0] = self.acc[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc[j] = s.acc[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Multiplies the `W` lane partials via the `reduce_mul`
         intrinsic.
@@ -1176,7 +1176,7 @@ struct ReduceProduct[
         r.acc[0] = self.acc.reduce_mul()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine. No hardware-fast scalar `product`, so
         this goes through `reducer.generic`. Runs after `reduce`, so
@@ -1230,7 +1230,7 @@ struct MinMax[
     var max_acc: SIMD[Self.dtype, Self.W]
     """Lane-wise running maximum. Final scalar in `max_acc[0]`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `min_acc = +inf_W`, `max_acc = -inf_W`."""
         comptime assert (
@@ -1239,7 +1239,7 @@ struct MinMax[
         self.min_acc = SIMD[Self.dtype, Self.W](max_finite[Self.dtype]())
         self.max_acc = SIMD[Self.dtype, Self.W](min_finite[Self.dtype]())
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -1269,7 +1269,7 @@ struct MinMax[
         self.min_acc = min(self.min_acc, padded_min)
         self.max_acc = max(self.max_acc, padded_max)
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine: lane-wise min and max.
 
@@ -1279,7 +1279,7 @@ struct MinMax[
         self.min_acc = min(self.min_acc, other.min_acc)
         self.max_acc = max(self.max_acc, other.max_acc)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
@@ -1287,13 +1287,13 @@ struct MinMax[
         r.max_acc[0] = self.max_acc[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.min_acc[j] = s.min_acc[0]
         self.max_acc[j] = s.max_acc[0]
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """Collapses each field's `W` lane partials via the `reduce_min`
         / `reduce_max` intrinsics.
@@ -1310,7 +1310,7 @@ struct MinMax[
         r.max_acc[0] = self.max_acc.reduce_max()
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Cross-thread combine via `reducer.min` / `reducer.max`,
         splatting each scalar result across its field's lanes. Runs
@@ -1337,7 +1337,7 @@ struct MinMax[
             reducer.generic(self)
 
 
-@always_inline
+@inline(.always)
 def _in_range_index(idx: Int64) -> Int64:
     """Folds the `Int64.MAX` identity index to an in-range value.
 
@@ -1354,7 +1354,7 @@ def _in_range_index(idx: Int64) -> Int64:
     return 0 if idx == Int64.MAX else idx
 
 
-@always_inline
+@inline(.always)
 def _argmax_identity[dtype: DType]() -> Scalar[dtype]:
     """Returns the ArgMax identity — `-inf` for floating dtypes, `MIN`
     for integer dtypes. Never wins against any finite value under the
@@ -1365,7 +1365,7 @@ def _argmax_identity[dtype: DType]() -> Scalar[dtype]:
         return Scalar[dtype].MIN
 
 
-@always_inline
+@inline(.always)
 def _argmin_identity[dtype: DType]() -> Scalar[dtype]:
     """Returns the ArgMin identity — `+inf` for floating dtypes, `MAX`
     for integer dtypes."""
@@ -1417,7 +1417,7 @@ struct ArgMax[
     var acc_indices: SIMD[.int64, Self.W]
     """Per-lane axis indices corresponding to `acc_values`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: scalars at `-inf`/`MIN` and `Int.MAX`; SIMD accs at
         the same identities. First real `(value, idx)` always wins under
@@ -1432,7 +1432,7 @@ struct ArgMax[
         )
         self.acc_indices = SIMD[.int64, Self.W](Int64.MAX)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -1473,7 +1473,7 @@ struct ArgMax[
         self.acc_values = take.select(val_padded, self.acc_values)
         self.acc_indices = take.select(idx_padded, self.acc_indices)
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine. Element-wise SIMD merge of the acc;
         scalar merge of the `(best, best_idx)` tail.
@@ -1500,7 +1500,7 @@ struct ArgMax[
             self.best = other.best
             self.best_idx = other.best_idx
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
@@ -1510,7 +1510,7 @@ struct ArgMax[
         r.acc_indices[0] = self.acc_indices[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc_values[j] = s.acc_values[0]
@@ -1518,7 +1518,7 @@ struct ArgMax[
         self.best = s.best
         self.best_idx = s.best_idx
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """SIMD-tree collapse (faster than the default lane-fold for a
         value+index select): max value in lane 0, lowest index among the
@@ -1535,7 +1535,7 @@ struct ArgMax[
         r.acc_indices[0] = _in_range_index(masked_idx.reduce_min())
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Folds the within-thread acc at lane 0 into the scalar
         `(best, best_idx)`, resets the SIMD acc so the cross-thread
@@ -1602,7 +1602,7 @@ struct ArgMin[
     var acc_indices: SIMD[.int64, Self.W]
     """Per-lane axis indices corresponding to `acc_values`."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Identity: `best = +inf`/`MAX`, `best_idx = Int.MAX`, SIMD
         accs at the same identity."""
@@ -1616,7 +1616,7 @@ struct ArgMin[
         )
         self.acc_indices = SIMD[.int64, Self.W](Int64.MAX)
 
-    @always_inline
+    @inline(.always)
     def accumulate[
         val_dtype: DType, w: Int
     ](
@@ -1651,7 +1651,7 @@ struct ArgMin[
         self.acc_values = take.select(val_padded, self.acc_values)
         self.acc_indices = take.select(idx_padded, self.acc_indices)
 
-    @always_inline
+    @inline(.always)
     def join(mut self, other: Self):
         """Sequential combine. Element-wise SIMD merge of the acc;
         scalar merge of the `(best, best_idx)` tail. Tie-symmetric:
@@ -1675,7 +1675,7 @@ struct ArgMin[
             self.best = other.best
             self.best_idx = other.best_idx
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, j: Int) -> Self.Single:
         """Returns lane `j` as a width-1 monoid."""
         var r = Self.Single()
@@ -1685,7 +1685,7 @@ struct ArgMin[
         r.acc_indices[0] = self.acc_indices[j]
         return r
 
-    @always_inline
+    @inline(.always)
     def __setitem__(mut self, j: Int, s: Self.Single):
         """Writes width-1 monoid `s` into lane `j`."""
         self.acc_values[j] = s.acc_values[0]
@@ -1693,7 +1693,7 @@ struct ArgMin[
         self.best = s.best
         self.best_idx = s.best_idx
 
-    @always_inline
+    @inline(.always)
     def reduce(self) -> Self.Single:
         """SIMD-tree collapse (faster than the default lane-fold for a
         value+index select): min value in lane 0, lowest index among the
@@ -1710,7 +1710,7 @@ struct ArgMin[
         r.acc_indices[0] = _in_range_index(masked_idx.reduce_min())
         return r
 
-    @always_inline
+    @inline(.always)
     def join_parallel[R: Reducer](mut self, reducer: R):
         """Folds the within-thread acc at lane 0 into the scalar
         `(best, best_idx)`, resets the SIMD acc, combines across

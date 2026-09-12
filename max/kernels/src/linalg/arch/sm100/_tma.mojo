@@ -35,15 +35,26 @@ from max.gpu.host import DeviceBuffer, DeviceContext
 from std.sys import size_of
 from layout.swizzle import Swizzle
 from std.bit import log2_floor
-from std.builtin.device_passable import DeviceTypeEncoder
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 
 
 struct TMADescriptor[
     dtype: DType, tile_shape: IntTuple, swizzle_mode: SwizzleMode
-](ImplicitlyCopyable):
+](DevicePassable, ImplicitlyCopyable):
     var tensormap: TensorMap
 
-    @always_inline
+    comptime device_type: AnyType = Self
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        encoder.encode_fields[Self](self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return "TMADescriptor"
+
+    @inline(.always)
     @implicit
     def __init__(out self, tensormap: TensorMap):
         """
@@ -126,7 +137,7 @@ struct TMALoad[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -140,7 +151,7 @@ struct TMALoad[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(
         out self,

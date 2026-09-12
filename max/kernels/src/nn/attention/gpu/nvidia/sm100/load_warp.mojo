@@ -52,7 +52,7 @@ from std.utils.static_tuple import StaticTuple
 from .smem import SM100AttentionSMem
 
 
-@always_inline
+@inline(.always)
 def fa4_load[
     KVLUTType: MHAOperand,
     MaxSeqLenType: OptionallyStaticInt,
@@ -294,7 +294,7 @@ def fa4_load[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def q_async_copy[
         eviction_policy: CacheEviction = q_default_eviction,
     ](
@@ -387,7 +387,7 @@ def fa4_load[
     ]()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _k_num_valid_pages(current_kv_row: UInt32) -> UInt32:
         """Valid K sub-tile pages at `current_kv_row` (per-CTA range)."""
         if current_kv_row >= num_keys:
@@ -400,7 +400,7 @@ def fa4_load[
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _v_num_valid_pages(current_kv_row: UInt32) -> UInt32:
         """Valid V sub-tile pages at `current_kv_row` (full BN range)."""
         return min(
@@ -509,7 +509,7 @@ def fa4_load[
     # `v_tma_op`, `config`. Caller owns `populate`, `smem_ptr`, and the
     # producer-pipeline acquire/step lifecycle.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _produce_k[
         partial: Bool,
         qk_stage: Int = 0,
@@ -557,7 +557,7 @@ def fa4_load[
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _produce_v[
         partial: Bool,
         d_tile: Int = 0,
@@ -668,7 +668,7 @@ def fa4_load[
     comptime v_e_pages_per_chunk = config.v_e_chunk_rows() // v_e_rows_per_page
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _produce_v_e[
         partial: Bool,
         r: Int,
@@ -748,7 +748,7 @@ def fa4_load[
     ]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _produce_v_sk[
         partial: Bool,
         t: Int,
@@ -834,7 +834,7 @@ def fa4_load[
         # The caller still owns `populate` (K computes `rows`, V reuses it)
         # and any interleaved Q TMA.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _emit_k[
             partial: Bool,
             with_q: Bool = False,
@@ -859,7 +859,7 @@ def fa4_load[
                 kv_pipeline.state.step()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _emit_v[
             partial: Bool, acquire: Bool = True
         ](

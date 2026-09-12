@@ -27,7 +27,7 @@ from comm.broadcast import broadcast
 from comm.sync import enable_p2p, init_signal_buffer
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _input_value[dtype: DType](root: Int, j: Int) -> Scalar[dtype]:
     """Generate position-based input value that includes root rank.

@@ -61,7 +61,7 @@ struct MLAMaskType(TrivialRegisterPassable):
         return self.value != rhs.value
 
 
-@always_inline
+@inline(.always)
 def host_cast_k_fp8_to_bf16[
     kv_fp8_t: DType,
     k_bf16_t: DType,
@@ -199,7 +199,7 @@ def test[
     ](batch_size, num_keys, seq_len, ctx)
     var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext,
     ) raises {var q_tt, var k_tt, var out_tt, var scalar_args_buf_tt, imm}:

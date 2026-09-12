@@ -42,6 +42,7 @@ from max.pipelines.lib.config.config import (
     _resolve_default_structured_output_backend,
     _resolve_default_tool_parser,
     _resolve_overlap_and_device_graph_capture,
+    _resolve_spec_decode_mixed_batches,
 )
 from max.pipelines.lib.config.model_config import (
     _build_model_config,
@@ -77,6 +78,7 @@ def _serve_optimization_arch(
     *,
     supports_overlap_scheduler: bool = True,
     supports_device_graph_capture: bool = True,
+    supports_spec_decode_mixed_batches: bool = False,
     task: PipelineTask = PipelineTask.TEXT_GENERATION,
 ) -> SimpleNamespace:
     """Minimal architecture stub for serve-optimization resolution tests."""
@@ -85,6 +87,7 @@ def _serve_optimization_arch(
         task=task,
         supports_overlap_scheduler=supports_overlap_scheduler,
         supports_device_graph_capture=supports_device_graph_capture,
+        supports_spec_decode_mixed_batches=supports_spec_decode_mixed_batches,
     )
 
 
@@ -405,9 +408,13 @@ class TestSpeculativeArchitectureOverride:
         *,
         speculative: bool = True,
         is_dflash: bool = False,
+        is_dflash2: bool = False,
         draft_arch: str | None = None,
     ) -> SimpleNamespace:
-        """Build a minimal stand-in exposing the attrs the method reads."""
+        """Build a minimal stand-in exposing the attrs the method reads.
+
+        ``is_dflash`` is true for v2 as well, mirroring the real predicate.
+        """
         model = SimpleNamespace(
             huggingface_config=SimpleNamespace(architectures=[target_arch])
         )
@@ -417,7 +424,10 @@ class TestSpeculativeArchitectureOverride:
                 huggingface_config=SimpleNamespace(architectures=[draft_arch])
             )
         spec = (
-            SimpleNamespace(is_dflash=lambda: is_dflash)
+            SimpleNamespace(
+                is_dflash=lambda: is_dflash or is_dflash2,
+                is_dflash2=lambda: is_dflash2,
+            )
             if speculative
             else None
         )
@@ -431,26 +441,6 @@ class TestSpeculativeArchitectureOverride:
         _apply_speculative_target_architecture(cfg.speculative, cfg.manifest)
         return cfg.manifest["main"].huggingface_config.architectures[0]
 
-    def test_deepseek_mtp_no_draft(self) -> None:
-        """DeepseekV3 + no draft (NextN baked in) -> unified MTP arch."""
-        cfg = self._make_config("DeepseekV3ForCausalLM", draft_arch=None)
-        assert self._resolved_arch(cfg) == "UnifiedMTPDeepseekV3ForCausalLM"
-
-    def test_deepseek_eagle3_draft(self) -> None:
-        cfg = self._make_config(
-            "DeepseekV3ForCausalLM", draft_arch="Eagle3DeepseekV2ForCausalLM"
-        )
-        assert self._resolved_arch(cfg) == "Eagle3DeepseekV3ForCausalLM"
-
-    def test_deepseek_unrecognized_draft_raises(self) -> None:
-        cfg = self._make_config(
-            "DeepseekV3ForCausalLM", draft_arch="LlamaForCausalLM"
-        )
-        with pytest.raises(
-            ValueError, match="Unrecognized draft architecture for DeepseekV3"
-        ):
-            self._resolved_arch(cfg)
-
     def test_llama_eagle(self) -> None:
         cfg = self._make_config("LlamaForCausalLM")
         assert self._resolved_arch(cfg) == "UnifiedEagleLlama3ForCausalLM"
@@ -458,6 +448,20 @@ class TestSpeculativeArchitectureOverride:
     def test_llama_dflash(self) -> None:
         cfg = self._make_config("LlamaForCausalLM", is_dflash=True)
         assert self._resolved_arch(cfg) == "UnifiedDflashLlama3ForCausalLM"
+
+    def test_dflash2_does_not_take_a_v1_or_eagle_rewrite(self) -> None:
+        """DFlash2 shares ``is_dflash()`` but not the graphs it selects.
+
+        The Llama and Kimi arms name v1 and Eagle graphs, neither of which
+        can verify a DFlash2 block draft, so rewriting to one would load a
+        graph that silently mismatches the drafter. The exclusion is
+        deliberately limited to those arms: a target with its own DFlash2
+        arm must still reach it, so this must not become a blanket
+        "return early for v2".
+        """
+        for target in ("LlamaForCausalLM", "KimiK25ForConditionalGeneration"):
+            cfg = self._make_config(target, is_dflash2=True)
+            assert self._resolved_arch(cfg) == target
 
     def test_gemma4_mtp(self) -> None:
         cfg = self._make_config(
@@ -1694,6 +1698,50 @@ def test_validate_and_resolve_overlap_scheduler__auto_enable_device_graph_captur
     assert device_graph_capture is expected_device_graph_capture
     if expected_device_graph_capture:
         assert enable_overlap_scheduler is True
+
+
+@pytest.mark.parametrize(
+    (
+        "requested",
+        "user_in_flight",
+        "supported",
+        "expected_mixed",
+        "expected_in_flight",
+    ),
+    [
+        (False, False, True, False, False),
+        (False, True, True, False, True),
+        (True, False, True, True, True),
+        (True, True, True, True, True),
+        (True, False, False, False, True),
+        (True, True, False, False, True),
+    ],
+)
+def test_resolve_spec_decode_mixed_batches(
+    requested: bool,
+    user_in_flight: bool,
+    supported: bool,
+    expected_mixed: bool,
+    expected_in_flight: bool,
+) -> None:
+    """Requesting mixed batches turns in-flight batching on either way.
+
+    An architecture that cannot commit per row loses draft verification but
+    still gets the in-flight batching the flag implies, so the resolved pair
+    is the effective one and nothing downstream has to re-derive it.
+    """
+    runtime = PipelineRuntimeConfig(
+        enable_spec_decode_mixed_batches=requested,
+        enable_in_flight_batching=user_in_flight,
+    )
+    arch = _serve_optimization_arch(
+        "test-arch", supports_spec_decode_mixed_batches=supported
+    )
+
+    mixed, in_flight = _resolve_spec_decode_mixed_batches(runtime, arch)
+
+    assert mixed is expected_mixed
+    assert in_flight is expected_in_flight
 
 
 @mock_pipeline_config_resolve

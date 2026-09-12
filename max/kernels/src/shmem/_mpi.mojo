@@ -59,7 +59,7 @@ def _init_mpi_dylib() -> OwnedDLHandle:
         abort(t"failed to load MPI library: {e}")
 
 
-@always_inline
+@inline(.always)
 def _get_mpi_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -200,7 +200,7 @@ def get_mpi_comm_world() raises -> MPIComm:
     """
     var handle = MPI_LIBRARY.get_or_create_ptr()[].borrow()
     var comm_world_ptr = handle.get_symbol[OpaquePointer[MutUntrackedOrigin]](
-        cstr_name="ompi_mpi_comm_world".as_c_string_slice()
+        cstr_name="ompi_mpi_comm_world".as_c_string_span()
     )
     if not comm_world_ptr:
         raise Error("symbol ompi_mpi_comm_world not found in MPI library")

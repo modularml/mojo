@@ -75,11 +75,11 @@ struct Progress(ImplicitlyCopyable):
     var _percentage: Float64
     var _term_dims: Tuple[Int, Int]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, end: Int):
         self = Self(0, end)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, start: Int, end: Int, step: Int = 1):
         self._range = _StridedRange(start, end, step)
         self._percentage = Float64(1) / Float64(len(self._range))

@@ -297,7 +297,7 @@ def _run_case[
         # device as host-stack pointers and the stores land out of bounds.
         @__copy_capture(quant_view, scale_view)
         @__parameter
-        @always_inline
+        @inline(.always)
         def mx_epilogue[
             width: Int
         ](row: Int, col: Int, val: SIMD[in_dtype, width]):
@@ -331,7 +331,7 @@ def _run_case[
         # This branch owes the SAME outputs as the fused one; dropping the
         # `quantize_mx_amd` leaves them stale and arm A catches it (verified).
         @__parameter
-        @always_inline
+        @inline(.always)
         def two_launch_with_quant() raises:
             comptime if not route_two_launch:
                 # Poison: `threshold = full_bytes` forces the fused branch, so

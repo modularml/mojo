@@ -46,7 +46,7 @@ from std.algorithm import vectorize
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _memcmp_impl_unconstrained[
     dtype: DType, //
 ](
@@ -62,7 +62,7 @@ def _memcmp_impl_unconstrained[
     return 0
 
 
-@always_inline
+@inline(.always)
 def _memcmp_opt_impl_unconstrained[
     dtype: DType, //
 ](
@@ -108,7 +108,7 @@ def _memcmp_opt_impl_unconstrained[
     return 0
 
 
-@always_inline
+@inline(.always)
 def _memcmp_impl[
     dtype: DType
 ](
@@ -122,7 +122,7 @@ def _memcmp_impl[
         return _memcmp_opt_impl_unconstrained(s1, s2, count)
 
 
-@always_inline
+@inline(.always)
 def unsafe_memcmp[
     type: AnyType, address_space: AddressSpace
 ](
@@ -165,7 +165,7 @@ def unsafe_memcmp[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _memcpy_impl(
     dest_data: MutPointer[Byte, ...],
     src_data: ImmPointer[Byte, ...],
@@ -246,7 +246,7 @@ def _memcpy_impl(
     vectorize[32](n, copy)
 
 
-@always_inline
+@inline(.always)
 def unsafe_memcpy[
     T: AnyType
 ](*, dest: MutPointer[T, _], src: Pointer[T, _], count: Int,):
@@ -288,7 +288,7 @@ def unsafe_memcpy[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def unsafe_memmove[
     T: AnyType
 ](*, dest: MutPointer[T, _], src: ImmPointer[T, _], count: Int,):
@@ -320,7 +320,7 @@ def unsafe_memmove[
         )
 
 
-@always_inline
+@inline(.always)
 @deprecated(use=unsafe_memmove)
 def memmove[
     T: AnyType
@@ -345,7 +345,7 @@ def memmove[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _memset_impl(ptr: MutPointer[Byte, ...], value: Byte, count: Int):
     def fill[width: Int](offset: Int) {imm}:
         ptr.unsafe_store(offset, SIMD[.uint8, width](value))
@@ -354,7 +354,7 @@ def _memset_impl(ptr: MutPointer[Byte, ...], value: Byte, count: Int):
     vectorize[simd_width](count, fill)
 
 
-@always_inline
+@inline(.always)
 def unsafe_memset(ptr: MutPointer[...], value: Byte, count: Int):
     """Fills memory with the given value.
 
@@ -377,7 +377,7 @@ def unsafe_memset(ptr: MutPointer[...], value: Byte, count: Int):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def unsafe_memset_zero(ptr: MutPointer[...], count: Int):
     """Fills memory with zeros.
 
@@ -393,7 +393,7 @@ def unsafe_memset_zero(ptr: MutPointer[...], count: Int):
     unsafe_memset(ptr, 0, count)
 
 
-@always_inline
+@inline(.always)
 def unsafe_memset_zero[
     dtype: DType, //, *, count: Int
 ](ptr: MutPointer[Scalar[dtype], ...]):
@@ -421,7 +421,7 @@ def unsafe_memset_zero[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _malloc[
     type: AnyType,
     /,
@@ -465,7 +465,7 @@ def _malloc[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _free(ptr: MutPointer[...]):
     comptime if is_gpu():
         libc.free(ptr.unsafe_bitcast[NoneType]())
@@ -473,7 +473,7 @@ def _free(ptr: MutPointer[...]):
         __mlir_op.`pop.aligned_free`(ptr._get_kgen_pointer())
 
 
-@always_inline
+@inline(.always)
 def _free(ptr: OptionalPointer[mut=True, ...]):
     comptime if is_gpu():
         # SAFETY: `Optional[Pointer]`'s niche layout is identical regardless of
@@ -496,7 +496,7 @@ def _free(ptr: OptionalPointer[mut=True, ...]):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 @deprecated(use=IsTriviallyMovable)
 def is_trivially_movable[T: Movable]() -> Bool:
     """Returns whether `T` has a trivial move constructor.
@@ -515,7 +515,7 @@ def is_trivially_movable[T: Movable]() -> Bool:
     return T.__move_ctor_is_trivial
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 @deprecated(use=IsTriviallyCopyable)
 def is_trivially_copyable[T: Copyable]() -> Bool:
     """Returns whether `T` has a trivial copy constructor.
@@ -534,7 +534,7 @@ def is_trivially_copyable[T: Copyable]() -> Bool:
     return T.__copy_ctor_is_trivial
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 @deprecated(use=IsTriviallyDeinitable)
 def is_trivially_deletable[T: AnyType]() -> Bool:
     """Returns whether `T` has a trivial destructor.
@@ -560,7 +560,7 @@ def is_trivially_deletable[T: AnyType]() -> Bool:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def unsafe_uninit_move_n[
     T: Movable,
     //,
@@ -627,7 +627,7 @@ def unsafe_uninit_move_n[
                 )
 
 
-@always_inline
+@inline(.always)
 def unsafe_uninit_copy_n[
     T: Copyable,
     //,
@@ -689,7 +689,7 @@ def unsafe_uninit_copy_n[
                 dest.unsafe_offset(i).unsafe_write(copy=src.unsafe_offset(i)[])
 
 
-@always_inline
+@inline(.always)
 def unsafe_destroy_n[T: Deinitable](pointer: MutPointer[T, _], count: Int):
     """Destroy `count` initialized values at `pointer`.
 
@@ -727,7 +727,7 @@ def unsafe_destroy_n[T: Deinitable](pointer: MutPointer[T, _], count: Int):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def forget_deinit[T: AnyType](var value: T):
     """Takes ownership and skips running `__deinit__` deinitializers.
 

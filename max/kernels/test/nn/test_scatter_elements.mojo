@@ -217,7 +217,7 @@ def main() raises:
             5.0,
         ]
 
-        @always_inline
+        @inline(.always)
         def _max[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:
@@ -273,7 +273,7 @@ def main() raises:
             output_ptr.unsafe_ptr(), IndexList[2](rows, 1)
         )
 
-        @always_inline
+        @inline(.always)
         def _add[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:

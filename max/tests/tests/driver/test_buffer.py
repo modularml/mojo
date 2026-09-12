@@ -268,6 +268,194 @@ def test_contiguous_tensor() -> None:
     assert cont_tensor[1, 1].item() == 5
 
 
+def test_strides_of_a_fresh_buffer_are_row_major() -> None:
+    # Strides are in elements, outermost first, and a freshly allocated buffer
+    # is row-major: each dimension's stride is the product of the ones inside.
+    assert Buffer(DType.int32, (4,)).strides == (1,)
+    assert Buffer(DType.int32, (3, 5)).strides == (5, 1)
+    assert Buffer(DType.int32, (2, 3, 5)).strides == (15, 5, 1)
+    # Element units, not bytes: the dtype does not enter.
+    assert Buffer(DType.uint8, (3, 5)).strides == (5, 1)
+    assert Buffer(DType.float64, (3, 5)).strides == (5, 1)
+
+
+def test_strides_are_independent_of_dtype_width() -> None:
+    for dtype in (DType.uint8, DType.int32, DType.float64):
+        assert Buffer(dtype, (7, 11)).strides == (11, 1)
+
+
+def test_slice_keeps_the_strides_of_its_parent() -> None:
+    # Dropping the tail of each row leaves the row spacing alone, so the outer
+    # stride stays wider than the inner extent. That gap is the whole point of
+    # exposing strides.
+    parent = Buffer(DType.uint8, (8, 10))
+    assert parent.strides == (10, 1)
+
+    rows = parent[:, :6]
+    assert rows.shape == (8, 6)
+    assert rows.strides == (10, 1)
+    assert not rows.is_contiguous
+
+    # Narrowing the outer dimension instead does not change any stride.
+    fewer = parent[:4, :]
+    assert fewer.shape == (4, 10)
+    assert fewer.strides == (10, 1)
+    assert fewer.is_contiguous
+
+
+def test_strides_survive_a_view_of_a_strided_buffer() -> None:
+    # A view may reinterpret what sits inside a row, but it cannot close the
+    # gap between rows, so the outer stride is carried across unchanged.
+    strided = Buffer(DType.uint8, (8, 12))[:, :8]
+    assert strided.strides == (12, 1)
+
+    # Same dtype, inner dimension refactored: 8 -> (2, 4).
+    reshaped = strided.view(DType.uint8, (8, 2, 4))
+    assert reshaped.shape == (8, 2, 4)
+    assert reshaped.strides == (12, 4, 1)
+
+    # Wider dtype: the outer stride is rescaled into the new element size.
+    as_i32 = strided.view(DType.int32, (8, 2))
+    assert as_i32.shape == (8, 2)
+    assert as_i32.strides == (3, 1)
+
+
+def test_view_of_a_contiguous_buffer_is_row_major() -> None:
+    # The contiguous path is unchanged: strides come straight from the shape.
+    buf = Buffer(DType.uint8, (8, 12))
+    assert buf.view(DType.uint8, (8, 3, 4)).strides == (12, 4, 1)
+    assert buf.view(DType.int32, (8, 3)).strides == (3, 1)
+    assert buf.view(DType.uint8, (96,)).strides == (1,)
+
+
+def test_view_of_a_strided_buffer_must_keep_the_outer_dimension() -> None:
+    # Collapsing dimension 0 would have to express the inter-row gap somewhere,
+    # and a shape cannot.
+    strided = Buffer(DType.uint8, (8, 12))[:, :8]
+    with pytest.raises(ValueError, match="must keep dimension 0"):
+        strided.view(DType.uint8, (64,))
+    with pytest.raises(ValueError, match="must keep dimension 0"):
+        strided.view(DType.uint8, (4, 16))
+    with pytest.raises(ValueError, match="must keep dimension 0"):
+        strided.view(DType.uint8, (16, 4))
+
+
+def test_view_of_a_strided_buffer_rejects_an_unrepresentable_stride() -> None:
+    # An outer stride of 10 bytes is not a whole number of int32s, so there is
+    # no stride in the new element type to report.
+    strided = Buffer(DType.uint8, (8, 10))[:, :8]
+    assert strided.strides == (10, 1)
+    with pytest.raises(ValueError, match="whole number"):
+        strided.view(DType.int32, (8, 2))
+
+
+def test_view_still_rejects_a_size_mismatch() -> None:
+    for buf in (
+        Buffer(DType.uint8, (8, 12)),
+        Buffer(DType.uint8, (8, 12))[:, :8],
+    ):
+        with pytest.raises((ValueError, RuntimeError)):
+            buf.view(DType.uint8, (8, 7))
+
+
+def test_strided_view_addresses_the_rows_its_stride_implies() -> None:
+    # The payoff: reading through a strided view lands on the parent's rows,
+    # skipping the tail each row leaves behind.
+    parent = Buffer.from_numpy(np.arange(8 * 10, dtype=np.uint8).reshape(8, 10))
+    rows = parent[:, :6]
+    assert rows.strides == (10, 1)
+    np.testing.assert_array_equal(
+        rows.contiguous().to_numpy(),
+        np.arange(8 * 10, dtype=np.uint8).reshape(8, 10)[:, :6],
+    )
+
+    # Re-typing inside the row keeps that addressing.
+    as_pairs = rows.view(DType.uint8, (8, 3, 2))
+    assert as_pairs.strides == (10, 2, 1)
+    np.testing.assert_array_equal(
+        as_pairs.contiguous().to_numpy(),
+        np.arange(8 * 10, dtype=np.uint8)
+        .reshape(8, 10)[:, :6]
+        .reshape(8, 3, 2),
+    )
+
+
+def test_view_rejects_a_stride_inside_a_row() -> None:
+    # A step within a row leaves gaps a re-typed row cannot describe, so the
+    # view is refused rather than quietly re-addressed as packed.
+    every_other = Buffer.from_numpy(
+        np.arange(16, dtype=np.uint8).reshape(4, 4)
+    )[:, ::2]
+    assert every_other.shape == (4, 2)
+    assert every_other.strides == (4, 2)
+    with pytest.raises(ValueError, match="rows are not packed"):
+        every_other.view(DType.uint8, (4, 2))
+
+
+def test_view_rejects_a_backwards_buffer() -> None:
+    parent = Buffer.from_numpy(np.arange(16, dtype=np.uint8).reshape(4, 4))
+
+    # Reversed inside the row: a negative step is a stride like any other, and
+    # it is not the packed one.
+    with pytest.raises(ValueError, match="rows are not packed"):
+        parent[:, ::-1].view(DType.uint8, (4, 4))
+
+    # Reversed across rows: dimension 0 would have to walk backwards.
+    with pytest.raises(ValueError, match="steps backwards"):
+        parent[::-1, :].view(DType.uint8, (4, 4))
+
+
+def test_view_of_a_single_row_slice_is_unconstrained() -> None:
+    # Picking one expert out of a stacked MoE weight, as the Gemma4 adapter
+    # does: the slice keeps a dim-0 stride that steps over the experts after
+    # it, but with one row that stride addresses nothing.
+    stacked = Buffer.from_numpy(
+        np.arange(3 * 4 * 5, dtype=np.uint8).reshape(3, 4, 5)
+    )
+    one = stacked[1:2, :2, :]
+    assert one.shape == (1, 2, 5)
+    assert not one.is_contiguous
+
+    flat = one.view(DType.uint8, (2, 5))
+    assert flat.strides == (5, 1)
+    np.testing.assert_array_equal(
+        flat.to_numpy(),
+        np.arange(3 * 4 * 5, dtype=np.uint8).reshape(3, 4, 5)[1, :2, :],
+    )
+
+
+def test_view_of_a_strided_buffer_rejects_an_unaligned_start() -> None:
+    # Starting mid-element sends the view down the rebasing path, where the new
+    # storage is cut to the view's extent and the stride would read past it.
+    strided = Buffer(DType.uint8, (8, 12))[:, 2:10]
+    assert strided.strides == (12, 1)
+    with pytest.raises(ValueError, match="starts mid-element"):
+        strided.view(DType.int32, (8, 2))
+
+    # Aligning the same slice leaves the view working.
+    aligned = Buffer(DType.uint8, (8, 12))[:, 4:12]
+    assert aligned.view(DType.int32, (8, 2)).strides == (3, 1)
+
+
+def test_view_carries_the_outer_stride_of_a_higher_rank_slice() -> None:
+    # The dimension carrying the stride need not be the sliced one: narrowing
+    # the middle dimension still leaves each row's interior packed.
+    parent = Buffer(DType.uint8, (5, 8, 3))
+    narrowed = parent[:, :6, :]
+    assert narrowed.strides == (24, 3, 1)
+
+    folded = narrowed.view(DType.uint8, (5, 18))
+    assert folded.strides == (24, 1)
+
+
+def test_reversed_slice_reports_negative_strides() -> None:
+    # Reversed slices are the reason `is_contiguous` is not just a stride
+    # comparison; make sure `strides` reports them rather than hiding them.
+    reversed_rows = Buffer(DType.int32, (3, 3))[::-1, :]
+    assert not reversed_rows.is_contiguous
+    assert reversed_rows.strides[0] < 0
+
+
 def test_modify_contiguous_tensor() -> None:
     # Modifications made to the original tensor should not be reflected
     # on the contiguous copy, and vice-versa.

@@ -23,7 +23,7 @@ from std.collections.string.string_span import (
     StaticString,
 )
 from std.os import PathLike
-from std.ffi import c_char, CStringSlice
+from std.ffi import c_char, CStringSpan
 
 # ===-----------------------------------------------------------------------===#
 # StringLiteral
@@ -97,7 +97,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self) * n
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, rhs: StringSlice) -> Bool:
         """Compare two string literals for equality.
 
@@ -109,7 +109,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return not (self != rhs)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, rhs: StringSlice) -> Bool:
         """Compare two string literals for inequality.
 
@@ -121,7 +121,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self) != rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __lt__(self, rhs: StringSlice) -> Bool:
         """Compare this value to the RHS using lesser than (LT) comparison.
 
@@ -133,7 +133,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self) < rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __le__(self, rhs: StringSlice) -> Bool:
         """Compare this value to the RHS using lesser than or equal to (LE) comparison.
 
@@ -145,7 +145,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return not (rhs < self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __gt__(self, rhs: StringSlice) -> Bool:
         """Compare this value to the RHS using greater than (GT) comparison.
 
@@ -157,7 +157,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return rhs < self
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ge__(self, rhs: StringSlice) -> Bool:
         """Compare this value to the RHS using greater than or equal to (GE) comparison.
 
@@ -173,7 +173,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __bool__(self) -> Bool:
         """Convert the string to a bool value.
 
@@ -182,7 +182,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return self.byte_length() != 0
 
-    @always_inline
+    @inline(.always)
     def __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
@@ -194,7 +194,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return Int(StringSlice(self))
 
-    @always_inline
+    @inline(.always)
     def __float__(self) raises -> Float64:
         """Parses the string as a floating-point number and returns that value.
 
@@ -260,7 +260,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
             SIMDLength(mlir_value=__mlir_op.`pop.string.size`(self.value))
         )
 
-    @always_inline
+    @inline(.always)
     def count_codepoints(self) -> Int:
         """Calculates the length in Unicode codepoints encoded in the
         UTF-8 representation of this string.
@@ -311,7 +311,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).count_codepoints()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def ptr(
         self,
     ) -> Pointer[Byte, ImmStaticOrigin]:
@@ -330,7 +330,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         return ptr.unsafe_bitcast[Byte]()
 
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @deprecated(use=ptr)
     def unsafe_ptr(
         self,
@@ -342,19 +342,32 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return self.ptr()
 
-    @always_inline
-    def as_c_string_slice(
+    @inline(.always)
+    def as_c_string_span(
         self,
-    ) -> CStringSlice[ImmStaticOrigin]:
-        """Return a `CStringSlice` to the underlying memory of the string.
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a `CStringSpan` to the underlying memory of the string.
 
         Returns:
-            The `CStringSlice` of the string.
+            The `CStringSpan` of the string.
         """
         # Safety: StringLiteral is guaranteed to be nul-terminated.
-        return CStringSlice(unsafe_from_ptr=self.ptr().unsafe_bitcast[c_char]())
+        return CStringSpan(unsafe_from_ptr=self.ptr().unsafe_bitcast[c_char]())
 
-    @always_inline("nodebug")
+    @deprecated(use=as_c_string_span)
+    @inline(.always)
+    def as_c_string_slice(
+        self,
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a `CStringSpan` to the underlying memory of the string.
+
+        Returns:
+            The `CStringSpan` of the string.
+        """
+        # Safety: StringLiteral is guaranteed to be nul-terminated.
+        return self.as_c_string_span()
+
+    @inline(.nodebug)
     def as_string_slice(self) -> StaticString:
         """Returns a string slice of this static string literal.
 
@@ -372,7 +385,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
             )
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def as_bytes(self) -> Span[Byte, ImmStaticOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
@@ -635,7 +648,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return self.lstrip().rstrip()
 
-    def strip(self, chars: ImmStringSlice) -> StaticString:
+    def strip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with leading and trailing
         characters removed.
 
@@ -649,7 +662,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
 
         return self.lstrip(chars).rstrip(chars)
 
-    def rstrip(self, chars: ImmStringSlice) -> StaticString:
+    def rstrip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with trailing characters
         removed.
 
@@ -671,7 +684,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).rstrip()
 
-    def lstrip(self, chars: ImmStringSlice) -> StaticString:
+    def lstrip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with leading characters removed.
 
         Args:
@@ -801,7 +814,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         var result = self
         return result.join(elems)
 
-    @always_inline
+    @inline(.always)
     def split(self, sep: StringSlice) -> List[StaticString]:
         """Split the string by a separator.
 
@@ -826,7 +839,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).split(sep)
 
-    @always_inline
+    @inline(.always)
     def split(self, sep: StringSlice, maxsplit: Int) -> List[StaticString]:
         """Split the string by a separator.
 
@@ -849,7 +862,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).split(sep, maxsplit=maxsplit)
 
-    @always_inline
+    @inline(.always)
     def split(self, sep: NoneType = None) -> List[StaticString]:
         """Split the string by every Whitespace separator.
 
@@ -876,7 +889,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).split(sep)
 
-    @always_inline
+    @inline(.always)
     def split(
         self, sep: NoneType = None, *, maxsplit: Int
     ) -> List[StaticString]:

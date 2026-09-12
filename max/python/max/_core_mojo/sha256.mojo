@@ -99,19 +99,19 @@ comptime _K: Array[UInt32, 64] = [
 ]
 
 
-@always_inline
+@inline(.always)
 def _ch(x: UInt32, y: UInt32, z: UInt32) -> UInt32:
     """Choice function: `(x & y) ^ (~x & z)`."""
     return (x & y) ^ (~x & z)
 
 
-@always_inline
+@inline(.always)
 def _maj(x: UInt32, y: UInt32, z: UInt32) -> UInt32:
     """Majority function: `(x & y) ^ (x & z) ^ (y & z)`."""
     return (x & y) ^ (x & z) ^ (y & z)
 
 
-@always_inline
+@inline(.always)
 def _big_sigma0(x: UInt32) -> UInt32:
     return (
         rotate_bits_right[2](x)
@@ -120,7 +120,7 @@ def _big_sigma0(x: UInt32) -> UInt32:
     )
 
 
-@always_inline
+@inline(.always)
 def _big_sigma1(x: UInt32) -> UInt32:
     return (
         rotate_bits_right[6](x)
@@ -129,17 +129,17 @@ def _big_sigma1(x: UInt32) -> UInt32:
     )
 
 
-@always_inline
+@inline(.always)
 def _small_sigma0(x: UInt32) -> UInt32:
     return rotate_bits_right[7](x) ^ rotate_bits_right[18](x) ^ (x >> 3)
 
 
-@always_inline
+@inline(.always)
 def _small_sigma1(x: UInt32) -> UInt32:
     return rotate_bits_right[17](x) ^ rotate_bits_right[19](x) ^ (x >> 10)
 
 
-@always_inline
+@inline(.always)
 def _load_be_u32(data: Span[Byte, _], offset: Int) -> UInt32:
     """Load a 32-bit big-endian integer from the data."""
     return (

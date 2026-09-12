@@ -23,7 +23,7 @@ struct Point(Writable):
     var x: Int
     var y: Int
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write("Point(", self.x, ", ", self.y, ")")
 

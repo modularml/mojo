@@ -41,7 +41,7 @@ print(info)
 from std.collections.string.string_span import _get_kgen_string
 from std.os import PathLike
 from std.pathlib import Path
-from std.sys.info import CompilationTarget, _current_target, _TargetType
+from std.sys.info import CompilationTarget, _TargetType
 
 from std.reflection import get_linkage_name
 
@@ -83,7 +83,7 @@ struct _PopulateInfo(TrivialRegisterPassable):
 struct CompiledFunctionInfo[
     func_type: TrivialRegisterPassable,
     func: func_type,
-    target: _TargetType,
+    target: CompilationTarget,
 ](TrivialRegisterPassable, Writable):
     """Contains compilation information and results for a function.
 
@@ -122,7 +122,7 @@ struct CompiledFunctionInfo[
     ](
         __mlir_attr[
             `#kgen.compile_offload_closure<`,
-            Self.target,
+            Self.target._mlir_value,
             `,`,
             Self.func,
             `> : `,
@@ -132,7 +132,7 @@ struct CompiledFunctionInfo[
     """Function pointer to populate captured variables in the function closure.
     """
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the assembly/IR to a writer.
 
@@ -141,7 +141,7 @@ struct CompiledFunctionInfo[
         """
         return writer.write(self.asm)
 
-    @no_inline
+    @inline(.never)
     def write_text[path_like: PathLike](self, path: path_like) raises:
         """Writes the assembly/IR to a file.
 
@@ -157,7 +157,7 @@ struct CompiledFunctionInfo[
         """
         Path(path.__fspath__()).write_text(String(self))
 
-    @no_inline
+    @inline(.never)
     def __contains__(self, content: String) -> Bool:
         """Checks if content exists in the assembly/IR.
 
@@ -206,7 +206,7 @@ def _get_emission_kind_id[emission_kind: StaticString]() -> Int:
         return _EMISSION_KIND_ASM
 
 
-@always_inline
+@inline(.always)
 def compile_info[
     func_type: TrivialRegisterPassable,
     //,
@@ -214,10 +214,8 @@ def compile_info[
     /,
     *,
     emission_kind: StaticString = "asm",
-    target: _TargetType = _current_target(),
-    compile_options: StaticString = CompilationTarget[
-        target
-    ].default_compile_options(),
+    target: CompilationTarget = CompilationTarget.current(),
+    compile_options: StaticString = target.default_compile_options(),
     link_options: StaticString = "",
 ]() -> CompiledFunctionInfo[func_type, func, target]:
     """Compiles a function and returns detailed compilation information.
@@ -268,7 +266,7 @@ def compile_info[
     """
 
     var offload = __mlir_op.`kgen.compile_offload`[
-        target_type=target,
+        target_type=target._mlir_value,
         emission_kind=_get_emission_kind_id[emission_kind]().__mlir_index__(),
         emission_option=_get_kgen_string[compile_options](),
         emission_link_option=_get_kgen_string[link_options](),

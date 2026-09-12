@@ -81,7 +81,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
 
     var num_groups: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         n: Int,
@@ -110,7 +110,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         self.pad_w = pad_w
         self.num_groups = num_groups
 
-    @always_inline
+    @inline(.always)
     def d(self) -> Int:
         """Input depth."""
 
@@ -119,7 +119,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def h(self) -> Int:
         """Input height."""
 
@@ -128,12 +128,12 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def w(self) -> Int:
         """Input width."""
         return Int(self.input_dims[Self.rank - 1].value())
 
-    @always_inline
+    @inline(.always)
     def do(self) -> Int:
         """Output depth."""
 
@@ -142,7 +142,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def ho(self) -> Int:
         """Output height."""
 
@@ -151,12 +151,12 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def wo(self) -> Int:
         """Output width."""
         return Int(self.output_dims[Self.rank - 1].value())
 
-    @always_inline
+    @inline(.always)
     def q(self) -> Int:
         """Filter window depth."""
 
@@ -165,7 +165,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def r(self) -> Int:
         """Filter window height."""
 
@@ -174,12 +174,12 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         else:
             return 1
 
-    @always_inline
+    @inline(.always)
     def s(self) -> Int:
         """Filter window width."""
         return Int(self.filter_dims[Self.rank - 1].value())
 
-    @always_inline
+    @inline(.always)
     def stride_at[axis: Int](self) -> Int:
         """Stride along `axis`.
 
@@ -188,7 +188,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         """
         return Int(self.stride[axis].value())
 
-    @always_inline
+    @inline(.always)
     def dilation_at[axis: Int](self) -> Int:
         """Dilation along `axis`.
 
@@ -197,34 +197,34 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         """
         return Int(self.dilation[axis].value())
 
-    @always_inline
+    @inline(.always)
     def pad_d_lower(self) -> Int:
         """Depth padding before the first input point."""
         return Int(self.pad_d[0].value())
 
-    @always_inline
+    @inline(.always)
     def pad_h_lower(self) -> Int:
         """Height padding above the first input row."""
         return Int(self.pad_h[0].value())
 
-    @always_inline
+    @inline(.always)
     def pad_w_lower(self) -> Int:
         """Width padding left of the first input column."""
         return Int(self.pad_w[0].value())
 
-    @always_inline
+    @inline(.always)
     def filter_window_flat_size(self) -> Int:
         return Int(self.filter_dims.product())
 
-    @always_inline
+    @inline(.always)
     def input_image_flat_size(self) -> Int:
         return Int(self.input_dims.product())
 
-    @always_inline
+    @inline(.always)
     def output_image_flat_size(self) -> Int:
         return Int(self.output_dims.product())
 
-    @always_inline
+    @inline(.always)
     def output_space_dims(self) -> IndexList[Self.rank]:
         # The compiler types the result as `IndexList[Int(len(tabulate(rank)))]`
         # and cannot prove that length equals `rank`, so reconcile the two.
@@ -232,7 +232,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
             coord_to_index_list(self.output_dims)
         )
 
-    @always_inline
+    @inline(.always)
     def output_flat_coord_to_input_offset(
         self, n: Int, output_flat_coord: Int
     ) -> Int:
@@ -273,19 +273,19 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
             # Pass compile.
             return -1
 
-    @always_inline
+    @inline(.always)
     def matmul_M(self) -> Int:
         return self.n * self.output_image_flat_size() * self.num_groups
 
-    @always_inline
+    @inline(.always)
     def matmul_N(self) -> Int:
         return self.f // self.num_groups
 
-    @always_inline
+    @inline(.always)
     def matmul_K(self) -> Int:
         return self.c * self.filter_window_flat_size() // self.num_groups
 
-    @always_inline
+    @inline(.always)
     def padded(self) -> Bool:
         return (
             self.pad_w != coord[0, 0]
@@ -293,19 +293,19 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
             or self.pad_d != coord[0, 0]
         )
 
-    @always_inline
+    @inline(.always)
     def c_per_group(self) -> Int:
         """Returns the number of channels per group. Channel count must be divisible by group size.
         """
         return self.c // self.num_groups
 
-    @always_inline
+    @inline(.always)
     def f_per_group(self) -> Int:
         """Returns the number of filters per group. Filter count must be divisible by group size.
         """
         return self.f // self.num_groups
 
-    @always_inline
+    @inline(.always)
     def f_to_group(self, f_idx: Int) -> Int:
         """Given a global filter idx, returns the group idx of the group the filter belongs to.
 
@@ -314,7 +314,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         """
         return f_idx // self.f_per_group()
 
-    @always_inline
+    @inline(.always)
     def c_to_group(self, c_idx: Int) -> Int:
         """Given a global channel idx, returns the group idx of the group the channel belongs to.
 
@@ -323,7 +323,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         """
         return c_idx // self.c_per_group()
 
-    @always_inline
+    @inline(.always)
     def f_in_group(self, f_idx: Int) -> Int:
         """Given a global filter idx, returns the offset of the filter in its group.
 
@@ -332,7 +332,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         """
         return f_idx % self.f_per_group()
 
-    @always_inline
+    @inline(.always)
     def c_in_group(self, c_idx: Int) -> Int:
         """Given a global channel idx, returns the offset of the channel in its group.
 
@@ -342,7 +342,7 @@ struct ConvShape[rank: Int](TrivialRegisterPassable):
         return c_idx % self.c_per_group()
 
 
-@always_inline
+@inline(.always)
 def get_conv_shape[
     rank: Int,
     filter_packed: Bool,
@@ -415,7 +415,7 @@ def get_conv_shape[
     )
 
 
-@always_inline
+@inline(.always)
 def get_conv_tile_size[dtype: DType]() -> Int:
     """Returns the convolution L2 cache tile size in elements for the target.
 
@@ -444,7 +444,7 @@ def get_conv_tile_size[dtype: DType]() -> Int:
     return 288 * KB // size_of[dtype]()
 
 
-@always_inline
+@inline(.always)
 def get_conv_tile_shape[
     dtype: DType,
 ](c: Int, filter_window_size: Int, micro_kernel_width: Int,) -> IndexList[2]:
@@ -489,7 +489,7 @@ def get_conv_tile_shape[
     return Index(c_tile_size, f_tile_size)
 
 
-@always_inline
+@inline(.always)
 def extend_shape[
     rank: Int
 ](in_shape: IndexList[rank], first: Int, last: Int) -> IndexList[rank + 2]:
@@ -513,7 +513,7 @@ def extend_shape[
     return out_shape
 
 
-@always_inline
+@inline(.always)
 def append_shape[
     rank: Int
 ](in_shape: IndexList[rank], last2nd: Int, last: Int) -> IndexList[rank + 2]:
@@ -537,7 +537,7 @@ def append_shape[
     return out_shape
 
 
-@always_inline
+@inline(.always)
 def reorder_padding[rank: Int](pad: IntTuple) -> IntTuple:
     """Reorders padding entries into `(lower, upper)` pairs per dimension.
 
@@ -586,7 +586,7 @@ struct ConvInfoStatic[rank: Int](Defaultable):
         self.dilation = IntTuple(dilation).flatten()
         self.num_groups = num_groups
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.pad = IntTuple(num_elems=Self.rank * 2)
         _ = self.pad._fill(UNKNOWN_VALUE)
@@ -596,7 +596,7 @@ struct ConvInfoStatic[rank: Int](Defaultable):
         _ = self.dilation._fill(UNKNOWN_VALUE)
         self.num_groups = UNKNOWN_VALUE
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         pad: IntTuple,
@@ -618,7 +618,7 @@ struct ConvInfoStatic[rank: Int](Defaultable):
         self.dilation = IntTuple(dilation).flatten()
         self.num_groups = num_groups
 
-    @always_inline
+    @inline(.always)
     def all_known(self) -> Bool:
         return (
             self.pad.all_known()
@@ -627,21 +627,21 @@ struct ConvInfoStatic[rank: Int](Defaultable):
             and self.num_groups != UNKNOWN_VALUE
         )
 
-    @always_inline
+    @inline(.always)
     def pad_left(self) -> Int:
         # TODO: extend to 1d/3d.
         return Int(self.pad[1])
 
-    @always_inline
+    @inline(.always)
     def pad_bottom(self) -> Int:
         # TODO: extend to 1d/3d.
         return Int(self.pad[0])
 
-    @always_inline
+    @inline(.always)
     def strides(self) -> IndexList[2]:
         return Index(self.stride[0], self.stride[1])
 
-    @always_inline
+    @inline(.always)
     def dilations(self) -> IndexList[2]:
         return Index(self.dilation[0], self.dilation[1])
 
@@ -801,7 +801,7 @@ struct ConvPartition(TrivialRegisterPassable):
     var c_offset: Int
     var c_size: Int
 
-    @always_inline
+    @inline(.always)
     def empty(self) -> Bool:
         # fmt: off
         return self.ng_size <= 0 or \
@@ -811,7 +811,7 @@ struct ConvPartition(TrivialRegisterPassable):
         # fmt: on
 
 
-@always_inline
+@inline(.always)
 def get_conv_num_tasks(num_threads: Int, conv_shape: ConvShape) -> Int:
     """Returns the number of tasks to partition the convolution into.
 
@@ -938,7 +938,7 @@ def get_conv_num_partitions[
     )
 
 
-@always_inline
+@inline(.always)
 def get_partition(
     task_id: Int,
     num_partitions: IndexList[4],
@@ -1022,11 +1022,11 @@ struct ConvAlgorithm(TrivialRegisterPassable):
         2
     )  # TF filter layout for channels last input.
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, rhs: ConvAlgorithm) -> Bool:
         return self.value == rhs.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, rhs: ConvAlgorithm) -> Bool:
         return self.value != rhs.value
 
@@ -1036,7 +1036,7 @@ struct ConvAlgorithm(TrivialRegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def align_down_residual(value: Int, alignment: Int) -> Int:
     """Returns the remainder after aligning down value to alignment.
 

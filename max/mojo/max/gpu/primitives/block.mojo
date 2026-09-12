@@ -48,7 +48,7 @@ from max.gpu import barrier
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_with_padding[
     dtype: DType,
     num_reductions: Int,
@@ -79,7 +79,7 @@ def _block_reduce_with_padding[
     comptime for i in range(num_reductions):
         warp_results[i] = warp_reduce_fn[reduction_idx=i](vals[i])
 
-    @always_inline
+    @inline(.always)
     def compute_offset(offset: Int) -> Int:
         """Computes the offset with the padding if needed."""
 
@@ -143,7 +143,7 @@ def _block_reduce_with_padding[
     return warp_results
 
 
-@always_inline
+@inline(.always)
 def _block_reduce[
     dtype: DType,
     num_reductions: Int,
@@ -248,7 +248,7 @@ def _block_reduce[
     ](vals, initial_vals=initial_vals, wid=wid)
 
 
-@always_inline
+@inline(.always)
 def _block_reduce[
     dtype: DType,
     //,
@@ -287,7 +287,7 @@ def _block_reduce[
         the complete result.
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _indexed_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -313,7 +313,7 @@ def _block_reduce[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def sum[
     dtype: DType,
     width: SIMDLength,
@@ -348,7 +348,7 @@ def sum[
     ](val.reduce_add(), initial_val=0)
 
 
-@always_inline
+@inline(.always)
 def sum[
     dtype: DType,
     width: SIMDLength,
@@ -396,7 +396,7 @@ def sum[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def max[
     dtype: DType,
     width: SIMDLength,
@@ -433,7 +433,7 @@ def max[
     ](val.reduce_max(), initial_val=Scalar[dtype].MIN_FINITE)
 
 
-@always_inline
+@inline(.always)
 def max[
     dtype: DType,
     width: SIMDLength,
@@ -483,7 +483,7 @@ def max[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def min[
     dtype: DType,
     width: SIMDLength,
@@ -519,7 +519,7 @@ def min[
     ](val.reduce_min(), initial_val=Scalar[dtype].MAX_FINITE)
 
 
-@always_inline
+@inline(.always)
 def min[
     dtype: DType,
     width: SIMDLength,
@@ -568,7 +568,7 @@ def min[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def broadcast[
     dtype: DType, width: SIMDLength, //, *, block_size: Int
 ](val: SIMD[dtype, width], src_thread: Int = 0) -> SIMD[dtype, width]:
@@ -617,7 +617,7 @@ def broadcast[
     return shared_mem.unsafe_load[width=width]()
 
 
-@always_inline
+@inline(.always)
 def broadcast[
     dtype: DType,
     width: SIMDLength,
@@ -681,7 +681,7 @@ def broadcast[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _prefix_sum[
     dtype: DType,
     //,
@@ -734,7 +734,7 @@ def _prefix_sum[
     return thread_result
 
 
-@always_inline
+@inline(.always)
 def prefix_sum[
     dtype: DType,
     //,
@@ -765,7 +765,7 @@ def prefix_sum[
     )
 
 
-@always_inline
+@inline(.always)
 def prefix_sum[
     dtype: DType,
     //,

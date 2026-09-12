@@ -16,12 +16,16 @@
 from extensibility import get_row_major_tensor_spec_static
 from extensibility import ManagedTensorSlice, IOSpec
 from extensibility.managed_tensor_slice import (
+    OutputFusion,
     StaticTensorSpec,
     _IndexListToTileLayout,
 )
 from layout import coord_to_index_list
 from std.memory import AddressSpace
 from std.sys import align_of
+from max.gpu.host import DeviceContext
+from extensibility import foreach
+from layout import Coord
 from std.testing import assert_equal, TestSuite
 
 from std.utils import IndexList
@@ -338,6 +342,426 @@ def test_strides_coord_mixed() raises:
     var index_list = coord_to_index_list(strides)
     assert_equal(index_list[0], 4)
     assert_equal(index_list[1], 1)
+
+
+# ===----------------------------------------------------------------------=== #
+# `foreach` — the value (unified-closure) overload and its parametric twin.
+#
+# Every case runs from a parametric helper: the callback's return type has to
+# name `dtype` as a parameter reference for it to unify with the overload's
+# inferred `dtype`. A literal (`SIMD[DType.float32, width]`) does not.
+#
+# A test that needs two buffers carves both out of one `Array`. Two separate
+# `Array`s can end up sharing a stack slot once `unsafe_ptr()` is taken, which
+# silently aliases them.
+# ===----------------------------------------------------------------------=== #
+
+
+def _lane_ramp[dtype: DType, width: Int](start: Int) -> SIMD[dtype, width]:
+    """`[start, start + 1, ...]` — a body that varies per lane, so a wrong
+    index or a collapsed vector shows up as a wrong element."""
+    var v = SIMD[dtype, width](0)
+    for lane in range(width):
+        v[lane] = Scalar[dtype](start + lane)
+    return v
+
+
+def _flat_view[
+    dtype: DType, n: Int
+](
+    ptr: Pointer[Scalar[dtype], MutUntrackedOrigin],
+    out result: ManagedTensorSlice[
+        mut=True,
+        io_spec=IOSpec.Unknown,
+        static_spec=get_row_major_tensor_spec_static[dtype, 1, n](),
+    ],
+):
+    """A readable/writable rank-1 view, for setting up inputs and checking
+    results without going back through the raw pointer."""
+    return {ptr, IndexList[1](n)}
+
+
+def _flat_output[
+    dtype: DType, n: Int
+](
+    ptr: Pointer[Scalar[dtype], MutUntrackedOrigin],
+    out result: ManagedTensorSlice[
+        io_spec=IOSpec.Output,
+        static_spec=get_row_major_tensor_spec_static[dtype, 1, n](),
+    ],
+):
+    return {ptr, IndexList[1](n)}
+
+
+def _flat_input[
+    dtype: DType, n: Int
+](
+    ptr: Pointer[Scalar[dtype], MutUntrackedOrigin],
+    out result: ManagedTensorSlice[
+        io_spec=IOSpec.Input,
+        static_spec=get_row_major_tensor_spec_static[dtype, 1, n](),
+    ],
+):
+    return {ptr, IndexList[1](n)}
+
+
+def _fill_ramp[
+    dtype: DType, n: Int
+](tensor: ManagedTensorSlice[mut=True, dtype=dtype, rank=1, ...]):
+    for i in range(n):
+        tensor.store(IndexList[1](i), SIMD[dtype, 1](Scalar[dtype](i)))
+
+
+def _check_value_form_rank1[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var out = _flat_output[dtype, N](base)
+    var view = _flat_view[dtype, N](base)
+
+    var bias = Scalar[dtype](3)
+
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var bias} -> SIMD[dtype, width]:
+        return SIMD[dtype, width](bias)
+
+    var ctx = DeviceContext(api="cpu")
+    foreach(body, out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](3))
+    _ = storage^
+
+
+def test_foreach_value_form_rank1() raises:
+    """The value overload resolves and runs over a rank-1 tensor."""
+    _check_value_form_rank1[DType.float32]()
+
+
+def _check_value_form_rank2[dtype: DType]() raises:
+    comptime ROWS = 3
+    comptime COLS = 4
+    var storage = Array[Scalar[dtype], ROWS * COLS](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    comptime spec = get_row_major_tensor_spec_static[dtype, 2, ROWS, COLS]()
+    var out = ManagedTensorSlice[io_spec=IOSpec.Output, static_spec=spec](
+        base, IndexList[2](ROWS, COLS)
+    )
+    var view = ManagedTensorSlice[
+        mut=True, io_spec=IOSpec.Unknown, static_spec=spec
+    ](base, IndexList[2](ROWS, COLS))
+
+    var scale = Scalar[dtype](10)
+
+    # `Coord` carries the index of the vector's first element, so the body
+    # fills the remaining lanes along the last axis itself. A wrong index or a
+    # collapsed vector shows up as a wrong element.
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var scale} -> SIMD[dtype, width]:
+        var il = coord_to_index_list(idx)
+        var base_val = Scalar[dtype](il[0]) * scale + Scalar[dtype](il[1])
+        var v = SIMD[dtype, width](0)
+        for lane in range(width):
+            v[lane] = base_val + Scalar[dtype](lane)
+        return v
+
+    var ctx = DeviceContext(api="cpu")
+    foreach(body, out, ctx)
+
+    for r in range(ROWS):
+        for c in range(COLS):
+            assert_equal(
+                view.load[1](IndexList[2](r, c)), Scalar[dtype](r * 10 + c)
+            )
+    _ = storage^
+
+
+def test_foreach_value_form_rank2() raises:
+    """The value overload handles rank 2, including `Coord` conversion."""
+    _check_value_form_rank2[DType.float32]()
+
+
+def _check_value_matches_parametric[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], 2 * N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var value_ptr = base
+    var param_ptr = base.unsafe_offset(N)
+
+    var value_out = _flat_output[dtype, N](value_ptr)
+    var param_out = _flat_output[dtype, N](param_ptr)
+    var value_view = _flat_view[dtype, N](value_ptr)
+    var param_view = _flat_view[dtype, N](param_ptr)
+
+    var ctx = DeviceContext(api="cpu")
+    var two = Scalar[dtype](2)
+
+    # Both bodies compute `2 * i + 1`. The value form carries its multiplier in
+    # a capture list; the comptime form cannot capture at all without
+    # `@__parameter`, so it spells the multiplier inline. Same arithmetic, two
+    # dispatch paths — any divergence is the new overload's fault.
+    @inline(.always)
+    def value_body[width: Int](idx: Coord) {var two} -> SIMD[dtype, width]:
+        return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) * two + 1
+
+    foreach(value_body, value_out, ctx)
+
+    @inline(.always)
+    def param_body[width: Int](idx: Coord) capturing -> SIMD[dtype, width]:
+        return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) * 2 + 1
+
+    foreach[param_body](param_out, ctx)
+
+    for i in range(N):
+        assert_equal(
+            value_view.load[1](IndexList[1](i)),
+            param_view.load[1](IndexList[1](i)),
+        )
+        assert_equal(
+            value_view.load[1](IndexList[1](i)), Scalar[dtype](i * 2 + 1)
+        )
+    _ = storage^
+
+
+def test_foreach_value_matches_parametric() raises:
+    """Differential: both overloads produce identical results for one body."""
+    _check_value_matches_parametric[DType.float32]()
+
+
+def _check_capture_outer_tensor[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], 2 * N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var in_ptr = base
+    var out_ptr = base.unsafe_offset(N)
+
+    _fill_ramp[dtype, N](_flat_view[dtype, N](in_ptr))
+    # A mut view, not an `IOSpec.Input` one, even though the migrated examples
+    # capture inputs: `IOSpec.Input` means `mut=False`, which
+    # `simd_load_from_managed_tensor_slice` turns into an LLVM
+    # `!invariant.load`. Filling a buffer and reading it back in one function
+    # breaks that promise — at N=32 the optimizer forwarded the `Array`
+    # zero-init past `_fill_ramp` for the first vector. Real ops never write
+    # their own input, and the overload does not depend on the `IOSpec`.
+    var x = _flat_view[dtype, N](in_ptr)
+    var out = _flat_output[dtype, N](out_ptr)
+    var view = _flat_view[dtype, N](out_ptr)
+
+    # The shape every migrated `max/examples/` caller uses: capture the input
+    # tensor and read it through `load`.
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var x} -> SIMD[dtype, width]:
+        return x.load[width](idx) + 1
+
+    var ctx = DeviceContext(api="cpu")
+    foreach(body, out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](i + 1))
+    _ = storage^
+
+
+def test_foreach_captures_outer_tensor() raises:
+    """A captured input tensor, the shape the migrated examples use."""
+    _check_capture_outer_tensor[DType.float32]()
+
+
+def _check_capture_tensor_and_scalar[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], 2 * N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var in_ptr = base
+    var out_ptr = base.unsafe_offset(N)
+
+    _fill_ramp[dtype, N](_flat_view[dtype, N](in_ptr))
+    # A mut view, for the invariant-load reason given above.
+    var x = _flat_view[dtype, N](in_ptr)
+    var out = _flat_output[dtype, N](out_ptr)
+    var view = _flat_view[dtype, N](out_ptr)
+    var addend = Scalar[dtype](7)
+
+    # The `add_constant` shape: a tensor and a loose scalar in one capture list.
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var x, var addend} -> SIMD[dtype, width]:
+        return x.load[width](idx) + addend
+
+    var ctx = DeviceContext(api="cpu")
+    foreach(body, out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](i + 7))
+    _ = storage^
+
+
+def test_foreach_captures_tensor_and_scalar() raises:
+    """Mixed capture list: an outer tensor alongside an outer scalar."""
+    _check_capture_tensor_and_scalar[DType.float32]()
+
+
+def _check_capture_input_tensor[dtype: DType]() raises:
+    comptime N = 32
+    comptime FILL = 7
+    # The one test that captures a real `IOSpec.Input` tensor, so the shape the
+    # migrated examples use is covered with its invariant loads intact. It can
+    # do that only because the input is filled once, at construction, and never
+    # written again: with nothing stale in the buffer there is nothing for the
+    # optimizer to forward, which is the hazard `_check_capture_outer_tensor`
+    # documents. The ramp lives in the body instead of the buffer, so the
+    # expected value still varies per index.
+    var in_storage = Array[Scalar[dtype], N](fill=Scalar[dtype](FILL))
+    var out_storage = Array[Scalar[dtype], N](fill={})
+    var in_ptr = in_storage.unsafe_ptr().unsafe_origin_cast[
+        MutUntrackedOrigin
+    ]()
+    var out_ptr = out_storage.unsafe_ptr().unsafe_origin_cast[
+        MutUntrackedOrigin
+    ]()
+
+    var x = _flat_input[dtype, N](in_ptr)
+    var out = _flat_output[dtype, N](out_ptr)
+    var view = _flat_view[dtype, N](out_ptr)
+
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var x} -> SIMD[dtype, width]:
+        return x.load[width](idx) + _lane_ramp[dtype, width](
+            coord_to_index_list(idx)[0]
+        )
+
+    var ctx = DeviceContext(api="cpu")
+    foreach(body, out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](FILL + i))
+    _ = in_storage^
+    _ = out_storage^
+
+
+def test_foreach_captures_input_tensor() raises:
+    """A captured `IOSpec.Input` tensor, invariant loads and all."""
+    _check_capture_input_tensor[DType.float32]()
+
+
+def _check_simd_width_one[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var out = _flat_output[dtype, N](base)
+    var view = _flat_view[dtype, N](base)
+    var one = Scalar[dtype](1)
+
+    # `simd_width=1` is what `image_pipeline.mojo` and `grayscale.mojo` pass;
+    # the body asserts it actually arrives.
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var one} -> SIMD[dtype, width]:
+        comptime assert width == 1, "simd_width=1 was not honored"
+        return SIMD[dtype, width](
+            Scalar[dtype](coord_to_index_list(idx)[0]) * one
+        )
+
+    var ctx = DeviceContext(api="cpu")
+    foreach[simd_width=1](body, out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](i))
+    _ = storage^
+
+
+def test_foreach_honors_simd_width() raises:
+    """A non-default `simd_width` reaches the body."""
+    _check_simd_width_one[DType.float32]()
+
+
+@fieldwise_init
+struct _MarkingOutFusion[fusion_dtype: DType](OutputFusion):
+    """Records stores through the fusion path, offset by 100 so a store that
+    bypassed the fusion is distinguishable from one that used it."""
+
+    var dst: Pointer[Scalar[Self.fusion_dtype], MutUntrackedOrigin]
+
+    def store[
+        dtype: DType,
+        rank: Int,
+        simd_width: SIMDLength,
+        element_alignment: Int = 1,
+    ](self, idx: IndexList[rank], val: SIMD[dtype, simd_width]):
+        var start = idx[rank - 1]
+        for lane in range(Int(simd_width)):
+            self.dst.unsafe_offset(start + lane).unsafe_store(
+                rebind[Scalar[Self.fusion_dtype]](val[lane]) + 100
+            )
+
+
+def _check_fused_store[dtype: DType]() raises:
+    comptime N = 32
+    # `direct` is what the tensor points at; `fused` is where the fusion
+    # writes. A `foreach` that stored straight to the data pointer would fill
+    # `direct` and leave `fused` untouched — the regression this guards.
+    var storage = Array[Scalar[dtype], 2 * N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var direct_ptr = base
+    var fused_ptr = base.unsafe_offset(N)
+
+    var direct_view = _flat_view[dtype, N](direct_ptr)
+    var fused_view = _flat_view[dtype, N](fused_ptr)
+    for i in range(N):
+        direct_view.store(IndexList[1](i), SIMD[dtype, 1](Scalar[dtype](-1)))
+        fused_view.store(IndexList[1](i), SIMD[dtype, 1](Scalar[dtype](-1)))
+
+    var out = _flat_output[dtype, N](direct_ptr)
+    var fused_out = out._bind_to_fused_output(_MarkingOutFusion(fused_ptr))
+    var one = Scalar[dtype](1)
+
+    @inline(.always)
+    def body[width: Int](idx: Coord) {var one} -> SIMD[dtype, width]:
+        return SIMD[dtype, width](
+            Scalar[dtype](coord_to_index_list(idx)[0]) * one
+        )
+
+    var ctx = DeviceContext(api="cpu")
+    foreach[simd_width=1](body, fused_out, ctx)
+
+    for i in range(N):
+        assert_equal(
+            fused_view.load[1](IndexList[1](i)), Scalar[dtype](i + 100)
+        )
+        assert_equal(direct_view.load[1](IndexList[1](i)), Scalar[dtype](-1))
+    _ = storage^
+
+
+def test_foreach_routes_through_fused_store() raises:
+    """The value overload stores through `_fused_store`, not the data pointer.
+
+    Without this the wrapper could write straight to the tensor and silently
+    break output fusion while every other test still passed.
+    """
+    _check_fused_store[DType.float32]()
+
+
+def _check_parametric_form_still_resolves[dtype: DType]() raises:
+    comptime N = 32
+    var storage = Array[Scalar[dtype], N](fill={})
+    var base = storage.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    var out = _flat_output[dtype, N](base)
+    var view = _flat_view[dtype, N](base)
+
+    # No capture list: a `capturing` body written without `@__parameter` does
+    # not actually capture, so anything it needs has to come from `idx`.
+    @inline(.always)
+    def body[width: Int](idx: Coord) capturing -> SIMD[dtype, width]:
+        return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) + 5
+
+    var ctx = DeviceContext(api="cpu")
+    foreach[body](out, ctx)
+
+    for i in range(N):
+        assert_equal(view.load[1](IndexList[1](i)), Scalar[dtype](i + 5))
+    _ = storage^
+
+
+def test_foreach_parametric_form_still_resolves() raises:
+    """Regression guard: adding the value overload left the comptime one
+    callable and unambiguous."""
+    _check_parametric_form_still_resolves[DType.float32]()
 
 
 def main() raises:

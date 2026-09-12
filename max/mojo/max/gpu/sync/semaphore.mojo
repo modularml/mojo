@@ -42,7 +42,7 @@ from .sync import MaxHardwareBarriers, barrier, named_barrier
 comptime _device_atomic = Atomic[Int32, scope="device"]
 
 
-@always_inline
+@inline(.always)
 def _barrier_and(state: Bool) -> Bool:
     comptime assert is_nvidia_gpu(), "target must be an nvidia GPU"
     return llvm_intrinsic["llvm.nvvm.barrier.cta.red.and.aligned.all", Bool](
@@ -66,7 +66,7 @@ struct Semaphore[origin: MutOrigin, //](TrivialRegisterPassable):
     var _state: Int32
     """Current state of the semaphore, used to track synchronization status"""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, lock: Pointer[Int32, Self.origin], thread_id: Int):
         """Initialize a new Semaphore instance.
 
@@ -80,7 +80,7 @@ struct Semaphore[origin: MutOrigin, //](TrivialRegisterPassable):
         self._wait_thread = thread_id <= 0
         self._state = -1
 
-    @always_inline
+    @inline(.always)
     def fetch(mut self):
         """Fetch the current state of the semaphore from global memory.
 
@@ -92,7 +92,7 @@ struct Semaphore[origin: MutOrigin, //](TrivialRegisterPassable):
                 self._lock
             )
 
-    @always_inline
+    @inline(.always)
     def state(self) -> Int32:
         """Get the current state of the semaphore.
 
@@ -101,7 +101,7 @@ struct Semaphore[origin: MutOrigin, //](TrivialRegisterPassable):
         """
         return self._state
 
-    @always_inline
+    @inline(.always)
     def wait(mut self, status: Int = 0):
         """Wait until the semaphore reaches the specified state.
 
@@ -115,7 +115,7 @@ struct Semaphore[origin: MutOrigin, //](TrivialRegisterPassable):
             self.fetch()
         barrier()
 
-    @always_inline
+    @inline(.always)
     def release(mut self, status: Int32 = 0):
         """Release the semaphore by setting it to the specified state.
 
@@ -160,7 +160,7 @@ struct NamedBarrierSemaphore[
     var _state: Int32
     """Current state of the semaphore, used to track synchronization status"""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, lock: Pointer[Int32, Self.origin], thread_id: Int):
         """Initialize a new Semaphore instance.
 
@@ -177,7 +177,7 @@ struct NamedBarrierSemaphore[
         self._wait_thread = thread_id <= 0
         self._state = -1
 
-    @always_inline
+    @inline(.always)
     def state(self) -> Int32:
         """Get the current state of the semaphore.
 
@@ -186,7 +186,7 @@ struct NamedBarrierSemaphore[
         """
         return self._state
 
-    @always_inline
+    @inline(.always)
     def wait_eq(mut self, id: Int32, status: Int32 = 0):
         """Waits until the semaphore state equals the specified status.
 
@@ -202,7 +202,7 @@ struct NamedBarrierSemaphore[
 
         named_barrier[Self.thread_count,](Self.id_offset + id)
 
-    @always_inline
+    @inline(.always)
     def wait_lt(mut self, id: Int32, count: Int32 = 0):
         """Waits until the semaphore state is less than the specified count.
 
@@ -218,7 +218,7 @@ struct NamedBarrierSemaphore[
 
         named_barrier[Self.thread_count,](Self.id_offset + id)
 
-    @always_inline
+    @inline(.always)
     def arrive_set(self, id: Int32, status: Int32 = 0):
         """Arrives at the barrier and sets the semaphore status.
 

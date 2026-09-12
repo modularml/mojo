@@ -570,7 +570,7 @@ def test_kernel_2[
         comptime num_runs = 100
         comptime num_warmup = 10
 
-        @always_inline
+        @inline(.always)
         def run_kernel(ctx: DeviceContext) raises {imm}:
             kernel_2[
                 transpose_b=transpose_b,

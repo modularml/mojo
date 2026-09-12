@@ -233,12 +233,12 @@ struct MaybeUninit[T: AnyType](
 
     var _array: Self._mlir_type
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Construct a `MaybeUninit` in an uninitialized state."""
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, var value: Self.T, /
     ) where conforms_to(Self.T, Movable):
@@ -251,7 +251,7 @@ struct MaybeUninit[T: AnyType](
         self.unsafe_write(value^)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def zeroed(out result: Self):
         """Construct a `MaybeUninit` in an uninitialized state, with the memory
         set to all 0 bytes.
@@ -266,7 +266,7 @@ struct MaybeUninit[T: AnyType](
         result = Self()
         unsafe_memset_zero(Pointer(to=result), 1)
 
-    @always_inline
+    @inline(.always)
     def write(
         mut self,
         var value: Self.T,
@@ -285,7 +285,7 @@ struct MaybeUninit[T: AnyType](
         """
         self.unsafe_ptr().unsafe_write(value^)
 
-    @always_inline
+    @inline(.always)
     def unsafe_write(
         mut self, var value: Self.T, /
     ) where conforms_to(Self.T, Movable):
@@ -310,7 +310,7 @@ struct MaybeUninit[T: AnyType](
         """
         self.unsafe_ptr().unsafe_write(value^)
 
-    @always_inline
+    @inline(.always)
     def unsafe_assume_init(
         deinit self,
     ) -> Self.T where conforms_to(Self.T, Movable):
@@ -331,7 +331,7 @@ struct MaybeUninit[T: AnyType](
         """
         return self.unsafe_ptr().unsafe_take_pointee()
 
-    @always_inline
+    @inline(.always)
     def unsafe_assume_init(ref self) -> ref[self] Self.T:
         """Returns a reference to the internal value.
 
@@ -348,7 +348,7 @@ struct MaybeUninit[T: AnyType](
         """
         return self.unsafe_ptr()[]
 
-    @always_inline
+    @inline(.always)
     def unsafe_deinit(deinit self) where conforms_to(Self.T, Deinitable):
         """Destroys the contained value.
 
@@ -364,7 +364,7 @@ struct MaybeUninit[T: AnyType](
         """
         self.unsafe_ptr().unsafe_deinit_pointee()
 
-    @always_inline
+    @inline(.always)
     def unsafe_forget(deinit self):
         """Discards this `MaybeUninit` without destroying its contents.
 
@@ -381,7 +381,7 @@ struct MaybeUninit[T: AnyType](
         """
         pass
 
-    @always_inline
+    @inline(.always)
     def unsafe_ptr(
         ref self,
     ) -> Pointer[Self.T, origin_of(self)]:

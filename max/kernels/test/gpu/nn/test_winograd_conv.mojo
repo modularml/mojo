@@ -35,7 +35,7 @@ from std.utils.index import IndexList
 from std.utils.numerics import get_accum_type
 
 
-@always_inline
+@inline(.always)
 def _get_b[
     dtype: DType, element_layout: Layout
 ](
@@ -55,7 +55,7 @@ def _get_b[
     # fmt:on
 
 
-@always_inline
+@inline(.always)
 def _get_g[
     dtype: DType, element_layout: Layout
 ](
@@ -75,7 +75,7 @@ def _get_g[
     # fmt:on
 
 
-@always_inline
+@inline(.always)
 def _get_a[
     dtype: DType, element_layout: Layout
 ](
@@ -93,7 +93,7 @@ def _get_a[
     # fmt:on
 
 
-@always_inline
+@inline(.always)
 def matmul[
     c_type: DType,
     a_type: DType,
@@ -134,7 +134,7 @@ def matmul[
 
 # TODO: Workaround because I have not found a way to slice/tile a rank 4 LayoutTensor
 # to a rank 2 LayoutTensor
-@always_inline
+@inline(.always)
 def get_tile[
     dtype: DType, //, tile_size: Int
 ](
@@ -150,7 +150,7 @@ def get_tile[
     element_layout=input_tensor.element_layout,
 ]:
     # TODO: Issue because returning a stack variable? Workaround
-    # with @always_inline
+    # with @inline(.always)
     var result = LayoutTensor[
         dtype,
         Layout.row_major(tile_size, tile_size),
@@ -402,7 +402,7 @@ def winograd_conv2d_gpu_launcher[
     )
 
 
-@always_inline
+@inline(.always)
 def get_output_dim[
     input_dim: IntTuple,
     filter_dim: IntTuple,

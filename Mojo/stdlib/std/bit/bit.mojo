@@ -30,7 +30,7 @@ from std.utils._select import _select_register_value as select
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def count_leading_zeros[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -61,7 +61,7 @@ def count_leading_zeros[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def count_trailing_zeros[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -92,7 +92,7 @@ def count_trailing_zeros[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def bit_reverse[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -123,7 +123,7 @@ def bit_reverse[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def byte_swap[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -165,7 +165,7 @@ def byte_swap[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def pop_count[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -196,7 +196,7 @@ def pop_count[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def bit_not[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -225,7 +225,7 @@ def bit_not[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def bit_width[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -260,7 +260,7 @@ def bit_width[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def log2_floor[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -293,7 +293,7 @@ def log2_floor[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def log2_ceil(val: Scalar) -> type_of(val):
     """Returns the ceiling of the base-2 logarithm of an integer value.
 
@@ -315,7 +315,7 @@ def log2_ceil(val: Scalar) -> type_of(val):
 # reference: https://doc.rust-lang.org/std/primitive.usize.html#method.next_power_of_two
 
 
-@always_inline
+@inline(.always)
 def next_power_of_two[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -350,7 +350,7 @@ def next_power_of_two[
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
 
 
-@always_inline
+@inline(.always)
 def prev_power_of_two[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -386,7 +386,7 @@ def prev_power_of_two[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def rotate_bits_left[
     dtype: DType,
     width: SIMDLength,
@@ -422,7 +422,7 @@ def rotate_bits_left[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def rotate_bits_right[
     dtype: DType,
     width: SIMDLength,

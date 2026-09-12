@@ -24,7 +24,7 @@ Differences from Qwen3 attention:
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 
 import numpy as np
 from max.dtype import DType
@@ -220,7 +220,7 @@ class Qwen3_5Attention(Module, Shardable):
             num_devices, self.n_heads, self.head_dim
         )
 
-    def shard(self, devices: Iterable[DeviceRef]) -> list[Qwen3_5Attention]:
+    def shard(self, devices: Iterable[DeviceRef]) -> Sequence[Qwen3_5Attention]:
         """Creates one per-device view of this layer, split by head.
 
         Constructs :class:`Qwen3_5Attention` rather than ``type(self)``, so a

@@ -711,3 +711,29 @@ comptime compute[Trait: type_of(AnyType), T: Trait, val: T] = val
 def main():
     # expected-error @below {{failed to infer from type 'IntLiteral[5]', it overwrites an explicitly unbound parameter '_' at #0}}
     var value = compute[_, _, 5]
+
+
+##===----------------------------------------------------------------------===##
+# MOCO-4805
+##===----------------------------------------------------------------------===##
+
+trait Fooable(Defaultable, ImplicitlyCopyable, TrivialRegisterPassable):
+    pass
+
+struct Leaf(Fooable, TrivialRegisterPassable):
+    def __init__(out self):
+        pass
+
+struct Bag[ *element_types: Fooable, tail: Int = 0](TrivialRegisterPassable):
+    def __init__(out self):
+        pass
+
+# expected-note @below {{function declared here}}
+def helper[
+    element_types: TypeList[Trait=Fooable, ...], //
+](bag: Bag[*element_types]):
+    pass
+
+def call_helper():
+    # expected-error @below {{invalid call to 'helper': value passed to 'bag' cannot be converted from 'Bag[Leaf, tail=Int(1)]' to 'Bag[Leaf]'}}
+    helper(Bag[Leaf, tail=1]())

@@ -339,7 +339,7 @@ def bench_grouped_block_scaled_gemm[
     # Total FLOPs for all groups
     var total_flops = 2 * M * Int(n.value()) * Int(k.value()) * num_groups
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut bencher: Bencher,
     ) {
@@ -357,7 +357,7 @@ def bench_grouped_block_scaled_gemm[
         var total_tiles,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_block_scaled_matmul[
                 transpose_b=transpose_b,

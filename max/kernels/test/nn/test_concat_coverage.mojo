@@ -237,7 +237,7 @@ def test_fused_concat_cpu() raises:
 
     # Input lambda: generates data based on input index
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn[
         input_index: Int, width: Int, _rank: Int, alignment: Int = 1
     ](indices: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -252,7 +252,7 @@ def test_fused_concat_cpu() raises:
 
     # Output epilogue: multiply by 2
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output)
     def output_fn[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
@@ -370,7 +370,7 @@ def test_concat_with_epilogue() raises:
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output)
     def epilogue_add_10[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int

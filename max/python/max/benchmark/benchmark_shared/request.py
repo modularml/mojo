@@ -26,7 +26,14 @@ import threading
 import time
 import traceback
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
@@ -115,6 +122,47 @@ def _apply_sampling_to_request_payload(
         payload["top_k"] = sampling.top_k
     if sampling.top_p is not None:
         payload["top_p"] = sampling.top_p
+
+
+# A ChatMessage after model_dump(): "role" plus "content", which is either a
+# plain string or a list of content blocks. Not a TypedDict because these
+# arrive from model_dump() as dict[str, Any], which would need a cast.
+SerializedChatMessage = MutableMapping[str, Any]
+
+
+def _attach_images_to_first_user_message(
+    messages: Sequence[SerializedChatMessage],
+    images: Sequence[OpenAIImage],
+) -> None:
+    """Attach images to the first user message, normalizing string content.
+
+    Neither "index 0" nor "content is a list" holds in general: a conversation
+    can lead with a system message, and datasets such as agentic-code pass
+    plain-string content straight through.
+
+    The drop paths below are a safety net, not a supported outcome. Image
+    augmentation skips prompts with no user message rather than counting
+    tokens for images it knows would be dropped here, so reaching a drop
+    means sampling and sending disagree about the prompt shape.
+    """
+    target = next((m for m in messages if m.get("role") == "user"), None)
+    if target is None:
+        logger.warning(
+            "Dropping %d image(s): the conversation has no user message.",
+            len(images),
+        )
+        return
+    content = target.get("content")
+    if isinstance(content, str):
+        target["content"] = [{"type": "text", "text": content}]
+    elif not isinstance(content, list):
+        logger.warning(
+            "Dropping %d image(s): unexpected content type %s.",
+            len(images),
+            type(content).__name__,
+        )
+        return
+    target["content"].extend(images)
 
 
 def _build_final_payload(
@@ -864,10 +912,10 @@ class OpenAIChatCompletionsRequestDriver(RequestDriver):
             )
         if request_func_input.tools:
             base_payload["tools"] = request_func_input.tools
-        for img in request_func_input.images:
-            # TODO: Remove this type ignore
-            # (error: Value of type "object" is not indexable)
-            base_payload["messages"][0]["content"].append(img)  # type: ignore[index, union-attr]
+        if request_func_input.images:
+            _attach_images_to_first_user_message(
+                messages_data, request_func_input.images
+            )
         payload = _build_final_payload(base_payload, self.extra_body)
 
         headers = {

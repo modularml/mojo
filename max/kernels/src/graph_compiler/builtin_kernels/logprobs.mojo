@@ -59,7 +59,7 @@ struct FixedHeightMinHeap[k_dtype: DType, v_dtype: DType, levels: Int]:
         self.k_array = Array[length=Self.num_elements](fill=fill_k)
         self.v_array = Array[length=Self.num_elements](fill=fill_v)
 
-    @always_inline
+    @inline(.always)
     def swap(mut self, a: Int, b: Int) -> None:
         """Swaps the key/value pairs at two heap positions.
 

@@ -18,15 +18,23 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pytest
-from max.nn.kv_cache import KVCacheGroupId
+from max.driver import Buffer
+from max.nn.kv_cache import KVCacheGroupId, PagedKVLeafRegion
+from max.nn.kv_cache.cache_params import KVCacheMemory
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import InsufficientBlocksError
 from max.pipelines.kv_cache.kv_connector import BlockCount
 from max.pipelines.kv_cache.paged_kv_cache.block_manager import PrefixCacheHits
+from max.pipelines.kv_cache.paged_kv_cache.block_utils import (
+    LittleKVCacheBlock,
+)
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
+    _PageCopy,
+    create_groups,
+    create_pools,
 )
 from max.pipelines.request.base import RequestID
 
@@ -59,17 +67,85 @@ def make_manager(
     max_num_input_tokens: int | None = None,
     num_draft_tokens: int = 0,
     num_draft_tokens_per_step: int = 0,
+    replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]] | None = None,
+    enable_dp_cross_replica_prefix_copy: bool = True,
 ) -> JengaBlockManager:
+    pools = create_pools(leaf_infos, num_huge_blocks, num_replicas)
     return JengaBlockManager(
-        dict(leaf_infos),
-        num_huge_blocks=num_huge_blocks,
+        pools=pools,
+        groups=create_groups(leaf_infos, pools, block_size),
         block_size=block_size,
         enable_prefix_caching=enable_prefix_caching,
-        num_replicas=num_replicas,
         max_num_input_tokens=max_num_input_tokens,
         num_draft_tokens=num_draft_tokens,
         num_draft_tokens_per_step=num_draft_tokens_per_step,
+        replica_kv_memory=replica_kv_memory,
+        enable_dp_cross_replica_prefix_copy=enable_dp_cross_replica_prefix_copy,
+        leaves={
+            leaf_id: PagedKVLeafRegion(
+                leaf_id=leaf_id,
+                group_id=info.group_id,
+                bytes_per_page=1,
+                page_size=block_size,
+            )
+            for leaf_id, info in leaf_infos.items()
+        },
     )
+
+
+def page_byte(replica: int, leaf_no: int, shard: int, page: int) -> int:
+    """A byte value unique to one page of the fixture below."""
+    return replica * 64 + leaf_no * 16 + shard * 4 + page
+
+
+def make_replica_kv_memory(
+    leaf_ids: Sequence[str],
+    num_replicas: int = 2,
+    *,
+    num_pages: int = 4,
+    bytes_per_page: int = 8,
+    num_shards: int = 1,
+) -> list[dict[str, KVCacheMemory]]:
+    """One CPU-backed memory unit per leaf per replica.
+
+    Each page is filled with its own :func:`page_byte`, so a copy landing
+    from the wrong replica, leaf, shard or page is visible.
+    """
+    memory: list[dict[str, KVCacheMemory]] = []
+    for replica in range(num_replicas):
+        units: dict[str, KVCacheMemory] = {}
+        for leaf_no, leaf_id in enumerate(leaf_ids):
+            buffers = []
+            for shard in range(num_shards):
+                arr = np.zeros((num_pages, bytes_per_page), dtype=np.uint8)
+                for page in range(num_pages):
+                    arr[page, :] = page_byte(replica, leaf_no, shard, page)
+                buffers.append(Buffer.from_numpy(arr))
+            units[leaf_id] = KVCacheMemory(replicated=False, buffers=buffers)
+        memory.append(units)
+    return memory
+
+
+def commit_hashes(
+    bm: JengaBlockManager,
+    leaf_ids: Sequence[str],
+    hashes: Sequence[bytes],
+    replica_idx: int,
+    release: bool = False,
+) -> None:
+    """Commits one block per hash into each leaf's cache on one replica.
+
+    ``release`` drops the reference afterwards, leaving the blocks committed
+    but unreferenced -- what a finished request leaves behind, and the state
+    in which a later allocation may evict them.
+    """
+    pool = bm.pools[replica_idx]
+    for block_hash in hashes:
+        for leaf_id in leaf_ids:
+            block = pool.alloc_block(leaf_id)
+            pool.commit_into_prefix_cache(block_hash, block)
+            if release:
+                pool.free_block(block)
 
 
 def make_ctx(num_tokens: int) -> TextContext:
@@ -779,7 +855,7 @@ def test_a_dropped_sliding_window_blocks_all_reuse() -> None:
 
     The full cache holds the whole prefix and the sliding one holds
     nothing, so there is no point both can resume from and the request starts
-    over. The full cache's depth cannot carry the sliding one: its blocks
+    over. The full cache's num_blocks cannot carry the sliding one: its blocks
     feed its own caches, and resuming on its strength would leave the sliding
     caches attending null pages where their window should be.
     """
@@ -979,7 +1055,7 @@ def test_alphabet() -> None:
     assert len(bm.pools[0].prefix_caches[SLIDING]) == 5
 
     # Four blocks reused. The full cache still reaches I, but a resume point
-    # there needs a window the sliding cache no longer holds, and its depth
+    # there needs a window the sliding cache no longer holds, and its num_blocks
     # cannot stand in for one: the blocks below the resume point feed its own
     # caches, so recomputing from I would leave those queries reading nulls.
     ctx = make_ctx(num_tokens=len(alphabet))
@@ -1198,6 +1274,53 @@ def test_get_prefix_cache_hit_counts_is_per_replica() -> None:
     assert hits[1].device_blocks == 0
 
 
+def test_hit_counts_see_other_replicas_when_copies_are_on() -> None:
+    """A prefix only replica 1 holds still counts for replica 0."""
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        num_huge_blocks=8,
+        num_replicas=2,
+        enable_prefix_caching=True,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    warm = make_ctx(num_tokens=4)
+    bm.claim(warm, replica_idx=1)
+    bm.alloc(warm)
+    warm.update(42)
+    bm.step(warm)
+    bm.release(warm)
+
+    hits = bm.get_prefix_cache_hit_counts(make_ctx(num_tokens=4))
+
+    assert hits[1].device_blocks > 0
+    assert hits[0].device_blocks == hits[1].device_blocks
+
+
+def test_hit_counts_stay_local_when_copies_are_off() -> None:
+    """The counting path reports only what the reuse path can serve."""
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        num_huge_blocks=8,
+        num_replicas=2,
+        enable_prefix_caching=True,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+        enable_dp_cross_replica_prefix_copy=False,
+    )
+    warm = make_ctx(num_tokens=4)
+    bm.claim(warm, replica_idx=1)
+    bm.alloc(warm)
+    warm.update(42)
+    bm.step(warm)
+    bm.release(warm)
+
+    hits = bm.get_prefix_cache_hit_counts(make_ctx(num_tokens=4))
+
+    assert hits[1].device_blocks > 0
+    assert hits[0].device_blocks == 0
+
+
 # ===--------------------------------------------------------------------=== #
 # Data Parallelism
 # ===--------------------------------------------------------------------=== #
@@ -1358,10 +1481,9 @@ def test_a_dummy_points_at_its_own_replica_null_page() -> None:
     dummy = make_ctx(num_tokens=1)
     bm.alloc_dummy(dummy, replica_idx=1)
 
-    assert (
-        bm._leaves[FULL].req_to_blocks[dummy.request_id][0]
-        is bm.pools[1].null_little_blocks[FULL]
-    )
+    # Every replica's null page has the same id, so compare by identity.
+    row = bm.groups[KVCacheGroupId.full()].blocks_of(dummy.request_id)
+    assert row[FULL][0] is bm.pools[1].null_little_blocks[FULL]
 
 
 def test_releasing_a_dummy_gives_nothing_back() -> None:
@@ -1586,3 +1708,477 @@ def test_effective_max_seq_length_full_leaf_is_the_bottleneck_once_swa_caps() ->
     # 5 allocable huge blocks: full=1,sliding=0 -> full=1,sliding=1
     # -> full=2,sliding=1 -> full=2,sliding capped (None) -> full=3.
     assert bm.effective_max_seq_length == 3
+
+
+# ===--------------------------------------------------------------------=== #
+# Cross-replica prefix copy
+# ===--------------------------------------------------------------------=== #
+
+
+def test_cross_replica_copy_enabled() -> None:
+    """On when the flag, a second replica, and device memory all line up."""
+    bm = make_manager(
+        {FULL: full()},
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL]),
+    )
+    assert bm._cross_replica_copy_enabled
+
+
+def test_cross_replica_copy_needs_a_second_replica() -> None:
+    """One replica has nowhere to copy from."""
+    bm = make_manager(
+        {FULL: full()},
+        num_replicas=1,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_replicas=1),
+    )
+    assert not bm._cross_replica_copy_enabled
+
+
+def test_cross_replica_copy_off_by_flag() -> None:
+    bm = make_manager(
+        {FULL: full()},
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL]),
+        enable_dp_cross_replica_prefix_copy=False,
+    )
+    assert not bm._cross_replica_copy_enabled
+
+
+def test_cross_replica_copy_needs_device_memory() -> None:
+    """Without buffer handles there is nothing to copy with."""
+    bm = make_manager({FULL: full()}, num_replicas=2)
+    assert not bm._cross_replica_copy_enabled
+
+
+def test_submit_page_copies_moves_the_page() -> None:
+    """The destination page ends up holding the source replica's bytes."""
+    memory = make_replica_kv_memory([FULL])
+    bm = make_manager({FULL: full()}, num_replicas=2, replica_kv_memory=memory)
+
+    num_bytes = bm._submit_page_copies(
+        dst_replica=0,
+        copies=[_PageCopy(leaf_id=FULL, dst_bid=3, src_bid=1, src_replica=1)],
+    )
+
+    dst = memory[0][FULL].buffers[0].to_numpy()
+    assert (dst[3] == page_byte(1, 0, 0, 1)).all()
+    # Neighbouring pages keep their own bytes.
+    assert (dst[0] == page_byte(0, 0, 0, 0)).all()
+    assert num_bytes == 8
+
+
+def test_submit_page_copies_batches_leaves_and_shards() -> None:
+    """Each leaf and each TP shard is copied from its own counterpart."""
+    memory = make_replica_kv_memory([FULL, SLIDING], num_shards=2)
+    bm = make_manager(
+        {FULL: full(), SLIDING: sliding()},
+        num_replicas=2,
+        replica_kv_memory=memory,
+    )
+
+    num_bytes = bm._submit_page_copies(
+        dst_replica=0,
+        copies=[
+            _PageCopy(leaf_id=FULL, dst_bid=2, src_bid=0, src_replica=1),
+            _PageCopy(leaf_id=SLIDING, dst_bid=3, src_bid=1, src_replica=1),
+        ],
+    )
+
+    for shard in range(2):
+        full_pages = memory[0][FULL].buffers[shard].to_numpy()
+        sliding_pages = memory[0][SLIDING].buffers[shard].to_numpy()
+        assert (full_pages[2] == page_byte(1, 0, shard, 0)).all()
+        assert (sliding_pages[3] == page_byte(1, 1, shard, 1)).all()
+
+    # 2 leaves x 2 shards x 8 bytes per page.
+    assert num_bytes == 32
+
+
+def test_submit_page_copies_no_op_when_empty() -> None:
+    memory = make_replica_kv_memory([FULL])
+    bm = make_manager({FULL: full()}, num_replicas=2, replica_kv_memory=memory)
+    before = memory[0][FULL].buffers[0].to_numpy().copy()
+
+    num_bytes = bm._submit_page_copies(dst_replica=0, copies=[])
+
+    assert (memory[0][FULL].buffers[0].to_numpy() == before).all()
+    assert num_bytes == 0
+
+
+def test_cross_replica_lookup_finds_a_remote_hit() -> None:
+    """Hashes held only by another replica count only when copies are on."""
+    bm = make_manager({FULL: full()}, num_replicas=2)
+    hashes = [b"a", b"b", b"c"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    assert bm._find_longest_device_prefix_cache_hit(hashes, 0, False) == 0
+    assert bm._find_longest_device_prefix_cache_hit(hashes, 0, True) == 3
+
+
+def test_cross_replica_lookup_needs_every_leaf_of_the_group() -> None:
+    """The group's leaves are written in lockstep, so a partial hit is a miss."""
+    bm = make_manager({VALUES: full(), SCALES: full()}, num_replicas=2)
+    commit_hashes(bm, [VALUES], [b"a"], replica_idx=1)
+
+    assert bm._find_longest_device_prefix_cache_hit([b"a"], 0, True) == 0
+
+    commit_hashes(bm, [SCALES], [b"a"], replica_idx=1)
+    assert bm._find_longest_device_prefix_cache_hit([b"a"], 0, True) == 1
+
+
+def test_copy_prefix_from_peers_commits_the_blocks_locally() -> None:
+    """The copies land in the local cache, unreferenced and ready to claim."""
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    bm._copy_prefix_from_peers(hashes, 0)
+
+    local = bm.pools[0].prefix_caches[FULL]
+    assert set(local) == set(hashes)
+    assert all(local[block_hash].ref_cnt == 0 for block_hash in hashes)
+    # 2 pages x 8 bytes per page.
+    assert bm.metrics.cross_replica_bytes_copied == 16
+
+
+def test_copy_prefix_from_peers_copies_nothing_without_room() -> None:
+    """A pool with nothing free commits nothing and strands nothing."""
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    free = bm.pools[0].num_free_blocks(FULL)
+    held = [bm.pools[0].alloc_block(FULL) for _ in range(free)]
+    assert len(held) == free
+
+    bm._copy_prefix_from_peers(hashes, 0)
+
+    assert not bm.pools[0].prefix_caches[FULL]
+    assert bm.pools[0].num_free_blocks(FULL) == 0
+
+
+def test_lookup_serves_a_cross_replica_hit() -> None:
+    """The whole remote run is returned, and stays local for the next request."""
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    hit_blocks, num_hit_blocks = bm._lookup_device_prefix_cache_hit(hashes, 0)
+
+    assert num_hit_blocks == 2
+    assert len(hit_blocks[FULL]) == 2
+    assert set(bm.pools[0].prefix_caches[FULL]) == set(hashes)
+
+
+def test_lookup_does_not_evict_the_local_part_of_the_hit() -> None:
+    """Allocating for the remote half must not evict the local half.
+
+    Regression: alloc_block evicts committed-but-unreferenced blocks, which
+    is exactly what a finished request leaves, so copying in the remote
+    blocks could destroy the prefix they were extending and claim_hit_blocks
+    would raise KeyError.
+    """
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=6,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=6),
+    )
+    local, remote = [b"a"], [b"b", b"c"]
+    commit_hashes(bm, [FULL], local + remote, replica_idx=1)
+    commit_hashes(bm, [FULL], local, replica_idx=0, release=True)
+    local_block = bm.pools[0].prefix_caches[FULL][local[0]]
+
+    # Squeeze replica 0 until the only way to serve the two remote blocks is
+    # one pristine huge block plus the committed block holding ``a``.
+    # alloc_block prefers a pristine huge block over evicting a commit, so
+    # without that squeeze the eviction never happens.
+    held = [bm.pools[0].alloc_block(FULL) for _ in range(3)]
+    assert bm.pools[0].num_free_blocks(FULL) == 2
+    assert len(held) == 3
+
+    hit_blocks, num_hit_blocks = bm._lookup_device_prefix_cache_hit(
+        local + remote, 0
+    )
+
+    # Holding ``a`` leaves room for one of the two remote pages, so the hit
+    # is the local block plus what fit. ``a`` survives either way, which is
+    # what this test is here for.
+    assert num_hit_blocks == 2
+    assert len(hit_blocks[FULL]) == 2
+    assert hit_blocks[FULL][0] is local_block
+    assert bm.pools[0].prefix_caches[FULL][local[0]] is local_block
+    # One page fit: 1 x 8 bytes per page.
+    assert bm.metrics.cross_replica_bytes_copied == 8
+
+
+def test_lookup_copies_the_remote_half_and_keeps_the_local_half() -> None:
+    """With room, the hit is served from both replicas at once.
+
+    The test above squeezes the pool until only part of the run fits. Here
+    every page fits and the whole run comes back. The pool is roomy enough
+    that alloc_block never has to consider evicting ``a``, so this covers
+    the copy rather than the hold.
+    """
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    local, remote = [b"a"], [b"b", b"c"]
+    commit_hashes(bm, [FULL], local + remote, replica_idx=1)
+    commit_hashes(bm, [FULL], local, replica_idx=0, release=True)
+    local_block = bm.pools[0].prefix_caches[FULL][local[0]]
+
+    hit_blocks, num_hit_blocks = bm._lookup_device_prefix_cache_hit(
+        local + remote, 0
+    )
+
+    assert num_hit_blocks == 3
+    assert set(bm.pools[0].prefix_caches[FULL]) == set(local + remote)
+    # The block already here is reused, not copied over itself.
+    assert hit_blocks[FULL][0] is local_block
+    # Only the two remote pages moved: 2 x 8 bytes per page.
+    assert bm.metrics.cross_replica_bytes_copied == 16
+
+
+def test_copy_prefix_from_peers_reads_the_page_the_hash_lives_on() -> None:
+    """The source page is picked by hash, not by position in the run."""
+    memory = make_replica_kv_memory([FULL], num_pages=8)
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=memory,
+    )
+    commit_hashes(bm, [FULL], [b"x", b"y"], replica_idx=1)
+    src_bid = bm.pools[1].prefix_caches[FULL][b"y"].bid
+    assert src_bid != bm.pools[1].prefix_caches[FULL][b"x"].bid
+
+    bm._copy_prefix_from_peers([b"y"], 0)
+
+    dst_bid = bm.pools[0].prefix_caches[FULL][b"y"].bid
+    dst = memory[0][FULL].buffers[0].to_numpy()
+    assert (dst[dst_bid] == page_byte(1, 0, 0, src_bid)).all()
+
+
+def test_copy_prefix_from_peers_serves_every_leaf_of_a_group() -> None:
+    """A group's leaves move together, each from its own counterpart page."""
+    memory = make_replica_kv_memory([VALUES, SCALES], num_pages=8)
+    bm = make_manager(
+        {VALUES: full(), SCALES: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=memory,
+    )
+    commit_hashes(bm, [VALUES, SCALES], [b"a"], replica_idx=1)
+
+    bm._copy_prefix_from_peers([b"a"], 0)
+
+    for leaf_no, leaf_id in enumerate((VALUES, SCALES)):
+        src_bid = bm.pools[1].prefix_caches[leaf_id][b"a"].bid
+        dst_bid = bm.pools[0].prefix_caches[leaf_id][b"a"].bid
+        pages = memory[0][leaf_id].buffers[0].to_numpy()
+        assert (pages[dst_bid] == page_byte(1, leaf_no, 0, src_bid)).all()
+
+    # One block of the prefix, but a page in each leaf: 2 x 8 bytes. Counting
+    # blocks would have reported 1 here and hidden the second leaf's cost.
+    assert bm.metrics.cross_replica_bytes_copied == 16
+
+
+def test_copy_prefix_from_peers_skips_leaves_already_present() -> None:
+    """A half-present hash copies only the leaf that is missing."""
+    bm = make_manager(
+        {VALUES: full(), SCALES: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([VALUES, SCALES], num_pages=8),
+    )
+    commit_hashes(bm, [VALUES, SCALES], [b"a"], replica_idx=1)
+    commit_hashes(bm, [VALUES], [b"a"], replica_idx=0, release=True)
+    kept = bm.pools[0].prefix_caches[VALUES][b"a"]
+
+    bm._copy_prefix_from_peers([b"a"], 0)
+
+    # The leaf already holding the hash keeps its page rather than copying
+    # over itself.
+    assert bm.pools[0].prefix_caches[VALUES][b"a"] is kept
+    assert b"a" in bm.pools[0].prefix_caches[SCALES]
+    # Only the missing leaf's page moved: 1 x 8 bytes per page.
+    assert bm.metrics.cross_replica_bytes_copied == 8
+
+
+def test_copy_prefix_from_peers_hands_back_its_pages_when_allocation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A refused allocation keeps what landed and strands nothing.
+
+    A page dropped here would be referenced by nothing and recorded
+    nowhere, so no later release could ever find it.
+    """
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    pool = bm.pools[0]
+    free_before = pool.num_free_blocks(FULL)
+    real_alloc = pool.alloc_block
+    allocated = 0
+
+    def alloc_then_refuse(leaf_id: str) -> LittleKVCacheBlock:
+        nonlocal allocated
+        allocated += 1
+        if allocated == 2:
+            raise InsufficientBlocksError("no room for the second page")
+        return real_alloc(leaf_id)
+
+    monkeypatch.setattr(pool, "alloc_block", alloc_then_refuse)
+
+    bm._copy_prefix_from_peers(hashes, 0)
+
+    assert allocated == 2
+    assert pool.num_free_blocks(FULL) == free_before
+    # The first page landed before the refusal, so it is kept rather than
+    # thrown away; only the hash whose page never arrived is missing.
+    assert set(pool.prefix_caches[FULL]) == {b"a"}
+
+
+def test_copy_prefix_from_peers_hands_back_its_pages_when_the_copy_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A driver failure must strand no pages either.
+
+    Same leak as the allocation case, reached from the copy instead: the
+    destinations are allocated but referenced by nothing and recorded
+    nowhere, so no later release can find them.
+    """
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+
+    pool = bm.pools[0]
+    free_before = pool.num_free_blocks(FULL)
+
+    def explode(dst_replica: int, copies: Sequence[_PageCopy]) -> int:
+        raise RuntimeError("driver said no")
+
+    monkeypatch.setattr(bm, "_submit_page_copies", explode)
+
+    with pytest.raises(RuntimeError, match="driver said no"):
+        bm._copy_prefix_from_peers(hashes, 0)
+
+    assert pool.num_free_blocks(FULL) == free_before
+    assert not pool.prefix_caches[FULL]
+
+
+def test_lookup_falls_back_to_the_local_hit_without_room() -> None:
+    """No room to copy into degrades to what this replica already holds."""
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([FULL], num_pages=8),
+    )
+    local_hash, remote_hash = b"a", b"b"
+    commit_hashes(bm, [FULL], [local_hash], replica_idx=0)
+    commit_hashes(bm, [FULL], [local_hash, remote_hash], replica_idx=1)
+
+    free = bm.pools[0].num_free_blocks(FULL)
+    held = [bm.pools[0].alloc_block(FULL) for _ in range(free)]
+    assert len(held) == free
+
+    _, num_hit_blocks = bm._lookup_device_prefix_cache_hit(
+        [local_hash, remote_hash], 0
+    )
+
+    assert num_hit_blocks == 1
+
+
+def test_lookup_copies_nothing_when_the_feature_is_off() -> None:
+    """With the flag off, a remote prefix stays remote and no page moves."""
+    memory = make_replica_kv_memory([FULL], num_pages=8)
+    bm = make_manager(
+        {FULL: full()},
+        num_huge_blocks=8,
+        num_replicas=2,
+        replica_kv_memory=memory,
+        enable_dp_cross_replica_prefix_copy=False,
+    )
+    hashes = [b"a", b"b"]
+    commit_hashes(bm, [FULL], hashes, replica_idx=1)
+    before = memory[0][FULL].buffers[0].to_numpy().copy()
+
+    _, num_hit_blocks = bm._lookup_device_prefix_cache_hit(hashes, 0)
+
+    assert num_hit_blocks == 0
+    assert not bm.pools[0].prefix_caches[FULL]
+    assert (memory[0][FULL].buffers[0].to_numpy() == before).all()
+    assert bm.metrics.cross_replica_bytes_copied == 0
+
+
+def test_cross_replica_lookup_finds_a_remote_window() -> None:
+    """A sliding-window group resumes from a run held by another replica."""
+    bm = make_manager(
+        {SLIDING: sliding(window=3)}, block_size=1, num_replicas=2
+    )
+    hashes = [b"a", b"b", b"c"]
+    commit_hashes(bm, [SLIDING], hashes, replica_idx=1)
+
+    assert bm._find_longest_device_prefix_cache_hit(hashes, 0, False) == 0
+    assert bm._find_longest_device_prefix_cache_hit(hashes, 0, True) == 3
+
+
+def test_lookup_serves_a_cross_replica_window() -> None:
+    """A windowed group copies in its window and nulls what sits below it.
+
+    ``claimable_hashes`` and ``claim_hit_blocks`` derive the window bound
+    separately, so this covers the two agreeing on the real path.
+    """
+    bm = make_manager(
+        {SLIDING: sliding(window=3)},
+        num_huge_blocks=8,
+        block_size=1,
+        num_replicas=2,
+        replica_kv_memory=make_replica_kv_memory([SLIDING], num_pages=8),
+    )
+    hashes = [b"a", b"b", b"c"]
+    commit_hashes(bm, [SLIDING], hashes, replica_idx=1)
+
+    hit_blocks, num_hit_blocks = bm._lookup_device_prefix_cache_hit(hashes, 0)
+
+    assert num_hit_blocks == 3
+    # Only the two blocks the window still reads were worth copying.
+    assert set(bm.pools[0].prefix_caches[SLIDING]) == {b"b", b"c"}
+    assert bm.metrics.cross_replica_bytes_copied == 16
+
+    row = hit_blocks[SLIDING]
+    assert len(row) == 3
+    assert row[0] is bm.pools[0].null_little_blocks[SLIDING]
+    assert not any(block.is_null for block in row[1:])

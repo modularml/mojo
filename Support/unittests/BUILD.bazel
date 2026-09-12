@@ -102,6 +102,32 @@ modular_cc_test(
 
 # Separate test because of global log file state
 modular_cc_test(
+    name = "RequestLogTest",
+    srcs = [
+        "Log/RequestLogTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:RequestLog",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Does not link the logger, which is the point: the context stands alone.
+modular_cc_test(
+    name = "RequestContextTest",
+    srcs = [
+        "RequestContextTest.cpp",
+    ],
+    deps = [
+        "//Support:RequestContext",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
     name = "SpanGuardTest",
     srcs = [
         "Log/SpanGuardTest.cpp",

@@ -14,7 +14,7 @@ from std.sys.compile import SanitizeAddress
 from std.ffi import external_call
 
 
-@always_inline
+@inline(.always)
 def __sanitizer_annotate_contiguous_container(
     beg: OptionalPointer[NoneType, MutUntrackedOrigin],
     end: OptionalPointer[NoneType, MutUntrackedOrigin],

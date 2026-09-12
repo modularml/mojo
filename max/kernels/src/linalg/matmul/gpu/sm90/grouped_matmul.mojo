@@ -40,7 +40,7 @@ from ....utils import elementwise_epilogue_type
 from ....utils_gpu import MatmulConfig
 
 
-@always_inline
+@inline(.always)
 def default_config_sm90[
     a_type: DType,
     b_type: DType,

@@ -747,7 +747,7 @@ class GraphPipelineModel(PipelineModel[BaseContextType]):
 
 
 class ModuleV3PipelineModel(PipelineModel[BaseContextType]):
-    """ModuleV3 eager pipeline model without KV cache.
+    """ModuleV3 pipeline model without KV cache.
 
     Subclasses implement :meth:`_instantiate_module` and optionally
     :meth:`_create_model_config`, :meth:`_prepare_state_dict`, and
@@ -797,7 +797,7 @@ class ModuleV3PipelineModel(PipelineModel[BaseContextType]):
     def _module_default_dtype(
         self, state_dict: dict[str, Any], model_config: Any
     ) -> DType:
-        """Default dtype for the eager module build context."""
+        """Default dtype for the module build context."""
         del state_dict, model_config
         return self.dtype
 
@@ -934,7 +934,7 @@ class GraphPipelineModelWithKVCache(PipelineModelWithKVCache[BaseContextType]):
     :meth:`_create_model_config`, :meth:`_init_distributed_runtime`) rather than
     duplicating weight loading, timing, and EP batch-processor wiring.
 
-    ModuleV3 (eager) models and multi-graph VLMs should inherit
+    ModuleV3 models and multi-graph VLMs should inherit
     :class:`MultiGraphPipelineModelWithKVCache` instead.
     """
 
@@ -1095,7 +1095,7 @@ class MultiGraphPipelineModelWithKVCache(
 class ModuleV3PipelineModelWithKVCache(
     PipelineModelWithKVCache[BaseContextType]
 ):
-    """ModuleV3 (eager) pipeline model with shared compile template.
+    """ModuleV3 pipeline model with shared compile template.
 
     Subclasses override :meth:`_instantiate_module` (and optionally
     :meth:`_create_model_config`, :meth:`_init_distributed_runtime`,
@@ -1147,7 +1147,7 @@ class ModuleV3PipelineModelWithKVCache(
     def _module_default_dtype(
         self, state_dict: dict[str, Any], model_config: Any
     ) -> DType:
-        """Default dtype for the eager module build context."""
+        """Default dtype for the module build context."""
         del state_dict
         return model_config.dtype
 

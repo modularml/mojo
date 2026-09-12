@@ -78,7 +78,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -94,19 +94,19 @@ def _get_dylib_function[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def check_cublas_error(stat: Result) raises:
     if stat != Result.SUCCESS:
         raise Error(t"failed to operate on CUBLAS due to error: {stat}")
 
 
-@always_inline
+@inline(.always)
 def check_cublas_error(stat: Result, msg: StringSlice) raises:
     if stat != Result.SUCCESS:
         raise Error(t"{msg}. Got a CUBLAS error: {stat}")
 
 
-@always_inline
+@inline(.always)
 def _convert_to_cublas_datatype[mojo_type: DType]() -> DataType:
     comptime if mojo_type == .float32:
         return DataType.R_32F
@@ -128,7 +128,7 @@ def _convert_to_cublas_datatype[mojo_type: DType]() -> DataType:
         return DataType.R_16BF
 
 
-@always_inline
+@inline(.always)
 def _convert_to_cublas_transpose(transpose: Bool) -> cublasOperation_t:
     return (
         cublasOperation_t.CUBLAS_OP_T if transpose else cublasOperation_t.CUBLAS_OP_N
@@ -810,7 +810,7 @@ struct cublasPointerMode_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_POINTER_MODE_HOST:
             return writer.write_string("CUBLAS_POINTER_MODE_HOST")
@@ -973,7 +973,7 @@ struct cublasMath_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_DEFAULT_MATH:
             return writer.write_string("CUBLAS_DEFAULT_MATH")
@@ -2134,7 +2134,7 @@ struct Algorithm(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.DEFAULT:
             return writer.write_string("DEFAULT")
@@ -2659,7 +2659,7 @@ struct cublasDiagType_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_DIAG_NON_UNIT:
             return writer.write_string("CUBLAS_DIAG_NON_UNIT")
@@ -2695,7 +2695,7 @@ struct ComputeType(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.COMPUTE_16F:
             return writer.write_string("COMPUTE_16F")
@@ -6161,7 +6161,7 @@ struct cublasAtomicsMode_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_ATOMICS_NOT_ALLOWED:
             return writer.write_string("CUBLAS_ATOMICS_NOT_ALLOWED")
@@ -6461,7 +6461,7 @@ struct cublasSideMode_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_SIDE_LEFT:
             return writer.write_string("CUBLAS_SIDE_LEFT")
@@ -7091,7 +7091,7 @@ struct cublasOperation_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLAS_OP_N:
             return writer.write_string("CUBLAS_OP_N")

@@ -35,7 +35,7 @@ comptime test_dtypes = (DType.uint8, DType.bfloat16)
 comptime test_gpu_counts = (2, 4)
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _input_value[dtype: DType](root: Int, j: Int) -> Scalar[dtype]:
     return Scalar[dtype](root + 1) + Scalar[dtype](j % 251)

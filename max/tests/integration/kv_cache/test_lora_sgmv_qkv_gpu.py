@@ -25,7 +25,6 @@ from max.nn.kernels import sgmv_qkv_lora_kernel
 from max.nn.kv_cache import (
     KVCacheParams,
     MHAKVCacheParams,
-    PagedCacheValues,
 )
 from test_common.simple_kv_cache import (
     block_ids_for_batch,
@@ -335,13 +334,7 @@ def run_sgmv_qkv_lora_kernel(
 
         layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
 
-        kv_collection = PagedCacheValues(
-            kv_blocks=kv_inputs[0].buffer,
-            cache_lengths=kv_inputs[1].tensor,
-            lookup_table=kv_inputs[2].tensor,
-            max_prompt_length=kv_inputs[3].tensor,
-            max_cache_length=kv_inputs[4].tensor,
-        )
+        kv_collection = kv_params.unflatten_kv_inputs(iter(kv_inputs)).inputs[0]
 
         q_out = sgmv_qkv_lora_kernel(
             input=x.tensor,

@@ -30,8 +30,11 @@ from max.pipelines.lib._model_components import (
     updated_component,
 )
 from max.pipelines.lib.arch_lookup import (
+    ARCH_LOOKUP,
+    Speculator,
     find_architecture,
     import_custom_architectures,
+    select_speculator,
 )
 from max.pipelines.lib.host_memory import (
     _PREPROCESS_CACHE_MAX_FRACTION_OF_HOST_MEMORY,
@@ -398,6 +401,32 @@ def _resolve_overlap_and_device_graph_capture(
     return device_graph_capture, enable_overlap_scheduler
 
 
+def _resolve_spec_decode_mixed_batches(
+    runtime: PipelineRuntimeConfig, arch: Any
+) -> tuple[bool, bool]:
+    """Returns the effective (mixed-batch verify, in-flight batching) pair.
+
+    Keeping draft verification alive across a mixed prefill+decode batch
+    needs a unified speculative graph that commits per row
+    (``supports_spec_decode_mixed_batches``). An architecture that does not
+    declare it keeps the documented fallback: plain in-flight batching, with
+    mixed batches advancing draft-less.
+    """
+    requested = runtime.enable_spec_decode_mixed_batches
+    if not requested:
+        return False, runtime.enable_in_flight_batching
+    if arch is None or not arch.supports_spec_decode_mixed_batches:
+        logger.warning(
+            "enable_spec_decode_mixed_batches is set but architecture '%s' "
+            "does not support per-row mixed-batch commits; falling back to "
+            "in-flight batching without draft verification for mixed "
+            "batches.",
+            arch.name if arch is not None else "<unresolved>",
+        )
+        return False, True
+    return True, True
+
+
 def _resolve_preprocess_cache_budgets(
     runtime: PipelineRuntimeConfig, model: MAXModelConfig, arch: Any
 ) -> tuple[int, int]:
@@ -528,8 +557,13 @@ def _resolved_runtime_and_sampling(
     capped_image_bytes, capped_video_bytes = _resolve_preprocess_cache_budgets(
         runtime, model, arch
     )
+    mixed_batches, in_flight_batching = _resolve_spec_decode_mixed_batches(
+        runtime, arch
+    )
     runtime_changes = _resolved_field_changes(
         runtime,
+        enable_spec_decode_mixed_batches=mixed_batches,
+        enable_in_flight_batching=in_flight_batching,
         reasoning_parser=_resolve_default_reasoning_parser(runtime, arch),
         tool_parser=_resolve_default_tool_parser(runtime, model, arch),
         device_graph_capture=device_graph_capture,
@@ -582,68 +616,77 @@ def _apply_speculative_draft_architecture(
             draft_model.huggingface_config.architectures[0] = "LlamaForCausalLM"
 
 
-def _apply_speculative_target_architecture(
+def _select_declared_speculator(
     speculative: SpeculativeConfig | None, models: Mapping[str, MAXModelConfig]
-) -> None:
-    """Override the target architecture for unified spec-decode pipelines.
+) -> Speculator | None:
+    """Selects the speculator declared for the target architecture.
 
-    Unified EAGLE / DFlash / MTP pipelines fold the draft into a dedicated
-    target architecture (e.g. ``DeepseekV3ForCausalLM`` →
-    ``UnifiedMTPDeepseekV3ForCausalLM``). This mutates
-    ``model.huggingface_config.architectures[0]`` in place.
-
-    This must run *before* the architecture is resolved from
-    ``models.main_architecture_name``, so that the resolved ``arch`` —
-    consumed by memory estimation, the overlap scheduler, parser
-    resolution, and ``pipeline_model`` construction — reflects the
-    override. ``from_args`` invokes it before construction-time
-    resolution. It is a no-op when speculative decoding is disabled.
+    Raises:
+        ValueError: If the target offers speculators but none accepts the
+            configured draft.
     """
     if not speculative:
-        return
+        return None
+
+    target_archs = models["main"].huggingface_config.architectures
+    if not target_archs:
+        return None
+    target = target_archs[0]
+
+    # Keyed by target name, so a target that declares no speculators costs
+    # nothing here and never imports a spec-decode package.
+    if not ARCH_LOOKUP.speculators_for(target):
+        return None
+
+    draft_model = models.get("draft")
+    draft_arch: str | None = None
+    if draft_model is not None:
+        draft_archs = draft_model.huggingface_config.architectures
+        if not draft_archs:
+            raise ValueError(
+                "Draft model HF config has empty ``architectures=[]``,"
+                f" so no speculator for {target} can be selected."
+            )
+        draft_arch = draft_archs[0]
+
+    return select_speculator(target, speculative.speculative_method, draft_arch)
+
+
+def _apply_speculative_target_architecture(
+    speculative: SpeculativeConfig | None, models: Mapping[str, MAXModelConfig]
+) -> Speculator | None:
+    """Selects the fused spec-decode architecture for the target.
+
+    A target that declares a :class:`Speculator` returns it, leaving its
+    ``architectures`` untouched. The caller derives the fused architecture
+    from the one the checkpoint's own name resolves to.
+
+    It is a no-op when speculative decoding is disabled.
+    """
+    if not speculative:
+        return None
+    speculator = _select_declared_speculator(speculative, models)
+    if speculator is not None:
+        return speculator
 
     draft_model = models.get("draft")
     target_archs = models["main"].huggingface_config.architectures
     if not target_archs:
         # Nothing to rewrite; the lookup below reports the real problem.
-        return
-    if target_archs[0] == "LlamaForCausalLM":
+        return None
+    # The Llama and Kimi arms below name DFlash v1 and Eagle graphs, and
+    # neither can verify a DFlash2 block draft. ``is_dflash()`` is true for
+    # v2, so without this both would happily rewrite a DFlash2 pairing onto
+    # a graph that silently mismatches the drafter. A v2 target selects its
+    # own fused arch from its own arm; leaving the name alone here lets the
+    # lookup reject a pairing no arm claims.
+    v1_or_eagle = not speculative.is_dflash2()
+    if target_archs[0] == "LlamaForCausalLM" and v1_or_eagle:
         if speculative.is_dflash():
             target_archs[0] = "UnifiedDflashLlama3ForCausalLM"
         else:
             target_archs[0] = "UnifiedEagleLlama3ForCausalLM"
-    if target_archs[0] == "DeepseekV3ForCausalLM":
-        # Choose between MTP (NextN layer baked into target ckpt) and
-        # Eagle3 (separate draft ckpt with arch
-        # ``Eagle3DeepseekV2ForCausalLM``) based on the draft arch.
-        draft_archs = (
-            draft_model.huggingface_config.architectures
-            if draft_model is not None
-            else None
-        )
-        if draft_archs is None:
-            target_archs[0] = "UnifiedMTPDeepseekV3ForCausalLM"
-        elif draft_archs and draft_archs[0] == "Eagle3DeepseekV2ForCausalLM":
-            target_archs[0] = "Eagle3DeepseekV3ForCausalLM"
-        elif draft_archs and draft_archs[0] == "LlamaForCausalLMEagle3":
-            target_archs[0] = "Eagle3MHADeepseekV3ForCausalLM"
-        else:
-            if not draft_archs:
-                raise ValueError(
-                    "Draft model HF config has empty"
-                    " ``architectures=[]``. Expected"
-                    " 'Eagle3DeepseekV2ForCausalLM' (Eagle3 draft),"
-                    " 'LlamaForCausalLMEagle3' (Llama MHA Eagle3"
-                    " draft), or no draft model (MTP path)."
-                )
-            raise ValueError(
-                "Unrecognized draft architecture for DeepseekV3"
-                f" target: {draft_archs[0]!r}. Expected"
-                " 'Eagle3DeepseekV2ForCausalLM' (Eagle3 draft),"
-                " 'LlamaForCausalLMEagle3' (Llama MHA Eagle3 draft),"
-                " or no draft model (MTP path)."
-            )
-    if target_archs[0] == "KimiK25ForConditionalGeneration":
+    if target_archs[0] == "KimiK25ForConditionalGeneration" and v1_or_eagle:
         draft_archs = (
             draft_model.huggingface_config.architectures
             if draft_model is not None
@@ -719,8 +762,22 @@ def _apply_speculative_target_architecture(
             models["main"].huggingface_config,
         )
         has_mtp = (getattr(text_config, "mtp_num_hidden_layers", 0) or 0) > 0
+        draft_archs = (
+            draft_model.huggingface_config.architectures
+            if draft_model is not None
+            else None
+        )
         if speculative.is_mtp() and models.get("draft") is None and has_mtp:
             target_archs[0] = "UnifiedMTPQwen3_5ForConditionalGeneration"
+        elif (
+            speculative.is_dflash2()
+            and draft_archs
+            # "DFlash2DraftModel" is a registered placeholder arch, so
+            # unlike v1's "DFlashDraftModel" it is never rewritten to
+            # "LlamaForCausalLM" and only the one spelling reaches here.
+            and draft_archs[0] == "DFlash2DraftModel"
+        ):
+            target_archs[0] = "UnifiedDflash2Qwen3_5ForConditionalGeneration"
     if target_archs[0] == "GlmMoeDsaForCausalLM":
         # GLM-5.2 bakes a NextN MTP layer into the target checkpoint, so
         # there is no separate draft model. GLM-5.1 shares the arch name
@@ -747,6 +804,10 @@ def _apply_speculative_target_architecture(
         )
         if models.get("draft") is None and (n_mtp or 0) > 0:
             target_archs[0] = "UnifiedMTPInklingForConditionalGeneration"
+
+    # The legacy branches above rewrote the name in place; there is no
+    # speculator to hand back.
+    return None
 
 
 def _required_argument_changes(
@@ -1422,8 +1483,13 @@ class PipelineConfig(ConfigFileModel):
         _apply_speculative_draft_architecture(
             args.speculative, models.get("draft")
         )
+        # Must precede the arch lookups so every consumer resolves the
+        # overridden arch (#88511).
+        speculator: Speculator | None = None
         if args.speculative is not None and "main" in models:
-            _apply_speculative_target_architecture(args.speculative, models)
+            speculator = _apply_speculative_target_architecture(
+                args.speculative, models
+            )
         for model in models.values():
             model.validate_repo_access()
 
@@ -1456,6 +1522,8 @@ class PipelineConfig(ConfigFileModel):
             )
             if arch_name is not None and arch is None:
                 raise ValueError(f"No architecture found for {arch_name}")
+            if arch is not None and speculator is not None:
+                arch = speculator.derive()
 
         draft_arch = None
         if models.get("draft") is not None:

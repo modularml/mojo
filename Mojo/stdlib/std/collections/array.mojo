@@ -99,7 +99,7 @@ struct _ArrayIter[
     var index: Int
     var src: Pointer[Array[Self.T, Self.length], Self.origin]
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
@@ -117,7 +117,7 @@ struct _ArrayIter[
             self.index -= 1
             return self.src[][self.index]
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
@@ -173,7 +173,7 @@ struct _ArrayIterOwned[T: Movable & Deinitable, length: Int](
             count=Self.length - move._index,
         )
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         # Move fields out of self so we can manage their lifetimes.
         var idx = self._index
@@ -189,7 +189,7 @@ struct _ArrayIterOwned[T: Movable & Deinitable, length: Int](
         # double-destroy the elements we already handled.
         forget_deinit(array^)
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -203,7 +203,7 @@ struct _ArrayIterOwned[T: Movable & Deinitable, length: Int](
             .unsafe_take_pointee()
         )
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var remaining = Self.length - self._index
         return (remaining, {remaining})
@@ -351,7 +351,7 @@ struct Array[T: AnyType, length: Int](
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, uninitialized: Bool):
         """Create an Array with uninitialized memory.
 
@@ -404,7 +404,7 @@ struct Array[T: AnyType, length: Int](
             )
         std.memory.forget_deinit(unsafe_assume_initialized^)
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
     ) where conforms_to(Self.T, Defaultable):
@@ -424,7 +424,7 @@ struct Array[T: AnyType, length: Int](
                 init_with=lambda () -> Self.T: Self.T()
             )
 
-    @always_inline
+    @inline(.always)
     def __init__[
         batch_size: Int = 64
     ](out self, *, fill: Self.T) where conforms_to(Self.T, Copyable):
@@ -465,7 +465,7 @@ struct Array[T: AnyType, length: Int](
             fill_with=lambda (_i: Int) -> Self.T: fill.copy()
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, fill_with_unrolled: Some[def[Int]() -> Self.T]):
         """Constructs an array by calling `fill_with_unrolled[i]()` for each
         index `i`.
@@ -496,7 +496,7 @@ struct Array[T: AnyType, length: Int](
                 init_with=lambda () {ref} -> Self.T: fill_with_unrolled[i]()
             )
 
-    @always_inline
+    @inline(.always)
     def __init__[
         batch_size: Int = 64
     ](out self, *, fill_with: Some[def(Int) -> Self.T]):
@@ -686,7 +686,7 @@ struct Array[T: AnyType, length: Int](
     # ===------------------------------------------------------------------===#
 
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __getitem__(ref self, idx: Int, /) -> ref[self] Self.T:
         """Gets a reference to the element at the given index.
 
@@ -703,7 +703,7 @@ struct Array[T: AnyType, length: Int](
         check_bounds(idx, len(self))
         return self._unchecked_get(idx)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(ref self, idx: Some[Indexer]) -> ref[self] Self.T:
         """Gets a reference to the element at the given index.
 
@@ -730,7 +730,7 @@ struct Array[T: AnyType, length: Int](
         return self._unchecked_get(idx)
 
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __getitem_param__[idx: Int, /](ref self) -> ref[self] Self.T:
         """Gets a reference to the element at the given index with compile-time
         bounds checking.
@@ -760,7 +760,7 @@ struct Array[T: AnyType, length: Int](
         comptime assert index(idx) < Self.length, "index is out of bounds"
         return self._unchecked_get(materialize[idx]())
 
-    @always_inline
+    @inline(.always)
     def __getitem_param__[
         idx: Some[Indexer & Deinitable]
     ](ref self) -> ref[self] Self.T:
@@ -794,7 +794,7 @@ struct Array[T: AnyType, length: Int](
         comptime assert index(idx) < Self.length, "index is out of bounds"
         return self._unchecked_get(materialize[idx]())
 
-    @always_inline
+    @inline(.always)
     def _unchecked_get(ref self, idx: Some[Indexer]) -> ref[self] Self.T:
         var ptr = __mlir_op.`pop.array.gep`(
             Pointer(to=self._array)._get_kgen_pointer(),
@@ -802,7 +802,7 @@ struct Array[T: AnyType, length: Int](
         )
         return Pointer[_, origin_of(self)](_mlir_value=ptr)[]
 
-    @always_inline
+    @inline(.always)
     def concat(
         deinit self,
         deinit rhs: Array[Self.T, _],
@@ -843,7 +843,7 @@ struct Array[T: AnyType, length: Int](
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the length of the array.
 
@@ -896,7 +896,7 @@ struct Array[T: AnyType, length: Int](
                 return True
         return False
 
-    @always_inline
+    @inline(.always)
     def _compare(
         self, other: Self
     ) -> Int where conforms_to(Self.T, Comparable):
@@ -920,7 +920,7 @@ struct Array[T: AnyType, length: Int](
                 return 1
         return 0
 
-    @always_inline
+    @inline(.always)
     def __lt__(self, other: Self) -> Bool where conforms_to(Self.T, Comparable):
         """Compares two arrays lexicographically for less-than ordering.
 
@@ -933,7 +933,7 @@ struct Array[T: AnyType, length: Int](
         """
         return self._compare(other) < 0
 
-    @always_inline
+    @inline(.always)
     def __le__(self, other: Self) -> Bool where conforms_to(Self.T, Comparable):
         """Compares two arrays lexicographically for less-than-or-equal
         ordering.
@@ -946,7 +946,7 @@ struct Array[T: AnyType, length: Int](
         """
         return self._compare(other) <= 0
 
-    @always_inline
+    @inline(.always)
     def __gt__(self, other: Self) -> Bool where conforms_to(Self.T, Comparable):
         """Compares two arrays lexicographically for greater-than ordering.
 
@@ -959,7 +959,7 @@ struct Array[T: AnyType, length: Int](
         """
         return self._compare(other) > 0
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Self) -> Bool where conforms_to(Self.T, Comparable):
         """Compares two arrays lexicographically for greater-than-or-equal
         ordering.
@@ -990,7 +990,7 @@ struct Array[T: AnyType, length: Int](
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def unsafe_get(ref self, idx: Some[Indexer]) -> ref[self] Self.T:
         """Gets a reference to an element without bounds checking.
 
@@ -1020,7 +1020,7 @@ struct Array[T: AnyType, length: Int](
         check_bounds[cpu_default=False](idx, len(self))
         return self._unchecked_get(idx)
 
-    @always_inline
+    @inline(.always)
     @stable(since="1.0")
     def unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
@@ -1063,7 +1063,7 @@ struct Array[T: AnyType, length: Int](
             .unsafe_address_space_cast[address_space]()
         )
 
-    @always_inline
+    @inline(.always)
     @stable(since="1.0")
     def __contains__(
         self, value: Self.T
@@ -1191,7 +1191,7 @@ struct Array[T: AnyType, length: Int](
             Pointer(to=self),
         )
 
-    @always_inline
+    @inline(.always)
     def repeat[
         n: Int
     ](

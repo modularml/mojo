@@ -65,7 +65,7 @@ def _init_nvshmem_dylib() -> OwnedDLHandle:
         abort(t"failed to load NVSHMEM library: {e}")
 
 
-@always_inline
+@inline(.always)
 def _get_nvshmem_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() -> result_type:

@@ -89,7 +89,7 @@ comptime DEPTH = 128
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _K_fp32(m_kv: Int, d: Int) -> Float32:
     # Distinct (m_kv, d) coefficients so a swap or off-by-one in the loader
     # produces wrong values. Range ~[-0.25, 1.5] -> FP8 e4m3fn representable
@@ -98,7 +98,7 @@ def _K_fp32(m_kv: Int, d: Int) -> Float32:
     return (Float32(m_kv) * 0.1 + Float32(d) * 0.05 - 0.3) / 16.0
 
 
-@always_inline
+@inline(.always)
 def _Q_fp32(n_q: Int, d: Int) -> Float32:
     # Different coefficients so K and Q can't trivially "swap" without
     # detection. Negative-tilt vs K so the product range spans sign.
@@ -219,7 +219,7 @@ def kernel_qk_chain[
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _quantize_to_K[T: DType](v: Float32) -> Scalar[T]:
     comptime if T == .bfloat16:
         return rebind[Scalar[T]](BFloat16(v))
@@ -227,7 +227,7 @@ def _quantize_to_K[T: DType](v: Float32) -> Scalar[T]:
         return rebind[Scalar[T]](Float8_e4m3fn(v))
 
 
-@always_inline
+@inline(.always)
 def _dequantize_to_f32[T: DType](v: Scalar[T]) -> Float32:
     return v.cast[.float32]()
 

@@ -34,7 +34,7 @@ from .info import is_amd_gpu, is_apple_gpu, is_nvidia_gpu, size_of
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def llvm_intrinsic[
     intrin: StaticString,
     type: TrivialRegisterPassable,
@@ -82,7 +82,7 @@ def llvm_intrinsic[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def gather[
     dtype: DType,
     size: SIMDLength,
@@ -180,7 +180,7 @@ def gather[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def scatter[
     dtype: DType,
     size: SIMDLength,
@@ -282,7 +282,7 @@ struct PrefetchLocality(TrivialRegisterPassable):
     comptime HIGH = PrefetchLocality(3)
     """Extremely local locality (keep in cache)."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, value: Int):
         """Constructs a prefetch locality option.
 
@@ -303,7 +303,7 @@ struct PrefetchRW(TrivialRegisterPassable):
     comptime WRITE = PrefetchRW(1)
     """Write prefetch."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, value: Int):
         """Constructs a prefetch read-write option.
 
@@ -313,7 +313,7 @@ struct PrefetchRW(TrivialRegisterPassable):
         """
         self.value = Int32(value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two prefetch read-write options are equal.
 
@@ -337,7 +337,7 @@ struct PrefetchCache(TrivialRegisterPassable):
     comptime DATA = PrefetchCache(1)
     """The data prefetching option."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, value: Int):
         """Constructs a prefetch option.
 
@@ -371,14 +371,14 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
     var cache: PrefetchCache
     """Indicates i-cache or d-cache prefetching."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         """Constructs an instance of PrefetchOptions with default params."""
         self.rw = PrefetchRW.READ
         self.locality = PrefetchLocality.HIGH
         self.cache = PrefetchCache.DATA
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def for_read(self) -> Self:
         """
         Sets the prefetch purpose to read.
@@ -390,7 +390,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.rw = PrefetchRW.READ
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def for_write(self) -> Self:
         """
         Sets the prefetch purpose to write.
@@ -402,7 +402,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.rw = PrefetchRW.WRITE
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def no_locality(self) -> Self:
         """
         Sets the prefetch locality to none.
@@ -414,7 +414,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.locality = PrefetchLocality.NONE
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def low_locality(self) -> Self:
         """
         Sets the prefetch locality to low.
@@ -426,7 +426,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.locality = PrefetchLocality.LOW
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def medium_locality(self) -> Self:
         """
         Sets the prefetch locality to medium.
@@ -438,7 +438,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.locality = PrefetchLocality.MEDIUM
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def high_locality(self) -> Self:
         """
         Sets the prefetch locality to high.
@@ -450,7 +450,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.locality = PrefetchLocality.HIGH
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def to_data_cache(self) -> Self:
         """
         Sets the prefetch target to data cache.
@@ -462,7 +462,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         updated.cache = PrefetchCache.DATA
         return updated
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def to_instruction_cache(self) -> Self:
         """
         Sets the prefetch target to instruction cache.
@@ -475,7 +475,7 @@ struct PrefetchOptions(Defaultable, TrivialRegisterPassable):
         return updated
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def prefetch[
     dtype: DType, //, params: PrefetchOptions = PrefetchOptions()
 ](addr: Pointer[Scalar[dtype], ...]):
@@ -520,7 +520,7 @@ def prefetch[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def masked_load[
     dtype: DType,
     //,
@@ -569,7 +569,7 @@ def masked_load[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def masked_store[
     size: SIMDLength,
     alignment: Int = 1,
@@ -609,7 +609,7 @@ def masked_store[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def compressed_store[
     dtype: DType, size: SIMDLength
 ](
@@ -647,7 +647,7 @@ def compressed_store[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def strided_load[
     dtype: DType, //, simd_width: SIMDLength, *, invariant: Bool = False
 ](
@@ -702,7 +702,7 @@ def strided_load[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def strided_store[
     dtype: DType, //, simd_width: SIMDLength
 ](
@@ -749,7 +749,7 @@ struct _RegisterPackType[*Ts: TrivialRegisterPassable](TrivialRegisterPassable):
 
     var _mlir_value: Self._mlir_type
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem_param__[i: Int](self) -> Self.Ts[i]:
         """Get the element.
 
@@ -769,7 +769,7 @@ struct _RegisterPackType[*Ts: TrivialRegisterPassable](TrivialRegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def expect[T: TrivialRegisterPassable, //, expected_val: T](val: T) -> T:
     """Provides information about expected (the most probable) value of `val`,
     which can be used by optimizers.
@@ -799,7 +799,7 @@ def expect[T: TrivialRegisterPassable, //, expected_val: T](val: T) -> T:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def likely(val: Bool) -> Bool:
     """Provides information that the most probable value of `val` is going to be
     `True`. This information can be used by optimizers.
@@ -818,7 +818,7 @@ def likely(val: Bool) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def unlikely(val: Bool) -> Bool:
     """Provides information that the most probable value of `val` is going to be
     `False`. This information can be used by optimizers.
@@ -837,7 +837,7 @@ def unlikely(val: Bool) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def assume(val: Bool):
     """Signals to the optimizer that the condition is always true. This allows
     the optimizer to optimize the code.
@@ -855,7 +855,7 @@ def assume(val: Bool):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def implicitarg_ptr(
     out result: Pointer[UInt8, MutUntrackedOrigin, address_space=.CONSTANT]
 ):
@@ -877,7 +877,7 @@ def implicitarg_ptr(
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def readfirstlane[T: AnyType, //](value: Pointer[T, ...]) -> type_of(value):
     """
     Get the value in the lowest active lane of the input operand.
@@ -897,7 +897,7 @@ def readfirstlane[T: AnyType, //](value: Pointer[T, ...]) -> type_of(value):
     ](value)
 
 
-@always_inline
+@inline(.always)
 def readfirstlane[dtype: DType](value: Scalar[dtype]) -> Scalar[dtype]:
     """Gets the value in the lowest active lane of the input operand.
 
@@ -927,7 +927,7 @@ def readfirstlane[dtype: DType](value: Scalar[dtype]) -> Scalar[dtype]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def sendmsg(opcode: Int32, msg: Int32):
     """
     Send a message to fixed function hardware.
@@ -948,7 +948,7 @@ def sendmsg(opcode: Int32, msg: Int32):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ballot[dtype: DType](value: Bool) -> Scalar[dtype]:
     """
     Returns a bitfield(Int32 or Int64) containing the result

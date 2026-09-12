@@ -47,7 +47,7 @@ struct Status(Equatable, TrivialRegisterPassable, Writable):
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SUCCESS:
             return writer.write_string("SUCCESS")
@@ -256,7 +256,7 @@ def _init_dylib() -> OwnedDLHandle:
     return _find_dylib["HIP BLAS LT"](materialize[HIPBLASLT_LIBRARY_PATHS]())
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -491,13 +491,13 @@ def hipblasLtMatmul(
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _check_hipblas_error(status: Status) raises:
     if status != Status.SUCCESS:
         raise Error(t"HIPBLASLT ERROR:{status}")
 
 
-@always_inline
+@inline(.always)
 def _convert_to_hip_datatype[dtype: DType]() -> hipDataType_t:
     comptime if dtype == .float32:
         return hipDataType_t.R_32F

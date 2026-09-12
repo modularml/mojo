@@ -1700,7 +1700,7 @@ def run_bench_paged_variable[
     )
     var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext,
     ) raises {
@@ -2939,7 +2939,7 @@ def run_bench_paged_variable_native_fp8[
     )
     var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext,
     ) raises {

@@ -22,7 +22,7 @@ from std.ffi import (
     _Global,
     c_int,
     c_size_t,
-    CStringSlice,
+    CStringSpan,
     external_call,
     OwnedDLHandle,
     RTLD,
@@ -68,7 +68,7 @@ def _init_rocshmem_dylib() -> OwnedDLHandle:
         abort(t"failed to load ROCSHMEM library: {e}")
 
 
-@always_inline
+@inline(.always)
 def _get_rocshmem_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() -> result_type:
@@ -338,11 +338,11 @@ def rocshmem_create_uniqueid(
     _get_rocshmem_function[
         "rocshmem_create_uniqueid",
         def(
-            CStringSlice[origin_of(server_ip)],
+            CStringSpan[origin_of(server_ip)],
             c_int,
             UnsafePointer[SHMEMUniqueID, origin_of(uid)],
         ) thin -> None,
-    ]()(server_ip.as_c_string_slice(), server_port, UnsafePointer(to=uid))
+    ]()(server_ip.as_c_string_span(), server_port, UnsafePointer(to=uid))
     return uid
 
 

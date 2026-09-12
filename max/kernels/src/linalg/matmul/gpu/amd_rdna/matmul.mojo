@@ -244,7 +244,7 @@ def _naive_matmul_kernel[
                 c[global_row, global_col] = accum.cast[c_type]()
 
 
-@always_inline
+@inline(.always)
 def _load_tile_to_smem[
     dtype: DType,
     tile_layout: TensorLayout,
@@ -331,7 +331,7 @@ def _load_tile_to_smem[
             smem[row * SMEM_STRIDE + col] = val
 
 
-@always_inline
+@inline(.always)
 def _load_tile_regs[
     dtype: DType,
     tile_layout: TensorLayout,
@@ -369,7 +369,7 @@ def _load_tile_regs[
     return regs^
 
 
-@always_inline
+@inline(.always)
 def _store_tile_regs[
     dtype: DType,
     BLOCK_ROWS: Int,
@@ -393,7 +393,7 @@ def _store_tile_regs[
             smem.store(row * SMEM_STRIDE + elem_idx % BLOCK_K, regs[i])
 
 
-@always_inline
+@inline(.always)
 def _compute_ktile[
     a_type: DType,
     b_type: DType,

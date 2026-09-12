@@ -52,6 +52,7 @@ from max.pipelines.lib import (
     PipelineConfig,
     PipelineRuntimeConfig,
 )
+from max.pipelines.lib.log_probabilities import _MAX_TOP_LOGPROBS
 from max.pipelines.lib.tokenizer import open_image
 from max.pipelines.modeling.types import (
     ParsedToolCallDelta,
@@ -70,6 +71,7 @@ from max.serve.pipelines.echo_gen import (
 )
 from max.serve.pipelines.llm import TokenGeneratorOutput, TokenGeneratorPipeline
 from max.serve.router._image_resolution import (
+    _ALLOWED_IMAGE_FORMATS,
     _decode_data_uri_base64,
     decode_and_validate_images,
     resolve_image_from_url,
@@ -411,6 +413,51 @@ async def test_openai_chat_completion_prompt_too_long_returns_400(
     assert body["error"]["type"] == "invalid_request_error"
 
 
+@pytest.mark.parametrize("top_logprobs", [_MAX_TOP_LOGPROBS + 1, 100, -1])
+@pytest.mark.asyncio
+async def test_chat_completion_out_of_range_top_logprobs_returns_400(
+    app: FastAPI,
+    top_logprobs: int,
+) -> None:
+    """A ``top_logprobs`` the logprobs graph cannot answer is rejected as 400.
+
+    Regression: the count used to reach the model worker untouched, where the
+    logprobs graph raised ``ValueError``, killing the worker and taking the
+    whole server down with it -- so every later request in a fuzz run failed
+    against a dead endpoint.
+    """
+    request = simple_openai_request(model_name="echo", content="hi")
+    request["logprobs"] = True
+    request["top_logprobs"] = top_logprobs
+
+    async with AsyncTestClient(app) as client:
+        response = await client.post("/v1/chat/completions", json=request)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert "top_logprobs" in body["error"]["message"]
+    assert body["error"]["type"] == "invalid_request_error"
+
+
+@pytest.mark.parametrize("logprobs", [_MAX_TOP_LOGPROBS + 1, 100, -1])
+@pytest.mark.asyncio
+async def test_completion_out_of_range_logprobs_returns_400(
+    app: FastAPI,
+    logprobs: int,
+) -> None:
+    """The legacy ``/v1/completions`` spelling of the count is bounded too."""
+    async with AsyncTestClient(app) as client:
+        response = await client.post(
+            "/v1/completions",
+            json={"model": "echo", "prompt": "hi", "logprobs": logprobs},
+        )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert "logprobs" in body["error"]["message"]
+    assert body["error"]["type"] == "invalid_request_error"
+
+
 @pytest.mark.asyncio
 async def test_openai_chat_completion_input_error_returns_400(app) -> None:  # noqa: ANN001
     async with AsyncTestClient(app) as client:
@@ -522,21 +569,66 @@ def test_decode_and_validate_images_rejects_truncated_image() -> None:
         decode_and_validate_images([full[: int(len(full) * 0.88)]])
 
 
-def test_decode_and_validate_images_rejects_decompression_bomb(
-    monkeypatch,  # noqa: ANN001
-) -> None:
-    # An image whose pixel count blows past PIL's decompression-bomb guard must
-    # become a clean 400 (InputError), not an unhandled DecompressionBombError
-    # (which is not an OSError/ValueError, so it would otherwise escape as 500).
-    # (MXSERV-162.)
+def test_decode_and_validate_images_rejects_oversized_decode() -> None:
+    # A decompression bomb -- small on the wire, huge once decoded -- must
+    # become a clean 400 (InputError). The decoded-memory bound is the one
+    # request-memory knob (max_media_bytes), so an image whose header says it
+    # decodes to more than that limit is rejected before load() allocates the
+    # pixel buffer. (MXSERV-389, finding 6.)
     buf = io.BytesIO()
     Image.new("RGB", (64, 64)).save(buf, format="PNG")
     data = buf.getvalue()
-    # Lower the limit *after* building the bytes so 64*64 px trips the guard
-    # (DecompressionBombError fires above 2x MAX_IMAGE_PIXELS).
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 16)
+    # 64x64 RGB decodes to 64*64*3 = 12288 bytes, over the 1024-byte budget.
+    with pytest.raises(
+        InputError, match=r"decodes to .*exceeding the maximum media size"
+    ):
+        decode_and_validate_images([data], max_decoded_bytes=1024)
+
+
+def test_decode_and_validate_images_allows_within_decode_budget() -> None:
+    # Within the decoded-memory budget, a valid image decodes normally.
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64)).save(buf, format="PNG")
+    decoded = decode_and_validate_images(
+        [buf.getvalue()], max_decoded_bytes=64 * 64 * 3
+    )
+    assert decoded[0].size == (64, 64)
+
+
+def test_decode_and_validate_images_rejects_disallowed_format() -> None:
+    # Image.open is pinned to an explicit formats allowlist (MXSERV-389,
+    # finding 7), so a format outside it -- here EPS, whose PIL plugin shells
+    # out to Ghostscript -- is never handed to its decoder and fails as a clean
+    # 400 instead of reaching a native plugin.
+    eps = b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 10 10\nshowpage\n"
     with pytest.raises(InputError):
-        decode_and_validate_images([data])
+        decode_and_validate_images([eps])
+
+
+def test_decode_and_validate_images_accepts_allowlisted_formats() -> None:
+    # Every format on the allowlist (common web formats plus the semi-popular
+    # additions -- PPM, TIFF, TGA, AVIF -- that this build actually registered)
+    # must decode cleanly. Iterating the live allowlist keeps this test in step
+    # with the module and with the codecs present on the running platform.
+    # Name the live allowlist in every failure message: which formats this
+    # build registered is the first thing you need to know, and it varies by
+    # platform for the optional codecs.
+    allowed = set(_ALLOWED_IMAGE_FORMATS)
+    assert {"PNG", "JPEG", "WEBP", "GIF", "BMP"} <= allowed, (
+        f"allowlist lost a common web format: {_ALLOWED_IMAGE_FORMATS}"
+    )
+    size = (16, 16)
+    for fmt in _ALLOWED_IMAGE_FORMATS:
+        buf = io.BytesIO()
+        Image.new("RGB", size).save(buf, format=fmt)
+        decoded = decode_and_validate_images([buf.getvalue()])
+        assert len(decoded) == 1, (
+            f"{fmt} did not decode; allowlist is {_ALLOWED_IMAGE_FORMATS}"
+        )
+        assert decoded[0].size == size, (
+            f"{fmt} decoded to {decoded[0].size}, expected {size}; "
+            f"allowlist is {_ALLOWED_IMAGE_FORMATS}"
+        )
 
 
 def test_open_image_carry_path_matches_bytes_path() -> None:

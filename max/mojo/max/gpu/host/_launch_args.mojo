@@ -20,7 +20,7 @@ the public API.
 from std.collections.optional import Optional
 
 
-@always_inline
+@inline(.always)
 def _compact_zero_sized_capture_slots(
     dense_args_addrs: Pointer[OpaquePointer[MutAnyOrigin], MutUntrackedOrigin],
     capture_sizes: Pointer[UInt64, ImmUntrackedOrigin],

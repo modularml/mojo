@@ -31,7 +31,7 @@ struct StructWithIntParam[size: Int](RegisterPassable):
 
 # CHECK-LABEL: lit.fn @"paramArith{{.*}}"<x: !Int>() -> !kgen.none
 def paramArith[x: Int]():
-    # CHECK: lit.alias.decl *"y`": !Bool = <sugar_builtin(apply({{.*}}{_mlir_value: scalar<bool> = eq(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, 99)})>
+    # CHECK: lit.alias.decl *"y`": !Bool = <sugar_builtin(apply({{.*}}{:scalar<bool> identical(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, 99)})>
     comptime y = x == 98 + 1
 
 def take_3index(a: Int, b: Int, c: Int) -> Int:
@@ -1373,7 +1373,7 @@ def default_inferring_param[O: ImmOrigin](str: StringSpan[O] = StaticString(""))
 # CHECK-LABEL: lit.fn @"test_default_inferring_param
 def test_default_inferring_param(b: String):
     # Infers O to default value.
-    # CHECK: %0 = kgen.param.constant: !lit.struct<#StringSpan <:!Bool {:scalar<bool> false}, :origin<false> #lit.origin.field<#lit.static.origin : !lit.origin<false>, "__constants__">,
+    # CHECK: %0 = kgen.param.constant: !lit.struct<#StringSpan <:origin<false> #lit.origin.field<#lit.static.origin : !lit.origin<false>, "__constants__">,
     # CHECK-NEXT: lit.call {{.*}}default_inferring_param{{.*}}(%0)
     default_inferring_param()
     default_inferring_param(StaticString("a"))

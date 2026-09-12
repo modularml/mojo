@@ -33,13 +33,3 @@ Results
 
    CompiledCallable
    StagedGraph
-
-Specs
------
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/function.rst
-
-   as_layout

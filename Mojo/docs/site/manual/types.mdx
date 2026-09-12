@@ -20,7 +20,7 @@ There are some types that aren't defined as structs:
 Mojo comes with a standard library that provides a number of useful types and
 utility functions. These standard types aren't privileged. Each of the standard
 library types is defined just like user-defined types—even basic types like
-[`Int`](/docs/std/builtin/simd/#int) and
+[`Int`](/docs/std/simd/#int) and
 [`String`](/docs/std/collections/string/string/String/). But these standard
 library types are the building blocks you'll use for most Mojo programs.
 
@@ -56,7 +56,7 @@ width, or for an unsigned integer, use the fixed-size integer types:
 - Use the general `Int` type when you don't require a specific bit width.
 
 These general and fixed-precision integer types are aliases to the
-[`SIMD`](/docs/std/builtin/simd/SIMD/) type.
+[`SIMD`](/docs/std/simd/SIMD/) type.
 
 `Int` represents a signed integer that uses the system's native word size,
 typically 64 bits on 64-bit CPUs and 32 bits on 32-bit CPUs.
@@ -349,7 +349,7 @@ print(arbitrary_precision, finite_precision)
 ### `SIMD` and `DType`
 
 To support high-performance numeric processing, Mojo uses the
-[`SIMD`](/docs/std/builtin/simd/SIMD/) type as the basis for its numeric
+[`SIMD`](/docs/std/simd/SIMD/) type as the basis for its numeric
 types. SIMD (single instruction, multiple data) is a processor technology that
 allows you to perform an operation on an entire set of operands at once. Mojo's
 `SIMD` type abstracts SIMD operations. A `SIMD` value represents a SIMD
@@ -450,7 +450,7 @@ narrow or widen operands to a common type. You need to explicitly convert the
 operands to the desired type.
 
 You can explicitly convert a `SIMD` value to a different `SIMD` type either by
-invoking its [`cast()`](/docs/std/builtin/simd/SIMD/#cast) method or by passing
+invoking its [`cast()`](/docs/std/simd/SIMD/#cast) method or by passing
 it as an argument to the initializer of the target type. For example:
 
 ```mojo
@@ -484,7 +484,7 @@ Result: 9.0
 ```
 
 You can convert a scalar value of any numeric type to `Int` by passing the value
-to the [`Int()`](/docs/std/builtin/simd/SIMD/#__init__) initializer method.
+to the [`Int()`](/docs/std/simd/SIMD/#__init__) initializer method.
 Additionally, you can pass an instance of any struct that implements the
 [`Intable`](/docs/std/builtin/int/Intable/) trait or
 [`IntableRaising`](/docs/std/builtin/int/IntableRaising/) trait to the `Int()`

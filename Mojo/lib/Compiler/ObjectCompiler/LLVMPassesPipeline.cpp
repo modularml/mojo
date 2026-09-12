@@ -577,8 +577,8 @@ M::KGEN::buildLLVMOptimizationPipeline(PassBuilder &passBuilder,
       TargetBackendRegistry::get().lookup(llvm::Triple(options.targetTriple));
   const TargetBackend *backend = backendOr.isError() ? nullptr : *backendOr;
 
-  // A backend may fully own its pipeline (e.g. Metal's AIR legalization),
-  // replacing the standard optimization pipeline below.
+  // A backend may fully own its pipeline, replacing the standard
+  // optimization pipeline below.
   if (backend) {
     ModulePassManager mpm;
     if (backend->buildLLVMPipeline(mpm, passBuilder, options))
@@ -608,7 +608,6 @@ void M::KGEN::registerKGENLLVMPasses(PassBuilder &passBuilder) {
         return false;
       });
 
-  // Backend-specific passes (e.g. Metal's kgen-metal-air).
   for (const std::unique_ptr<TargetBackend> &backend :
        TargetBackendRegistry::get().backends())
     backend->registerPipelinePasses(passBuilder);

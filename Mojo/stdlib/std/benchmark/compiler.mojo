@@ -25,7 +25,7 @@ from std.sys._assembly import inlined_assembly
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def keep[T: AnyType, origin: Origin, //](ref[origin] value: T):
     """Provides a hint to the compiler to not optimize the variable use away.
 
@@ -54,7 +54,7 @@ def keep[T: AnyType, origin: Origin, //](ref[origin] value: T):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def black_box[
     T: AnyType, origin: Origin, //
 ](ref[origin] value: T) -> ref[origin] T:
@@ -134,7 +134,7 @@ def black_box[
     return value
 
 
-@always_inline
+@inline(.always)
 def black_box[T: Movable, //](*, var take: T) -> T:
     """Prevents the compiler from optimizing away computations or values.
 

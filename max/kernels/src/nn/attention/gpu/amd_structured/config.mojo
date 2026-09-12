@@ -39,7 +39,7 @@ comptime _MHA_DECODE_WIDE_MMA_K = 64
 comptime _MHA_DECODE_FOLD_WM = 16
 
 
-@always_inline
+@inline(.always)
 def mha_decode_fold_wide_mma[
     dtype: DType, num_heads: Int, group: Int, q_seq_len: Int
 ]() -> Bool:
@@ -81,7 +81,7 @@ def mha_decode_fold_wide_mma[
     )
 
 
-@always_inline
+@inline(.always)
 def _mha_decode_fold_warp_m[
     dtype: DType, num_heads: Int, group: Int, S: Int
 ]() -> Int:
@@ -128,7 +128,7 @@ comptime _MHA_DECODE_WIDE_TILE_ROWS = 4 * _MHA_DECODE_WIDE_MMA_M
 comptime _MHA_DECODE_PAD_MIN_ROWS = 48
 
 
-@always_inline
+@inline(.always)
 def mha_decode_fold_tile_q_seq_len[
     dtype: DType, num_heads: Int, group: Int, q_seq_len: Int
 ]() -> Int:
@@ -166,7 +166,7 @@ def mha_decode_fold_tile_q_seq_len[
     return q_seq_len
 
 
-@always_inline
+@inline(.always)
 def decode_mma_shape[
     dtype: DType,
     depth: Int,
@@ -248,7 +248,7 @@ struct AMDStructuredConfig[
     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def heads_per_tile() -> Int:
         # MLA: tile spans `BM` heads of the single latent kv (block_idx.y is
         # the tile idx). MHA: tile spans `group` heads of one kv head
@@ -256,7 +256,7 @@ struct AMDStructuredConfig[
         return Self.config.block_m() if Self.mla_mode else Self.group
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_head_idx() -> Int:
         comptime if Self.token_gen:
             comptime mma_shape = Self.get_mma_shape()
@@ -266,7 +266,7 @@ struct AMDStructuredConfig[
             return block_idx.x
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_tile_idx() -> Int:
         comptime if Self.token_gen:
             # MLA decode tiles queries across block_idx.y; MHA decode keeps
@@ -276,7 +276,7 @@ struct AMDStructuredConfig[
             return Int(block_idx.y)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def kv_head_idx() -> Int:
         comptime if Self.token_gen:
             # MLA decode: single latent kv head at index 0.
@@ -285,7 +285,7 @@ struct AMDStructuredConfig[
             return ufloordiv(Self.q_head_idx(), Self.group)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_mma_shape() -> IndexList[3]:
         comptime if Self.token_gen:
             return decode_mma_shape[
@@ -309,7 +309,7 @@ struct AMDStructuredConfig[
         return IndexList[3](32, 32, 16)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_q_offset[q_depth: Int]() -> UInt32:
         comptime if Self.token_gen and Self.mla_mode:
             # MLA decode: `BM` queries per tile along block_idx.y.
@@ -328,6 +328,6 @@ struct AMDStructuredConfig[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_output_offset[output_depth: Int]() -> UInt32:
         return Self.get_q_offset[output_depth]()

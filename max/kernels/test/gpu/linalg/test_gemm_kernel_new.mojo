@@ -262,7 +262,7 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
         comptime nrun = 200
         comptime nwarmup = 2
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[kernel](
                 mat_c,
@@ -530,7 +530,7 @@ def matmul_kernel_naive[
     c[x, y] = accum.cast[c.dtype]()
 
 
-@always_inline
+@inline(.always)
 def outer_product_acc(
     res: TileTensor[mut=True, ...],
     lhs: TileTensor,

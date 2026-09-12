@@ -97,7 +97,7 @@ def test_stencil_avg_pool() raises:
         )
         return lower_bound, upper_bound
 
-    @always_inline
+    @inline(.always)
     def load_fn[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {
@@ -116,11 +116,11 @@ def test_stencil_avg_pool() raises:
 
         return r
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return SIMD[dtype, simd_width](0)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute[
         simd_width: SIMDLength
     ](
@@ -133,7 +133,7 @@ def test_stencil_avg_pool() raises:
     def dilation_fn(dim: Int) -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -241,11 +241,11 @@ def test_stencil_avg_pool_padded() raises:
             linear_idx
         )._refine[dtype]()
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return SIMD[dtype, simd_width](0)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute[
         simd_width: SIMDLength
     ](
@@ -366,11 +366,11 @@ def test_stencil_avg_pool_stride_2() raises:
             linear_idx
         )._refine[dtype]()
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return SIMD[dtype, simd_width](0)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute[
         simd_width: SIMDLength
     ](
@@ -493,11 +493,11 @@ def test_stencil_max_pool_dilation_2() raises:
             linear_idx
         )._refine[dtype]()
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return min_or_neg_inf[dtype]()
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute[
         simd_width: SIMDLength
     ](
@@ -517,7 +517,7 @@ def test_stencil_max_pool_dilation_2() raises:
         var output_ptr: Pointer[output.T, output.origin] = output.unsafe_ptr()
         output_ptr.unsafe_store(linear_idx, val)
 
-    @always_inline
+    @inline(.always)
     def dilation_fn(dim: Int) -> Int:
         return dilation
 

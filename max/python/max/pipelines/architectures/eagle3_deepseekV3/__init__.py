@@ -12,7 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 """DeepseekV3 + Eagle3 speculator pipeline."""
 
-from .arch import eagle3_deepseekV3_arch, eagle3_mha_deepseekV3_arch
+from .arch import (
+    eagle3_deepseekV3_speculator,
+    eagle3_mha_deepseekV3_speculator,
+)
 from .eagle3_draft import Eagle3DeepseekV3
 from .mha_pipeline import Eagle3MHADeepseekV3Inputs, Eagle3MHADeepseekV3Model
 from .model import Eagle3DeepseekV3Inputs, Eagle3DeepseekV3Model
@@ -27,6 +30,6 @@ __all__ = [
     "Eagle3MHADeepseekV3Inputs",
     "Eagle3MHADeepseekV3Model",
     "convert_eagle3_draft_state_dict",
-    "eagle3_deepseekV3_arch",
-    "eagle3_mha_deepseekV3_arch",
+    "eagle3_deepseekV3_speculator",
+    "eagle3_mha_deepseekV3_speculator",
 ]

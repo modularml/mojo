@@ -162,7 +162,7 @@ def test[
         row_major((batch_size, seq_len, Idx[num_heads], Idx[depth])),
     )
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext,
     ) raises {var q_device, var k_device, var v_device, var output_device, imm}:
@@ -568,7 +568,7 @@ def test_flash_attention_sink_kernel(ctx: DeviceContext, seq_len: Int) raises:
         RuntimeLayout[sinks_layout].row_major(Index(num_heads)),
     )
 
-    @always_inline
+    @inline(.always)
     def launch(ctx: DeviceContext) raises {imm}:
         flash_attention[sink=True](
             out_device,

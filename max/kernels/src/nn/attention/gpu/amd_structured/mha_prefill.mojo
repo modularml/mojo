@@ -48,14 +48,14 @@ from .mma import TiledMmaOp
 # --- Synchronization primitives (re-exported for mla_prefill.mojo) ---
 
 
-@always_inline
+@inline(.always)
 def barrier():
     """Emits the AMD GPU `s.barrier` instruction to synchronize all waves in the workgroup.
     """
     llvm_intrinsic["llvm.amdgcn.s.barrier", NoneType]()
 
 
-@always_inline
+@inline(.always)
 def block_sync_lds_direct_load[*, vmcnt: UInt32 = 0]():
     """Waits for outstanding vector-memory instructions to complete before a direct LDS load.
 
@@ -188,7 +188,7 @@ __extension Attention:
         # MMA helpers
         # =============================================================
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_qk():
             """All QK MMAs for the tile, reading K regs from SMEM."""
@@ -212,7 +212,7 @@ __extension Attention:
                             self.p_reg_buffer.stage_tile[0](),
                         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_pv():
             """All PV MMAs for the tile, reading V regs from SMEM."""
@@ -268,7 +268,7 @@ __extension Attention:
         # softmax (split), wait V, mma_pv.
         # =============================================================
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def process_tile[slot: Int, has_next: Bool]():
             comptime next_slot = 1 - slot

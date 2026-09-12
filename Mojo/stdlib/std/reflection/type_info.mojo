@@ -42,7 +42,7 @@ def main():
 ```
 """
 
-from std.sys.info import _current_target, _TargetType
+from std.sys.info import CompilationTarget
 from std.collections.string.string_span import get_static_string
 
 from .reflect import reflect
@@ -53,7 +53,7 @@ def get_linkage_name[
     //,
     func: func_type,
     *,
-    target: _TargetType = _current_target(),
+    target: CompilationTarget = CompilationTarget.current(),
 ]() -> StaticString:
     """Returns `func`'s symbol name.
 
@@ -67,7 +67,7 @@ def get_linkage_name[
     """
     var res = __mlir_attr[
         `#kgen.get_linkage_name<`,
-        target,
+        target._mlir_value,
         `,`,
         func,
         `> : !kgen.string`,

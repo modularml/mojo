@@ -38,7 +38,7 @@ trait ExplicitDestroyEmptyMsgOnDeinitable(Deinitable):
 
 
 # expected-error @+2 {{@explicit_destroy requires an argument: `@explicit_destroy("...")`}}
-# expected-note @+2 {{Use `Deinitable where False` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
+# expected-note @+2 {{Use a `not Deinitable` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
 @explicit_destroy
 trait BareExplicitDestroyTrait:
     def consume(deinit self):
@@ -65,7 +65,7 @@ trait NonStringArgExplicitDestroyTrait:
 
 
 # expected-error @+2 {{@explicit_destroy requires an argument: `@explicit_destroy("...")`}}
-# expected-note @+2 {{Use `Deinitable where False` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
+# expected-note @+2 {{Use a `not Deinitable` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
 @explicit_destroy
 struct UnconditionalDefault(Movable where False):
     pass
@@ -84,14 +84,14 @@ struct NonStringArgExplicitDestroy:
 
 
 # expected-error @+2 {{@explicit_destroy requires an argument: `@explicit_destroy("...")`}}
-# expected-note @+2 {{Use `Deinitable where False` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
+# expected-note @+2 {{Use a `not Deinitable` conformance to opt out of implicit deletion. `@explicit_destroy` is no longer required.}}
 @explicit_destroy
 struct ConditionalDefault[cond: Bool](Deinitable where cond, Movable where False):
     pass
 
 
 # expected-error @+2 {{@explicit_destroy is not valid on `struct` with unconditional conformance to `Deinitable`}}
-# expected-note @+2 {{Add `Deinitable where False` conformance or remove `@explicit_destroy`}}
+# expected-note @+2 {{Add a `not Deinitable` conformance or remove `@explicit_destroy`}}
 @explicit_destroy("some error")
 struct UnconditionalCustom(Movable where False):
     pass

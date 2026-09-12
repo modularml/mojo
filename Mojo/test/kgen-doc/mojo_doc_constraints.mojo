@@ -649,6 +649,18 @@ struct StructOptingOutOfMovable(Movable where False):
     var value: Int
 
 
+# `not Movable` is the preferred spelling of the same opt-out.
+# CHECK: "name": "StructNotMovable",
+# CHECK: "parentTraits": [
+# CHECK-NOT: "Movable"
+# CHECK: "signature": "struct StructNotMovable"
+@fieldwise_init
+struct StructNotMovable(not Movable):
+    """A struct that opts out of the implicit Movable conformance with `not`."""
+
+    var value: Int
+
+
 # A struct with no conditional conformance emits no "condition" anywhere.
 # CHECK: "name": "StructWithoutConditionalConformance",
 # CHECK: "parentTraits": [

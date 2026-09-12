@@ -283,7 +283,10 @@ modular_py_library(
 modular_py_binary(
     name = "gpqa_logit_gate",
     testonly = True,
-    srcs = ["calibration/gpqa_logit_gate.py"],
+    srcs = [
+        "calibration/gpqa_gate_report.py",
+        "calibration/gpqa_logit_gate.py",
+    ],
     imports = ["."],
     main = "calibration/gpqa_logit_gate.py",
     tags = ["manual"],

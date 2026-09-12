@@ -31,7 +31,7 @@ from std.ffi import (
     external_call,
     _DLHandle,
     OwnedDLHandle,
-    CStringSlice,
+    CStringSpan,
     c_char,
     c_double,
     c_int,
@@ -178,12 +178,12 @@ struct PyObjectPtr(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize a null PyObjectPtr."""
         self._unsized_obj_ptr = {}
 
-    @always_inline
+    @inline(.always)
     def __init__[
         T: AnyType, //
     ](out self, *, upcast_from: OptionalPointer[T, MutUntrackedOrigin]):
@@ -193,7 +193,7 @@ struct PyObjectPtr(
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs: Self) -> Bool:
         """Compare two PyObjectPtr for equality.
 
@@ -209,11 +209,11 @@ struct PyObjectPtr(
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         return Bool(self._unsized_obj_ptr)
 
-    @always_inline
+    @inline(.always)
     def __int__(self) -> Int:
         if self._unsized_obj_ptr:
             return Int(self._unsized_obj_ptr.unsafe_value())
@@ -243,7 +243,7 @@ struct PyObjectPtr(
         """
         writer.write(self._unsized_obj_ptr)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyObjectPtr` to a writer.
 
@@ -296,7 +296,7 @@ struct PythonVersion(ImplicitlyCopyable, RegisterPassable):
 
 def _py_get_version(lib: _DLHandle) -> StaticString:
     return StaticString(
-        unsafe_from_utf8=CStringSlice(
+        unsafe_from_utf8=CStringSpan(
             unsafe_from_ptr=lib.call[
                 "Py_GetVersion",
                 OptionalPointer[c_char, ImmStaticOrigin],
@@ -320,7 +320,7 @@ struct PyMethodDef(Defaultable, ImplicitlyCopyable):
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var method_name: Optional[CStringSlice[ImmStaticOrigin]]
+    var method_name: Optional[CStringSpan[ImmStaticOrigin]]
     """A pointer to the name of the method as a C string.
 
     Notes:
@@ -336,7 +336,7 @@ struct PyMethodDef(Defaultable, ImplicitlyCopyable):
     References:
     - https://docs.python.org/3/c-api/structures.html#c.PyMethodDef"""
 
-    var method_docstring: Optional[CStringSlice[ImmStaticOrigin]]
+    var method_docstring: Optional[CStringSpan[ImmStaticOrigin]]
     """The docstring for the method."""
 
     # ===-------------------------------------------------------------------===#
@@ -387,10 +387,10 @@ struct PyMethodDef(Defaultable, ImplicitlyCopyable):
             | (METH_KEYWORDS if with_kwargs else 0)
         )
         return PyMethodDef(
-            func_name.as_c_string_slice(),
+            func_name.as_c_string_span(),
             func_ptr,
             flags,
-            docstring.as_c_string_slice(),
+            docstring.as_c_string_span(),
         )
 
     @staticmethod
@@ -415,10 +415,10 @@ struct PyMethodDef(Defaultable, ImplicitlyCopyable):
         """
         var flags = c_int(METH_FASTCALL | (METH_STATIC if static_method else 0))
         return PyMethodDef(
-            func_name.as_c_string_slice(),
+            func_name.as_c_string_span(),
             _fn_ptr_as_opaque(func),
             flags,
-            docstring.as_c_string_slice(),
+            docstring.as_c_string_span(),
         )
 
 
@@ -463,7 +463,7 @@ struct PyType_Spec(ImplicitlyCopyable, RegisterPassable):
     - https://docs.python.org/3/c-api/type.html#c.PyType_Spec
     """
 
-    var name: Optional[CStringSlice[ImmStaticOrigin]]
+    var name: Optional[CStringSpan[ImmStaticOrigin]]
     var basicsize: c_int
     var itemsize: c_int
     var flags: c_uint
@@ -583,7 +583,7 @@ struct PyObject(
         writer.write("object_type=", self.object_type)
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyObject` to a writer.
 
@@ -651,7 +651,7 @@ struct PyModuleDef_Base(Defaultable, Movable, Writable):
         writer.write("dict_copy=", self.dict_copy)
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyModuleDef_Base` to a writer.
 
@@ -687,10 +687,10 @@ struct PyModuleDef(Movable, Writable):
 
     var base: PyModuleDef_Base
 
-    var name: Optional[CStringSlice[ImmStaticOrigin]]
+    var name: Optional[CStringSpan[ImmStaticOrigin]]
     """Name for the new module."""
 
-    var docstring: Optional[CStringSlice[ImmStaticOrigin]]
+    var docstring: Optional[CStringSpan[ImmStaticOrigin]]
     """Points to the contents of the docstring for the module."""
 
     var size: Py_ssize_t
@@ -728,7 +728,7 @@ struct PyModuleDef(Movable, Writable):
 
     def __init__(out self, name: StaticString):
         self.base = {}
-        self.name = name.as_c_string_slice()
+        self.name = name.as_c_string_span()
         self.docstring = {}
         # setting `size` to -1 means that the module does not support sub-interpreters
         self.size = -1
@@ -765,7 +765,7 @@ struct PyModuleDef(Movable, Writable):
         writer.write("free_fn=<unprintable>")
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyModuleDef` to a writer.
 
@@ -790,7 +790,7 @@ struct ExternalFunction[
     type: TrivialRegisterPassable,
 ]:
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(lib: _DLHandle) -> Self.type:
         """Loads this external function from an opened dynamic library."""
         return lib._get_function[Self.name, Self.type]()
@@ -1731,7 +1731,7 @@ struct CPython(Defaultable, Movable):
         # TODO(MOCO-772) Allow raises to propagate through function pointers
         # and make this initialization a raising function.
         self.init_error = StaticString(
-            unsafe_from_utf8=CStringSlice(
+            unsafe_from_utf8=CStringSpan(
                 unsafe_from_ptr=external_call[
                     "KGEN_CompilerRT_Python_SetPythonPath",
                     Pointer[c_char, ImmStaticOrigin],
@@ -2108,7 +2108,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_SimpleString
         """
         return self._PyRun_SimpleString(
-            command.as_c_string_slice().ptr().as_unsafe_any_origin()
+            command.as_c_string_span().ptr().as_unsafe_any_origin()
         )
 
     def PyRun_String(
@@ -2127,7 +2127,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_String
         """
         return self._PyRun_String(
-            str.as_c_string_slice().ptr().as_unsafe_any_origin(),
+            str.as_c_string_span().ptr().as_unsafe_any_origin(),
             start,
             globals,
             locals,
@@ -2148,8 +2148,8 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/veryhigh.html#c.Py_CompileString
         """
         return self._Py_CompileString(
-            str.as_c_string_slice().ptr().as_unsafe_any_origin(),
-            filename.as_c_string_slice().ptr().as_unsafe_any_origin(),
+            str.as_c_string_span().ptr().as_unsafe_any_origin(),
+            filename.as_c_string_span().ptr().as_unsafe_any_origin(),
             start,
         )
 
@@ -2442,7 +2442,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/import.html#c.PyImport_ImportModule
         """
         return self._PyImport_ImportModule(
-            name.as_c_string_slice().ptr().as_unsafe_any_origin()
+            name.as_c_string_span().ptr().as_unsafe_any_origin()
         )
 
     def PyImport_AddModule(self, var name: String) -> PyObjectPtr:
@@ -2454,7 +2454,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/import.html#c.PyImport_AddModule
         """
         return self._PyImport_AddModule(
-            name.as_c_string_slice().ptr().as_unsafe_any_origin()
+            name.as_c_string_span().ptr().as_unsafe_any_origin()
         )
 
     # ===-------------------------------------------------------------------===#
@@ -2476,7 +2476,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/object.html#c.PyObject_HasAttrString
         """
         return self._PyObject_HasAttrString(
-            obj, name.as_c_string_slice().ptr().as_unsafe_any_origin()
+            obj, name.as_c_string_span().ptr().as_unsafe_any_origin()
         )
 
     def PyObject_GetAttrString(
@@ -2490,7 +2490,7 @@ struct CPython(Defaultable, Movable):
         - https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString
         """
         return self._PyObject_GetAttrString(
-            obj, name.as_c_string_slice().ptr().as_unsafe_any_origin()
+            obj, name.as_c_string_span().ptr().as_unsafe_any_origin()
         )
 
     def PyObject_SetAttrString(
@@ -2504,7 +2504,7 @@ struct CPython(Defaultable, Movable):
         """
         return self._PyObject_SetAttrString(
             obj,
-            name.as_c_string_slice().ptr().as_unsafe_any_origin(),
+            name.as_c_string_span().ptr().as_unsafe_any_origin(),
             value,
         )
 
@@ -3388,7 +3388,7 @@ struct CPython(Defaultable, Movable):
             .as_imm()
             .as_unsafe_any_origin(),
             Py_ssize_t(s.byte_length()),
-            "strict".as_c_string_slice().ptr().as_unsafe_any_origin(),
+            "strict".as_c_string_span().ptr().as_unsafe_any_origin(),
         )
 
     # TODO: fix signature to take unicode and size as args
@@ -3716,7 +3716,7 @@ struct CPython(Defaultable, Movable):
         """
         return self._PyCapsule_New(
             pointer,
-            name.as_c_string_slice().ptr().as_unsafe_any_origin(),
+            name.as_c_string_span().ptr().as_unsafe_any_origin(),
             destructor,
         )
 
@@ -3733,7 +3733,7 @@ struct CPython(Defaultable, Movable):
         """
         var r = self._PyCapsule_GetPointer(
             capsule,
-            name.as_c_string_slice().ptr().as_unsafe_any_origin(),
+            name.as_c_string_span().ptr().as_unsafe_any_origin(),
         )
         if self.PyErr_Occurred():
             raise self.get_error()
@@ -3755,7 +3755,7 @@ struct CPython(Defaultable, Movable):
         return (
             self._PyCapsule_IsValid(
                 capsule,
-                name.as_c_string_slice().ptr().as_unsafe_any_origin(),
+                name.as_c_string_span().ptr().as_unsafe_any_origin(),
             )
             != 0
         )

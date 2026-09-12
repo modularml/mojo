@@ -43,6 +43,7 @@ from max.experimental.functional import (
 )
 from max.experimental.nn.module import Module, module_dataclass
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
     GreedyReshard,
     PlacementMapping,
@@ -50,7 +51,7 @@ from max.experimental.sharding import (
     Sharded,
     mode,
 )
-from max.experimental.sharding.types import DistributedTensorType
+from max.experimental.sharding.types import TensorLayout
 from max.experimental.tensor import Tensor
 
 F32 = DType.float32
@@ -134,11 +135,8 @@ def _block_ir(solver: GreedyReshard) -> str:
     mesh = _mesh_2()
     with mode(solver):
         block = _make_tp_block(mesh)
-        input_type = DistributedTensorType(
-            dtype=F32,
-            shape=["batch", HIDDEN],
-            mesh=mesh,
-            placements=(Replicated(),),
+        input_type = TensorLayout(
+            F32, ["batch", HIDDEN], DeviceMapping(mesh, (Replicated(),))
         )
         return repr(block.trace(input_type))
 
@@ -147,11 +145,8 @@ def _matmul_relu_matmul_ir(solver: GreedyReshard) -> str:
     mesh = _mesh_2()
     with mode(solver):
         block = _make_matmul_relu_matmul(mesh)
-        input_type = DistributedTensorType(
-            dtype=F32,
-            shape=["batch", HIDDEN],
-            mesh=mesh,
-            placements=(Replicated(),),
+        input_type = TensorLayout(
+            F32, ["batch", HIDDEN], DeviceMapping(mesh, (Replicated(),))
         )
         return repr(block.trace(input_type))
 

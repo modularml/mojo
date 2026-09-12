@@ -59,6 +59,7 @@ from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT7
 
 from scenarios import BaseScenario, ScenarioResult, Verdict
+from scenarios._constrained_stream import leading_json, overrun_detail
 
 if TYPE_CHECKING:
     from client import FuzzClient, RunConfig
@@ -351,15 +352,20 @@ def _check_one(
     schema: Any, output: str, *, truncated: bool
 ) -> tuple[Verdict, str]:
     """Validate a single output string against ``schema``."""
-    try:
-        instance = json.loads(output)
-    except Exception:
+    parsed = leading_json(output)
+    if parsed is None:
         if truncated:
             return (
                 Verdict.INTERESTING,
                 "output truncated at max_tokens (incomplete JSON)",
             )
         return Verdict.FAIL, f"output is not valid JSON: {output[:200]!r}"
+
+    # Trailing text means the constraint was dropped, not that the budget
+    # ran out -- "Extra data" would otherwise read as truncation.
+    instance, trailing = parsed
+    if trailing:
+        return Verdict.FAIL, overrun_detail(trailing)
 
     js_ok, js_detail = _jsonschema_check(schema, instance)
     if js_ok is None:

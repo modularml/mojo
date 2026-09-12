@@ -194,7 +194,7 @@ def execute_kv_cache_ragged_rope[
     )
     var flop_count = num_flops_per_elem * num_elems
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) raises {
@@ -205,7 +205,7 @@ def execute_kv_cache_ragged_rope[
         var output_device_tensor,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             fused_qk_rope_ragged[
                 kv_collection_device.CacheType,

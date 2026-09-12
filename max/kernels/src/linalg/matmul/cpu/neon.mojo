@@ -44,7 +44,7 @@ struct Inner_matmul_neon(InnerMatmulKernel, Movable):
     B columns. Handles tail elements in the K dimension with scalar cleanup.
     """
 
-    @always_inline
+    @inline(.always)
     def _accumulate_lane[
         simd_size: Int,
         a_col_size: Int,
@@ -111,7 +111,7 @@ struct Inner_matmul_neon(InnerMatmulKernel, Movable):
 
             b_ptr = b_ptr + kernel_cols
 
-    @always_inline
+    @inline(.always)
     def __inner_matmul__[
         kernel_rows: Int,
         kernel_cols: Int,

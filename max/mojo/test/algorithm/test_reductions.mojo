@@ -73,7 +73,7 @@ def test_fused_reductions_inner() raises:
     for i in range(size):
         vector[i] = Float32(i + 1)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(vector)
     @__parameter
     def input_fn[
@@ -86,7 +86,7 @@ def test_fused_reductions_inner() raises:
 
     var out = StaticTuple[Scalar[test_type], num_reductions]()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_fn[
         dtype: DType, width: SIMDLength, rank: Int
@@ -100,7 +100,7 @@ def test_fused_reductions_inner() raises:
 
         out = rebind[StaticTuple[Scalar[test_type], num_reductions]](val)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_fn[
         ty: DType,
@@ -157,7 +157,7 @@ def test_fused_reductions_outer() raises:
     for i in range(size):
         vector[i] = Float32(i + 1)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(vector)
     @__parameter
     def input_fn[
@@ -168,7 +168,7 @@ def test_fused_reductions_outer() raises:
         )
         return loaded_val._refine[dtype]()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_fn[
         ty: DType,
@@ -191,7 +191,7 @@ def test_fused_reductions_outer() raises:
     )
     var shape = Coord((50, 2))
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_fn[
         dtype: DType, width: SIMDLength, rank: Int

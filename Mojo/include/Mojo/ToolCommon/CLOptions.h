@@ -29,31 +29,6 @@ namespace KGEN {
 class CompiledFunc;
 class ExecutionEngine;
 
-/// What to do with a given KGEN file.
-enum class Command {
-  // (FIXME) put 3 different config of elaborate here
-  // to be flexible with different default value for
-  // whether to use parametric interpreter or not.
-  // Default value for whether use parametric interpreter or not.
-  kElaborate,
-  // Do not use parametric interpreter.
-  kElaborateNoUseParametricInterpreter,
-  // Use parametric interpreter.
-  kElaborateUseParametricInterpreter,
-  kEmit,
-  kEmitAssembly,
-  kEmitAssemblyVerbose,
-  kEmitHeader,
-  kEmitLLVM,
-  kEmitLLVMBitcode,
-  kEmitLLVMOpt,
-  kEmitLLVMOptBitcode,
-  kEmitSharedObject,
-  kExecute,
-  kLSP,
-  kLSPNoDump,
-};
-
 //===----------------------------------------------------------------------===//
 // CommandLineFunc
 //===----------------------------------------------------------------------===//
@@ -539,7 +514,10 @@ private:
 };
 class KGENOptions : public KGENCommonOptions, public CommonOptions {
 public:
-  Command cmd{/*required*/};
+  /// Canonical command string: "elaborate[=<mode>]", "emit=<kind>",
+  /// "execute", or "lsp[=no-dump]". Bare "emit" is canonicalized to
+  /// "emit=object".
+  std::string cmd;
   llvm::SmallVector<CommandLineFunc> funcs{};
   std::optional<CommandLineFunc> shouldExecuteFunc(StringRef func) const {
     auto found = llvm::find_if(
@@ -550,14 +528,38 @@ public:
   }
 };
 
-/// Provide a parser for the KGENCLOptions object.
-class KGENCLOptionsParser : public llvm::cl::parser<Command> {
+/// Parser for the unnamed command option: the spellings from commands() are
+/// registered as literal option names and parsed into a canonical command
+/// string.
+class KGENCLOptionsParser : public llvm::cl::parser<std::string> {
 
 public:
-  using llvm::cl::parser<Command>::parser;
+  using llvm::cl::parser<std::string>::parser;
 
   bool parse(llvm::cl::Option &o, StringRef argName, StringRef argValue,
-             Command &val);
+             std::string &val);
+
+  /// One accepted command spelling, shown in --help.
+  struct CommandInfo {
+    llvm::StringRef name;
+    llvm::StringRef description;
+  };
+  static llvm::ArrayRef<CommandInfo> commands();
+
+  void getExtraOptionNames(llvm::SmallVectorImpl<StringRef> &names);
+
+  // Render the command spellings like an enumerated option's value list.
+  size_t getOptionWidth(const llvm::cl::Option &o) const;
+  void printOptionInfo(const llvm::cl::Option &o, size_t globalWidth) const;
+
+  /// The requested `-emit` kind (bare `-emit` records "object"), for
+  /// validation against the target's TargetTraits once the target options
+  /// are parsed. Empty when no emit command was given.
+  std::string emissionKind;
+
+  /// The `emit=<kind>` spellings for the tool's emission kinds, filled in by
+  /// `KGENCLOptions` for option-name registration and suggestions.
+  llvm::SmallVector<std::string> emitSpellings;
 };
 
 class KGENCLOptions : public KGENCommonCLOptions, public CommonCLOptions {
@@ -565,57 +567,32 @@ class KGENCLOptions : public KGENCommonCLOptions, public CommonCLOptions {
 public:
   KGENOptions &options;
   KGENCLOptions(int argc, char **argv, KGENOptions &opts,
-                bool skipInitLLVM = false)
+                bool skipInitLLVM = false,
+                llvm::ArrayRef<llvm::StringRef> emissionKinds = {})
       : KGENCommonCLOptions(opts),
-        CommonCLOptions(argc, argv, opts, skipInitLLVM), options(opts) {}
+        CommonCLOptions(argc, argv, opts, skipInitLLVM), options(opts) {
+    KGENCLOptionsParser &parser = cmd.getParser();
+    for (llvm::StringRef kind : emissionKinds)
+      parser.emitSpellings.push_back(("emit=" + kind).str());
+    // The command option is unnamed; registering the spellings as literal
+    // option names is what routes `-elaborate`, `-emit=llvm`, ... to it.
+    // The spellings are registered only after emitSpellings stops growing,
+    // since the registry keeps StringRefs into its strings.
+    for (const KGENCLOptionsParser::CommandInfo &info :
+         KGENCLOptionsParser::commands())
+      llvm::cl::AddLiteralOption(cmd, info.name);
+    for (const std::string &spelling : parser.emitSpellings)
+      llvm::cl::AddLiteralOption(cmd, spelling);
+  }
+
+  /// The requested `-emit` kind, or empty when no emit command was given.
+  StringRef requestedEmissionKind() { return cmd.getParser().emissionKind; }
 
 private:
   llvm::cl::OptionCategory KGENCLOptionsCategory{"KGEN Command line options"};
-  M::cl::MOpt<Command, true, KGENCLOptionsParser> cmd{
-      cl::desc("The command to execute"),
-      cl::values(
-          clEnumValN(Command::kElaborate, "elaborate", "Elaborate the input."),
-          clEnumValN(Command::kElaborateUseParametricInterpreter,
-                     "elaborate=use-parametric-interpreter",
-                     "Elaborate the input with the parametric interpreter."),
-          clEnumValN(
-              Command::kElaborateNoUseParametricInterpreter,
-              "elaborate=no-use-parametric-interpreter",
-              "Elaborate the input but don't use the parametric interpreter."),
-          clEnumValN(Command::kEmitLLVM, "emit=llvm", "Emit funcs as LLVM IR."),
-          clEnumValN(Command::kEmitLLVMBitcode, "emit-llvm=bitcode",
-                     "Emit bitcode of unoptimized LLVM IR."),
-          clEnumValN(Command::kEmitLLVMOpt, "emit=llvm-opt",
-                     "Emit funcs as optimized LLVM IR."),
-          clEnumValN(Command::kEmitLLVMOptBitcode, "emit-llvm=opt-bitcode",
-                     "Emit bitcode of optimized LLVM IR."),
-          clEnumValN(Command::kEmitAssembly, "emit=asm",
-                     "Emit the funcs as assembly."),
-          clEnumValN(
-              Command::kEmitAssemblyVerbose, "emit=asm-verbose",
-              "Emit the funcs as verbose assembly with preserved comments"),
-          clEnumValN(Command::kEmit, "emit", "Emit funcs as an object file."),
-          clEnumValN(Command::kEmit, "emit=object",
-                     "Emit funcs as an object file."),
-          clEnumValN(Command::kEmitHeader, "emit=header",
-                     "Emit a C header file with declarations of "
-                     "exported functions."),
-          clEnumValN(Command::kEmitSharedObject, "emit=shared-lib",
-                     "Emit funcs as a shared object (ELF only)."),
-          clEnumValN(Command::kExecute, "execute", "Execute funcs."),
-          clEnumValN(Command::kLSP, "lsp",
-                     "Process the input as the language server does: lazy "
-                     "parse + check pipeline, printing the checked IR to "
-                     "stdout and reporting diagnostics on stderr."),
-          clEnumValN(Command::kLSPNoDump, "lsp=no-dump",
-                     "Same as -lsp, but skips printing the checked IR to "
-                     "stdout. Diagnostics on stderr and the exit status are "
-                     "unaffected; only useful when a caller checks for "
-                     "crashes/diagnostics and never reads stdout, since "
-                     "serializing the IR is not free.")),
-      llvm::cl::location(options.cmd),
-      llvm::cl::Required,
-      llvm::cl::ValueOptional,
+  M::cl::MOpt<std::string, true, KGENCLOptionsParser> cmd{
+      cl::desc("The command to execute"), llvm::cl::location(options.cmd),
+      llvm::cl::Required, llvm::cl::ValueOptional,
       llvm::cl::cat(KGENCLOptionsCategory)};
 
   M::cl::MListOpt<CommandLineFunc, llvm::SmallVector<CommandLineFunc>,

@@ -102,13 +102,13 @@ comptime DEPTH = 128
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _V_fp32(key: Int, depth: Int) -> Float32:
     # Smooth, distinct per (key, depth). Range ~[-0.3, 1.4].
     return (Float32(key) * 0.05 + Float32(depth) * 0.03 - 0.3) / 16.0
 
 
-@always_inline
+@inline(.always)
 def _P_fp32(key: Int, q: Int) -> Float32:
     # Post-softmax-like: small positives. Range ~[0.005, 0.1].
     return (Float32(key) * 0.001 + Float32(q) * 0.003 + 0.005) / 1.0
@@ -121,7 +121,7 @@ def _P_fp32(key: Int, q: Int) -> Float32:
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _quantize[T: DType](v: Float32) -> Scalar[T]:
     comptime if T == .bfloat16:
         return rebind[Scalar[T]](BFloat16(v))
@@ -129,7 +129,7 @@ def _quantize[T: DType](v: Float32) -> Scalar[T]:
         return rebind[Scalar[T]](Float8_e4m3fn(v))
 
 
-@always_inline
+@inline(.always)
 def _dequant_to_f32[T: DType](v: Scalar[T]) -> Float32:
     return v.cast[.float32]()
 

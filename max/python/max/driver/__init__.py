@@ -18,6 +18,7 @@ from max._core import __version__
 from max._core.driver import (
     CompletionFlag,
     DeviceEvent,
+    HostHazardError,
     LaunchTraceEntry,
     Usage,
     __unsafe_pack_py_host_func,
@@ -105,6 +106,7 @@ __all__ = [
     "DevicePinnedBuffer",
     "DeviceQueue",
     "DeviceSpec",
+    "HostHazardError",
     "LaunchTraceEntry",
     "Usage",
     "accelerator_api",

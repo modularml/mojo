@@ -25,12 +25,13 @@ import importlib
 import logging
 import os
 import sys
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 from max.experimental.nn import Module
 from max.pipelines.modeling.types import InputModality, PipelineTask
+from max.pipelines.speculative.config import SpeculativeMethod
 
 from .interfaces.pipeline_model import PipelineModel
 from .pipeline_executor import PipelineExecutor
@@ -61,7 +62,9 @@ logger = logging.getLogger("max.pipelines")
 
 __all__ = [
     "PipelineModelType",
+    "Speculator",
     "SupportedArchitecture",
+    "select_speculator",
 ]
 
 PipelineModelType: TypeAlias = type[
@@ -198,6 +201,12 @@ class SupportedArchitecture:
         default_factory=dict
     )
     """A dictionary specifying required values for PipelineConfig options."""
+
+    checkpoints_recurrent_state: bool = False
+    """Whether this architecture carries recurrent state a prefix hit must resume.
+
+    A prefix hit is safe only where the state that consumed exactly that
+    prefix is restored with it."""
 
     context_validators: list[
         Callable[[TextContext | TextAndVisionContext | PixelContext], None]
@@ -368,6 +377,14 @@ class SupportedArchitecture:
     via ``--device-graph-capture --force``.
     """
 
+    supports_spec_decode_mixed_batches: bool = False
+    """Whether this architecture's speculative graph is per-row correct on
+    mixed prefill+decode verify batches.
+
+    When ``False``, ``--enable-spec-decode-mixed-batches`` falls back to
+    plain in-flight batching for this architecture.
+    """
+
     memory_planner: type[MemoryPlanner] | None = None
     """Optional :class:`~max.pipelines.kv_cache.MemoryPlanner` subclass for
     this architecture.
@@ -448,14 +465,109 @@ class SupportedArchitecture:
         return TextTokenizer
 
 
+@dataclass(frozen=True)
+class Speculator:
+    """One speculative variant of a target architecture.
+
+    A speculator is a bounded delta on its :attr:`base`, not a separate
+    architecture: :meth:`derive` copies only the fields below, and everything
+    else -- tokenizer, config class, encodings, memory planner, tool and
+    reasoning parsers, structured-output defaults are inherited.
+    Declared in the speculator's own package, which already depends on the base.
+
+    A speculator is not registered as an architecture. It is indexed against
+    its target, and selection applies :meth:`derive` to the architecture the
+    checkpoint's own name already resolved to.
+    """
+
+    name: str
+    """Identifies the fused architecture in logs and generated docs."""
+
+    base: SupportedArchitecture
+    """The target architecture this speculator applies to."""
+
+    draft_arch: str | None
+    """The draft repo's ``huggingface_config.architectures[0]``.
+
+    ``None`` when the draft head ships inside the target checkpoint, as for
+    MTP/NextN: the ``draft`` manifest role stays empty and the draft weights
+    come out of the target's own state dict.
+    """
+
+    method: SpeculativeMethod
+    """The mechanism this speculator implements.
+
+    Matched against the configured ``speculative_method``, so naming a method
+    selects the mechanism that runs rather than whichever speculator the draft
+    checkpoint happens to fit.
+    """
+
+    pipeline_model: PipelineModelType
+    """The fused pipeline model, which runs target and draft in one graph."""
+
+    batching: type[Any] | None = None
+    weight_adapters: Mapping[WeightsFormat, WeightsAdapter] = field(
+        default_factory=dict
+    )
+    example_repo_ids: list[str] | None = None
+    """Replace the target's example repos.
+
+    Set it when the fused graph is exercised by a different checkpoint than
+    the target's own.
+    """
+
+    opt_out_cascade: bool = False
+    """Clear the base's ``cascade_pipeline_factory``.
+
+    The fused spec-decode graph has no cascade path, so inheriting the base's
+    factory would advertise one that does not exist.
+    """
+
+    supports_device_graph_capture: bool | None = None
+    """Override whether the fused graph can be captured; ``None`` inherits.
+
+    Set it ``False`` only for a fused graph that genuinely cannot be
+    captured. A multimodal speculator whose vision encoder runs eagerly
+    during prefill is the case that exists: it produces variable-shape image
+    embeddings from outside the captured region, so the target's own support
+    does not carry over.
+    """
+
+    def derive(self) -> SupportedArchitecture:
+        """Returns the fused architecture for this speculator.
+
+        Applies this speculator's own fields on top of :attr:`base`. Every
+        field not named here is inherited, which is what keeps a speculator
+        from drifting away from its target.
+        """
+        changes: dict[str, Any] = {
+            "name": self.name,
+            "pipeline_model": self.pipeline_model,
+        }
+        if self.batching is not None:
+            changes["batching"] = self.batching
+        if self.weight_adapters:
+            changes["weight_adapters"] = dict(self.weight_adapters)
+        if self.opt_out_cascade:
+            changes["cascade_pipeline_factory"] = None
+        if self.example_repo_ids is not None:
+            changes["example_repo_ids"] = self.example_repo_ids
+        if self.supports_device_graph_capture is not None:
+            changes["supports_device_graph_capture"] = (
+                self.supports_device_graph_capture
+            )
+        return replace(self.base, **changes)
+
+
 class ArchLookup:
     """Architecture tables plus registration and selection logic.
 
-    Owns the three tables behind architecture lookup: the primary name table,
-    the ``(name, task)`` disambiguation table, and the lazy-registration
-    table. :class:`~max.pipelines.lib.registry.PipelineRegistry` delegates
-    its architecture concerns here; the global registry shares
-    :obj:`ARCH_LOOKUP` so config-layer lookups hit the same table.
+    Owns the tables behind architecture lookup: the primary name table, the
+    ``(name, task)`` disambiguation table, the lazy-registration table, and
+    the speculator index :meth:`speculators_for` reads.
+    :class:`~max.pipelines.lib.registry.PipelineRegistry` delegates its
+    architecture concerns here; the global registry shares :obj:`ARCH_LOOKUP`
+    so config-layer lookups hit the same table.
     """
 
     def __init__(self) -> None:
@@ -473,12 +585,39 @@ class ArchLookup:
         self._lazy_architectures: dict[
             str, list[tuple[str, str, str | None]]
         ] = {}
+        # Deferred speculator registrations, keyed by the *target* they
+        # speculate on rather than by a name of their own: a speculator is not
+        # an architecture and never claims a slot in the table above.
+        self._lazy_speculators: dict[
+            str, list[tuple[str, str, str | None]]
+        ] = {}
+        # Imported speculators, keyed by target, in declaration order.
+        self._speculators: dict[str, list[Speculator]] = {}
         # Already-imported module specs; repeated calls must not re-register.
         self._imported_custom_arch_specs: set[str] = set()
 
+    def _bind_batch_processor(
+        self, architecture: SupportedArchitecture
+    ) -> None:
+        """Binds a declared batch processor onto its pipeline model."""
+        if architecture.batching is None:
+            return
+        from .interfaces.pipeline_model import PipelineModel
+
+        pipeline_model_cls = architecture.pipeline_model
+        if not isinstance(pipeline_model_cls, type) or not issubclass(
+            pipeline_model_cls, PipelineModel
+        ):
+            raise TypeError(
+                f"Architecture '{architecture.name}' sets batching= but "
+                f"pipeline_model {pipeline_model_cls!r} is not a PipelineModel "
+                "subclass."
+            )
+        pipeline_model_cls.batch_processor_cls = architecture.batching
+
     def register(
         self,
-        architecture: SupportedArchitecture,
+        architecture: SupportedArchitecture | Speculator,
         *,
         allow_override: bool = False,
     ) -> None:
@@ -486,20 +625,23 @@ class ArchLookup:
 
         If multiple architectures share the same name but have different tasks,
         they are registered in a secondary lookup table keyed by (name, task).
-        """
-        if architecture.batching is not None:
-            from .interfaces.pipeline_model import PipelineModel
 
-            pipeline_model_cls = architecture.pipeline_model
-            if not isinstance(pipeline_model_cls, type) or not issubclass(
-                pipeline_model_cls, PipelineModel
-            ):
-                raise TypeError(
-                    f"Architecture '{architecture.name}' sets batching= but "
-                    f"pipeline_model {pipeline_model_cls!r} is not a PipelineModel "
-                    "subclass."
-                )
-            pipeline_model_cls.batch_processor_cls = architecture.batching
+        A :class:`Speculator` is indexed against its target instead. It does
+        not enter the name table: the fused architecture it derives is reached
+        by selecting the speculator, never by looking up a name.
+        """
+        if isinstance(architecture, Speculator):
+            speculators = self._speculators.setdefault(
+                architecture.base.name, []
+            )
+            if not any(known is architecture for known in speculators):
+                speculators.append(architecture)
+            # Against the derived architecture, so an inherited batch
+            # processor binds onto the fused pipeline model too.
+            self._bind_batch_processor(architecture.derive())
+            return
+
+        self._bind_batch_processor(architecture)
 
         task_key = (architecture.name, architecture.task)
 
@@ -542,12 +684,32 @@ class ArchLookup:
         symbol: str,
         *,
         package: str | None = None,
+        speculates_on: str | None = None,
     ) -> None:
         """Records *how* to import an architecture without importing it yet.
 
         The real :class:`SupportedArchitecture` is imported and registered the
         first time ``name`` is looked up; see :meth:`materialize`.
+
+        With ``speculates_on`` the symbol is a :class:`Speculator`, which is
+        filed under its target rather than under ``name`` -- so the fused
+        architecture never becomes a name anyone can look up, and the target
+        can still offer its speculators without importing them.
+
+        Args:
+            name: Architecture name to register under. Ignored for a
+                speculator, which is keyed by its target.
+            module: Module the symbol lives in.
+            symbol: Attribute on ``module`` holding the declaration.
+            package: Anchor for a ``.``-relative ``module``.
+            speculates_on: For a :class:`Speculator`, the name of the target
+                it speculates on.
         """
+        if speculates_on is not None:
+            self._lazy_speculators.setdefault(speculates_on, []).append(
+                (module, symbol, package)
+            )
+            return
         self._lazy_architectures.setdefault(name, []).append(
             (module, symbol, package)
         )
@@ -564,9 +726,9 @@ class ArchLookup:
             return
         for module, symbol, package in entries:
             imported = importlib.import_module(module, package)
-            architecture = getattr(imported, symbol)
-            existing = self.architectures.get(architecture.name)
-            if existing is not None and existing.task == architecture.task:
+            declaration = getattr(imported, symbol)
+            existing = self.architectures.get(declaration.name)
+            if existing is not None and existing.task == declaration.task:
                 # An architecture registered eagerly under this name (e.g. via
                 # --custom-architectures) takes precedence over the deferred
                 # built-in.
@@ -574,10 +736,25 @@ class ArchLookup:
                     "Skipping lazy registration of built-in architecture "
                     "'%s': an architecture with that name is already "
                     "registered.",
-                    architecture.name,
+                    declaration.name,
                 )
                 continue
-            self.register(architecture)
+            self.register(declaration)
+
+    def speculators_for(self, target: str) -> list[Speculator]:
+        """Returns the speculators declared against ``target``.
+
+        Imports their packages, so it costs nothing until speculation is
+        actually being configured. An empty result means ``target`` offers no
+        speculator at all and the caller should leave the architecture alone.
+
+        Declaration order is preserved, so it is also the tie-break when two
+        speculators would accept the same draft.
+        """
+        for module, symbol, package in self._lazy_speculators.pop(target, []):
+            imported = importlib.import_module(module, package)
+            self.register(getattr(imported, symbol))
+        return list(self._speculators.get(target, []))
 
     def import_custom_architectures(
         self, custom_architectures: list[str]
@@ -617,6 +794,8 @@ class ArchLookup:
                     f"Custom model imported, but did not expose an `ARCHITECTURES` list. Module: {module_spec}"
                 )
 
+            # An entry may be a Speculator, declaring a speculator of a built-in
+            # target the same way an in-tree speculator package does.
             for arch in module.ARCHITECTURES:
                 self.register(arch, allow_override=True)
             self._imported_custom_arch_specs.add(module_spec)
@@ -695,6 +874,8 @@ class ArchLookup:
         self.architectures.clear()
         self._architectures_by_task.clear()
         self._lazy_architectures.clear()
+        self._lazy_speculators.clear()
+        self._speculators.clear()
         self._imported_custom_arch_specs.clear()
 
 
@@ -717,10 +898,10 @@ def find_architecture(
     Args:
         name: The architecture class name to look up
             (e.g. ``"LlamaForCausalLM"`` or ``"FluxPipeline"``).
-        prefer_module_v3: Whether to use the eager API architecture variant.
+        prefer_module_v3: Whether to use the ModuleV3 architecture variant.
             When ``False`` (default), uses the standard graph API architecture name.
             When ``True``, appends the ``_ModuleV3`` suffix to look up the
-            eager API architecture.
+            ModuleV3 architecture.
         task: Optional task to disambiguate when multiple architectures
             share the same name.
 
@@ -728,6 +909,59 @@ def find_architecture(
         The matching SupportedArchitecture or None if no match found.
     """
     return ARCH_LOOKUP.find(name, prefer_module_v3=prefer_module_v3, task=task)
+
+
+def select_speculator(
+    target: str,
+    method: SpeculativeMethod | None,
+    draft_arch: str | None,
+) -> Speculator | None:
+    """Returns the speculator ``target`` declares for ``method``/``draft_arch``.
+
+    ``None`` when ``target`` declares no speculators at all, which is every
+    target still routed by the legacy override chain -- so a caller that
+    applies the result leaves those untouched.
+
+    Both halves have to agree. Matching the draft alone runs whichever
+    mechanism the draft checkpoint happens to fit rather than the one asked
+    for; matching the method alone cannot separate two speculators that
+    implement it with different drafts.
+
+    Raises:
+        ValueError: If ``target`` declares speculators but none accepts this
+            method and draft together.
+    """
+    declared = ARCH_LOOKUP.speculators_for(target)
+    if not declared:
+        return None
+    speculator = next(
+        (
+            s
+            for s in declared
+            if s.method == method and s.draft_arch == draft_arch
+        ),
+        None,
+    )
+    if speculator is None:
+        raise ValueError(
+            f"No speculator for {target} runs {method!r} with draft"
+            f" architecture {draft_arch!r}. Declared:"
+            f" {_declared_combinations(declared)}."
+        )
+    return speculator
+
+
+def _declared_combinations(speculators: Sequence[Speculator]) -> str:
+    """Renders the method and draft each of ``speculators`` accepts."""
+    return ", ".join(
+        f"{speculator.method!r} with "
+        + (
+            f"draft {speculator.draft_arch!r}"
+            if speculator.draft_arch is not None
+            else "no draft model"
+        )
+        for speculator in speculators
+    )
 
 
 def import_custom_architectures(custom_architectures: list[str]) -> None:

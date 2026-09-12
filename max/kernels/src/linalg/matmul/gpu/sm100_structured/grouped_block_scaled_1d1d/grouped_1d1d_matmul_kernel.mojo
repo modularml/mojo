@@ -38,11 +38,11 @@ architecture.
 """
 
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
-from std.collections import Optional
+from std.collections import Array, Optional
 from std.math import align_up, ceildiv
 from std.memory import Pointer, UnsafePointer, bitcast
 from std.math.uutils import ufloordiv, umod
-from std.sys import align_of, size_of
+from std.sys import align_of, get_defined_bool, get_defined_int, size_of
 
 from max.gpu import (
     WARP_SIZE,
@@ -155,10 +155,16 @@ from ..structured_kernels.warp_context import (
 
 from .grouped_1d1d_smem import Grouped1D1DSmem, SchedulerSlot
 from .grouped_1d1d_tile_scheduler import (
-    GroupedWorkIterator1D1D,
     GroupedWorkContext1D1D,
+    GroupedWorkIterator1D1D,
+    GroupedWorkLookup1D1D,
 )
-from ..structured_kernels.output_writer import TileWriter
+from ..structured_kernels.output_writer import (
+    EpiloguePeerSink,
+    NullPeerSink,
+    P3PeerSendConfig,
+    TileWriter,
+)
 
 
 comptime SWIGLU_MAX_TRACED_TILES = 64
@@ -429,35 +435,35 @@ struct NullSwiGLUOutput[
 
     comptime device_type: AnyType = Self
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         pass
 
-    @always_inline
+    @inline(.always)
     def store_packed_byte(self, m: Int, byte_pos: Int, val: UInt8):
         pass
 
-    @always_inline
+    @inline(.always)
     def store_packed_word(self, m: Int, byte_pos: Int, val: UInt32):
         pass
 
-    @always_inline
+    @inline(.always)
     def set_sf(self, m: Int, post_col: Int, sf: Scalar[Self.SfDtype]):
         pass
 
-    @always_inline
+    @inline(.always)
     def input_scale(self, active_expert_idx: Int) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def clamp_alpha(self) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def clamp_limit(self) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def pad_sf_zero_block(
         self,
         sf_block_base: Int,
@@ -534,7 +540,7 @@ struct RealSwiGLUOutput[
     var _clamp_alpha: Float32
     var _clamp_limit: Float32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         c_packed_ptr: UnsafePointer[UInt8, MutAnyOrigin],
@@ -551,12 +557,12 @@ struct RealSwiGLUOutput[
         self._clamp_alpha = clamp_alpha
         self._clamp_limit = clamp_limit
 
-    @always_inline
+    @inline(.always)
     def store_packed_byte(self, m: Int, byte_pos: Int, val: UInt8):
         # c_packed shape (M_total, c_packed_row_stride), row-major.
         self.c_packed_ptr.store(m * Self.c_packed_row_stride + byte_pos, val)
 
-    @always_inline
+    @inline(.always)
     def store_packed_word(self, m: Int, byte_pos: Int, val: UInt32):
         # Caller guarantees `byte_pos` and `c_packed_row_stride` are
         # multiples of 4 so PTX lowers to one ST.GLOBAL.B32.
@@ -564,7 +570,7 @@ struct RealSwiGLUOutput[
             (m * Self.c_packed_row_stride + byte_pos) // 4, val
         )
 
-    @always_inline
+    @inline(.always)
     def set_sf(
         self,
         m: Int,
@@ -587,19 +593,19 @@ struct RealSwiGLUOutput[
         ) * dim4 + i4
         self.c_swiglu_scales_ptr.store(linear_idx, sf)
 
-    @always_inline
+    @inline(.always)
     def input_scale(self, active_expert_idx: Int) -> Float32:
         return self.c_input_scales_ptr[active_expert_idx]
 
-    @always_inline
+    @inline(.always)
     def clamp_alpha(self) -> Float32:
         return self._clamp_alpha
 
-    @always_inline
+    @inline(.always)
     def clamp_limit(self) -> Float32:
         return self._clamp_limit
 
-    @always_inline
+    @inline(.always)
     def pad_sf_zero_block(
         self,
         sf_block_base: Int,
@@ -639,7 +645,7 @@ struct RealSwiGLUOutput[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -711,6 +717,17 @@ struct Grouped1D1DMatmulKernel[
     a_scale_offsets_engine: TensorEngine = DefaultEngine[element_width=1],
     expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
     expert_scales_engine: TensorEngine = DefaultEngine[element_width=1],
+    # When True, nothing reads the local C output (the epilogue's peer send
+    # is its only consumer), so the store is dead for the whole launch. The
+    # launcher then skips the C TMA encode and passes an empty descriptor,
+    # and the C tensor needs no backing allocation. Unlike `fuse_swiglu`
+    # this keeps the BF16 epilogue body -- only the GMEM store goes away.
+    c_store_dead: Bool = False,
+    p5_direct_scatter: Bool = False,
+    p5_row_cache: Bool = False,
+    # A second destination for the epilogue's output tile. Stateless, so it
+    # costs nothing to carry; the default keeps the local store.
+    SinkT: EpiloguePeerSink = NullPeerSink,
 ]:
     """Grouped 1D-1D block-scaled matmul kernel.
 
@@ -773,6 +790,19 @@ struct Grouped1D1DMatmulKernel[
         expert_ids_engine: Engine of the expert-IDs `TileTensor`.
         expert_scales_engine: Engine of the expert-scales
             `TileTensor`.
+        c_store_dead: When `True`, nothing reads the local C output, so
+            the C TMA descriptor is an empty placeholder and the C tensor
+            is unbacked; the epilogue keeps its BF16 body but issues no
+            GMEM store (defaults to `False`).
+        p5_direct_scatter: When `True`, compiles the in-epilogue EP-combine
+            peer scatter-send into the writer. Still gated at runtime by
+            `p3_control` (defaults to `False`).
+        p5_row_cache: When `True`, the peer send resolves each row's
+            destination once per launch instead of once per (row, tile)
+            (defaults to `False`).
+        SinkT: A second destination for the output tile, replacing the local
+            store when its `Enabled` is set. Defaults to `NullPeerSink`, which
+            keeps the local store.
     """
 
     # ========== Derived Constants ==========
@@ -797,12 +827,19 @@ struct Grouped1D1DMatmulKernel[
 
     # ========== Thread/Warp Organization ==========
 
-    comptime num_output_warps = 4
+    comptime num_output_warps = 4 * Self.config.num_epilogue_warpgroups
+    # `-D P5_SEND_WARPS=N`: extra warps above the scheduler that run the
+    # EP-combine peer send as a second consumer of the epilogue's SMEM output
+    # tile. See `output_writer.mojo`'s `p5_send_warps`. Default 0 leaves every
+    # role's thread range and the block size byte-identical.
+    comptime num_p5_send_warps = get_defined_int["P5_SEND_WARPS", 0]()
     # SFB warps are only launched on the decode (MMA_N < 64) path; on the
     # prefill / 2SM path (MMA_N >= 64) they are compile-time elided and the
     # scheduler warp takes warp 6 instead of warp 11, saving 160 idle threads.
     comptime WarpRole = WarpRole1D1D[
-        Self.MMA_N < 64, num_epi_warps=Self.num_output_warps
+        Self.MMA_N < 64,
+        num_epi_warps=Self.num_output_warps,
+        num_send_warps=Self.num_p5_send_warps,
     ]
     comptime NUM_THREADS = Self.WarpRole.TOTAL_THREADS
 
@@ -966,6 +1003,10 @@ struct Grouped1D1DMatmulKernel[
         num_output_warps=Self.num_output_warps,
         batched=False,  # 1D-1D uses 2D coordinates with bounds checking
         problem_n=Self.static_N,
+        c_store_dead=Self.c_store_dead,
+        p5_direct_scatter=Self.p5_direct_scatter,
+        p5_row_cache=Self.p5_row_cache,
+        SinkT=Self.SinkT,
     ]
 
     # ========== Work Iterator Type ==========
@@ -979,6 +1020,15 @@ struct Grouped1D1DMatmulKernel[
         OffsetsEngine=Self.offsets_engine,
         ExpertIdsEngine=Self.expert_ids_engine,
         ExpertScalesEngine=Self.expert_scales_engine,
+    ]
+
+    # ========== Warp-Cooperative Work Lookup Type ==========
+
+    # Geometry (tile shape, cluster, storages) comes from the iterator,
+    # so both scheduler paths share one block space.
+    comptime WorkLookup = GroupedWorkLookup1D1D[
+        Self.WorkIterator,
+        walk_cache_slots=Self.SmemType.SCHED_GROUP_CACHE_CAP,
     ]
 
     # ========== TMA Load Size Constants ==========
@@ -1154,6 +1204,17 @@ struct Grouped1D1DMatmulKernel[
             2,
         ), "Only support cta_group == 1 or 2"
         comptime assert Self.transpose_b, "Only support transposed B"
+        # The peer send writes a whole tile's N span from `n_abs` into a
+        # destination row slot sized for one hidden row, and unlike the local
+        # store it carries no per-column bound. A partial N tile would run past
+        # the row into the next payload, so require the span to divide N.
+        comptime assert (
+            not Self.p5_direct_scatter
+            or Self.static_N % Self.TileWriterType.stage_contiguous_size == 0
+        ), (
+            "the peer send has no per-column bound, so static_N must be a"
+            " whole number of output-stage spans"
+        )
         comptime if Self.MMA_N < 64:
             comptime assert (
                 Self.cta_group == 1
@@ -1162,7 +1223,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         elect_one_warp: Bool,
         elect_one_thread: Bool,
@@ -1204,9 +1265,10 @@ struct Grouped1D1DMatmulKernel[
             a_tma_op.prefetch_descriptor()
             b_tma_op.prefetch_descriptor()
             # On the fused path the C TMA op is an empty placeholder (results
-            # are written through `swiglu_out`), so there is no valid
-            # descriptor to prefetch.
-            comptime if not Self.fuse_swiglu:
+            # are written through `swiglu_out`), and `c_store_dead` makes it
+            # one for the same reason, so there is no valid descriptor to
+            # prefetch.
+            comptime if not (Self.fuse_swiglu or Self.c_store_dead):
                 c_tma_op.prefetch_descriptor()
             sfa_tma_op.prefetch_descriptor()
             sfb_tma_op.prefetch_descriptor()
@@ -1232,7 +1294,7 @@ struct Grouped1D1DMatmulKernel[
         cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_sched_ctx(
         ref[AddressSpace.SHARED] smem: Self.SmemType, slot_idx: Int
     ) -> GroupedWorkContext1D1D:
@@ -1265,7 +1327,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _consume_sched_ctx(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         mut sched_ci: Int,
@@ -1282,7 +1344,7 @@ struct Grouped1D1DMatmulKernel[
         return ctx
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_iter0_ctx(
         num_active_experts: Int,
         a_offsets: Self.OffsetsTile,
@@ -1293,9 +1355,9 @@ struct Grouped1D1DMatmulKernel[
 
         Each consumer warp calls this independently at kernel start,
         eliminating the latency of waiting for the scheduler warp to
-        publish slot 0. Only lane 0 runs the GMEM scan; results are
-        broadcast to all lanes via warp.broadcast (which also provides
-        the implicit __syncwarp memory fence).
+        publish slot 0. Lane 0 scans the group slots here and
+        broadcasts the result. The warp lookup stays with the scheduler
+        warp so its priming is paid once per CTA.
         """
         var s_m: UInt32 = 0
         var s_n: UInt32 = 0
@@ -1330,7 +1392,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sched_terminal_slot() -> SchedulerSlot:
         return SchedulerSlot(
             UInt32(0),
@@ -1344,7 +1406,24 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
+    def _ctx_to_sched_slot(ctx: GroupedWorkContext1D1D) -> SchedulerSlot:
+        """Convert a work context into a scheduler slot."""
+        if ctx.is_done():
+            return Self._sched_terminal_slot()
+        return SchedulerSlot(
+            ctx.m(),
+            ctx.n(),
+            ctx.group_idx(),
+            ctx.expert_id(),
+            ctx.m_start(),
+            ctx.m_end,
+            ctx.expert_scale,
+            UInt32(0),
+        )
+
+    @staticmethod
+    @inline(.always)
     def _compute_sched_slot(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         num_active_experts: Int,
@@ -1434,7 +1513,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _publish_sched_slot(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         slot_idx: Int,
@@ -1446,7 +1525,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)
@@ -2473,14 +2552,18 @@ struct Grouped1D1DMatmulKernel[
                     ctx = Self._consume_sched_ctx(smem, sched_ci, sched_phase)
 
         # ===== SCHEDULER WARP =====
-        # Sequential single-lane producer: 2-slot ProducerConsumer.
-        # Consumers compute iter 0 inline, so the scheduler starts at iter 1:
-        # bootstrap publishes iters 1,2 to slots 0,1, then steady-state uses
-        # slot = (it-1) % 2 to stay aligned with consumers reading slot = ci % 2.
+        # 2-slot ProducerConsumer. Consumers compute iter 0 inline, so the
+        # scheduler starts at iter 1: bootstrap publishes iters 1,2 to slots
+        # 0,1, then steady-state uses slot = (it-1) % 2 to stay aligned with
+        # consumers reading slot = ci % 2.
         if Self.WarpRole.is_scheduler():
-            var use_group_cache = (
-                _num_active_experts <= Self.SmemType.SCHED_GROUP_CACHE_CAP
-            )
+            # Token total across every slot. This is the only scheduler
+            # input still in GMEM, so load it only when it decides the
+            # choice.
+            var total_m = UInt32(0)
+            if Self.WorkLookup.needs_total_m(_num_active_experts, num_k_iters):
+                total_m = a_offsets[_num_active_experts][0]
+
             var cta_stride = UInt32(
                 ufloordiv(grid_dim.x, Self.config.cta_group)
             )
@@ -2488,99 +2571,140 @@ struct Grouped1D1DMatmulKernel[
                 ufloordiv(block_idx.x, Self.config.cta_group)
             )
 
-            var grp: UInt32 = 0
-            var cumsum: UInt32 = 0
-            var bstart: UInt32 = 0
-            var has_steady_state = Int32(0)
-
-            # --- Bootstrap: iters 1,2 from GMEM (cache not primed yet) ---
-            if lane_id() == 0:
-                var slot0 = Self._compute_sched_slot(
-                    smem,
-                    _num_active_experts,
-                    a_offsets,
-                    expert_ids,
-                    expert_scales,
-                    False,  # GMEM — cache not primed yet
-                    cta_stride + cta_offset,  # iter 1
-                    grp,
-                    cumsum,
-                    bstart,
+            if Self.WorkLookup.can_handle(
+                _num_active_experts, total_m, num_k_iters
+            ):
+                # Fast path: the warp shares one block prefix, so a
+                # slot costs a ballot and a shuffle. All lanes take part
+                # in the lookups; lane 0 publishes.
+                var lookup = Self.WorkLookup(
+                    _num_active_experts, a_offsets, expert_ids, expert_scales
                 )
-                Self._publish_sched_slot(smem, 0, slot0)
 
-                if slot0.expert_id >= 0:
-                    var slot1 = Self._compute_sched_slot(
+                # Iters 1,2 bootstrap without waiting. From iter 3 the
+                # consumer must free the slot first.
+                var it = Int32(1)
+                var prod_phase = UInt32(0)
+                while True:
+                    # Align with consumer's `ci % 2`: iter=ci+1, so the
+                    # slot the producer writes is (iter-1)%2.
+                    var slot = Int(it - 1) % 2
+                    if it >= 3:
+                        smem.sched_empty_mbar()[slot].wait(prod_phase)
+                        if slot == 1:
+                            prod_phase ^= 1
+
+                    var ctx = lookup.lookup(
+                        UInt32(it) * cta_stride + cta_offset
+                    )
+                    if lane_id() == 0:
+                        Self._publish_sched_slot(
+                            smem, slot, Self._ctx_to_sched_slot(ctx)
+                        )
+
+                    if ctx.is_done():
+                        break
+                    it += 1
+            else:
+                # Sequential single-lane producer, for launches the
+                # lookup declines.
+                var use_group_cache = (
+                    _num_active_experts <= Self.SmemType.SCHED_GROUP_CACHE_CAP
+                )
+                var grp: UInt32 = 0
+                var cumsum: UInt32 = 0
+                var bstart: UInt32 = 0
+                var has_steady_state = Int32(0)
+
+                # --- Bootstrap: iters 1,2 from GMEM (cache not primed yet) ---
+                if lane_id() == 0:
+                    var slot0 = Self._compute_sched_slot(
                         smem,
                         _num_active_experts,
                         a_offsets,
                         expert_ids,
                         expert_scales,
                         False,  # GMEM — cache not primed yet
-                        UInt32(2) * cta_stride + cta_offset,  # iter 2
+                        cta_stride + cta_offset,  # iter 1
                         grp,
                         cumsum,
                         bstart,
                     )
-                    Self._publish_sched_slot(smem, 1, slot1)
+                    Self._publish_sched_slot(smem, 0, slot0)
 
-                    if slot1.expert_id >= 0:
-                        has_steady_state = Int32(1)
-
-            # --- Prime SMEM group cache (all 32 lanes, fire-and-forget) ---
-            # Steady-state empty_mbar.wait() below fences these stores before
-            # any cache reads.
-            if use_group_cache:
-                var sched_group_offsets = smem.sched_group_offsets()
-                var sched_expert_ids = smem.sched_expert_ids()
-                var sched_expert_scales = smem.sched_expert_scales()
-                var lane = Int(lane_id())
-                for i in range(lane, _num_active_experts + 1, WARP_SIZE):
-                    sched_group_offsets[i] = a_offsets[i][0]
-                for i in range(lane, _num_active_experts, WARP_SIZE):
-                    var eid = expert_ids[i][0]
-                    sched_expert_ids[i] = eid
-                    sched_expert_scales[i] = expert_scales[Int(eid)][
-                        0
-                    ] if eid >= 0 else Float32(1.0)
-
-            # --- Steady-state: use SMEM cache (fast) ---
-            # warp.broadcast() is shuffle_idx with full mask — it includes an
-            # implicit __syncwarp that fences the cache priming stores above.
-            if warp.broadcast(has_steady_state) > 0:
-                if lane_id() == 0:
-                    var it = Int32(3)
-                    var prod_phase = UInt32(0)
-                    while True:
-                        # Align with consumer's `ci % 2`: iter=ci+1, so the
-                        # slot the producer writes is (iter-1)%2.
-                        var slot = Int(it - 1) % 2
-                        smem.sched_empty_mbar()[slot].wait(prod_phase)
-                        if slot == 1:
-                            prod_phase ^= 1
-
-                        var sched_slot = Self._compute_sched_slot(
+                    if slot0.expert_id >= 0:
+                        var slot1 = Self._compute_sched_slot(
                             smem,
                             _num_active_experts,
                             a_offsets,
                             expert_ids,
                             expert_scales,
-                            use_group_cache,
-                            UInt32(it) * cta_stride + cta_offset,
+                            False,  # GMEM — cache not primed yet
+                            UInt32(2) * cta_stride + cta_offset,  # iter 2
                             grp,
                             cumsum,
                             bstart,
                         )
-                        Self._publish_sched_slot(smem, slot, sched_slot)
+                        Self._publish_sched_slot(smem, 1, slot1)
 
-                        if sched_slot.expert_id < 0:
-                            break
-                        it += 1
+                        if slot1.expert_id >= 0:
+                            has_steady_state = Int32(1)
+
+                # --- Prime SMEM group cache (all 32 lanes, fire-and-forget) ---
+                # Steady-state empty_mbar.wait() below fences these stores
+                # before any cache reads.
+                if use_group_cache:
+                    var sched_group_offsets = smem.sched_group_offsets()
+                    var sched_expert_ids = smem.sched_expert_ids()
+                    var sched_expert_scales = smem.sched_expert_scales()
+                    var lane = Int(lane_id())
+                    for i in range(lane, _num_active_experts + 1, WARP_SIZE):
+                        sched_group_offsets[i] = a_offsets[i][0]
+                    for i in range(lane, _num_active_experts, WARP_SIZE):
+                        var eid = expert_ids[i][0]
+                        sched_expert_ids[i] = eid
+                        sched_expert_scales[i] = expert_scales[Int(eid)][
+                            0
+                        ] if eid >= 0 else Float32(1.0)
+
+                # --- Steady-state: use SMEM cache (fast) ---
+                # warp.broadcast() is shuffle_idx with full mask — it includes
+                # an implicit __syncwarp that fences the cache priming
+                # stores above.
+                if warp.broadcast(has_steady_state) > 0:
+                    if lane_id() == 0:
+                        var it = Int32(3)
+                        var prod_phase = UInt32(0)
+                        while True:
+                            # Align with consumer's `ci % 2`: iter=ci+1, so
+                            # the slot the producer writes is (iter-1)%2.
+                            var slot = Int(it - 1) % 2
+                            smem.sched_empty_mbar()[slot].wait(prod_phase)
+                            if slot == 1:
+                                prod_phase ^= 1
+
+                            var sched_slot = Self._compute_sched_slot(
+                                smem,
+                                _num_active_experts,
+                                a_offsets,
+                                expert_ids,
+                                expert_scales,
+                                use_group_cache,
+                                UInt32(it) * cta_stride + cta_offset,
+                                grp,
+                                cumsum,
+                                bstart,
+                            )
+                            Self._publish_sched_slot(smem, slot, sched_slot)
+
+                            if sched_slot.expert_id < 0:
+                                break
+                            it += 1
 
     # ========== SFB Load to TMEM (MMA_N < 64) ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sfb_load_to_tmem(
         sfb_tiles: Self.SmemType.Core.SFBTileArray,
         tmem_region: Self.TmemRegion,
@@ -2682,7 +2806,7 @@ struct Grouped1D1DMatmulKernel[
             _ = _sfb_st_vals
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _get_sf_coords(
         m_coord: UInt32,
         n_coord: UInt32,
@@ -2715,7 +2839,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Load Input Tiles ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -3028,7 +3152,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== MMA Operation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_sfb_tmem_adj(
         m_coord: UInt32, n_coord: UInt32, m_start: UInt32
     ) -> UInt32:
@@ -3062,7 +3186,7 @@ struct Grouped1D1DMatmulKernel[
             return UInt32(0)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -3140,7 +3264,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Epilogue ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _swiglu_quant_epilogue_body(
         c_tiles: Self.SmemType.Core.CTileArray,
         output_stage: Self.TileWriterType.Stage,
@@ -3691,7 +3815,7 @@ struct Grouped1D1DMatmulKernel[
         # `cvt.rn.bf16x2.f32` cast width used by `tile_writer` so the
         # bf16 SMEM scratchpad is byte-identical to the standalone
         # matmul's BF16 GMEM output (chain reference).
-        @always_inline
+        @inline(.always)
         @__parameter
         def store_scaled_pair(
             smem_idx_a: UInt32,
@@ -4009,7 +4133,7 @@ struct Grouped1D1DMatmulKernel[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def epilogue(
         c_tiles: Self.SmemType.Core.CTileArray,
         c_tma_op: Self.CTmaOp,
@@ -4020,6 +4144,16 @@ struct Grouped1D1DMatmulKernel[
         swiglu_out: Self.SwiGLUOutputT,
         trace_buf: Self.TraceBufT,
         tile_idx_epi: Int = 0,
+        # Forwarded verbatim to
+        # `TileWriter.write_absolute_with_bounds_check`; see there and
+        # `P3PeerSendConfig`'s docstring. `p3_expert_id` is NOT a new param
+        # here -- `work_ctx.expert_id()` is already in scope below, and it is
+        # the right one: `work_ctx.group_idx()` indexes the compacted ACTIVE-
+        # experts list, which is shorter than `n_local_experts` whenever a
+        # local expert has zero tokens this batch, while the peer-send counters
+        # are addressed by the LOGICAL per-rank expert slot.
+        p3_control: Int = -1,
+        p3_cfg: P3PeerSendConfig = P3PeerSendConfig.disabled(),
     ):
         """Execute epilogue to store accumulated results with expert_scale.
 
@@ -4048,6 +4182,9 @@ struct Grouped1D1DMatmulKernel[
                 records; zero-sized when `swiglu_enable_trace=False`.
             tile_idx_epi: Per-tile epilogue counter for trace event
                 indexing (defaults to 0).
+            p3_control: Peer-send gate; `-1` disables the send.
+            p3_cfg: Bundled peer-send configuration (buffers, geometry and
+                the destination-resolve tables).
         """
 
         # For 1D-1D, pass absolute coordinates directly (not tile indices)
@@ -4092,4 +4229,7 @@ struct Grouped1D1DMatmulKernel[
                 work_ctx.m_end,  # Token dim end for bounds checking
                 work_ctx.expert_scale,
                 c_device,
+                p3_control=p3_control,
+                p3_expert_id=work_ctx.expert_id(),
+                p3_cfg=p3_cfg,
             )

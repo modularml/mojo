@@ -132,3 +132,13 @@ kgen.func @nonnull_pointer(%arg0: !kgen.pointer<scalar<f32>, 0, nonnull>) {
 kgen.func @nonnull_pointer_addrspace(%arg0: !kgen.pointer<scalar<f32>, 1, nonnull>) {
   kgen.return
 }
+
+// COM: An `@inline(expr)` the elaborator has not folded yet round-trips as
+// COM: `inline<expr>` where an inline-level keyword would go.
+// CHECK-LABEL: kgen.generator @unfolded_inline_level
+// CHECK-SAME: inline<#kgen.cast_to_builtin
+kgen.generator @unfolded_inline_level<policy: !kgen.scalar<index>>()
+    inline<#kgen.cast_to_builtin<#kgen.param.decl.ref<"policy">
+                                 : !kgen.scalar<index>> : index> {
+  kgen.return
+}

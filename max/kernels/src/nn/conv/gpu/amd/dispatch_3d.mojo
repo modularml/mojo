@@ -385,7 +385,7 @@ def dispatch_amd_4wave_conv3d[
         comptime if _all_dhw_static:
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_static[
                 stride_v: Int, pad_d_c: Int, pad_hw_c: Int
             ]() raises -> Bool:
@@ -572,7 +572,7 @@ def dispatch_amd_4wave_conv3d[
             # output dims, then call the kernel via use_runtime_hw=True.
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_runtime[
                 stride_v: Int, pad_d_c: Int, pad_hw_c: Int
             ]() raises:

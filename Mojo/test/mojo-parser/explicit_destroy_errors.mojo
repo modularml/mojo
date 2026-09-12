@@ -285,6 +285,29 @@ def testWhereFalseCustomMessage():
     _ = WhereFalseCustom()
 
 
+# The reason on an always-false `Deinitable` conformance is that message,
+# without a decorator. This is the replacement for `@explicit_destroy("...")`.
+struct NotDeinitableReason(not Deinitable else "use consume()"):
+    def __init__(out self):
+        pass
+
+
+def testNotDeinitableReason():
+    # expected-error @below {{abandoned without being explicitly destroyed: use consume()}}
+    _ = NotDeinitableReason()
+
+
+# The older `where False` spelling carries a reason the same way.
+struct WhereFalseReason(Deinitable where False else "use consume()"):
+    def __init__(out self):
+        pass
+
+
+def testWhereFalseReason():
+    # expected-error @below {{abandoned without being explicitly destroyed: use consume()}}
+    _ = WhereFalseReason()
+
+
 # A conditional Deinitable slot that the struct's own where-clause
 # renders unsatisfiable (`where not (n > 0)` under `where n > 0`) is an opt-out
 # indistinguishable from the literal `where False` above: for any instantiable

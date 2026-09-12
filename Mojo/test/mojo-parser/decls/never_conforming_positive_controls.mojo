@@ -28,7 +28,9 @@
 #      getConformanceCondition against collapsing an implied (true) condition to
 #      false;
 #   4. the MixedConformance shape keeps `Deinitable` and drops only the
-#      `Movable where False` slot.
+#      `Movable where False` slot;
+#   5. a `not Trait` entry suppresses exactly its own slot -- opting out of one
+#      trait must not take a neighboring conformance down with it.
 
 # RUN: %parse-mojo-isolated %s | FileCheck %s
 
@@ -82,6 +84,28 @@ struct ImpliedMovable[n: Int](Movable where n > 0) where n > 5:
 # CHECK-NOT: __init__(move:
 struct MixedInner[value: Int](
     Deinitable where value >= 0, Movable where False,
+):
+    pass
+
+
+# --- 5. `not` suppresses only its own slot ----------------------------------
+
+# `Copyable` is not one of the injected traits, so opting out of it states the
+# default. `Movable` must still be injected and its move ctor synthesized --
+# the marker is the plain unconstrained alias, exactly as in case 1.
+# CHECK-LABEL: lit.struct.decl @NotCopyableKeepsMovable(!AnyType_Deinitable_Movable)
+# CHECK: lit.fn @"__init__(move:{{.*}}NotCopyableKeepsMovable$)"
+struct NotCopyableKeepsMovable(not Copyable):
+    pass
+
+
+# The `not` sibling of case 4: `not Movable` drops only the Movable slot, and
+# the conditional `Deinitable` conformance beside it survives verbatim.
+# CHECK-LABEL: lit.struct.decl @NotMixedInner<value: !Int>(!constrained_AnyType_Deinitable{{[0-9]*}})
+# CHECK-SAME: does not conditionally conform to 'Deinitable' for these parameters
+# CHECK-NOT: __init__(move:
+struct NotMixedInner[value: Int](
+    Deinitable where value >= 0, not Movable,
 ):
     pass
 

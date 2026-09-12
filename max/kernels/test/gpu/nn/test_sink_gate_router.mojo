@@ -36,15 +36,18 @@ def sigmoid_ref(x: Float32) -> Float32:
 
 
 def test_sink_gate_router[
-    n_routed: Int, topk: Int, n_shared: Int
+    n_routed: Int, topk: Int, n_shared: Int, pad: Int = 0
 ](num_tokens: Int, ctx: DeviceContext) raises:
     comptime n_total = n_routed + n_shared
+    # Padding for alignment gives the router wider rows; the extra columns
+    # hold no expert and must not be read.
+    comptime n_stride = n_total + pad
     comptime k_total = topk + n_shared
     comptime route_scale = 8.0
     comptime global_scale_val = 1.3
 
     var logits_host = ctx.enqueue_create_host_buffer[scores_type](
-        num_tokens * n_total
+        num_tokens * n_stride
     )
     var bias_host = ctx.enqueue_create_host_buffer[bias_type](n_routed)
     var gscale_host = ctx.enqueue_create_host_buffer[scores_type](1)
@@ -52,15 +55,19 @@ def test_sink_gate_router[
     # Continuous random values keep the selection order unambiguous: ties would
     # be broken by lower index in the kernel but are measure-zero here.
     random(
-        TileTensor(logits_host, row_major(Coord(num_tokens, Idx[n_total]))),
+        TileTensor(logits_host, row_major(Coord(num_tokens, Idx[n_stride]))),
         min=-4.0,
         max=4.0,
     )
+    # Poison the padding: this would take every top-k slot if scored.
+    for t in range(num_tokens):
+        for c in range(n_total, n_stride):
+            logits_host[t * n_stride + c] = 1.0e4
     random(TileTensor(bias_host, row_major(Idx[n_routed])), min=-0.1, max=0.1)
     gscale_host[0] = Float32(global_scale_val)
 
     var logits_dev = ctx.enqueue_create_buffer[scores_type](
-        num_tokens * n_total
+        num_tokens * n_stride
     )
     var bias_dev = ctx.enqueue_create_buffer[bias_type](n_routed)
     var gscale_dev = ctx.enqueue_create_buffer[scores_type](1)
@@ -76,7 +83,7 @@ def test_sink_gate_router[
         TileTensor(w_dev, row_major(Coord(num_tokens, Idx[topk]))),
         TileTensor(sink_dev, row_major(Coord(num_tokens, Idx[n_shared]))),
         TileTensor(
-            logits_dev, row_major(Coord(num_tokens, Idx[n_total]))
+            logits_dev, row_major(Coord(num_tokens, Idx[n_stride]))
         ).as_immut(),
         TileTensor(bias_dev, row_major(Idx[n_routed])).as_immut(),
         TileTensor(gscale_dev, row_major(Idx[1])).as_immut(),
@@ -112,7 +119,9 @@ def test_sink_gate_router[
                         taken = True
                 if taken:
                     continue
-                var s = sigmoid_ref(logits_host[t * n_total + e]) + bias_host[e]
+                var s = (
+                    sigmoid_ref(logits_host[t * n_stride + e]) + bias_host[e]
+                )
                 if best == -1 or s > best_score:
                     best = e
                     best_score = s
@@ -126,10 +135,10 @@ def test_sink_gate_router[
         # kernel's own expression.
         var sigmoids = List[Float32]()
         for j in range(topk):
-            sigmoids.append(sigmoid_ref(logits_host[t * n_total + winners[j]]))
+            sigmoids.append(sigmoid_ref(logits_host[t * n_stride + winners[j]]))
         for s in range(n_shared):
             sigmoids.append(
-                sigmoid_ref(logits_host[t * n_total + n_routed + s])
+                sigmoid_ref(logits_host[t * n_stride + n_routed + s])
             )
 
         var total = Float32(0)
@@ -175,3 +184,5 @@ def main() raises:
         test_sink_gate_router[256, 6, 2](64, ctx)
         # k_total = 4, and a routed count of exactly one AMD wavefront.
         test_sink_gate_router[64, 2, 2](5, ctx)
+        # Inkling pads its 258 gate rows to 264 for an aligned router GEMM.
+        test_sink_gate_router[256, 6, 2, pad=6](17, ctx)

@@ -395,7 +395,7 @@ __extension SM100MLA:
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _kernel_impl_per_token_scale(
         q_nope_tma_op: QTMATile[
             Self.KVLUTType.dtype,
@@ -680,7 +680,7 @@ __extension SM100MLA:
             warpgroup_reg_dealloc[num_reg_empty]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_per_token_scale(
         mbars: Self.MiscMBarsType,
         score_row: UInt32,
@@ -917,7 +917,7 @@ __extension SM100MLA:
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _k_num_valid_pages(current_kv_row: UInt32) -> UInt32:
             """Valid K_nope/V/k_scale sub-tile pages at `current_kv_row`."""
             if current_kv_row >= num_keys:
@@ -928,7 +928,7 @@ __extension SM100MLA:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _rope_num_valid_pages(current_kv_row: UInt32) -> UInt32:
             """Valid K_rope sub-tile pages at `current_kv_row`."""
             if current_kv_row >= num_keys:
@@ -956,7 +956,7 @@ __extension SM100MLA:
         # K_rope shared closure. Bytes are accounted by the caller on
         # the K barrier (no separate CVT mbar — unlike blockscale).
         @__parameter
-        @always_inline
+        @inline(.always)
         def _produce_k_rope[
             partial: Bool,
         ](
@@ -1011,7 +1011,7 @@ __extension SM100MLA:
 
         # k_scale shared closure. Bytes accounted by caller on `mbar`.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _produce_k_scale[
             partial: Bool,
         ](
@@ -1061,7 +1061,7 @@ __extension SM100MLA:
         # pipeline_v.get_tile().mbar in non-shared-KV), so this closure
         # emits its own partial-aware `expect_bytes_pred` directly.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _produce_v[
             partial: Bool,
         ](
@@ -1119,7 +1119,7 @@ __extension SM100MLA:
             var k_scale_idx: UInt32 = 0
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _fused_kv_buffer_ptr() -> (
                 SharedMemPointer[Scalar[Self.KVLUTType.dtype]]
             ):
@@ -1129,7 +1129,7 @@ __extension SM100MLA:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _fused_rope_smem_ptr() -> (
                 SharedMemPointer[Scalar[Self.KRopeType.dtype]]
             ):
@@ -1142,7 +1142,7 @@ __extension SM100MLA:
                 return rope_smem_base + rope_idx * UInt32(rope_stage_elems)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _fused_k_scale_smem_ptr() -> (
                 SharedMemPointer[Scalar[config.scale_dtype]]
             ):
@@ -1150,7 +1150,7 @@ __extension SM100MLA:
                 return k_scale_smem + k_scale_idx * UInt32(k_scale_elems)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _produce_k_fused[
                 partial: Bool,
                 with_q: Bool = False,
@@ -1254,7 +1254,7 @@ __extension SM100MLA:
                 # slot passes `acquire=False` (initial producer
                 # phase = 1).
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def _emit_k_1q[
                     partial: Bool,
                     with_q: Bool = False,
@@ -1282,7 +1282,7 @@ __extension SM100MLA:
                     kv_pipeline.state.step()
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def _emit_v_1q[
                     partial: Bool
                 ](paged: type_of(paged_rows), v_nvp: UInt32):
@@ -1659,7 +1659,7 @@ __extension SM100MLA:
             comptime KNopeSplitSub = SMemTensorLT[k_nope_split_sub]
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _split_v_smem_ptr(
                 pair: type_of(pipeline_v.get_tile[qk_stage=0]()),
             ) -> SharedMemPointer[Scalar[Self.KVLUTType.dtype]]:
@@ -1676,7 +1676,7 @@ __extension SM100MLA:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _produce_k_split[
                 partial: Bool,
                 with_q: Bool = False,
@@ -1952,7 +1952,7 @@ __extension SM100MLA:
                         pipeline_v.commit_step()
 
 
-@always_inline
+@inline(.always)
 def q_scale_tma[
     dtype: DType, //, BM: Int
 ](
@@ -2184,7 +2184,7 @@ def mla_sm100_prefill_per_token_scale[
     # `BM // num_q` = 128 in both modes; K/V/rope/k_scale TMA shapes
     # are BM-independent), so they are passed through unchanged.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _launch[cfg: MLAConfig]() raises:
         comptime assert cfg.supported(), cfg.fa4_config.description()
         comptime SchedulerType = TransientScheduler[

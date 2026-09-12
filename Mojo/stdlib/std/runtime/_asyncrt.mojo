@@ -172,7 +172,7 @@ def _create_task(
     _async_execute[handle.type](task._handle._handle, desired_worker_id)
 
 
-@always_inline
+@inline(.always)
 def _run(var handle: Coroutine[...], out result: handle.type):
     """Executes a coroutine and waits for its completion.
     This function runs the given coroutine on the async runtime and blocks until
@@ -247,7 +247,7 @@ struct Task[type: Deinitable, origins: OriginSet](Movable where False):
         _del_asyncrt_chain(_AsyncContext.get_chain(ctx))
         self._handle^._unsafe_force_deinit()
 
-    @always_inline
+    @inline(.always)
     def __await__(self) -> ref[self.get()] Self.type:
         """Suspend the current async function until the task completes and its
         result becomes available. This function must be force inlined into the
@@ -262,7 +262,7 @@ struct Task[type: Deinitable, origins: OriginSet](Movable where False):
 
         var ctx = self._handle._get_ctx[_AsyncContext]()
 
-        @always_inline
+        @inline(.always)
         def await_body(cur_hdl: AnyCoroutine) {var}:
             _async_and_then(
                 cur_hdl,
@@ -408,7 +408,7 @@ struct RaisingTask[type: Movable, origins: OriginSet](
         dealloc(self._error_alloc^.unsafe_with_layout({count = 1}))
         dealloc(self._result_alloc^.unsafe_with_layout({count = 1}))
 
-    @always_inline
+    @inline(.always)
     def __await__(deinit self, out result: Self.type) raises:
         """Suspend the current async function until the task completes.
 
@@ -426,7 +426,7 @@ struct RaisingTask[type: Movable, origins: OriginSet](
 
         var ctx = self._handle._get_ctx[_AsyncContext]()
 
-        @always_inline
+        @inline(.always)
         def await_body(cur_hdl: AnyCoroutine) {var}:
             _async_and_then(cur_hdl, _AsyncContext.get_chain(ctx))
 
@@ -525,7 +525,7 @@ struct TaskGroup(Defaultable):
         """Clean up resources associated with the TaskGroup."""
         _del_asyncrt_chain(Pointer(to=self.chain))
 
-    @always_inline
+    @inline(.always)
     def _counter_decr(mut self) -> Int:
         var prev: Int = self.counter.fetch_sub(1)
         return prev - 1
@@ -579,14 +579,14 @@ struct TaskGroup(Defaultable):
         _async_and_then(hdl, Pointer(to=task_group.chain))
         task_group._task_complete()
 
-    @always_inline
+    @inline(.always)
     def __await__(mut self):
         """Make TaskGroup awaitable in async contexts.
 
         This allows using 'await task_group' syntax in async functions.
         """
 
-        @always_inline
+        @inline(.always)
         def await_body(cur_hdl: AnyCoroutine) {mut}:
             Self.await_body_impl(cur_hdl, self)
 

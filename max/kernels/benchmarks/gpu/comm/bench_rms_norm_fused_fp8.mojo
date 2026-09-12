@@ -100,7 +100,7 @@ def bench_rms_norm_fused_fp8[
     ctx.enqueue_copy(gamma_d, gamma_h)
 
     # ===== Benchmark 1: RMS norm alone =====
-    @always_inline
+    @inline(.always)
     def bench_rms_norm(
         mut b: Bencher,
     ) raises {
@@ -111,7 +111,7 @@ def bench_rms_norm_fused_fp8[
         var cb_rms_output,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             # Construct buffers with offsets
             var data_ptr_offset = cb_data.offset_ptr(iteration)
@@ -126,7 +126,7 @@ def bench_rms_norm_fused_fp8[
             # Input function for RMS norm. `rms_norm_gpu` migrated to a `Coord`
             # shape boundary (softmax PR #88203).
             @__copy_capture(data_buf_offset)
-            @always_inline
+            @inline(.always)
             @__parameter
             def input_fn[width: Int](coords: Coord) -> SIMD[in_dtype, width]:
                 var idx = data_buf_offset.layout(coords)
@@ -135,7 +135,7 @@ def bench_rms_norm_fused_fp8[
                 )
 
             # Output function for RMS norm
-            @always_inline
+            @inline(.always)
             @__copy_capture(rms_output_buf_offset)
             @__parameter
             def rms_output_fn[
@@ -169,16 +169,16 @@ def bench_rms_norm_fused_fp8[
     # ===== Benchmark 2: FP8 quantization alone =====
     var scales_base_ptr = scales_d.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def bench_fp8_quant(
         mut b: Bencher,
     ) raises {var cb_rms_output, var cb_fp8_output, var scales_base_ptr, imm,}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             # Input function for FP8 quant (reads from RMS norm output)
             var rms_ptr_offset = cb_rms_output.offset_ptr(iteration)
 
-            @always_inline
+            @inline(.always)
             def fp8_input_fn[
                 width: Int, alignment: Int
             ](row: Int, col: Int) {var rms_ptr_offset} -> SIMD[in_dtype, width]:
@@ -213,7 +213,7 @@ def bench_rms_norm_fused_fp8[
     # ===== Benchmark 3: Fused RMS norm + FP8 quantization =====
     var scales_base_ptr_fused = scales_base_ptr
 
-    @always_inline
+    @inline(.always)
     def bench_fused(
         mut b: Bencher,
     ) raises {
@@ -225,13 +225,13 @@ def bench_rms_norm_fused_fp8[
         var scales_base_ptr_fused,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx_: DeviceContext, iteration: Int) raises {imm}:
             # Input function with offset
             var data_ptr_offset = cb_data.offset_ptr(iteration)
 
             @__copy_capture(data_ptr_offset)
-            @always_inline
+            @inline(.always)
             @__parameter
             def input_fn_fused[
                 width: Int, _rank: Int
@@ -309,14 +309,14 @@ def bench_rms_norm_fused_fp8[
     # Input function for verification. `rms_norm_gpu` migrated to a `Coord`
     # shape boundary (softmax PR #88203).
     @__copy_capture(data_buf_verify)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn_verify[width: Int](coords: Coord) -> SIMD[in_dtype, width]:
         var idx = data_buf_verify.layout(coords)
         return data_buf_verify.raw_load[width=width](idx)
 
     # Output function for verification
-    @always_inline
+    @inline(.always)
     @__copy_capture(rms_output_buf_verify)
     @__parameter
     def rms_output_fn_verify[
@@ -339,7 +339,7 @@ def bench_rms_norm_fused_fp8[
     )
 
     # Run FP8 quantization on RMS norm output
-    @always_inline
+    @inline(.always)
     def fp8_input_fn_verify[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var rms_verify_base_ptr} -> SIMD[in_dtype, width]:
@@ -373,7 +373,7 @@ def bench_rms_norm_fused_fp8[
     var data_base_ptr_verify = cb_data.unsafe_ptr()
 
     @__copy_capture(data_base_ptr_verify)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn_fused_verify[
         width: Int, _rank: Int

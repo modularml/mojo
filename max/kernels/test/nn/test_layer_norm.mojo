@@ -49,7 +49,7 @@ def run_layer_norm_cpu[
     var beta = TileTensor(beta_ptr, row_major(Coord(param_shape)))
     var epsilon = Scalar[dtype](0.0001)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int,
         alignment: Int,
@@ -57,7 +57,7 @@ def run_layer_norm_cpu[
         var idx = input_buf.layout(coords)
         return input_buf.raw_load[width=width, alignment=alignment](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var output_buf}:

@@ -425,7 +425,7 @@ struct Set[
         write_sequence_to(writer, iterate, start="{", end="}")
         _ = iterator^
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Copyable) and conforms_to(Self.T, Writable):
@@ -436,7 +436,7 @@ struct Set[
         """
         self._write_self_to[is_repr=False](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Copyable) and conforms_to(Self.T, Writable):

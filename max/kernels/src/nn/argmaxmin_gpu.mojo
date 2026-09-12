@@ -50,7 +50,7 @@ comptime _ARGMAXMIN_BYTES_PER_BLOCK = 32 * 1024
 comptime _ARGMAXMIN_MAX_SPLITS = 64
 
 
-@always_inline
+@inline(.always)
 def _argmaxmin_vec_update[
     dtype: DType, largest: Bool, simd_width: Int
 ](
@@ -75,7 +75,7 @@ def _argmaxmin_vec_update[
     best_idxs = better.select(lane_offsets + Int32(base), best_idxs)
 
 
-@always_inline
+@inline(.always)
 def _argmaxmin_scan[
     dtype: DType,
     largest: Bool,
@@ -121,7 +121,7 @@ def _argmaxmin_scan[
         i += lane_stride
 
 
-@always_inline
+@inline(.always)
 def _argmaxmin_block_partial[
     dtype: DType, largest: Bool, simd_width: Int, unroll: Int
 ](

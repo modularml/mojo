@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.builtin.simd import *
+from std.simd import *
 from max.gpu.host import DeviceContext
 from std.memory import bitcast
 

@@ -72,12 +72,43 @@ private:
   const llvm::SourceMgr &sourceMgr;
 };
 
+/// The EmitAs outputs kgen writes; their spellings are accepted directly,
+/// and target-declared kinds canonicalize onto them.
+static constexpr EmitAs kEmitAsKinds[] = {
+    EmitAs::OBJECT, EmitAs::LLVM,     EmitAs::LLVM_BITCODE,
+    EmitAs::ASM,    EmitAs::LLVM_OPT, EmitAs::LLVM_OPT_BITCODE};
+
+/// kgen products with no EmitAs identity, named only here.
+static constexpr llvm::StringRef kAsmVerboseKind = "asm-verbose";
+static constexpr llvm::StringRef kHeaderKind = "header";
+static constexpr llvm::StringRef kSharedLibKind = "shared-lib";
+static constexpr llvm::StringRef kProductKinds[] = {
+    kAsmVerboseKind, kHeaderKind, kSharedLibKind};
+
+/// The accepted `-emit` spellings, for option-name registration and
+/// suggestions.
+static llvm::SmallVector<llvm::StringRef> emissionKindNames() {
+  llvm::SmallVector<llvm::StringRef> names;
+  for (EmitAs kind : kEmitAsKinds)
+    names.push_back(stringifyEmitAs(kind));
+  llvm::append_range(names, kProductKinds);
+  return names;
+}
+
+/// True if `cmd` is the emit command for `kind`.
+static bool isEmitCmd(llvm::StringRef cmd, llvm::StringRef kind) {
+  return cmd.consume_front("emit=") && cmd == kind;
+}
+static bool isEmitCmd(llvm::StringRef cmd, EmitAs kind) {
+  return isEmitCmd(cmd, stringifyEmitAs(kind));
+}
+
 class CLOptions : public KGENOptions {
 public:
   KGENCLOptions parser;
 
   CLOptions(int argc, char **argv, bool skipInitLLVM = false)
-      : parser(argc, argv, *this, skipInitLLVM) {}
+      : parser(argc, argv, *this, skipInitLLVM, emissionKindNames()) {}
 
   M::cl::MListOpt<std::string> inputFiles{llvm::cl::Positional,
                                           cl::desc("<input files>")};
@@ -247,7 +278,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   // for threads that never do anything -- a measured ~15-20% of wall time on
   // real kernel files, matching the real LSP server's `-mojo-test` mode, which
   // does the same.
-  if (clOptions.cmd == Command::kLSP || clOptions.cmd == Command::kLSPNoDump)
+  if (clOptions.cmd == "lsp" || clOptions.cmd == "lsp=no-dump")
     clOptions.withSingleThreaded();
 
   // Register MLIR stuff
@@ -269,7 +300,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   CompilationOptions options = clOptions.getCompilationOptions();
   if (clOptions.saveTemps)
     options.saveTempsPrefix = clOptions.tempsDir;
-  options.verboseOutput = (clOptions.cmd == Command::kEmitAssemblyVerbose);
+  options.verboseOutput = isEmitCmd(clOptions.cmd, kAsmVerboseKind);
   options.bitcodeLibs = llvm::to_vector_of<std::string>(clOptions.bitcodeLibs);
   options.cacheBaseExtra = "kgen";
   options.warnOnUnstableAPIs = clOptions.warnOnUnstableAPIs;
@@ -342,9 +373,9 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
       clOptions.enableLocalMLIRReproducer;
 
   options.isCrossCompilation = !clOptions.targetAccelerator.empty();
-  if (clOptions.cmd == Command::kElaborateUseParametricInterpreter)
+  if (clOptions.cmd == "elaborate=use-parametric-interpreter")
     options.useParametricInterpreter = true;
-  else if (clOptions.cmd == Command::kElaborateNoUseParametricInterpreter)
+  else if (clOptions.cmd == "elaborate=no-use-parametric-interpreter")
     options.useParametricInterpreter = false;
 
   KGENCompiler compiler(*ctx, options, std::move(pmOptions));
@@ -364,7 +395,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   // diagnostics are the only signal), this CLI command reports any
   // error-severity diagnostic as a non-zero exit -- useful for scripts/tests
   // that want a pass/fail signal without scraping stderr.
-  if (clOptions.cmd == Command::kLSP || clOptions.cmd == Command::kLSPNoDump) {
+  if (clOptions.cmd == "lsp" || clOptions.cmd == "lsp=no-dump") {
     if (!inputFileName.ends_with(".mojo"))
       return failure(
           clOptions.reportError("lsp command requires a .mojo file"));
@@ -405,7 +436,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
       OwningOpRef<ModuleOp> clone = LIT::cloneDeclModuleForCompilation(*decl);
       (void)compiler.runCheckLITPipeline(*clone);
 
-      if (clOptions.cmd != Command::kLSPNoDump) {
+      if (clOptions.cmd != "lsp=no-dump") {
         clone->print(llvm::outs());
         llvm::outs() << "\n";
       }
@@ -540,9 +571,9 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
     options.targetAccelerator = clOptions.targetAccelerator;
   }
 
-  auto compilerOr = ObjectCompiler::create(kMojoCacheBaseDirName, options,
-                                           clOptions.cmd == Command::kExecute,
-                                           *ctx, pmOptions);
+  auto compilerOr =
+      ObjectCompiler::create(kMojoCacheBaseDirName, options,
+                             clOptions.cmd == "execute", *ctx, pmOptions);
   if (failed(compilerOr))
     return failure(clOptions.reportError(compilerOr.getError()));
   ObjectCompiler &objCompiler = **compilerOr;
@@ -554,9 +585,9 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
 
   // If all we're doing is generating a library file or elaborating, we're done
   // now.
-  if (clOptions.cmd == Command::kElaborate ||
-      clOptions.cmd == Command::kElaborateUseParametricInterpreter ||
-      clOptions.cmd == Command::kElaborateNoUseParametricInterpreter)
+  if (clOptions.cmd == "elaborate" ||
+      clOptions.cmd == "elaborate=use-parametric-interpreter" ||
+      clOptions.cmd == "elaborate=no-use-parametric-interpreter")
     return emitModuleIR(*theModule, clOptions);
 
   // Construct the symbol table and the export map.
@@ -564,8 +595,8 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   ExportMap exportedSymbols = getExportedSymbols(*theModule);
 
   // Handle LLVM output.
-  if (clOptions.cmd == Command::kEmitLLVM ||
-      clOptions.cmd == Command::kEmitLLVMBitcode) {
+  if (isEmitCmd(clOptions.cmd, EmitAs::LLVM) ||
+      isEmitCmd(clOptions.cmd, EmitAs::LLVM_BITCODE)) {
     llvm::LLVMContext llvmCtx;
     ErrorOr<std::unique_ptr<llvm::Module>> llvmModuleOr =
         objCompiler.lowerAllFuncsToLLVM(llvmCtx, *theModule);
@@ -579,7 +610,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
       return failure(clOptions.reportError("could not open .ll output file"));
 
     std::unique_ptr<llvm::Module> llvmModule = llvmModuleOr.takeValue();
-    if (clOptions.cmd == Command::kEmitLLVMBitcode) {
+    if (isEmitCmd(clOptions.cmd, EmitAs::LLVM_BITCODE)) {
       if (ErrorOrSuccess err =
               objCompiler.emitBitcode(*llvmModule, outFile->os()))
         return failure(clOptions.reportError(err.takeError().get()));
@@ -590,8 +621,8 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
     return mlir::success();
   }
 
-  if (clOptions.cmd == Command::kEmitLLVMOpt ||
-      clOptions.cmd == Command::kEmitLLVMOptBitcode) {
+  if (isEmitCmd(clOptions.cmd, EmitAs::LLVM_OPT) ||
+      isEmitCmd(clOptions.cmd, EmitAs::LLVM_OPT_BITCODE)) {
     auto outFile = clOptions.getOutputFile(/*hasBinaryOutput=*/false, ".ll");
     if (!outFile)
       return failure(clOptions.reportError("could not open .ll output file"));
@@ -602,7 +633,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
       return failure(clOptions.reportError("failed to generate LLVMIR: " +
                                            Twine(err.getError())));
     }
-    if (clOptions.cmd == Command::kEmitLLVMOptBitcode) {
+    if (isEmitCmd(clOptions.cmd, EmitAs::LLVM_OPT_BITCODE)) {
       if (ErrorOrSuccess err =
               objCompiler.emitBitcode(*llvmModule, outFile->os()))
         return failure(clOptions.reportError(err.takeError().get()));
@@ -614,8 +645,8 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   }
 
   // Handle assembly output.
-  if (clOptions.cmd == Command::kEmitAssembly ||
-      clOptions.cmd == Command::kEmitAssemblyVerbose) {
+  if (isEmitCmd(clOptions.cmd, EmitAs::ASM) ||
+      isEmitCmd(clOptions.cmd, kAsmVerboseKind)) {
     auto outFile = clOptions.getOutputFile(/*hasBinaryOutput=*/false, ".s");
     if (!outFile)
       return failure(clOptions.reportError("could not open .s output file"));
@@ -631,7 +662,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   }
 
   // Handle header emission, we don't need to generate an archive for this.
-  if (clOptions.cmd == Command::kEmitHeader) {
+  if (isEmitCmd(clOptions.cmd, kHeaderKind)) {
     LogicalResult result = failure();
     auto writeFn = [&](raw_ostream &os) {
       result =
@@ -677,7 +708,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   };
   SmallVector<FunctionExecution> funcExecs;
   StringSet<> foundFuncs;
-  if (clOptions.cmd == Command::kExecute) {
+  if (clOptions.cmd == "execute") {
     for (auto fn : theModule->getOps<FuncOp>()) {
       StringAttr name = fn.getSymNameAttr();
       // See if we were asked to execute this function.
@@ -702,7 +733,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
     }
   }
 
-  if (clOptions.cmd == Command::kEmitSharedObject) {
+  if (isEmitCmd(clOptions.cmd, kSharedLibKind)) {
     auto outFile = clOptions.getOutputFile(/*hasBinaryOutput=*/true, ".so");
     if (!outFile)
       return failure(clOptions.reportError("could not open .so output file"));
@@ -726,7 +757,7 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
   BufferRef archive = archiveOr.takeValue();
 
   // If we're emitting the archive, do it.
-  if (clOptions.cmd == Command::kEmit) {
+  if (isEmitCmd(clOptions.cmd, EmitAs::OBJECT)) {
     // Look up the first item in the exported symbols to trigger archive
     // generation.
     auto outFile = clOptions.getOutputFile(/*hasBinaryOutput=*/false, ".o");
@@ -787,6 +818,25 @@ int main(int argc, char **argv) {
   KGEN::forceLinkMLIRC();
   M::registerCommandFlags();
 
+  // The emission-kind table is target-dependent, so it is rendered from the
+  // registered TargetTraits rather than baked into the option declaration.
+  static std::string emissionKindsHelp = [] {
+    std::string text = "\nEMISSION KINDS (-emit=<kind>):\n";
+    llvm::raw_string_ostream os(text);
+    KGEN::printSupportedEmissionKinds(os);
+    os << "  Additional kgen-only kinds, accepted for every target:\n"
+       << "    " << kAsmVerboseKind
+       << " - verbose assembly with preserved comments\n"
+       << "    " << kHeaderKind
+       << " - a C header with declarations of exported functions\n"
+       << "    " << stringifyEmitAs(EmitAs::LLVM_OPT)
+       << " - optimized LLVM IR\n"
+       << "    " << stringifyEmitAs(EmitAs::LLVM_OPT_BITCODE)
+       << " - bitcode of optimized LLVM IR\n";
+    return text;
+  }();
+  llvm::cl::extrahelp emissionKindsExtraHelp(emissionKindsHelp);
+
   CLOptions clOptions(argc, argv);
 
   // Initialize targets first, so that --version shows registered targets.
@@ -819,6 +869,51 @@ int main(int argc, char **argv) {
   KGEN::initializeDebugOptions();
   KGEN::KGENPassCLOptions::registerOptions();
   llvm::cl::ParseCommandLineOptions(argc, argv);
+
+  // The requested emission kind must be one kgen implements; traits-declared
+  // kinds must also be accepted by the compilation target.
+  if (StringRef kind = clOptions.parser.requestedEmissionKind();
+      !kind.empty()) {
+    std::optional<EmitAs> emitAs = symbolizeEmitAs(kind);
+    // The spelling must name an EmitAs kgen actually writes.
+    if (emitAs && !llvm::is_contained(kEmitAsKinds, *emitAs))
+      emitAs = std::nullopt;
+    bool isProduct = llvm::is_contained(kProductKinds, kind);
+    if (!emitAs && !isProduct && !KGEN::isKnownEmissionKind(kind)) {
+      llvm::errs() << "kgen: error: unsupported 'emit' option value '" << kind
+                   << "'; see the EMISSION KINDS section of --help for the "
+                      "accepted kinds\n";
+      return EXIT_FAILURE;
+    }
+    if (KGEN::isKnownEmissionKind(kind)) {
+      ErrorOr<const TargetTraits *> traitsOr =
+          TargetTraitsRegistry::get().lookup(
+              llvm::Triple(clOptions.targetTriple));
+      ErrorOrSuccess err = traitsOr.isError()
+                               ? ErrorOrSuccess(Error(traitsOr.getError()))
+                               : (*traitsOr)->validateEmissionKind(kind);
+      if (err) {
+        llvm::errs() << "kgen: error: " << err.getError() << "\n";
+        return EXIT_FAILURE;
+      }
+      if (!emitAs && !isProduct) {
+        // A target-declared kind canonicalizes onto the EmitAs its traits
+        // map it to; link products need a linker kgen does not have.
+        ErrorOr<EmitAs> targetEmitAsOr = (*traitsOr)->emitAsForKind(kind);
+        if (targetEmitAsOr.isError()) {
+          llvm::errs() << "kgen: error: " << targetEmitAsOr.getError() << "\n";
+          return EXIT_FAILURE;
+        }
+        if (*targetEmitAsOr == EmitAs::OBJECT ||
+            !llvm::is_contained(kEmitAsKinds, *targetEmitAsOr)) {
+          llvm::errs() << "kgen: error: emission kind '" << kind
+                       << "' is not supported by kgen\n";
+          return EXIT_FAILURE;
+        }
+        clOptions.cmd = ("emit=" + stringifyEmitAs(*targetEmitAsOr)).str();
+      }
+    }
+  }
 
   // Set up the input file(s).
   llvm::SourceMgr sourceManager;

@@ -29,7 +29,10 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, TensorValue, ops
 from max.nn.kernels import moe_sink_gate_router
-from max.pipelines.architectures.inkling.layers.moe import InklingGate
+from max.pipelines.architectures.inkling.layers.moe import (
+    InklingGate,
+    padded_router_rows,
+)
 from torch.utils.dlpack import from_dlpack
 
 _HIDDEN_DIM = 64
@@ -63,7 +66,9 @@ def _unfused_route(
     selected = ops.gather_nd(
         routed, ops.unsqueeze(expert_ids, axis=-1), batch_dims=1
     )
-    sinks = logits[:, gate.n_routed_experts :]
+    sinks = logits[
+        :, gate.n_routed_experts : gate.n_routed_experts + gate.n_shared_experts
+    ]
 
     combined = ops.concat([selected, sinks], axis=-1)
     zero = ops.constant(0.0, combined.dtype, device=device)
@@ -88,9 +93,13 @@ def test_inkling_gate_route_matches_graph_ops() -> None:
     hidden_states_np = rng.normal(size=(num_tokens, _HIDDEN_DIM)).astype(
         np.float32
     )
-    n_total = n_routed_experts + n_shared
+    # The tail rows the gate pads its weight with must not reach the router:
+    # random values there would win the top-k if any did.
+    n_total = padded_router_rows(n_routed_experts + n_shared)
+    gate_weight = rng.normal(size=(n_total, _HIDDEN_DIM)).astype(np.float32)
+    gate_weight[n_routed_experts + n_shared :] = 0.0
     weights = {
-        "weight": rng.normal(size=(n_total, _HIDDEN_DIM)).astype(np.float32),
+        "weight": gate_weight,
         "bias": rng.normal(size=(n_routed_experts,)).astype(np.float32) * 0.1,
         "global_scale": np.array([1.3], dtype=np.float32),
     }

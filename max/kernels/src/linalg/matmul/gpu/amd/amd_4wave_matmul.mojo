@@ -85,7 +85,7 @@ from .matmul_mma import QuadrantMmaOp
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _xcd_wgm_swizzle(
     wgid_raw: Int, num_pid_m: Int, num_pid_n: Int
 ) -> Tuple[Int, Int]:
@@ -186,7 +186,7 @@ struct MatmulKernelConfig(ImplicitlyCopyable, Movable, Writable):
                 writer.write(sep)
             writer.write(list[i])
 
-    @always_inline
+    @inline(.always)
     def num_threads(self) -> Int:
         """Returns the total threads per workgroup (warps x `WARP_SIZE`).
 
@@ -970,11 +970,11 @@ struct AMD4WaveMatmul[
             swizzle=consumer_swizzle,
         ]()
 
-        @always_inline
+        @inline(.always)
         def s_barrier():
             llvm_intrinsic["llvm.amdgcn.s.barrier", NoneType]()
 
-        @always_inline
+        @inline(.always)
         def s_setprio[priority: Int16]():
             llvm_intrinsic["llvm.amdgcn.s.setprio", NoneType](priority)
 
@@ -988,7 +988,7 @@ struct AMD4WaveMatmul[
             (b_s1_h0, b_s1_h1),
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             a_loader.load_tile(
@@ -999,7 +999,7 @@ struct AMD4WaveMatmul[
                 k_offset=k,
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
@@ -1024,7 +1024,7 @@ struct AMD4WaveMatmul[
         # Body: framework-driven via Pipeline4Wave.
         # ====================================================
         @__parameter
-        @always_inline
+        @inline(.always)
         def _emit_framework_body():
             # `Pipeline4Wave.__init__` forces IDENTITY +
             # minimal_barriers + omit_mma_set_prio; the ScheduleConfig
@@ -1083,7 +1083,7 @@ struct AMD4WaveMatmul[
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _bind[entry: ScheduleEntry](k_base: Int):
                 # Framework-level infrastructure tags (BARRIER / WAIT_* /
                 # SET_PRIO / SCHEDULE_BARRIER) emit AMD intrinsics
@@ -1252,6 +1252,9 @@ struct AMD4WaveMatmul[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
         c_layout: TensorLayout,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
+        c_engine: TensorEngine,
         has_residual: Bool = False,
         # Pre-residual fused compute lambda (SM100 reference:
         # `D = lambda(Conv(A,B)) + beta * C`). Fires on the post-cast
@@ -1265,9 +1268,9 @@ struct AMD4WaveMatmul[
             elementwise_compute_lambda_type
         ] = None,
     ](
-        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin],
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
+        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
         source_ptr: UnsafePointer[Scalar[Self.c_type], ImmutAnyOrigin],
         source_row_stride: Int32,
         beta: Float32,
@@ -1299,6 +1302,9 @@ struct AMD4WaveMatmul[
             a_layout: Logical layout of `a` (4D NHWC).
             b_layout: Logical layout of `b` (2D `[C_out, K]` filter).
             c_layout: Logical layout of `c` (2D `[M, C_out]` output).
+            a_engine: `TensorEngine` of `a`.
+            b_engine: `TensorEngine` of `b`.
+            c_engine: `TensorEngine` of `c`.
             has_residual: When True, prefetch + FMA in `source * beta`
                 during the epilogue. When False, the residual args are
                 unused and the epilogue is identical to the no-residual
@@ -1591,11 +1597,11 @@ struct AMD4WaveMatmul[
             swizzle=consumer_swizzle,
         ]()
 
-        @always_inline
+        @inline(.always)
         def s_barrier():
             llvm_intrinsic["llvm.amdgcn.s.barrier", NoneType]()
 
-        @always_inline
+        @inline(.always)
         def s_setprio[priority: Int16]():
             llvm_intrinsic["llvm.amdgcn.s.setprio", NoneType](priority)
 
@@ -1609,7 +1615,7 @@ struct AMD4WaveMatmul[
             (b_s1_h0, b_s1_h1),
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             # `m_anchor=pid_m*BM` baked into the loader at construction;
@@ -1623,7 +1629,7 @@ struct AMD4WaveMatmul[
                 k_offset=k,
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
@@ -1648,7 +1654,7 @@ struct AMD4WaveMatmul[
         # Body: framework-driven via Pipeline4Wave.
         # ====================================================
         @__parameter
-        @always_inline
+        @inline(.always)
         def _emit_framework_body():
             # `Pipeline4Wave.__init__` forces IDENTITY +
             # minimal_barriers + omit_mma_set_prio; the ScheduleConfig
@@ -1693,7 +1699,7 @@ struct AMD4WaveMatmul[
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _bind[entry: ScheduleEntry](k_base: Int):
                 # Framework-level infrastructure tags (BARRIER / WAIT_* /
                 # SET_PRIO / SCHEDULE_BARRIER) emit AMD intrinsics
@@ -1936,7 +1942,7 @@ struct AMD4WaveMatmul[
                         c_writer.store(v, m=m_dram, n=n_global)
 
 
-@always_inline
+@inline(.always)
 def structured_4wave_matmul[
     a_type: DType,
     b_type: DType,
@@ -2052,7 +2058,7 @@ def structured_4wave_matmul[
     var N = Int(c.dim[1]())
     var M = Int(c.dim[0]())
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_kernel[config: MatmulKernelConfig]() raises:
         comptime kernel = AMD4WaveMatmul[

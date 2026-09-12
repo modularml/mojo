@@ -34,7 +34,7 @@ from kv_cache.paged_sparse_kv_index_remap import (
 )
 
 
-@always_inline
+@inline(.always)
 def _find_batch_for_row_ref(
     r: Int,
     row_offsets: ImmPointer[UInt32, _],
@@ -48,7 +48,7 @@ def _find_batch_for_row_ref(
     return UInt32(0)
 
 
-@always_inline
+@inline(.always)
 def _remap_one_ref(
     log_t: Int32,
     batch_u32: UInt32,

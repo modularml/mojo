@@ -745,7 +745,7 @@ def grouped_matmul_sm100_blockwise_scaled_fp8[
     )
 
 
-@always_inline
+@inline(.always)
 def _get_accumulator_size[
     *,
     c_smem_layout: Layout,
@@ -780,7 +780,7 @@ def _get_accumulator_size[
     return Index(num_stages, num_elements)
 
 
-@always_inline
+@inline(.always)
 def _tile_fits_full_tma[
     a_scales_type: DType, BM: Int
 ](m_tile_global_start: Int, total_m: Int) -> Bool:
@@ -811,7 +811,7 @@ def _tile_fits_full_tma[
     )
 
 
-@always_inline
+@inline(.always)
 def _copy_partial_a_tile_blockwise_from_gmem[
     a_type: DType,
     a_scales_type: DType,
@@ -892,7 +892,7 @@ def _copy_partial_a_tile_blockwise_from_gmem[
         a_scales_smem_tile[0, row] = sv
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -1095,7 +1095,7 @@ def load_AB[
         )
 
 
-@always_inline
+@inline(.always)
 def load_AB_partial[
     a_type: DType,
     b_type: DType,
@@ -1279,7 +1279,7 @@ def load_AB_partial[
         )
 
 
-@always_inline
+@inline(.always)
 def multi_stage_reg_epilogue[
     c_tile_rank: Int,
     c_tile_shape: IndexList[c_tile_rank],
@@ -1567,7 +1567,7 @@ def multi_stage_reg_epilogue[
             named_barrier[Int32(num_output_warps * WARP_SIZE)]()
 
 
-@always_inline
+@inline(.always)
 def promote_accumulators[
     pipeline_stages: Int,
     num_accum_pipeline_stages: Int,
@@ -2922,7 +2922,7 @@ def grouped_matmul_sm100_blockwise_scaled_fp8_persistent[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul_dynamic_scaled_fp8[
     c_type: DType,
     a_type: DType,
@@ -3000,7 +3000,7 @@ def grouped_matmul_dynamic_scaled_fp8[
     if num_active_experts == 0 or max_num_tokens_per_expert == 0:
         return
 
-    @always_inline
+    @inline(.always)
     def description_fn() {
         var c, var a, var a_scales, var b_scales, imm
     } -> String:

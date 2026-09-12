@@ -19,7 +19,7 @@ from max.gpu.host import DeviceContext, DeviceContextArray
 from max.runtime.asyncrt import task_id_for_device
 
 
-@always_inline
+@inline(.always)
 def _launch_device_collective[
     num_devices: Int,
     F: def[Int]() raises -> None,
@@ -31,7 +31,7 @@ def _launch_device_collective[
     var errors = Array[Optional[Error], num_devices](fill=Optional[Error]())
 
     # Wrap the launch function in a Mojo async function which does not raise.
-    @always_inline
+    @inline(.always)
     @__parameter
     async def wrapper[index: Int]() -> None:
         try:
@@ -55,7 +55,7 @@ def _launch_device_collective[
             raise errors[i].take()
 
 
-@always_inline
+@inline(.always)
 def _launch_device_collective[
     num_devices: Int,
     F: def[Int]() raises -> None,

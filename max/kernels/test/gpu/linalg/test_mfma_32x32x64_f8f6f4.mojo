@@ -22,7 +22,7 @@ regression artifact for MAX-595. The broader parametric coverage of both
 CDNA4 block-scaled shapes lives in `test_block_scaled_mma_amd.mojo`.
 """
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE, lane_id
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import MI355X
@@ -37,7 +37,7 @@ from linalg.arch.amd.block_scaled_mma import (
 )
 
 
-@always_inline
+@inline(.always)
 def _pack_e8m0_scale_word(value: Float32) -> Int32:
     """Packs one exact E8M0 scale into all four bytes of the MFMA scale word.
 

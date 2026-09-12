@@ -44,7 +44,7 @@ from std.sys.info import _accelerator_arch
 comptime MMA_DIM = 16  # one 16x16 score sub-tile
 
 
-@always_inline
+@inline(.always)
 def _frag_row_max(frag: SIMD[.float32, 8]) -> SIMD[.float32, 2]:
     """Full-row max over a 16x16 score fragment, for the lane's two rows.
 
@@ -61,7 +61,7 @@ def _frag_row_max(frag: SIMD[.float32, 8]) -> SIMD[.float32, 2]:
     return SIMD[.float32, 2](r0, r1)
 
 
-@always_inline
+@inline(.always)
 def _frag_row_sum(frag: SIMD[.float32, 8]) -> SIMD[.float32, 2]:
     """Full-row sum over a 16x16 score fragment, for the lane's two rows."""
     var r0 = frag[0] + frag[1] + frag[2] + frag[3]

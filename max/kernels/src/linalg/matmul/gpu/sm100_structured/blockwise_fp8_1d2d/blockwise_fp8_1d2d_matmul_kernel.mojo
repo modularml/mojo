@@ -424,7 +424,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         elect_one_warp: Bool,
         elect_one_thread: Bool,
@@ -485,7 +485,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     # ========== Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)
@@ -744,7 +744,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     # ========== Load Input Tiles ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -851,7 +851,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     # ========== MMA Operation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,

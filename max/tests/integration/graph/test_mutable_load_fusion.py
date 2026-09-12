@@ -16,11 +16,13 @@
 These mirror `GraphCompiler/test/mo-opt/MAPDialect/Transforms/FuseMutableLoads/`'s
 cases with real ops rather than the MLIR suite's `sampler.apply_penalties`
 opaque kernel, so each case here also proves numeric correctness on the
-mutated buffer, not just IR shape. Not env-gated: the new MAP-dialect system
-doesn't yet fuse every one of these shapes (a Mojo-codegen gap for a load
-fused via a new chain, an undiagnosed failure, and a crash -- see
-`GEX-4140`'s exclusion list, which covers this file), so this runs under the
-legacy pipeline, where every case here already fuses.
+mutated buffer, not just IR shape. The two load-only shapes fuse under both
+pipelines; the four mutable-store write-back shapes don't yet fuse the store
+into the producing kernel under the new MAP-dialect system (a Mojo-codegen gap
+for a load fused via a new chain for the elementwise cases; `GEX-3964` for the
+reduce case, where `EpilogueFuser` declines the store because
+`map.iter.opaque` carries neither an out chain nor memory-effect fields), so
+those four are marked `@xfail_under_adv_fusion` individually.
 
 Every case in this file uses ``ops.buffer_load``/``ops.buffer_store`` around a
 plain elementwise/view op -- `mo.add`, `mo.negative`, `mo.abs`, a static
@@ -38,6 +40,7 @@ from __future__ import annotations
 import re
 
 import numpy as np
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -48,6 +51,9 @@ def _fused(model_summaries: list[str], pattern: str) -> bool:
     return any(re.search(pattern, s) for s in model_summaries)
 
 
+@xfail_under_adv_fusion(
+    "the new fusion system does not fuse the mutable store into the add kernel"
+)
 def test_add_buffer_lhs_fuses(session: InferenceSession) -> None:
     """`buffer_store(buf, buffer_load(buf) + rhs)` fuses the load into the
     add kernel, which gains a chain in/out pair it didn't have before -- the
@@ -82,6 +88,9 @@ def test_add_buffer_lhs_fuses(session: InferenceSession) -> None:
     )
 
 
+@xfail_under_adv_fusion(
+    "the new fusion system does not fuse the mutable store into the add kernel"
+)
 def test_add_buffer_rhs_fuses(session: InferenceSession) -> None:
     """Same as `test_add_buffer_lhs_fuses`, but the buffer sits in the add's
     second operand slot -- the fused kernel's replacement index is computed
@@ -116,6 +125,9 @@ def test_add_buffer_rhs_fuses(session: InferenceSession) -> None:
     )
 
 
+@xfail_under_adv_fusion(
+    "the new fusion system does not fuse the mutable store into the add kernel"
+)
 def test_two_buffers_fuse_into_same_kernel(session: InferenceSession) -> None:
     """`buffer_store(buf2, buffer_load(buf1) + buffer_load(buf2))`: two
     independent loads fuse into the same add+store kernel. Mirrors
@@ -223,16 +235,20 @@ def test_slice_producer_fuses(session: InferenceSession) -> None:
     )
 
 
+@xfail_under_adv_fusion(
+    "GEX-3964: EpilogueFuser declines the mutable store because "
+    "map.iter.opaque carries no out chain or memory-effect fields"
+)
 def test_mutable_store_consumer_fuses(session: InferenceSession) -> None:
     """`buffer_store(buf, reduce.max(x, axis))` fuses the store into the
     reduction's epilogue, writing the buffer directly rather than
     materializing an intermediate tensor. Mirrors
     `mutable_store_consumer_not_fused`.
 
-    Deliberately not env-gated: `EpilogueFuser` (the new system) declines
-    this case outright (GEX-3964, a MOGG parity gap -- `map.iter.opaque`
-    carries neither an out chain nor memory-effect fields to fuse a store
-    soundly), so this exercises the legacy pipeline, where it already fuses.
+    `EpilogueFuser` (the new system) declines this case outright (GEX-3964, a
+    MOGG parity gap -- `map.iter.opaque` carries neither an out chain nor
+    memory-effect fields to fuse a store soundly), so it fuses only under the
+    legacy pipeline and is xfail'd under the new one.
     """
     with Graph(
         "mutable_store_consumer_fuses",

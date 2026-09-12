@@ -238,22 +238,52 @@ class ProtocolAbuse(BaseScenario):
         )
 
         # ----- 8. Mismatched Content-Length -----
+        # Declaring twice the body actually sent leaves the request
+        # incomplete, not malformed, so RFC 9112 has the server hold the
+        # connection open waiting for the bytes still owed -- delivering the
+        # remainder late gets a normal 200. No response inside the budget is
+        # therefore the conforming outcome, and the weakness worth probing is
+        # whether the parked request takes the server with it, which the
+        # health check below covers. Wait only long enough for an error
+        # response to come back rather than parking for the full timeout.
         resp = await client.post_raw_http(
             valid_body,
             auto_content_length=False,
             content_length=len(valid_body) * 2,
-            timeout=config.timeout * 0.33,
+            timeout=min(config.timeout * 0.33, 5.0),
         )
+        if resp.status >= 500:
+            verdict = Verdict.FAIL
+        elif resp.error == "TIMEOUT" or resp.status in (200, 400, 408, 413):
+            verdict = Verdict.PASS
+        else:
+            verdict = Verdict.INTERESTING
+
         results.append(
             self.make_result(
                 self.name,
                 "mismatched_content_length",
-                Verdict.FAIL
-                if resp.status == 0 or resp.status >= 500
-                else Verdict.PASS,
+                verdict,
                 status_code=resp.status,
-                detail=f"Status {resp.status}"
+                elapsed_ms=resp.elapsed_ms,
+                detail="held the connection open for the undelivered body"
+                if resp.error == "TIMEOUT"
+                else f"Status {resp.status}"
                 + (f" error: {resp.error}" if resp.error else ""),
+                error=resp.error or "",
+            )
+        )
+
+        health = await client.health_check()
+        results.append(
+            self.make_result(
+                self.name,
+                "health_after_mismatched_content_length",
+                Verdict.PASS if health.status == 200 else Verdict.FAIL,
+                status_code=health.status,
+                detail="Healthy"
+                if health.status == 200
+                else f"Unhealthy after a truncated body: {health.error}",
             )
         )
 

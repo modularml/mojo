@@ -148,6 +148,14 @@ class PagedKVCacheManagerInterface(ABC):
         """Returns the replica's KV buffer (single leaf or tree)."""
 
     @property
+    def chunk_alignment_tokens(self) -> int:
+        """Returns the token multiple a context-encoding chunk ends on.
+
+        Zero when no group of this cache needs the alignment.
+        """
+        return 0
+
+    @property
     @abstractmethod
     def effective_max_seq_length(self) -> int | None:
         """Returns the effective maximum sequence length that can be served by the block manager."""

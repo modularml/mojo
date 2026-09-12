@@ -44,7 +44,7 @@ from ..os import sep
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _get_stat_st_mode(var path: String) raises -> Int:
     comptime if CompilationTarget.is_macos():
         return Int(_stat_macos(path^).st_mode)
@@ -54,7 +54,7 @@ def _get_stat_st_mode(var path: String) raises -> Int:
         return Int(_stat_linux_x86(path^).st_mode)
 
 
-@always_inline
+@inline(.always)
 def _get_lstat_st_mode(var path: String) raises -> Int:
     comptime if CompilationTarget.is_macos():
         return Int(_lstat_macos(path^).st_mode)
@@ -305,7 +305,7 @@ def realpath[
     # through the libc_realpath call (avoids use-after-free).
     var fspath = path.__fspath__()
     var returned_path_ptr = libc_realpath(
-        fspath.as_c_string_slice(),
+        fspath.as_c_string_span(),
         string.unsafe_as_bytes_mut().unsafe_ptr().unsafe_bitcast[c_char](),
     )
     if not returned_path_ptr:

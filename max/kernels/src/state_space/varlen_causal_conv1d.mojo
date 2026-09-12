@@ -63,7 +63,7 @@ comptime _TAP_LANES[WIDTH: Int] = Int(next_power_of_two(WIDTH))
 # ============================================================================
 
 
-@always_inline
+@inline(.always)
 def _apply_silu[
     output_dtype: DType
 ](out_val: Scalar[output_dtype], silu_activation: Bool) -> Scalar[output_dtype]:
@@ -91,7 +91,7 @@ def _apply_silu[
     return out_val
 
 
-@always_inline
+@inline(.always)
 def _channel_weights[
     weight_dtype: DType,
     WIDTH: Int,
@@ -269,7 +269,7 @@ struct VarlenConvIO[
     var out_dim_stride: UInt32
     var out_seqlen_stride: UInt32
 
-    @always_inline
+    @inline(.always)
     def load_x(self, d: Int, s: Int) -> Scalar[Self.x_dtype]:
         """Load `x[d, s]`: windowed history read of the input.
 
@@ -282,7 +282,7 @@ struct VarlenConvIO[
         )
         return self.x.raw_load(offset)
 
-    @always_inline
+    @inline(.always)
     def load_weight(self, d: Int, w: Int) -> Scalar[Self.weight_dtype]:
         """Load `weight[d, w]`: per-channel conv tap.
 
@@ -293,7 +293,7 @@ struct VarlenConvIO[
         # `[0]` extracts lane 0: generic `Storage` makes `load()` non-scalar.
         return self.weight.load(Coord(d, w))[0]
 
-    @always_inline
+    @inline(.always)
     def load_bias(self, d: Int) -> Scalar[Self.bias_dtype]:
         """Load `bias[d]`: per-channel bias.
 
@@ -303,7 +303,7 @@ struct VarlenConvIO[
         # `[0]` extracts lane 0 (generic `Storage`, as in `load_weight`).
         return self.bias.load(Coord(d))[0]
 
-    @always_inline
+    @inline(.always)
     def store_out(self, d: Int, s: Int, val: Scalar[Self.out_dtype]):
         """Store `output[d, s] = val`: convolution output.
 

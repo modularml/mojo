@@ -75,13 +75,13 @@ struct AMDIGLPStrategy(Equatable, Intable, TrivialRegisterPassable):
         return Int(self._value)
 
 
-@always_inline
+@inline(.always)
 def _iglp_opt[strategy: AMDIGLPStrategy]() -> None:
     """Emits `llvm.amdgcn.iglp.opt(strategy)`: IGroupLP preset hint."""
     llvm_intrinsic["llvm.amdgcn.iglp.opt", NoneType](Int32(Int(strategy)))
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def sched_barrier_pairs[pairs: Int, valu_cnt: Int, group: Int]() -> None:
     """Emits `pairs` schedule groups of shape `[1 MFMA, valu_cnt VALU]`.
@@ -116,7 +116,7 @@ def sched_barrier_pairs[pairs: Int, valu_cnt: Int, group: Int]() -> None:
         sched_barrier_pairs[pairs - 1, valu_cnt, group]()
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def sched_dsread_valu_pairs[pairs: Int, valu_cnt: Int, group: Int]() -> None:
     """Emits `pairs` schedule groups of shape `[1 DS_READ, valu_cnt VALU]`.
@@ -146,7 +146,7 @@ def sched_dsread_valu_pairs[pairs: Int, valu_cnt: Int, group: Int]() -> None:
         sched_dsread_valu_pairs[pairs - 1, valu_cnt, group]()
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def sched_barrier_exp_pairs[pairs: Int, exp_cnt: Int, group: Int]() -> None:
     """Emits `pairs` schedule groups of shape `[1 MFMA, exp_cnt TRANS]`.

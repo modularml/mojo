@@ -50,7 +50,7 @@ comptime INITIAL_CAPACITY: Int = 16
 """Minimum table capacity. Must be >= GROUP_WIDTH."""
 
 
-@always_inline
+@inline(.always)
 def h2(hash: UInt64) -> UInt8:
     """Extract the top 7 bits of the hash as a fingerprint (0x00-0x7F).
 
@@ -63,7 +63,7 @@ def h2(hash: UInt64) -> UInt8:
     return UInt8(hash >> 57)
 
 
-@always_inline
+@inline(.always)
 def is_occupied(ctrl: UInt8) -> Bool:
     """Check if a control byte represents an occupied slot.
 
@@ -94,7 +94,7 @@ struct Group(Copyable, Movable):
 
     var ctrl: SIMD[.uint8, GROUP_WIDTH]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr: Pointer[UInt8, _]):
         """Load a group of control bytes from memory.
 
@@ -108,7 +108,7 @@ struct Group(Copyable, Movable):
     # which the interpreter can't handle, so we fall back to scalar loops for
     # comptime contexts (e.g., Dict used in `comptime` expressions).
 
-    @always_inline
+    @inline(.always)
     def match_h2(self, h2_val: UInt8) -> UInt16:
         """Return a bitmask of slots matching the given h2 fingerprint.
 
@@ -122,7 +122,7 @@ struct Group(Copyable, Movable):
             return Self._scalar_match(self.ctrl, h2_val)
         return pack_bits(self.ctrl.eq(SIMD[.uint8, GROUP_WIDTH](h2_val)))
 
-    @always_inline
+    @inline(.always)
     def match_empty(self) -> UInt16:
         """Return a bitmask of empty slots.
 
@@ -133,7 +133,7 @@ struct Group(Copyable, Movable):
             return Self._scalar_match(self.ctrl, CTRL_EMPTY)
         return pack_bits(self.ctrl.eq(SIMD[.uint8, GROUP_WIDTH](CTRL_EMPTY)))
 
-    @always_inline
+    @inline(.always)
     def match_empty_or_deleted(self) -> UInt16:
         """Return a bitmask of empty or deleted slots.
 
@@ -152,7 +152,7 @@ struct Group(Copyable, Movable):
             return result
         return pack_bits(self.ctrl.ge(SIMD[.uint8, GROUP_WIDTH](CTRL_DELETED)))
 
-    @always_inline
+    @inline(.always)
     def convert_special_to_empty_and_full_to_deleted(
         self,
     ) -> SIMD[.uint8, GROUP_WIDTH]:
@@ -181,7 +181,7 @@ struct Group(Copyable, Movable):
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _scalar_match(ctrl: SIMD[.uint8, GROUP_WIDTH], target: UInt8) -> UInt16:
         """Scalar fallback for compile-time evaluation.
 
@@ -247,7 +247,7 @@ struct SwissTableEntry[
         self.key = key^
         self.value = value^
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, var key: Self.K, var value: Self.V, *, unsafe_hash: UInt64
     ):
@@ -362,7 +362,7 @@ struct SwissTable[
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize an empty Swiss Table."""
         self._capacity = 0
@@ -371,7 +371,7 @@ struct SwissTable[
         self._len = 0
         self._growth_left = 0
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, capacity: Int):
         """Initialize an empty Swiss Table with a pre-reserved capacity.
 
@@ -481,7 +481,7 @@ struct SwissTable[
                 )
             )
 
-    @always_inline
+    @inline(.always)
     def _delete_occupied_entries(
         mut self,
     ) where conforms_to(Self.K, Deinitable) and conforms_to(Self.V, Deinitable):
@@ -505,7 +505,7 @@ struct SwissTable[
                 if is_occupied(self._ctrl[unsafe_offset=i]):
                     (self._slots.unsafe_offset(i)).unsafe_deinit_pointee()
 
-    @always_inline
+    @inline(.always)
     def _delete_occupied_entries_with(
         mut self, destroy_func: Some[def(var Self.K, var Self.V)]
     ):
@@ -523,7 +523,7 @@ struct SwissTable[
     # Core operations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def set_ctrl(mut self, index: Int, value: UInt8):
         """Set a control byte, maintaining the mirror for wrap-around SIMD loads.
 
@@ -536,7 +536,7 @@ struct SwissTable[
         if index < GROUP_WIDTH:
             self._ctrl[unsafe_offset=self._capacity + index] = value
 
-    @always_inline
+    @inline(.always)
     def find_slot(self, hash: UInt64, key: Self.K) -> Tuple[Bool, Int]:
         """Find a slot matching the given key, or the first EMPTY slot.
 
@@ -560,7 +560,7 @@ struct SwissTable[
             lambda (stored_key: Self.K) {imm key} -> Bool: (stored_key == key),
         )
 
-    @always_inline
+    @inline(.always)
     def find_slot_matching(
         self, hash: UInt64, key_matches: Some[def(Self.K) -> Bool]
     ) -> Tuple[Bool, Int]:
@@ -612,7 +612,7 @@ struct SwissTable[
 
             pos = (pos + GROUP_WIDTH) & (self._capacity - 1)
 
-    @always_inline
+    @inline(.always)
     def find_slot_or_deleted(
         self, hash: UInt64, key: Self.K
     ) -> Tuple[Bool, Int]:
@@ -679,7 +679,7 @@ struct SwissTable[
 
             pos = (pos + GROUP_WIDTH) & (self._capacity - 1)
 
-    @always_inline
+    @inline(.always)
     def find_empty_slot(self, hash: UInt64) -> Int:
         """Find the first EMPTY or DELETED slot for the given hash.
 
@@ -754,7 +754,7 @@ struct SwissTable[
         """
         return self._len <= self._capacity * 7 // 16
 
-    @no_inline
+    @inline(.never)
     def resize(mut self, new_capacity: Int) -> List[Tuple[Int, Int]]:
         """Double the table capacity and rehash all entries.
 
@@ -806,7 +806,7 @@ struct SwissTable[
 
         return relocations^
 
-    @no_inline
+    @inline(.never)
     def rehash_in_place(mut self) -> Pointer[Int32, MutUntrackedOrigin]:
         """Rehash in place without changing capacity (Abseil's drop-deletes).
 

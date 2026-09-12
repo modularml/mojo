@@ -42,7 +42,7 @@ from linalg.fp4_utils import (
     set_scale_factor,
 )
 from std.random import random_ui64, seed, rand
-from std.builtin.simd import (
+from std.simd import (
     _convert_f32_to_float8_scalar,
     _convert_f32_to_float8_ue8m0,
 )
@@ -177,8 +177,10 @@ def _test_kernel_impl_base[
     var a_scale_offsets_ptr = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts
     )
+    # Sized by the slot count: a launch can pin more slots than there are
+    # experts, with the surplus slots masked off.
     var expert_ids_host_ptr = ctx.enqueue_create_host_buffer[.int32](
-        num_experts
+        num_active_experts
     )
     var expert_scales_host_ptr = ctx.enqueue_create_host_buffer[.float32](
         num_experts
@@ -716,7 +718,7 @@ def run_grouped_matmul_sm100_block_fp4_suite[
         # Wrapper which forwards suite-level scales_dtype, SF_VECTOR_SIZE,
         # and scaling_kind, so call sites don't have to pass them explicitly.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _test_kernel_impl[
             kernel_type: String,
             a_type: DType,
@@ -1045,6 +1047,193 @@ def run_grouped_matmul_sm100_block_fp4_suite[
                     4,
                     [128, 128, 128, 128],
                     [-1, 3, 2, 4],
+                    ctx,
+                )
+
+            # Multi-lane scheduler lookup (structured kernel only).
+            # Every case pins 256 slots: fewer than 9 groups resolve
+            # inside lane 0 and reach neither the cross-lane prefix nor
+            # the broadcast. The cases cover both scheduler paths and
+            # both reasons the lookup is taken.
+            comptime if structured:
+                comptime sched_slots = 256
+
+                # Sparse, deep in K: the lookup is taken on density
+                # alone, and every group holds a single M block. Lane 1
+                # owns groups 8-11, behind a non-zero base.
+                # fmt: off
+                var tokens_12: List[Int] = [8, 1, 7, 4, 16, 3, 9, 5, 2, 3, 5, 1]
+                var eids_12: List[Int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+                # fmt: on
+                for _ in range(sched_slots - len(tokens_12)):
+                    tokens_12.append(0)
+                    eids_12.append(-1)
+                _test_kernel_impl[
+                    "new",
+                    dtype,
+                    dtype,
+                    out_dtype,
+                    scale_dtype,
+                    block_tile_shape,
+                    umma_shape,
+                    cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
+                    cta_group=1,
+                    a_swizzle=swizzle,
+                    b_swizzle=swizzle,
+                    block_swizzle_size=8,
+                    num_experts=12,
+                    expert_shape=Index(2048, 2048),
+                    swapAB=False,
+                ](
+                    sched_slots,
+                    tokens_12,
+                    eids_12,
+                    ctx,
+                )
+
+                # The same groups, dense and deep: the sequential path
+                # at a slot count that would otherwise take the lookup.
+                # fmt: off
+                var tokens_12_dense: List[Int] = [128, 1, 127, 256, 64, 300, 33, 129, 7, 200, 96, 1]
+                var eids_12_dense: List[Int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+                # fmt: on
+                for _ in range(sched_slots - len(tokens_12_dense)):
+                    tokens_12_dense.append(0)
+                    eids_12_dense.append(-1)
+                _test_kernel_impl[
+                    "new",
+                    dtype,
+                    dtype,
+                    out_dtype,
+                    scale_dtype,
+                    block_tile_shape,
+                    umma_shape,
+                    cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
+                    cta_group=1,
+                    a_swizzle=swizzle,
+                    b_swizzle=swizzle,
+                    block_swizzle_size=8,
+                    num_experts=12,
+                    expert_shape=Index(2048, 2048),
+                    swapAB=False,
+                ](
+                    sched_slots,
+                    tokens_12_dense,
+                    eids_12_dense,
+                    ctx,
+                )
+
+                # Dense but shallow in K: the lookup is taken on tile
+                # depth alone, and its groups span several M blocks.
+                # Lane 1 (groups 8-15) is fully masked, so the ballot
+                # must skip an empty segment.
+                # fmt: off
+                var tokens_20: List[Int] = [129, 64, 1, 256, 33, 7, 128, 200, 512, 128, 64, 1, 256, 33, 7, 128, 96, 1, 127, 65]
+                var eids_20: List[Int] = [0, 1, 2, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1, 16, 17, 18, 19]
+                # fmt: on
+                for _ in range(sched_slots - len(tokens_20)):
+                    tokens_20.append(0)
+                    eids_20.append(-1)
+                _test_kernel_impl[
+                    "new",
+                    dtype,
+                    dtype,
+                    out_dtype,
+                    scale_dtype,
+                    block_tile_shape,
+                    umma_shape,
+                    cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
+                    cta_group=1,
+                    a_swizzle=swizzle,
+                    b_swizzle=swizzle,
+                    block_swizzle_size=8,
+                    num_experts=20,
+                    expert_shape=Index(2048, 1024),
+                    swapAB=False,
+                ](
+                    sched_slots,
+                    tokens_20,
+                    eids_20,
+                    ctx,
+                )
+
+                # Every slot populated, so every lane holds a full
+                # segment: the ballot spans all 32 lanes and the prefix
+                # crosses every base. K stays at 4 k-iterations so the
+                # tile-depth term picks the lookup despite the density.
+                var tokens_full = List[Int]()
+                var eids_full = List[Int]()
+                for g in range(sched_slots):
+                    tokens_full.append(1 + (g * 37) % 320)
+                    eids_full.append(g)
+                _test_kernel_impl[
+                    "new",
+                    dtype,
+                    dtype,
+                    out_dtype,
+                    scale_dtype,
+                    block_tile_shape,
+                    umma_shape,
+                    cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
+                    cta_group=1,
+                    a_swizzle=swizzle,
+                    b_swizzle=swizzle,
+                    block_swizzle_size=8,
+                    num_experts=sched_slots,
+                    expert_shape=Index(1024, 1024),
+                    swapAB=False,
+                ](
+                    sched_slots,
+                    tokens_full,
+                    eids_full,
+                    ctx,
+                )
+
+                # The same slot count with 2 CTAs, which the prefill
+                # dispatch selects at every batch size the lookup can
+                # see. The block coordinates come off a halved CTA
+                # stride here, and `swapAB` transposes the tile shape
+                # they derive from, so neither scale is reachable from
+                # the cases above. One populated group per lane, at a
+                # varying offset inside its segment: the ballot spans
+                # all lanes and the winner's scan skips the empty
+                # groups ahead of its own. Two of those groups stay
+                # masked while still owning rows. K holds at 4
+                # k-iterations, so the tile-depth term selects the
+                # lookup.
+                comptime umma_shape_2sm_lookup = Index(2 * bm, 2 * bn, MMA_K)
+                comptime warp_lanes = 32
+                comptime lookup_depth = sched_slots // warp_lanes
+                var tokens_2sm = List[Int]()
+                var eids_2sm = List[Int]()
+                for _ in range(sched_slots):
+                    tokens_2sm.append(0)
+                    eids_2sm.append(-1)
+                for lane in range(warp_lanes):
+                    var slot = lane * lookup_depth + lane % lookup_depth
+                    tokens_2sm[slot] = 1 + (lane * 53) % 300
+                    if lane != 7 and lane != 20:
+                        eids_2sm[slot] = lane
+                _test_kernel_impl[
+                    "new",
+                    dtype,
+                    dtype,
+                    out_dtype,
+                    scale_dtype,
+                    block_tile_shape,
+                    umma_shape_2sm_lookup,
+                    cluster_shape=StaticTuple[Int32, 3](2, 1, 1),
+                    cta_group=2,
+                    a_swizzle=swizzle,
+                    b_swizzle=swizzle,
+                    block_swizzle_size=8,
+                    num_experts=warp_lanes,
+                    expert_shape=Index(2048, 1024),
+                    swapAB=True,
+                ](
+                    sched_slots,
+                    tokens_2sm,
+                    eids_2sm,
                     ctx,
                 )
 
@@ -1769,6 +1958,42 @@ def run_grouped_matmul_sm100_block_fp4_suite[
                 3,
                 [31, 97, 63],
                 [2, 0, 1],
+                ctx,
+            )
+
+            # AB_swapped, which every dispatch regime selects, swaps the
+            # tile extents, so M-block counts and the warp prefix differ
+            # from the cases above. 64 slots clear the SMEM walk cache
+            # and give every lane a segment; 13 tokens across them keep
+            # the launch sparse enough to take the lookup at any depth.
+            # The populated groups sit in the first three lanes, so the
+            # ballot must skip empty segments to reach a base.
+            print("Step 15: AB_swapped — scheduler lookup, 64 slots")
+            var tokens_sparse: List[Int] = [1, 2, 3, 1, 4, 2]
+            var eids_sparse: List[Int] = [0, 1, 2, 3, 4, 5]
+            for _ in range(64 - len(tokens_sparse)):
+                tokens_sparse.append(0)
+                eids_sparse.append(-1)
+            _test_kernel_impl[
+                "new",
+                dtype,
+                dtype,
+                out_dtype,
+                scale_dtype,
+                block_tile_shape_small,
+                umma_shape_small,
+                cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
+                cta_group=1,
+                a_swizzle=swizzle,
+                b_swizzle=swizzle,
+                block_swizzle_size=8,
+                num_experts=6,
+                expert_shape=Index(2048, 1024),
+                swapAB=True,
+            ](
+                64,
+                tokens_sparse,
+                eids_sparse,
                 ctx,
             )
 

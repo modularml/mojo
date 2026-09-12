@@ -1,0 +1,46 @@
+load(
+    "//bazel:api.bzl",
+    "modular_py_test",
+    "requirement",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+# The two module-level tests execute tiny CPU graphs against the DFlash2
+# authors' scalar references; test_drafter only stages a module.
+[
+    modular_py_test(
+        name = name,
+        size = "large",
+        srcs = [name + ".py"],
+        deps = [
+            "//max/python/max/driver",
+            "//max/python/max/dtype",
+            "//max/python/max/engine",
+            "//max/python/max/graph",
+            "//max/python/max/pipelines/architectures/dflash2_qwen3_5",
+            requirement("numpy"),
+        ],
+    )
+    for name in [
+        "test_grouped_conv",
+        "test_candidate_selector",
+    ]
+]
+
+modular_py_test(
+    name = "test_drafter",
+    size = "small",
+    srcs = ["test_drafter.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/dflash2_qwen3_5",
+        "//max/python/max/pipelines/architectures/llama3",
+    ],
+)

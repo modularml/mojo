@@ -91,7 +91,7 @@ from nn.conv.gpu.im2col_matmul_2d import dispatch_im2col_matmul_conv2d
 from std.utils.index import IndexList
 
 
-@always_inline
+@inline(.always)
 def _resolve_impl[impl: StaticString, dtype: DType]() -> StaticString:
     """Comptime-resolve `auto` to the platform-default impl.
 
@@ -323,7 +323,7 @@ def bench_conv2d[
 
     comptime if resolved == "im2col":
 
-        @always_inline
+        @inline(.always)
         def im2col_kernel(ctx: DeviceContext) raises {imm}:
             _ = dispatch_im2col_matmul_conv2d(
                 input_tt,
@@ -336,7 +336,7 @@ def bench_conv2d[
                 ctx,
             )
 
-        @always_inline
+        @inline(.always)
         def im2col_bench(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, im2col_kernel, ctx)
 
@@ -351,7 +351,7 @@ def bench_conv2d[
             " accelerator (e.g. cuda:b200) or pick a different impl."
         )
 
-        @always_inline
+        @inline(.always)
         def cudnn_kernel(ctx: DeviceContext) raises {imm}:
             conv_cudnn[dtype, dtype, dtype](
                 input_tt,
@@ -364,7 +364,7 @@ def bench_conv2d[
                 ctx,
             )
 
-        @always_inline
+        @inline(.always)
         def cudnn_bench(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, cudnn_kernel, ctx)
 
@@ -487,7 +487,7 @@ def bench_conv2d[
             output_amd_dev.unsafe_ptr(), output_2d_layout
         )
 
-        @always_inline
+        @inline(.always)
         def amd_4wave_kernel(ctx: DeviceContext) raises {imm}:
             amd_4wave_conv[
                 H=in_height,
@@ -501,7 +501,7 @@ def bench_conv2d[
                 C_in=in_channels,
             ](input_nhwc_amd, filter_frsc_tt, output_2d_tt, ctx)
 
-        @always_inline
+        @inline(.always)
         def amd_4wave_bench(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, amd_4wave_kernel, ctx)
 
@@ -529,7 +529,7 @@ def bench_conv2d[
         var grid_dim_x = ceildiv(w_out * h_out, block_size)
         var grid_dim_y = batch
 
-        @always_inline
+        @inline(.always)
         def naive_conv_kernel(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[naive_kernel](
                 input_buf,
@@ -543,7 +543,7 @@ def bench_conv2d[
                 block_dim=(block_size, block_size, 1),
             )
 
-        @always_inline
+        @inline(.always)
         def naive_bench(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, naive_conv_kernel, ctx)
 

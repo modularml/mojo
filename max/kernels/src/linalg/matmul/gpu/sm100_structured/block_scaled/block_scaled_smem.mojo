@@ -155,52 +155,52 @@ struct BlockScaledTileCore[
     var tiles: Self.Tiles
 
     # ========== Tile Accessors ==========
-    @always_inline
+    @inline(.always)
     def a_tiles(ref[AddressSpace.SHARED] self) -> Self.ATileArray:
         """Get A tile array accessor."""
         return self.tiles.a_tiles()
 
-    @always_inline
+    @inline(.always)
     def b_tiles(ref[AddressSpace.SHARED] self) -> Self.BTileArray:
         """Get B tile array accessor."""
         return self.tiles.b_tiles()
 
-    @always_inline
+    @inline(.always)
     def c_tiles(ref[AddressSpace.SHARED] self) -> Self.CTileArray:
         """Get C tile array accessor."""
         return self.tiles.c_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfa_tiles(ref[AddressSpace.SHARED] self) -> Self.SFATileArray:
         """Get SFA tile array accessor."""
         return self.tiles.sfa_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfb_tiles(ref[AddressSpace.SHARED] self) -> Self.SFBTileArray:
         """Get SFB tile array accessor."""
         return self.tiles.sfb_tiles()
 
     # ========== Size Utilities ==========
     @staticmethod
-    @always_inline
+    @inline(.always)
     def ab_pipeline_size() -> Int:
         """Total size of A+B tiles for all pipeline stages (in elements)."""
         return Self.ATileArray.num_elements + Self.BTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def sf_pipeline_size() -> Int:
         """Total size of SFA+SFB tiles for all pipeline stages (in elements)."""
         return Self.SFATileArray.num_elements + Self.SFBTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def c_output_size() -> Int:
         """Size of C tiles for all output stages (in elements)."""
         return Self.CTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def total_tile_size() -> Int:
         """Total tile storage size (A+B+SFA+SFB+C) in elements."""
         return (
@@ -266,52 +266,52 @@ struct BlockScaledSmem[
     var pipelines: Self.Pipelines
 
     # ========== Tile Accessors (forwarding) ==========
-    @always_inline
+    @inline(.always)
     def a_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.ATileArray:
         """Get A tile array accessor."""
         return self.core.a_tiles()
 
-    @always_inline
+    @inline(.always)
     def b_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.BTileArray:
         """Get B tile array accessor."""
         return self.core.b_tiles()
 
-    @always_inline
+    @inline(.always)
     def c_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.CTileArray:
         """Get C tile array accessor."""
         return self.core.c_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfa_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.SFATileArray:
         """Get SFA tile array accessor."""
         return self.core.sfa_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfb_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.SFBTileArray:
         """Get SFB tile array accessor."""
         return self.core.sfb_tiles()
 
     # ========== Size Utilities (forwarding) ==========
     @staticmethod
-    @always_inline
+    @inline(.always)
     def ab_pipeline_size() -> Int:
         """Total size of A+B tiles for all pipeline stages (in elements)."""
         return Self.Core.ab_pipeline_size()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def sf_pipeline_size() -> Int:
         """Total size of SFA+SFB tiles for all pipeline stages (in elements)."""
         return Self.Core.sf_pipeline_size()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def c_output_size() -> Int:
         """Size of C tiles for all output stages (in elements)."""
         return Self.Core.c_output_size()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def total_tile_size() -> Int:
         """Total tile storage size (A+B+SFA+SFB+C) in elements."""
         return Self.Core.total_tile_size()
@@ -322,7 +322,7 @@ struct BlockScaledSmem[
 # =============================================================================
 
 
-@always_inline
+@inline(.always)
 def sf_k_group_size[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SF_K_GROUP_SIZE from config.
 
@@ -333,7 +333,7 @@ def sf_k_group_size[config: BlockScaledMatmulConfig]() -> Int:
     return SF_ATOM_K * config.vec_sf_size
 
 
-@always_inline
+@inline(.always)
 def sf_bk[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SF_BK from config.
 
@@ -344,7 +344,7 @@ def sf_bk[config: BlockScaledMatmulConfig]() -> Int:
     return sf_k_group_size[config]() * config.num_sf_k_tiles
 
 
-@always_inline
+@inline(.always)
 def sfa_dim0[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SFA first dimension from config.
 
@@ -355,7 +355,7 @@ def sfa_dim0[config: BlockScaledMatmulConfig]() -> Int:
     return (config.block_tile_shape[0] // SF_MN_GROUP_SIZE) * SF_ATOM_M[0]
 
 
-@always_inline
+@inline(.always)
 def sfa_dim1[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SFA second dimension from config.
 
@@ -368,7 +368,7 @@ def sfa_dim1[config: BlockScaledMatmulConfig]() -> Int:
     )
 
 
-@always_inline
+@inline(.always)
 def sfb_dim0[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SFB first dimension from config.
 
@@ -381,7 +381,7 @@ def sfb_dim0[config: BlockScaledMatmulConfig]() -> Int:
     ) * SF_ATOM_M[0]
 
 
-@always_inline
+@inline(.always)
 def sfb_dim1[config: BlockScaledMatmulConfig]() -> Int:
     """Compute SFB second dimension from config.
 

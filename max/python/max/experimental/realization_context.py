@@ -57,12 +57,17 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from max import _core, driver
 from max._core.dialects import builtin
 from max._mlir_context import in_default_mlir_context
+from max.driver._hazard import (
+    render_producer_error,
+    stamp_device_write,
+)
 from max.dtype import DType
 from max.experimental import _passes
 from max.experimental.executor import (
     CompilingExecutor,
     Executor,
     InterpreterExecutor,
+    UnsupportedGraphError,
     default_executor,
 )
 from max.experimental.support import (
@@ -307,16 +312,33 @@ class EagerRealizationContext(RealizationContext):
         # All graph inputs (tensor data + signal buffers) go through
         # self.sources — signal buffers are registered there by
         # ensure_signal_buffers().
-        input_buffers = [
-            self.sources[inp._mlir_value].driver_tensor for inp in graph.inputs
-        ]
+        input_buffers: list[driver.Buffer] = []
+        mutated_inputs: list[driver.Buffer] = []
+        # graph.inputs excludes what remove_unused_arguments dropped.
+        for inp in graph.inputs:
+            buffer = self.sources[inp._mlir_value].driver_tensor
+            input_buffers.append(buffer)
+            if isinstance(inp, BufferValue):
+                mutated_inputs.append(buffer)
 
-        results = self._executor.execute(graph, input_buffers)
+        try:
+            results = self._executor.execute(graph, input_buffers)
+        except UnsupportedGraphError:
+            # Nothing was enqueued, so nothing needs poisoning.
+            raise
+        except BaseException as executor_error:
+            # Enqueued work can still land in a mutated source.
+            stamp_device_write(
+                mutated_inputs,
+                error=render_producer_error(executor_error),
+            )
+            raise
 
         # Update tensors to realized.
         # Each tensor consumes num_shards consecutive results (1 for
         # unsharded, N for sharded).
         result_idx = 0
+        written = list(mutated_inputs)
         for tensor in outputs:
             n = tensor.num_shards
             extracted = results[result_idx : result_idx + n]
@@ -328,6 +350,7 @@ class EagerRealizationContext(RealizationContext):
             tensor._storages = tuple(cast(list[driver.Buffer], extracted))
             tensor._state = None
             result_idx += n
+            written.extend(tensor._storages)
 
         # Update mutated buffer inputs to realized
         for source in self.sources.values():
@@ -335,6 +358,10 @@ class EagerRealizationContext(RealizationContext):
             # Mark the tensor as realized again.
             if source._state and source._state.ctx is self:
                 source._state = None
+
+        # Must precede the seed read below, which is a host read of one of
+        # these buffers.
+        stamp_device_write(written, input_buffers)
 
         new_seed, *outputs = outputs
         set_seed(new_seed.item())

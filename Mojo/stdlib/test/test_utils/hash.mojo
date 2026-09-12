@@ -35,7 +35,7 @@ def dif_bits(i1: UInt64, i2: UInt64) raises -> Int:
     return Int(pop_count(i1 ^ i2))
 
 
-@always_inline
+@inline(.always)
 def assert_dif_hashes(hashes: List[UInt64], upper_bound: Int) raises:
     """Asserts that all pairs of hashes differ by more than the upper bound.
 
@@ -96,7 +96,7 @@ def assert_dif_hashes(hashes: List[UInt64], upper_bound: Int) raises:
                 )
 
 
-@always_inline
+@inline(.always)
 def assert_fill_factor[
     label: String, HasherType: Hasher
 ](words: List[String], num_buckets: Int, lower_bound: Float64) raises:

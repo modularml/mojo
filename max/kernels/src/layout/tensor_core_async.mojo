@@ -154,7 +154,7 @@ from std.utils import IndexList, StaticTuple
 # `2/4/8 * T` is generalized as `swizzle.bytes() // size_of[type]()`.
 
 
-@always_inline
+@inline(.always)
 def _supported_mma_shape[
     mma_shape: IndexList[3],
 ]() -> Bool:
@@ -205,7 +205,7 @@ comptime _CM_LAYOUT_BITS = Layout.row_major(_CM_NUM_ROWS, _CM_ROW_BITS)
 comptime _CM_TILE_STRIDE = IntTuple(1, _CM_ROW_BITS)
 
 
-@always_inline
+@inline(.always)
 def warpgroup_fence[
     accum_type: DType,
     accum_layout: Layout,
@@ -229,7 +229,7 @@ def warpgroup_fence[
         accum_type == .float32
     ), "Only float32 is supported for warpgroup fence"
 
-    @always_inline
+    @inline(.always)
     def _warpgroup_fence_operand(reg: Scalar[accum_type]):
         inlined_assembly["", NoneType, constraints="+f", has_side_effect=True](
             reg
@@ -998,7 +998,7 @@ def _output_register_size[mma_shape: IndexList[3]]() -> Int:
     return mma_shape[0] * mma_shape[1] // 128
 
 
-@always_inline
+@inline(.always)
 def _convert_cfrags_to_tuple[
     c_type: DType, c_frag_size: Int
 ](
@@ -1014,7 +1014,7 @@ def _convert_cfrags_to_tuple[
     return c_frags_in_tuple
 
 
-@always_inline
+@inline(.always)
 def _convert_cfrags_to_simd[
     c_type: DType, c_frag_size: Int
 ](
@@ -1051,7 +1051,7 @@ struct TensorCoreAsync[
         transpose_b: Whether to transpose matrix B (default: False).
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize the `TensorCoreAsync` instance.
 
@@ -1067,7 +1067,7 @@ struct TensorCoreAsync[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wgmma[
         num_warp_groups: Int = 1,
         scale_c: Int = 1,
@@ -1236,7 +1236,7 @@ struct TensorCoreAsync[
                     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wgmma[
         num_warp_groups: Int = 1,
         scale_c: Int = 1,
@@ -1294,7 +1294,7 @@ struct TensorCoreAsync[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wgmma(
         a_frag_tile: LayoutTensor[Self.a_type, _, address_space=.LOCAL, ...],
         b_smem_tile: LayoutTensor[Self.b_type, _, address_space=.SHARED, ...],
@@ -1421,7 +1421,7 @@ struct TensorCoreAsync[
                     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def arrive():
         """Ensures memory consistency by creating a fence for WGMMA operations.
 
@@ -1431,7 +1431,7 @@ struct TensorCoreAsync[
         wgmma_fence_aligned()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def commit_group():
         """Commits the current warp group for execution.
 
@@ -1441,7 +1441,7 @@ struct TensorCoreAsync[
         wgmma_commit_group_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_group[group: Int = 0]():
         """Waits for the completion of a specific warp group's operations.
 

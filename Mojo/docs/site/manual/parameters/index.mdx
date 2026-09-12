@@ -456,7 +456,7 @@ exception to this rule—they can't take parameters.
 ### Case study: the SIMD type
 
 For a real-world example of a parameterized type, let's look at the
-[`SIMD`](/docs/std/builtin/simd/SIMD/) type from Mojo's standard library.
+[`SIMD`](/docs/std/simd/SIMD/) type from Mojo's standard library.
 
 [Single instruction, multiple data (SIMD)](https://en.wikipedia.org/wiki/Single_instruction,_multiple_data)
 is a parallel processing technology built into many modern CPUs, GPUs, and
@@ -472,7 +472,7 @@ longer SIMD vectors, and support many data types from 8-bit integers to 64-bit
 floating point numbers, so it's not practical to define all of the possible SIMD
 variations.
 
-Mojo's [`SIMD`](/docs/std/builtin/simd/SIMD/) type (defined as a struct)
+Mojo's [`SIMD`](/docs/std/simd/SIMD/) type (defined as a struct)
 exposes the common SIMD operations through its methods, and takes the SIMD data
 type and length values as parameters. This allows you to directly map your data
 to the SIMD vectors on any hardware.

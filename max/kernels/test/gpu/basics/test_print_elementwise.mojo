@@ -32,7 +32,7 @@ def test_elementwise_print[
         c_type, target=get_gpu_target["sm_80"]()
     ]()
 
-    @always_inline
+    @inline(.always)
     def binary[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
         var m: Int = Int(idx0[0].value())
         var n: Int = Int(idx0[1].value())

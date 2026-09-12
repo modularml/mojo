@@ -41,7 +41,7 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import fused_dual_qk_rms_norm_rope_ragged
-from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.kv_cache.input_types import KVCacheInputsPerDevice
 from test_common.graph_utils import is_b100_b200
 from test_common.simple_kv_cache import paged_kv_cache_inputs
@@ -210,22 +210,6 @@ def _run_dual(
         ) = graph.inputs
 
         num_main_kv_inputs = len(main_kv_params.flattened_kv_inputs())
-        (
-            main_blocks,
-            main_cache_lengths,
-            main_lookup,
-            main_max_p,
-            main_max_c,
-            *_main_rest,
-        ) = kv_inputs[:num_main_kv_inputs]
-        (
-            index_blocks,
-            index_cache_lengths,
-            index_lookup,
-            index_max_p,
-            index_max_c,
-            *_index_rest,
-        ) = kv_inputs[num_main_kv_inputs:]
 
         q_main_out, q_index_out = fused_dual_qk_rms_norm_rope_ragged(
             main_kv_params,
@@ -233,20 +217,12 @@ def _run_dual(
             q_main_in.tensor,
             q_index_in.tensor,
             iro_in.tensor,
-            PagedCacheValues(
-                main_blocks.buffer,
-                main_cache_lengths.tensor,
-                main_lookup.tensor,
-                main_max_p.tensor,
-                main_max_c.tensor,
-            ),
-            PagedCacheValues(
-                index_blocks.buffer,
-                index_cache_lengths.tensor,
-                index_lookup.tensor,
-                index_max_p.tensor,
-                index_max_c.tensor,
-            ),
+            main_kv_params.unflatten_kv_inputs(
+                iter(kv_inputs[:num_main_kv_inputs])
+            ).inputs[0],
+            index_kv_params.unflatten_kv_inputs(
+                iter(kv_inputs[num_main_kv_inputs:])
+            ).inputs[0],
             q_main_gamma=gamma_main_q_in.tensor,
             k_main_gamma=gamma_main_k_in.tensor,
             q_index_gamma=gamma_index_q_in.tensor,

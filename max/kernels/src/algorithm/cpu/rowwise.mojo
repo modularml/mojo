@@ -112,12 +112,12 @@ struct SerialReducer(Reducer, TrivialRegisterPassable):
     finalization (e.g. `ReduceSum` horizontally reducing its SIMD-wide
     accumulator into the scalar `acc` field exposed to bodies)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initializes the stateless single-participant reducer."""
         pass
 
-    @always_inline
+    @inline(.always)
     def sum[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns `val` unchanged — nothing to sum across on CPU.
 
@@ -132,7 +132,7 @@ struct SerialReducer(Reducer, TrivialRegisterPassable):
         """
         return val
 
-    @always_inline
+    @inline(.always)
     def max[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns `val` unchanged — nothing to combine across on CPU.
 
@@ -147,7 +147,7 @@ struct SerialReducer(Reducer, TrivialRegisterPassable):
         """
         return val
 
-    @always_inline
+    @inline(.always)
     def min[dtype: DType](self, val: Scalar[dtype]) -> Scalar[dtype]:
         """Returns `val` unchanged — nothing to combine across on CPU.
 
@@ -162,7 +162,7 @@ struct SerialReducer(Reducer, TrivialRegisterPassable):
         """
         return val
 
-    @always_inline
+    @inline(.always)
     def generic[S: ReduceOp](self, mut state: S):
         """No-op cross-thread combine — one worker per output on CPU.
 
@@ -180,7 +180,7 @@ struct SerialReducer(Reducer, TrivialRegisterPassable):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _simd_walk_unrolled[
     W: Int,
     rank: Int,
@@ -215,7 +215,7 @@ def _simd_walk_unrolled[
         k += 1
 
 
-@always_inline
+@inline(.always)
 def _simd_walk_unrolled[
     State: ReduceOp,
     W: Int,
@@ -254,7 +254,7 @@ def _simd_walk_unrolled[
         k += 1
 
 
-@always_inline
+@inline(.always)
 def reduce[
     params: ContextParams,
     rank: Int,
@@ -306,7 +306,7 @@ def reduce[
         )
 
 
-@always_inline
+@inline(.always)
 def reduce[
     State: ReduceOp,
     params: ContextParams,
@@ -388,7 +388,7 @@ def reduce[
         )
 
 
-@always_inline
+@inline(.always)
 def pjoin[
     State: ReduceOp,
     params: ContextParams,
@@ -467,7 +467,7 @@ def pjoin[
         state = State(sc)
 
 
-@always_inline
+@inline(.always)
 def once[
     Emit: ImplicitlyCopyable & RegisterPassable & (def() -> None),
     params: ContextParams,
@@ -617,7 +617,7 @@ def launch[
             )
             unsafe_memset_zero(counters_buf, num_outputs)
 
-            @always_inline
+            @inline(.always)
             def split_worker(
                 w: Int,
             ) {
@@ -656,9 +656,9 @@ def launch[
             var actual_workers = _min(num_workers, num_outputs)
             var chunk = ceildiv(num_outputs, actual_workers)
 
-            @always_inline
+            @inline(.always)
             def run_coop[params: ContextParams]() {imm}:
-                @always_inline
+                @inline(.always)
                 def row_worker(w: Int) {var body, imm}:
                     var start = w * chunk
                     var end = _min((w + 1) * chunk, num_outputs)
@@ -734,7 +734,7 @@ def launch[
             target="cpu",
         )
 
-        @always_inline
+        @inline(.always)
         def slice_worker(w: Int) {var body, imm}:
             var s_start = w * chunk
             var s_end = _min((w + 1) * chunk, slice_size)

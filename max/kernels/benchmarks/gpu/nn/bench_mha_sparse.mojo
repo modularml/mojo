@@ -217,11 +217,11 @@ def run_mha_sparse[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut b: Bencher,
         ) raises {var cb_q, var cb_k, var cb_v, var cb_o, imm}:
-            @always_inline
+            @inline(.always)
             def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 # Construct device buffers with offsets.
                 var q_device = TileTensor(

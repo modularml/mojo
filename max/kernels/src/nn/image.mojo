@@ -27,11 +27,11 @@ struct PadHandling(TrivialRegisterPassable):
     comptime EXCLUDE_PAD = PadHandling(0)  # Do not count padding.
     comptime INCLUDE_PAD = PadHandling(2)  # Count padding.
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, rhs: PadHandling) -> Bool:
         return self.value == rhs.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, rhs: PadHandling) -> Bool:
         return self.value != rhs.value
 
@@ -51,11 +51,11 @@ struct Image2DLayout(TrivialRegisterPassable):
     )  # TF filter layout for channels last input.
     comptime FRSCf = Image2DLayout(3)  # packed filter, adopted from oneDNN
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, rhs: Image2DLayout) -> Bool:
         return self.value == rhs.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, rhs: Image2DLayout) -> Bool:
         return self.value != rhs.value
 
@@ -181,7 +181,7 @@ struct ImageData[
 
         var image_shape = ImageShape(self)
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(image_shape)
         @__parameter
         def _compute_index_nchw() -> Int:
@@ -192,7 +192,7 @@ struct ImageData[
             idx = idx * image_shape.W + w
             return idx
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(image_shape)
         @__parameter
         def _compute_index_nhwc() -> Int:
@@ -224,7 +224,7 @@ struct ImageData[
 
         var image_shape = ImageShape(self)
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(image_shape)
         @__parameter
         def _compute_index_nchw() -> IndexList[4]:
@@ -234,7 +234,7 @@ struct ImageData[
             var n_idx, c_idx = divmod(lidx2, image_shape.C)
             return IndexList[4](n_idx, c_idx, h_idx, w_idx)
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(image_shape)
         @__parameter
         def _compute_index_nhwc() -> IndexList[4]:

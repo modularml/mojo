@@ -92,7 +92,7 @@ trait DispatchTestT(Deinitable):
     def __init__(out self, list_of_ctx: List[DeviceContext]) raises:
         ...
 
-    @always_inline
+    @inline(.always)
     def get_token_handler(
         self,
         dev_idx: Int,
@@ -102,13 +102,13 @@ trait DispatchTestT(Deinitable):
     ):
         ...
 
-    @always_inline
+    @inline(.always)
     def save_outputs_to_host(
         self, list_of_ctx: List[DeviceContext]
     ) raises -> None:
         ...
 
-    @always_inline
+    @inline(.always)
     def check_output_val(
         self,
         dev_idx: Int,
@@ -173,7 +173,7 @@ struct BF16DispatchTest[
         for i in range(Self.n_ranks):
             self.host_output_bufs_list[i].free()
 
-    @always_inline
+    @inline(.always)
     def get_token_handler(
         self,
         dev_idx: Int,
@@ -188,7 +188,7 @@ struct BF16DispatchTest[
         )
         result = Self.TokenFormatType(output_tensor)
 
-    @always_inline
+    @inline(.always)
     def save_outputs_to_host(
         self, list_of_ctx: List[DeviceContext]
     ) raises -> None:
@@ -198,7 +198,7 @@ struct BF16DispatchTest[
             )
             list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def check_output_val(
         self,
         dev_idx: Int,
@@ -323,7 +323,7 @@ struct BlockwiseFP8DispatchTest[
             self.host_output_bufs_list[i].free()
             self.host_output_scales_bufs_list[i].free()
 
-    @always_inline
+    @inline(.always)
     def get_token_handler(
         self,
         dev_idx: Int,
@@ -346,7 +346,7 @@ struct BlockwiseFP8DispatchTest[
         )
         result = Self.TokenFormatType(output_tensor, output_scales_tensor)
 
-    @always_inline
+    @inline(.always)
     def save_outputs_to_host(
         self, list_of_ctx: List[DeviceContext]
     ) raises -> None:
@@ -360,7 +360,7 @@ struct BlockwiseFP8DispatchTest[
             )
             list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def check_output_val(
         self,
         dev_idx: Int,
@@ -533,7 +533,7 @@ struct NVFP4DispatchTest[
             self.host_output_scales_bufs_list[i].free()
             self.host_output_scales_offset_bufs_list[i].free()
 
-    @always_inline
+    @inline(.always)
     def get_token_handler(
         self,
         dev_idx: Int,
@@ -567,7 +567,7 @@ struct NVFP4DispatchTest[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def save_outputs_to_host(
         self, list_of_ctx: List[DeviceContext]
     ) raises -> None:
@@ -585,7 +585,7 @@ struct NVFP4DispatchTest[
             )
             list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def check_output_val(
         self,
         dev_idx: Int,
@@ -763,7 +763,7 @@ struct MXFP4DispatchTest[
             self.host_output_bufs_list[i].free()
             self.host_output_scales_bufs_list[i].free()
 
-    @always_inline
+    @inline(.always)
     def get_token_handler(
         self,
         dev_idx: Int,
@@ -787,7 +787,7 @@ struct MXFP4DispatchTest[
 
         result = Self.TokenFormatType(output_tensor, output_scales_tensor)
 
-    @always_inline
+    @inline(.always)
     def save_outputs_to_host(
         self, list_of_ctx: List[DeviceContext]
     ) raises -> None:
@@ -801,7 +801,7 @@ struct MXFP4DispatchTest[
             )
             list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def check_output_val(
         self,
         dev_idx: Int,
@@ -995,55 +995,55 @@ def test_dispatch_common[
                 Int(recv_count_bufs_list[dev_idx].unsafe_ptr() + slot_idx * n_experts)
             )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_send_ptrs_tensor(slot_idx: Int, out result: TileTensor[.uint64, type_of(ptrs_layout), ImmutAnyOrigin]) raises:
         return type_of(result)(ptr=(send_ptrs_inputs + slot_idx * n_ranks).as_unsafe_any_origin(), layout=ptrs_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_recv_ptrs_tensor(slot_idx: Int, out result: TileTensor[.uint64, type_of(ptrs_layout), ImmutAnyOrigin]) raises:
         return type_of(result)( ptr=(recv_ptrs_inputs + slot_idx * n_ranks).as_unsafe_any_origin(), layout=ptrs_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_recv_count_ptrs_tensor(slot_idx: Int, out result: TileTensor[.uint64, type_of(ptrs_layout), ImmutAnyOrigin]) raises:
         return type_of(result)(ptr=(recv_count_ptrs_inputs + slot_idx * n_ranks).as_unsafe_any_origin(), layout=ptrs_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_atomic_counters_tensor( dev_idx: Int, slot_idx: Int, out result: TileTensor[.int32, type_of(counters_layout), MutAnyOrigin]) raises:
         return type_of(result)(
             ptr=(atomic_counters_list[dev_idx].unsafe_ptr() + slot_idx * counters_size).as_unsafe_any_origin(), layout=counters_layout
         )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_topk_ids_tensor(dev_idx: Int, slot_idx: Int, out result: TileTensor[.int32, type_of(topk_ids_layout), ImmutAnyOrigin]) raises:
         return type_of(result)(ptr=(device_topk_bufs_list[dev_idx].unsafe_ptr() + slot_idx * n_tokens_per_rank * top_k).as_unsafe_any_origin(), layout=topk_ids_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_input_tokens_tensor(dev_idx: Int, slot_idx: Int, out result: TileTensor[input_type, type_of(input_tokens_layout), ImmutAnyOrigin]) raises:
         return type_of(result)(ptr=(device_input_bufs_list[dev_idx].unsafe_ptr() + slot_idx * n_tokens_per_rank * hidden_size).as_unsafe_any_origin(), layout=input_tokens_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_row_offsets_tensor(dev_idx: Int, slot_idx: Int, out result: TileTensor[.uint32, type_of(row_offsets_layout), MutAnyOrigin]) raises:
         return type_of(result)(ptr=(device_row_offsets_bufs_list[dev_idx].unsafe_ptr() + slot_idx * (n_local_experts + 1)).as_unsafe_any_origin(), layout=row_offsets_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_expert_ids_tensor(dev_idx: Int, slot_idx: Int, out result: TileTensor[.int32, type_of(expert_ids_layout), MutAnyOrigin]) raises:
         return type_of(result)(ptr=(device_expert_ids_bufs_list[dev_idx].unsafe_ptr() + slot_idx * n_local_experts).as_unsafe_any_origin(), layout=expert_ids_layout)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_src_token_info_tensor(dev_idx: Int, slot_idx: Int, out result: TileTensor[.int32, type_of(src_token_info_layout), MutAnyOrigin]) raises:
         return type_of(result)(ptr=(device_src_token_info_bufs_list[dev_idx].unsafe_ptr() + slot_idx * max_recv_num_tokens * 2).as_unsafe_any_origin(), layout=src_token_info_layout)
     # fmt: on
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_dispatch_async(dev_idx: Int, slot_idx: Int) raises:
         var ctx = list_of_ctx[dev_idx]
@@ -1065,7 +1065,7 @@ def test_dispatch_common[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_dispatch_async_wait(dev_idx: Int, slot_idx: Int) raises:
         var ctx = list_of_ctx[dev_idx]
@@ -1089,13 +1089,13 @@ def test_dispatch_common[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_e2e(dev_idx: Int, slot_idx: Int) raises:
         run_dispatch_async(dev_idx, slot_idx)
         run_dispatch_async_wait(dev_idx, slot_idx)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def clean_up(dev_idx: Int) raises:
         var ctx = list_of_ctx[dev_idx]
@@ -1122,13 +1122,13 @@ def test_dispatch_common[
 
     # First, bench the dispatch kernel overhead
 
-    @always_inline
+    @inline(.always)
     def call_fn_dispatch(ctx: DeviceContext, cache_iter: Int) raises {}:
         var dev_id = Int(ctx.id())
         run_dispatch_async(dev_id, cache_iter)
 
     def per_gpu_dispatch(i: Int) raises {mut results_b, imm}:
-        @always_inline
+        @inline(.always)
         def bench_iter(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, call_fn_dispatch, list_of_ctx[i])
 
@@ -1162,13 +1162,13 @@ def test_dispatch_common[
     for dev_i in range(n_ranks):
         list_of_ctx[dev_i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def call_fn_dispatch_wait(ctx: DeviceContext, cache_iter: Int) raises {}:
         var dev_id = Int(ctx.id())
         run_dispatch_async_wait(dev_id, cache_iter)
 
     def per_gpu_dispatch_wait(i: Int) raises {mut results_b, imm}:
-        @always_inline
+        @inline(.always)
         def bench_iter(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, call_fn_dispatch_wait, list_of_ctx[i])
 
@@ -1205,14 +1205,14 @@ def test_dispatch_common[
             clean_up(dev_i)
             list_of_ctx[dev_i].synchronize()
 
-        @always_inline
+        @inline(.always)
         def call_fn_e2e(ctx: DeviceContext, cache_iter: Int) raises {}:
             var dev_id = Int(ctx.id())
             run_dispatch_async(dev_id, cache_iter + 1)
             run_dispatch_async_wait(dev_id, cache_iter + 1)
 
         def per_gpu_e2e(i: Int) raises {mut results_b, imm}:
-            @always_inline
+            @inline(.always)
             def bench_iter(mut b: Bencher) raises {imm}:
                 bencher_iter_custom(b, call_fn_e2e, list_of_ctx[i])
 
@@ -1248,7 +1248,7 @@ def test_dispatch_common[
     # Verify the results for each device and each slot
     print("Verifying results...")
 
-    @always_inline
+    @inline(.always)
     def verify_results(dev_idx: Int) raises {imm}:
         var ctx = list_of_ctx[dev_idx]
 

@@ -652,5 +652,70 @@ def test_replace_chains_for_multiple_dims() raises:
     comptime assert size_of[type_of(r)]() == 2 * size_of[Int64]()
 
 
+def test_product_default_dtype() raises:
+    """The unparameterized `product()` keeps returning `Scalar[Coord.DTYPE]`.
+
+    This overload is what `CoordLike` requires, so it must stay callable with
+    no explicit dtype and keep its historical return type.
+    """
+    var c = Coord(Idx[2], Int(3), Int32(5))
+    var p = c.product()
+    assert_true(type_of(p) == Scalar[type_of(c).DTYPE])
+    assert_equal(Int(p), 30)
+
+
+def test_product_empty() raises:
+    var t = Coord[]()
+    assert_equal(Int(t.product()), 1)
+    assert_equal(Int(t.product[.uint32]()), 1)
+
+
+def test_product_explicit_dtype() raises:
+    """`product[T]()` accumulates and returns at `T`, not at `Coord.DTYPE`."""
+    var c = Coord(Idx[4], Int(8), Int32(3))
+
+    var p32 = c.product[.uint32]()
+    assert_true(type_of(p32) == UInt32)
+    assert_equal(Int(p32), 96)
+
+    var p16 = c.product[.int16]()
+    assert_true(type_of(p16) == Int16)
+    assert_equal(Int(p16), 96)
+
+
+def test_product_narrow_dtype_wraps() raises:
+    var c = Coord(Idx[16], Int(17), Int(2))
+
+    comptime expected: Int = 16 * 17 * 2
+    assert_equal(Int(c.product()), expected)
+    assert_equal(Int(c.product[.uint8]()), expected % 256)
+
+
+def test_product_nested_explicit_dtype() raises:
+    """`product[T]()` recurses through nested `Coord`s."""
+    var c = Coord(Coord(Idx[2], Int(3)), Int32(5), Coord(Idx[7]))
+
+    comptime expected: Int = 2 * 3 * 5 * 7
+    assert_equal(Int(c.product()), expected)
+    assert_equal(Int(c.product[.uint32]()), expected)
+    assert_true(type_of(c.product[.uint32]()) == UInt32)
+
+
+def test_product_nested_overflow() raises:
+    var c = Coord(Coord(Idx[255], Int(2)), Int32(5))
+
+    comptime expected_u8: UInt8 = 255 * 2 * 5
+    assert_equal(c.product[.uint8](), expected_u8)
+    assert_true(type_of(c.product[.uint8]()) == UInt8)
+
+
+def test_product_float_dtype() raises:
+    """`T` is not restricted to integer dtypes."""
+    var c = Coord(Idx[3], Int(5), Int32(2))
+    var p = c.product[.float32]()
+    assert_true(type_of(p) == Float32)
+    assert_equal(p, Float32(30))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

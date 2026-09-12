@@ -142,7 +142,7 @@ struct MaskTileOp[
     comptime _lane_col_stride = 4
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def apply(
         masked: Bool,
         kv_tile_start_row: UInt32,

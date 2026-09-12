@@ -217,7 +217,7 @@ TEST(ArchTarget, StdlibPlugin) {
   // Explicitly passing "default" matches the field default.
   auto defaultAttr = TargetInfoAttr::get(
       &ctx, llvm::Triple("a"), "b", /*stdlib_plugin=*/"default",
-      /*features=*/"", /*data_layout=*/{},
+      /*opaque_plugin=*/{}, /*features=*/"", /*data_layout=*/{},
       /*relocation_model=*/llvm::Reloc::Static,
       /*simd_bit_width=*/0, /*index_bit_width=*/std::nullopt,
       /*tune_cpu=*/"", /*accelerator_arch=*/"", /*abi=*/"");
@@ -226,7 +226,7 @@ TEST(ArchTarget, StdlibPlugin) {
   // A non-default plugin name is stored on and read back from the attribute.
   auto pluginAttr = TargetInfoAttr::get(
       &ctx, llvm::Triple("a"), "b", /*stdlib_plugin=*/"metal",
-      /*features=*/"", /*data_layout=*/{},
+      /*opaque_plugin=*/{}, /*features=*/"", /*data_layout=*/{},
       /*relocation_model=*/llvm::Reloc::Static,
       /*simd_bit_width=*/0, /*index_bit_width=*/std::nullopt,
       /*tune_cpu=*/"", /*accelerator_arch=*/"", /*abi=*/"");

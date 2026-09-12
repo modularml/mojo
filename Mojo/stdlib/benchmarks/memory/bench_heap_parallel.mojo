@@ -46,7 +46,7 @@ comptime ALLOCS_PER_ITER = 2048
 
 
 def bench_heap_alloc_parallel(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var num_tasks = num_physical_cores()
         if num_tasks < 1:
@@ -55,7 +55,7 @@ def bench_heap_alloc_parallel(mut b: Bencher) raises:
         var per_task = ceildiv(ALLOCS_PER_ITER, num_tasks)
         var checksum = Atomic[Int64](0)
 
-        @always_inline
+        @inline(.always)
         def task_body(
             task_id: Int,
         ) {mut checksum, imm per_task,}:

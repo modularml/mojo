@@ -34,6 +34,7 @@ from max.pipelines.lib import (
     PipelineModelWithKVCache,
 )
 from max.pipelines.lib.log_probabilities import (
+    _LOGPROBS_HEAP_LEVELS,
     compute_log_probabilities_ragged,
     log_probabilities_ragged_graph,
 )
@@ -170,7 +171,8 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
 
     def _load_logprobs_model(self, session: InferenceSession) -> Model:
         graph = log_probabilities_ragged_graph(
-            DeviceRef.from_device(self.logprobs_device), levels=3
+            DeviceRef.from_device(self.logprobs_device),
+            levels=_LOGPROBS_HEAP_LEVELS,
         )
         return session.load(graph)
 

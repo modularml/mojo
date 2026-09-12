@@ -50,7 +50,7 @@ def is_pressure_test() -> Bool:
     return False
 
 
-@always_inline
+@inline(.always)
 def welford_update(
     mut mean: Float64, mut m2: Float64, count: Int, new_value: Float64
 ):
@@ -241,7 +241,7 @@ def test_dispatch[
     var e2e_stat_m: Float64 = 0
     var e2e_stat_m2: Float64 = 0
 
-    @always_inline
+    @inline(.always)
     def run_dispatch_async(ctx: DeviceContext) raises {var atomic_counter, imm}:
         # the recv_buf ptrs and recv_count ptrs need to be passed in a InlinedArray
         var recv_buf_ptrs: Array[Pointer[UInt8, MutAnyOrigin], 1] = [recv_buf]
@@ -262,7 +262,7 @@ def test_dispatch[
             block_dim=hw_info.max_thread_block_size,
         )
 
-    @always_inline
+    @inline(.always)
     def run_dispatch_async_wait(
         ctx: DeviceContext,
     ) raises {var atomic_counter, imm}:
@@ -280,12 +280,12 @@ def test_dispatch[
             block_dim=hw_info.max_thread_block_size,
         )
 
-    @always_inline
+    @inline(.always)
     def run_e2e(ctx: DeviceContext) raises {imm}:
         run_dispatch_async(ctx)
         run_dispatch_async_wait(ctx)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def clean_up(ctx: DeviceContext) raises:
         ctx.enqueue_memset(atomic_counter, Int32(0))

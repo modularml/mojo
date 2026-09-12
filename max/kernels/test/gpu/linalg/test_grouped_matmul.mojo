@@ -31,7 +31,7 @@ from std.utils.index import Index
 import std.itertools
 
 
-@always_inline
+@inline(.always)
 def test_epilogue[
     dtype: DType
 ](m: Int, n: Int, val: Scalar[dtype]) -> Scalar[dtype]:
@@ -196,7 +196,7 @@ def test[
         qkv_perm_dim and has_epilogue
     ), "qkv_perm_dim and has_epilogue cannot be True at the same time"
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_dev_tile)
     @__parameter
     def epilogue_fn[
@@ -215,7 +215,7 @@ def test[
 
         ptr.store[width=width, alignment=alignment](new_val.cast[out_type]())
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_dev_tile, total_num_tokens)
     @__parameter
     def perm_dim_fn[

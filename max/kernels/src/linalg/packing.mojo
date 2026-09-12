@@ -297,7 +297,7 @@ struct PackMatrixRows[
         var col_idx: Int = 0
 
         # An unswitch-able unit function that transpose packs a small tile.
-        @always_inline
+        @inline(.always)
         def transpose_pack_unit[
             static_switch0: Bool, static_switch1: Bool
         ]() {var transpose_buffer, imm}:
@@ -413,7 +413,7 @@ struct PackMatrixCols[
 
         instance._pack()
 
-    @always_inline
+    @inline(.always)
     def _pack_helper[
         skip_row_bound: Bool, skip_col_bound: Bool
     ](self, row_start: Int, valid_row_count: Int, col_start: Int):
@@ -429,7 +429,7 @@ struct PackMatrixCols[
 
         comptime unroll_factor = get_packB_unroll_factor()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def pack_vector(row_idx: Int, col_idx: Int):
             var global_idx = Index(
@@ -468,12 +468,12 @@ struct PackMatrixCols[
                 data,
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def pack_body[idx: Int]():
             pack_vector(row_start + idx, col_start)
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def prefetch_body[idx: Int]():
             var global_row_idx = (
@@ -584,7 +584,7 @@ struct PackMatrixCols[
         var row_idx: Int = 0
         var col_idx: Int = 0
 
-        @always_inline
+        @inline(.always)
         def pack_unit[
             skip_row_bound: Bool, skip_col_bound: Bool
         ]() {var valid_row_count, imm}:
@@ -614,7 +614,7 @@ struct PackMatrixCols[
             self._pack_default()
 
 
-@always_inline
+@inline(.always)
 def _pack_matmul_b_shape_func_impl[
     a_type: DType,
     c_type: DType,
@@ -639,7 +639,7 @@ def _pack_matmul_b_shape_func_impl[
     var k = dim1 if transpose_in_0 else dim0
     var tile_n_k = IndexList[2]()
 
-    @always_inline
+    @inline(.always)
     def dispatch_on_kernel_type[kernel_type: Bool]() {mut tile_n_k, b_input}:
         comptime config = get_kernel_config[
             a_type,
@@ -811,7 +811,7 @@ def pack_b[
                 dst_offset += tile_n * tile_k
 
 
-@always_inline
+@inline(.always)
 def _pack_b_ndbuffer_impl[
     b_type: DType,
     //,
@@ -864,7 +864,7 @@ def _pack_b_ndbuffer_impl[
                 )
             return
 
-        @always_inline
+        @inline(.always)
         def dispatch_on_kernel_type[
             kernel_type: Bool
         ]() {output_buffer, b_input}:
@@ -889,7 +889,7 @@ def _pack_b_ndbuffer_impl[
         dispatch_get_kernel_type(dispatch_on_kernel_type, kernel_type_m, n, k)
 
 
-@always_inline
+@inline(.always)
 def pack_matmul_b_shape_func[
     a_type: DType,
     c_type: DType,
@@ -920,7 +920,7 @@ def pack_matmul_b_shape_func[
     )
 
 
-@always_inline
+@inline(.always)
 def pack_b_ndbuffer[
     b_type: DType,
     //,
@@ -954,7 +954,7 @@ def pack_b_ndbuffer[
     )
 
 
-@always_inline
+@inline(.always)
 def pack_transposed_b_ndbuffer[
     b_type: DType,
     //,
@@ -1024,7 +1024,7 @@ struct BTileGenerator[
     var tile_n_k: DynamicCoord[.int64, 2]
 
     # needs to be always_inline so b_tile_stack_ptr gets allocated on caller's stack
-    @always_inline
+    @inline(.always)
     @staticmethod
     def get(
         b: TileTensor[Self.b_type, Self.b_layout, Self.origin],

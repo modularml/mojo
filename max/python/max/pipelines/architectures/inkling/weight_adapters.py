@@ -25,6 +25,8 @@ from max.graph import Shape
 from max.graph.weights import WeightData, Weights
 from transformers import AutoConfig
 
+from .layers.moe import padded_router_rows
+
 logger = logging.getLogger("max.pipelines")
 
 # Inkling ships raw input_amax without a precomputed input_scale, so we
@@ -98,6 +100,21 @@ def _sink_down(data: WeightData, name: str) -> WeightData:
     )
 
 
+def _pad_router_rows(data: WeightData, name: str) -> WeightData:
+    """Pads the gate weight up to the row count the graph declares."""
+    rows, hidden = (int(d) for d in data.shape)
+    padded = padded_router_rows(rows)
+    if padded == rows:
+        return _rename(data, name)
+    byte_rows = _as_bytes(data)
+    return _from_bytes(
+        np.pad(byte_rows, ((0, padded - rows), (0, 0))),
+        data,
+        [padded, hidden],
+        name,
+    )
+
+
 def _as_float32(data: WeightData) -> np.ndarray:
     """Widens a float weight to float32 on the host.
 
@@ -165,6 +182,8 @@ def _convert(name: str, data: WeightData) -> dict[str, WeightData]:
     if rest.endswith("shared_experts.shared_w2_weight"):
         target = f"{prefix}shared_experts.down_proj.weight"
         return {target: _sink_down(data, target)}
+    if rest.endswith("mlp.gate.weight"):
+        return {rest: _pad_router_rows(data, rest)}
     if rest.endswith(".input_amax"):
         target = rest[: -len(".input_amax")] + ".input_scale"
         return {target: _input_scale(data, target)}

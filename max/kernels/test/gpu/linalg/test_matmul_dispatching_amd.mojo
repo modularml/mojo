@@ -410,7 +410,7 @@ def test_oob_epilogue[
 
     # Epilogue writes to out_tensor using global (m, n) coordinates
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_tensor)
     def epilogue_fn[
         _dtype: DType,
@@ -608,7 +608,7 @@ def test_oob_epilogue_dynamic_m[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_tensor)
     def epilogue_fn[
         _dtype: DType,

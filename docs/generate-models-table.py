@@ -63,6 +63,25 @@ ARCH_LABEL_OVERRIDES: dict[str, list[str]] = {
     "WanImageToVideoPipeline": ["image-to-video"],
 }
 
+# Speculative-decoding variants that arch resolution rewrites a base
+# architecture into when the checkpoint has speculative heads. The user
+# never selects them, so the table folds each variant into its base
+# architecture's row. merge_architectures() raises on an unmapped
+# ``Unified*`` name, so new variants must be added here.
+SPEC_DECODE_VARIANT_BASE_ARCH: dict[str, str] = {
+    "UnifiedDflash2Qwen3_5ForConditionalGeneration": "Qwen3_5ForConditionalGeneration",
+    "UnifiedDflashGemma4_31BForCausalLM": "Gemma4ForConditionalGeneration",
+    "UnifiedDflashKimiK25ForCausalLM": "KimiK25ForConditionalGeneration",
+    "UnifiedDflashLlama3ForCausalLM": "LlamaForCausalLM",
+    "UnifiedDSparkGemma4_12BForCausalLM": "Gemma4UnifiedForConditionalGeneration",
+    "UnifiedDSparkGemma4_31BForCausalLM": "Gemma4ForConditionalGeneration",
+    "UnifiedMTPDeepseekV3ForCausalLM": "DeepseekV3ForCausalLM",
+    "UnifiedMTPGemma4ForCausalLM": "Gemma4ForConditionalGeneration",
+    "UnifiedMTPGlmMoeDsaForCausalLM": "GlmMoeDsaForCausalLM",
+    "UnifiedMTPInklingForConditionalGeneration": "InklingForConditionalGeneration",
+    "UnifiedMTPQwen3_5ForConditionalGeneration": "Qwen3_5ForConditionalGeneration",
+}
+
 
 def derive_modality_labels(
     task: str | None, input_modalities: AbstractSet[str]
@@ -277,6 +296,71 @@ def _parse_optional(path: Path) -> ast.Module | None:
     return ast.parse(path.read_text()) if path.exists() else None
 
 
+def _derived_arch_row(
+    call: ast.Call, node: ast.Assign, results: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Row for ``dataclasses.replace(<base_var>, ...)`` in an ``arch.py``.
+
+    The derived architecture inherits the base row's columns; only keyword
+    fields the table renders are overridden. Returns ``None`` when the base
+    is not an already-parsed ``SupportedArchitecture`` in the same file.
+    """
+    if not (call.args and isinstance(call.args[0], ast.Name)):
+        return None
+    base = next(
+        (r for r in results if r.get("var_name") == call.args[0].id), None
+    )
+    if base is None:
+        return None
+
+    name_node = extract_keyword_value(call, "name")
+    if not (
+        isinstance(name_node, ast.Constant) and isinstance(name_node.value, str)
+    ):
+        return None
+
+    row = dict(base)
+    if node.targets and isinstance(node.targets[0], ast.Name):
+        row["var_name"] = node.targets[0].id
+    row["name"] = name_node.value
+
+    repos = extract_keyword_value(call, "example_repo_ids")
+    if isinstance(repos, (ast.List, ast.Set)):
+        row["example_repo_ids"] = [
+            elt.value
+            for elt in repos.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        ]
+
+    modalities = extract_keyword_value(call, "input_modalities")
+    if isinstance(modalities, (ast.Set, ast.List)):
+        parsed = {
+            elt.attr
+            for elt in modalities.elts
+            if isinstance(elt, ast.Attribute)
+        }
+        if parsed:
+            row["input_modalities"] = parsed
+
+    task = extract_keyword_value(call, "task")
+    if isinstance(task, ast.Attribute):
+        row["modality"] = task.attr
+
+    encodings = extract_keyword_value(call, "supported_encodings")
+    if isinstance(encodings, (ast.List, ast.Set)):
+        row["supported_encodings"] = {
+            elt.value
+            for elt in encodings.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        }
+
+    multi_gpu = extract_keyword_value(call, "multi_gpu_supported")
+    if isinstance(multi_gpu, ast.Constant):
+        row["multi_gpu_supported"] = bool(multi_gpu.value)
+
+    return row
+
+
 def parse_arch_file(arch_path: Path) -> list[dict[str, Any]]:
     """Parse an arch.py file and extract all SupportedArchitecture definitions."""
     tree = ast.parse(arch_path.read_text())
@@ -317,6 +401,29 @@ def parse_arch_file(arch_path: Path) -> list[dict[str, Any]]:
             and func.attr == "SupportedArchitecture"
         ):
             is_supported_arch = True
+
+        is_speculator = (
+            isinstance(func, ast.Name) and func.id == "Speculator"
+        ) or (isinstance(func, ast.Attribute) and func.attr == "Speculator")
+        if is_speculator:
+            speculator = _speculator_row(call, node, tree, arch_path.parent)
+            if speculator is not None:
+                results.append(speculator)
+            continue
+
+        # dataclasses.replace(<base>, ...) derives an architecture from a
+        # SupportedArchitecture in the same file (e.g. the text-only
+        # Gemma4Unified line) and inherits the base's columns.
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "replace"
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "dataclasses"
+        ):
+            derived = _derived_arch_row(call, node, results)
+            if derived is not None:
+                results.append(derived)
+            continue
 
         if not is_supported_arch:
             continue
@@ -387,19 +494,68 @@ def parse_arch_file(arch_path: Path) -> list[dict[str, Any]]:
         if name is None:
             continue
 
-        results.append(
-            {
-                "var_name": var_name,
-                "name": name,
-                "example_repo_ids": example_repo_ids,
-                "modality": modality,
-                "input_modalities": input_modalities,
-                "supported_encodings": supported_encodings,
-                "multi_gpu_supported": multi_gpu,
-            }
-        )
+        base = {
+            "var_name": var_name,
+            "name": name,
+            "example_repo_ids": example_repo_ids,
+            "modality": modality,
+            "input_modalities": input_modalities,
+            "supported_encodings": supported_encodings,
+            "multi_gpu_supported": multi_gpu,
+        }
+        results.append(base)
 
     return results
+
+
+def _base_arch_row(
+    tree: ast.Module, package_dir: Path, base_var: str
+) -> dict[str, Any] | None:
+    """The parsed row of the architecture ``base_var`` refers to.
+
+    A speculator lives in its own package and names its target by relative
+    import, so the target's columns come from a different ``arch.py``.
+    """
+    for module_path in _relative_import_modules(tree, package_dir):
+        if module_path.name != "arch.py" or not module_path.exists():
+            continue
+        for row in parse_arch_file(module_path):
+            if row.get("var_name") == base_var:
+                return row
+    return None
+
+
+def _speculator_row(
+    call: ast.Call, node: ast.Assign, tree: ast.Module, package_dir: Path
+) -> dict[str, Any] | None:
+    """Row for a ``Speculator(...)`` declared in a speculator's ``arch.py``."""
+    name_node = extract_keyword_value(call, "name")
+    base_node = extract_keyword_value(call, "base")
+    if not (
+        isinstance(name_node, ast.Constant)
+        and isinstance(name_node.value, str)
+        and isinstance(base_node, ast.Name)
+    ):
+        return None
+    base_row = _base_arch_row(tree, package_dir, base_node.id)
+    if base_row is None:
+        return None
+
+    row = dict(base_row)
+    row["name"] = name_node.value
+    row["var_name"] = (
+        node.targets[0].id
+        if node.targets and isinstance(node.targets[0], ast.Name)
+        else None
+    )
+    repos = extract_keyword_value(call, "example_repo_ids")
+    if isinstance(repos, (ast.List, ast.Set)):
+        row["example_repo_ids"] = [
+            elt.value
+            for elt in repos.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        ]
+    return row
 
 
 def collect_architectures() -> list[dict[str, Any]]:
@@ -453,13 +609,26 @@ def merge_architectures(archs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Combines example repos, modality/context pairs, encodings, and multi-GPU
     support so that architectures registered under the same HuggingFace model
     name (e.g. ``Qwen3ForCausalLM`` for both text-gen and embeddings) produce
-    one table row.
+    one table row. Speculative-decoding variants fold into their base
+    architecture's row via ``SPEC_DECODE_VARIANT_BASE_ARCH``.
     """
     grouped: dict[str, dict[str, Any]] = {}
     insert_order: list[str] = []
 
     for arch in archs:
-        display_name = arch["name"].removesuffix("_ModuleV3")
+        name = arch["name"]
+        if (
+            name.startswith("Unified")
+            and name not in SPEC_DECODE_VARIANT_BASE_ARCH
+        ):
+            raise ValueError(
+                f"Unmapped spec-decode variant {name!r}: add it to "
+                "SPEC_DECODE_VARIANT_BASE_ARCH so it folds into its base "
+                "architecture's row."
+            )
+        display_name = SPEC_DECODE_VARIANT_BASE_ARCH.get(
+            name, name
+        ).removesuffix("_ModuleV3")
 
         if display_name not in grouped:
             insert_order.append(display_name)

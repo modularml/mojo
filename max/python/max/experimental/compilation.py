@@ -23,13 +23,13 @@ stops after tracing, for inspecting the graph.
     from max.driver import CPU
     from max.dtype import DType
     from max.experimental import compilation
+    from max.experimental.sharding import TensorLayout
     from max.experimental.tensor import Tensor
-    from max.graph import DeviceRef, TensorType
 
     def step(x: Tensor, *, gain: float) -> Tensor:
         return x * gain
 
-    x_spec = TensorType(DType.float32, ["batch", 2], device=DeviceRef.CPU())
+    x_spec = TensorLayout(DType.float32, ["batch", 2], CPU())
 
     run = compilation.compile(step)(x_spec, gain=3.0)
     out = run(Tensor.ones([4, 2], device=CPU()), gain=3.0)  # "batch" accepts 4
@@ -49,7 +49,7 @@ import itertools
 import re
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Generic, ParamSpec, TypeAlias, TypeVar, get_args
+from typing import Any, Generic, ParamSpec, TypeVar
 
 from max.driver import Accelerator, Buffer, Device, DLPackArray
 from max.engine import CompiledModel, Model
@@ -63,20 +63,16 @@ from max.experimental.realization_context import (
     subgraph_context,
 )
 from max.experimental.sharding import (
-    DeviceMesh,
-    DistributedBufferType,
-    PlacementMapping,
-    Replicated,
+    BufferLayout,
     TensorLayout,
+    as_layout,
 )
-from max.experimental.sharding.placements import local_shard_shape_from_global
 from max.experimental.support import _session
 from max.experimental.tensor import Tensor, realization_context
 from max.experimental.tree_utils import TreeDef
 from max.graph import (
     BufferType,
     BufferValue,
-    DeviceRef,
     Graph,
     StaticDim,
     TensorType,
@@ -88,17 +84,16 @@ from max.graph import (
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
-Spec: TypeAlias = (
-    TensorLayout | TensorType | Tensor | BufferType | DistributedBufferType
+# What may stand in for one tensor argument, and so the leaves of a spec tree.
+# A ``Tensor`` is a leaf so that ``as_layout`` can refuse it by name. Dropping
+# it here would instead have the walk descend into it as a pytree, which
+# contributes its pieces as separate inputs and says nothing.
+_LAYOUT_TYPES: tuple[type, ...] = (
+    TensorLayout,
+    Tensor,
+    TensorType,
+    BufferType,
 )
-"""What one tensor argument may be staged as."""
-
-NormalizedSpec: TypeAlias = TensorLayout | BufferType | DistributedBufferType
-"""A :data:`Spec` that :func:`as_layout` has normalized, and so what the graph
-reads."""
-
-# The types accepted as one input spec, and so the leaves of a spec tree.
-_SPEC_TYPES: tuple[type, ...] = get_args(Spec)
 # The types a graph boundary carries, and so the leaves of a staged result.
 _GRAPH_VALUE_TYPES = (BufferValue, TensorValue)
 
@@ -109,74 +104,10 @@ def _sanitized_graph_name(fn: Callable[..., object]) -> str:
     return re.sub(r"\W+", "_", raw).strip("_") or "fn"
 
 
-def as_layout(spec: Spec) -> NormalizedSpec:
-    """Normalizes a tensor spec into a layout.
-
-    Applied to every tensor argument, which is what lets a real tensor stand
-    in for a spec.
-
-    .. code-block:: python
-
-        from max.dtype import DType
-        from max.experimental.compilation import as_layout
-        from max.graph import DeviceRef, TensorType
-
-        layout = as_layout(
-            TensorType(DType.float32, [4], device=DeviceRef.CPU())
-        )
-
-    .. invisible-code-block: python
-
-        assert layout.dtype == DType.float32
-        assert layout.mesh.num_devices == 1
-
-    Args:
-        spec: A :class:`~max.experimental.sharding.TensorLayout`, a
-            :class:`~max.graph.TensorType`, an example
-            :class:`~max.experimental.tensor.Tensor`, or a buffer spec.
-
-    Returns:
-        The equivalent layout, or ``spec`` itself when it is a buffer spec.
-
-    Raises:
-        TypeError: If ``spec`` is none of the accepted forms.
-    """
-    if isinstance(spec, (TensorLayout, BufferType, DistributedBufferType)):
-        return spec
-    if isinstance(spec, Tensor):
-        return TensorLayout(spec.dtype, spec.shape, spec.mapping)
-    if isinstance(spec, TensorType):
-        mesh = DeviceMesh.single(spec.device.to_device())
-        return TensorLayout(
-            spec.dtype, spec.shape, PlacementMapping(mesh, (Replicated(),))
-        )
-    raise TypeError(
-        f"expected a TensorLayout, TensorType, Tensor, BufferType or "
-        f"DistributedBufferType spec, got {type(spec).__name__}: {spec!r}"
-    )
-
-
-def _graph_input_types(
-    spec: NormalizedSpec,
-) -> list[TensorType | BufferType]:
-    """The graph input types one layout contributes, in mesh order."""
-    if isinstance(spec, BufferType):
-        return [spec]
-    if isinstance(spec, TensorLayout):
-        shapes = local_shard_shape_from_global(
-            spec.shape, spec.mesh, spec.placements
-        )
-        return [
-            TensorType(spec.dtype, shape, DeviceRef.from_device(device))
-            for shape, device in zip(shapes, spec.mesh.devices, strict=True)
-        ]
-    return list(spec.local_types)
-
-
 def _fills_one_slot(value: object) -> bool:
     """Whether ``value`` fills one argument slot rather than nesting further."""
     # Deferring to ``tree.is_node`` keeps this agreeing with ``_record_graph``'s walk.
-    return isinstance(value, _SPEC_TYPES) or not tree.is_node(value)
+    return isinstance(value, _LAYOUT_TYPES) or not tree.is_node(value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -231,7 +162,7 @@ class _Signature:
         buffers: list[Buffer] = []
         for path, layout in wanted.items():
             arg, name = given[path], path.partition(".")[2]
-            if not isinstance(layout, _SPEC_TYPES):
+            if not isinstance(layout, _LAYOUT_TYPES):
                 # __eq__ may be elementwise, so only a clean True counts.
                 try:
                     matches = arg is layout or bool(arg == layout)
@@ -249,18 +180,19 @@ class _Signature:
                     f"{type(arg).__name__}; use execute_raw()"
                 )
             shards = arg.local_shards
-            if isinstance(layout, (BufferType, DistributedBufferType)):
+            if isinstance(layout, BufferLayout):
                 # Dtype and shard count only: extent is whatever was allocated.
-                expected = _graph_input_types(layout)
-                if len(shards) != len(expected) or arg.dtype != layout.dtype:
+                expected = layout.mesh.num_devices
+                if len(shards) != expected or arg.dtype != layout.dtype:
                     raise ValueError(
                         f"argument {name}: expected {layout.dtype} across "
-                        f"{len(expected)} device(s), got {arg.dtype} across "
+                        f"{expected} device(s), got {arg.dtype} across "
                         f"{len(shards)}"
                     )
                 buffers.extend(shard.driver_tensor for shard in shards)
                 continue
-            # Every non-buffer spec went through ``as_layout`` when staged.
+            # Staging put every spec through ``as_layout``, so what reaches
+            # here reads as a value.
             assert isinstance(layout, TensorLayout)
             devices = [shard.device for shard in shards]
             # A symbolic dim was staged to accept any size, so only match statics.
@@ -305,13 +237,14 @@ class StagedGraph(Generic[_P, _R]):
 
         from max.dtype import DType
         from max.experimental import compilation
+        from max.experimental.sharding import TensorLayout
         from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, TensorType
+        from max.driver import CPU
 
         def scale(x: Tensor) -> Tensor:
             return x * 2
 
-        spec = TensorType(DType.float32, [4], device=DeviceRef.CPU())
+        spec = TensorLayout(DType.float32, [4], CPU())
         staged = compilation.stage(scale)(spec)
 
     .. invisible-code-block: python
@@ -386,13 +319,13 @@ class CompiledCallable(Generic[_P, _R]):
         from max.driver import CPU
         from max.dtype import DType
         from max.experimental import compilation
+        from max.experimental.sharding import TensorLayout
         from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, TensorType
 
         def scale(x: Tensor) -> Tensor:
             return x * 2
 
-        spec = TensorType(DType.float32, [3], device=DeviceRef.CPU())
+        spec = TensorLayout(DType.float32, [3], CPU())
 
         run = compilation.compile(scale)(spec)  # compiles here
         run.export_mef("scale.mef")             # no weights, no device memory
@@ -490,7 +423,7 @@ class CompiledCallable(Generic[_P, _R]):
 
 
 def _signal_device_ids(
-    layouts: Sequence[NormalizedSpec], signal_devices: Iterable[Device]
+    layouts: Sequence[TensorLayout], signal_devices: Iterable[Device]
 ) -> tuple[int, ...]:
     """The accelerators whose collectives need signal buffers.
 
@@ -504,7 +437,7 @@ def _signal_device_ids(
     spanned = (
         device
         for layout in layouts
-        if not isinstance(layout, BufferType) and layout.mesh.num_devices > 1
+        if layout.mesh.num_devices > 1
         for device in layout.mesh.devices
     )
     ids = tuple(
@@ -520,30 +453,26 @@ def _signal_device_ids(
 def _argument_tensor(
     ctx: GraphRealizationContext,
     values: Iterator[Value[Any]],
-    spec: NormalizedSpec,
+    layout: TensorLayout,
 ) -> Tensor:
-    """One staged argument, rebuilt from the graph inputs its spec claims.
+    """Rebuilds one staged argument from the graph inputs its layout claims.
 
     Args:
         ctx: The context the rebuilt tensor records into.
-        values: The graph's inputs, in spec order, drained by what ``spec``
-            spans.
-        spec: What the argument was staged as.
+        values: The graph's inputs, in layout order, drained by what
+            ``layout`` spans.
+        layout: What the argument was staged as.
 
     Returns:
         The tensor to pass ``fn`` in that argument's place.
     """
-    if isinstance(spec, BufferType):
-        return Tensor.from_graph_value(next(values).buffer)
-    shards = itertools.islice(values, spec.mesh.num_devices)
-    if isinstance(spec, DistributedBufferType):
-        return ctx.create_unrealized(
-            tuple(value.buffer for value in shards),
-            mapping=PlacementMapping(spec.mesh, spec.placements),
-        )
-    return ctx.create_unrealized(
-        tuple(value.tensor for value in shards), mapping=spec.mapping
+    shards = itertools.islice(values, layout.mesh.num_devices)
+    graph_values: tuple[BufferValue | TensorValue, ...] = (
+        tuple(value.buffer for value in shards)
+        if isinstance(layout, BufferLayout)
+        else tuple(value.tensor for value in shards)
     )
+    return ctx.create_unrealized(graph_values, mapping=layout.mapping)
 
 
 def stage(
@@ -561,23 +490,27 @@ def stage(
     to get the :class:`StagedGraph`, which prints as MLIR. Use
     :func:`compile` to run ``fn`` instead.
 
-    Tensor arguments are given as specs: a :class:`~max.graph.TensorType`, a
-    :class:`~max.experimental.sharding.TensorLayout`, or a buffer type. A real
-    :class:`~max.experimental.tensor.Tensor` also works, converted by
-    :func:`as_layout`, which fixes every dimension. Pass a type to keep one
-    symbolic.
+    Tensor arguments are given as specs. A
+    :class:`~max.experimental.sharding.TensorLayout` is a layout, and an argument
+    given one is read-only; pass a
+    :class:`~max.experimental.sharding.BufferLayout` for a buffer the callable
+    may also store through. Only a layout may declare a boundary: a live
+    :class:`~max.experimental.tensor.Tensor` is refused, because its dims are
+    whatever it currently holds and taking them would fix every one. Pass
+    ``tensor.layout`` to do that on purpose.
 
     .. code-block:: python
 
         from max.dtype import DType
         from max.experimental import compilation
+        from max.experimental.sharding import TensorLayout
         from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, TensorType
+        from max.driver import CPU
 
         def combine(kv: dict[str, Tensor], alpha: float) -> Tensor:
             return (kv["a"] + kv["b"]) * alpha
 
-        spec = TensorType(DType.float32, [2], device=DeviceRef.CPU())
+        spec = TensorLayout(DType.float32, [2], CPU())
 
         # Each tensor in the container is an input; alpha is baked in.
         staged = compilation.stage(combine)({"a": spec, "b": spec}, 2.0)
@@ -600,15 +533,16 @@ def stage(
         is_device_graph: Whether to record a device graph.
 
     Returns:
-        A callable taking one spec per argument of ``fn``, as :func:`as_layout`
+        A callable taking one spec per argument of ``fn``, as
+        :func:`~max.experimental.sharding.as_layout`
         accepts them, and returning the :class:`StagedGraph`.
     """
 
     def record(*args: Any, **kwargs: Any) -> StagedGraph[_P, _R]:
         # Positional, like _Signature.flatten: one graph input per argument slot.
-        in_specs = tree.map(as_layout, (args, dict(kwargs)), leaf=_SPEC_TYPES)
-        layouts, structure = tree.flatten(in_specs, leaf=_SPEC_TYPES)
-        types = [t for spec in layouts for t in _graph_input_types(spec)]
+        in_specs = tree.map(as_layout, (args, dict(kwargs)), leaf=_LAYOUT_TYPES)
+        layouts, structure = tree.flatten(in_specs, leaf=_LAYOUT_TYPES)
+        types = [t for spec in layouts for t in spec.local_types]
         ids = _signal_device_ids(layouts, signal_devices)
         graph = Graph(
             name or _sanitized_graph_name(fn),
@@ -658,11 +592,14 @@ def compile(
     Call the returned function with one spec per tensor argument of ``fn``
     to get the :class:`CompiledCallable`; call that on real tensors.
 
-    Tensor arguments are given as specs: a :class:`~max.graph.TensorType`, a
-    :class:`~max.experimental.sharding.TensorLayout`, or a buffer type. A real
-    :class:`~max.experimental.tensor.Tensor` also works, converted by
-    :func:`as_layout`, which fixes every dimension. Pass a type to keep one
-    symbolic.
+    Tensor arguments are given as specs. A
+    :class:`~max.experimental.sharding.TensorLayout` is a layout, and an argument
+    given one is read-only; pass a
+    :class:`~max.experimental.sharding.BufferLayout` for a buffer the callable
+    may also store through. Only a layout may declare a boundary: a live
+    :class:`~max.experimental.tensor.Tensor` is refused, because its dims are
+    whatever it currently holds and taking them would fix every one. Pass
+    ``tensor.layout`` to do that on purpose.
 
     .. code-block:: python
 
@@ -670,15 +607,15 @@ def compile(
         from max.dtype import DType
         from max.experimental import compilation
         from max.experimental import functional as F
+        from max.experimental.sharding import TensorLayout
         from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, TensorType
 
-        w_type = TensorType(DType.float32, [2], device=DeviceRef.CPU())
+        w_type = TensorLayout(DType.float32, [2], CPU())
 
         def layer(x: Tensor) -> Tensor:
             return x * F.constant_external("w", w_type)
 
-        x_spec = TensorType(DType.float32, ["batch", 2], device=DeviceRef.CPU())
+        x_spec = TensorLayout(DType.float32, ["batch", 2], CPU())
         w = Tensor.ones([2], device=CPU()) * 3
 
         run = compilation.compile(layer, weights={"w": w})(x_spec)
@@ -790,10 +727,10 @@ def as_subgraph(
         from max.dtype import DType
         from max.experimental import compilation
         from max.experimental import functional as F
+        from max.experimental.sharding import TensorLayout
         from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, TensorType
 
-        w_type = TensorType(DType.float32, [1], device=DeviceRef.CPU())
+        w_type = TensorLayout(DType.float32, [1], CPU())
 
         def block(x: Tensor) -> Tensor:
             return x * F.constant_external("w", w_type, is_placeholder=True)

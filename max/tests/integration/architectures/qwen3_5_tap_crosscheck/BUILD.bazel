@@ -1,0 +1,47 @@
+# Cross-framework check on Qwen3.5's DFlash2 hidden-state tap.
+#
+# The fused DFlash2 graph is gated against a drafter fixture that feeds
+# *synthetic* taps, so it establishes the drafter is right given right taps
+# and says nothing about the taps themselves. This package closes that gap by
+# running the same weights through HuggingFace and through MAX and comparing
+# the tapped tensors directly.
+
+load(
+    "//bazel:api.bzl",
+    "modular_py_test",
+    "requirement",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_tap_matches_huggingface",
+    size = "large",
+    srcs = ["test_tap_matches_huggingface.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
+    ],
+)

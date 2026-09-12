@@ -448,7 +448,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
     # ========== Load Input Tiles ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         a_tma_origin: ImmOrigin,
         b_tma_origin: ImmOrigin,
@@ -564,7 +564,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
     # ========== MMA Operation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -629,7 +629,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         ctx: Self.Context,
         a_tma_op: Self.ATmaOp,
@@ -705,7 +705,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
     # ========== Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)

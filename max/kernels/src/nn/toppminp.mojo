@@ -24,7 +24,7 @@ from nn.softmax import softmax_inline
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def top_p_sampling[
     dtype: DType,
     out_idx_type: DType,
@@ -64,7 +64,7 @@ def top_p_sampling[
     )
 
 
-@always_inline
+@inline(.always)
 def min_p_sampling[
     dtype: DType,
     out_idx_type: DType,
@@ -102,7 +102,7 @@ def min_p_sampling[
     )
 
 
-@always_inline
+@inline(.always)
 def _topp_minp_sampling[
     dtype: DType,
     out_idx_type: DType,
@@ -245,7 +245,7 @@ def _topp_minp_sampling[
     dealloc(sorted_probs_alloc^)
 
 
-@always_inline
+@inline(.always)
 def sort_buf_descending[
     dtype: DType, out_idx_type: DType
 ](
@@ -307,7 +307,7 @@ def merge_sort_recursive[
         merge(buf_keys, buf_ids, start, mid, end)
 
 
-@always_inline
+@inline(.always)
 def merge[
     dtype: DType, out_idx_type: DType
 ](

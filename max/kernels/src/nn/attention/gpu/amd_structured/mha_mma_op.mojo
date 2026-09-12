@@ -266,7 +266,7 @@ struct MlaConfigV2(ImplicitlyCopyable, Movable):
         self.cache_depth = cache_depth
         self.rope_cache_offset = rope_cache_offset
 
-    @always_inline
+    @inline(.always)
     def d_nope(self) -> Int:
         """Returns the non-RoPE segment depth (= `depth` = `d_pv`).
 
@@ -277,7 +277,7 @@ struct MlaConfigV2(ImplicitlyCopyable, Movable):
         """
         return self.depth
 
-    @always_inline
+    @inline(.always)
     def mha(self) -> MhaConfigV2:
         """Returns an `MhaConfigV2` derived from `Self` for sharing
         the `MhaMmaOp[T, ...]` machinery.
@@ -521,7 +521,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
     # FP32 SMEM (unused here) would take the identity branch.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _swizzle_K_sub(r: Int, c: Int) -> Int:
         """Returns the byte offset of `(r, c)` within a K sub-block,
         with a two-XOR same-distance swizzle applied for BF16 and FP8.
@@ -555,14 +555,14 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
             return offset
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_K[
         layout_dst: TensorLayout,
         layout_src: TensorLayout,
         //,
     ](
         mut dst: RegTile[Self.T, layout_dst, MutUntrackedOrigin],
-        src: SMemTile[Self.T, layout_src, MutAnyOrigin],
+        src: SMemTile[Self.T, layout_src, MutAnyOrigin, _],
     ):
         """Loads the whole `(KV_BLOCK, DEPTH)` K tile from SMEM into the
         row_l register tile (32×MMA_K base tiles), unswizzling on the way.
@@ -772,14 +772,14 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
                     ](frag)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_V[
         layout_dst: TensorLayout,
         layout_src: TensorLayout,
         //,
     ](
         mut dst: RegTile[Self.T, layout_dst, MutUntrackedOrigin],
-        src: SMemTile[Self.T, layout_src, MutAnyOrigin],
+        src: SMemTile[Self.T, layout_src, MutAnyOrigin, _],
     ):
         """Loads the whole V tile from SMEM into the col_l register tile.
 
@@ -964,7 +964,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
                     comptime _sub_col = _depth_offset // _V_SUB_COLS_
                     comptime _d_in_sub = _depth_offset % _V_SUB_COLS_
 
-                    @always_inline
+                    @inline(.always)
                     @__parameter
                     def _load_keys[key_base: Int]() -> SIMD[Self.T, 8]:
                         # Comptime per-cell offset, derived from
@@ -1048,7 +1048,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
     # MMA dispatch — MFMA over RegTile, named by attention semantic.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma_QK[
         T_att: DType,
         layout_att: TensorLayout,
@@ -1114,7 +1114,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
                 att_v[n, m, 0] = d_simd
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma_PV[
         T_o: DType,
         layout_o: TensorLayout,
@@ -1182,7 +1182,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
                 o_v[n, m, 0] = d_simd
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def exp2_inplace_range[
         T_att: DType,
         layout: TensorLayout,
@@ -1301,13 +1301,13 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
     # --- Shared swizzle / MFMA / softmax methods: delegate to `MhaMmaOp`.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _swizzle_K_sub(r: Int, c: Int) -> Int:
         """K sub-block byte swizzle: delegates to `MhaMmaOp`."""
         return Self._Shared._swizzle_K_sub(r, c)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma_QK[
         T_att: DType,
         layout_att: TensorLayout,
@@ -1341,7 +1341,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
         Self._Shared.mma_QK(att, k, q)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma_PV[
         T_o: DType,
         layout_o: TensorLayout,
@@ -1376,7 +1376,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
         Self._Shared.mma_PV(o, v, p)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def exp2_inplace_range[
         T_att: DType,
         layout: TensorLayout,
@@ -1409,10 +1409,14 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
     # --- FP8 32x32x64 fragment loaders (MLA-only). ---
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_K_frag[
         sub_id: Int,
-    ](src: SMemTile[Self.T, _, MutAnyOrigin],) -> SIMD[Self.T, Self.FRAG_ELTS]:
+    ](
+        src: SMemTile[Self.T, _, MutAnyOrigin, _],
+    ) -> SIMD[
+        Self.T, Self.FRAG_ELTS
+    ]:
         """Loads ONE K MFMA fragment (`sub_id`) from the K SMEM sub-view
         `src` and returns it as a SIMD value: the single-fragment
         factoring of the FP8 32x32x64 K-load inner loop.
@@ -1472,7 +1476,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
         return rebind[SIMD[Self.T, Self.FRAG_ELTS]](lo.join(hi))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def precompute_v_lane_base[
         origin: Origin,
         //,
@@ -1617,7 +1621,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
         return v_slot_ptr + v_lane_base_offset
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_V_from_lane_base[
         layout_dst: TensorLayout,
     ](
@@ -1679,7 +1683,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
                 comptime _sub_col = _depth_offset // _V_SUB_COLS_
                 comptime _d_in_sub = _depth_offset % _V_SUB_COLS_
 
-                @always_inline
+                @inline(.always)
                 @__parameter
                 def _load_keys[key_base: Int]() -> SIMD[Self.T, 8]:
                     comptime _B = _row_offset + key_base
@@ -1698,7 +1702,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
                 dst_v[i, j, 0] = rebind[dst_v.ElementType](frag)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_V_frag[
         i_strip: Int,
         j_depth: Int,
@@ -1778,7 +1782,7 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
         comptime _sub_col = _depth_offset // _V_SUB_COLS_
         comptime _d_in_sub = _depth_offset % _V_SUB_COLS_
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _load_keys[key_base: Int]() -> SIMD[Self.T, 8]:
             comptime _B = _row_offset + key_base

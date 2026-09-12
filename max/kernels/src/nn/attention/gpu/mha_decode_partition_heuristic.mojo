@@ -26,7 +26,7 @@ from max.gpu.host import DeviceAttribute, DeviceContext
 from std.math import ceildiv, clamp
 
 
-@always_inline
+@inline(.always)
 def _bucket_partitions(n: Int) -> Int:
     """Bucket a partition count up to a fixed grid-shape ladder.
 

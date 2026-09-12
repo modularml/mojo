@@ -99,14 +99,14 @@ def run_one_case(
     var epsilon = Float32(0.001)
     var weight_offset = Scalar[rn_type](0.0)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(data_buf)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[rn_type, width]:
         var idx = data_buf.layout(coords)
         return data_buf.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(data_buf)
     @__parameter
     def identity_output_fn[

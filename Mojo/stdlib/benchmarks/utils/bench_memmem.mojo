@@ -145,7 +145,7 @@ from std.benchmark import black_box, keep
 # ===-----------------------------------------------------------------------===#
 # Baseline `_memmem` implementation
 # ===-----------------------------------------------------------------------===#
-@always_inline
+@inline(.always)
 def _memmem_baseline[
     dtype: DType
 ](
@@ -208,7 +208,7 @@ def bench_find_baseline(mut b: Bencher) raises:
     var local_haystack = haystack
     var local_needle = needle
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(
             _memmem_baseline(
@@ -225,7 +225,7 @@ def bench_find_optimized(mut b: Bencher) raises:
     var local_haystack = haystack
     var local_needle = needle
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         keep(
             _memmem(

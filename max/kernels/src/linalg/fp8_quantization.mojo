@@ -85,7 +85,7 @@ comptime _batched_input_fn_trait[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def quantize_static_scaled_fp8[
     out_dtype: DType,
     in_dtype: DType,
@@ -109,7 +109,7 @@ def quantize_static_scaled_fp8[
         DType.float8_e4m3fnuz,
     ), "output dtype should be float8_e4m3fn or float8_e4m3fnuz"
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(out_tensor, in_tensor, scale)
     def scaled_fp8_quant[
@@ -204,7 +204,7 @@ def max_reduction_scale_kernel[
             _ = Atomic[Float32].max(scale_global.ptr, row_max / fp8_max)
 
 
-@always_inline
+@inline(.always)
 def quantize_tensor_dynamic_scaled_fp8[
     out_dtype: DType,
     in_dtype: DType,
@@ -281,7 +281,7 @@ def quantize_tensor_dynamic_scaled_fp8[
     ), "group size must be multiple of simd size"
 
     # TODO: MOCO-4295
-    @always_inline
+    @inline(.always)
     def wrap[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var input_fn} -> SIMD[in_dtype, width]:
@@ -363,7 +363,7 @@ def quantize_tensor_dynamic_scaled_fp8[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_scaled_fp8[
     out_dtype: DType,
     in_dtype: DType,
@@ -413,7 +413,7 @@ def quantize_dynamic_scaled_fp8[
     ), "group size must be multiple of simd size"
 
     # TODO: MOCO-4295
-    @always_inline
+    @inline(.always)
     def wrap[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var input_fn} -> SIMD[in_dtype, width]:
@@ -773,7 +773,7 @@ struct _QuantizeFp8KernelPerTensor[
                 )
 
 
-@always_inline
+@inline(.always)
 def batched_quantize_dynamic_scaled_fp8[
     out_dtype: DType,
     in_dtype: DType,
@@ -823,7 +823,7 @@ def batched_quantize_dynamic_scaled_fp8[
         return
 
     # TODO: MOCO-4295
-    @always_inline
+    @inline(.always)
     def wrap[
         width: Int, alignment: Int
     ](batch: Int, row: Int, col: Int) {var input_fn} -> SIMD[in_dtype, width]:
@@ -957,7 +957,7 @@ struct _BatchedQuantizeFp8Kernel[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def matmul_dynamic_scaled_fp8[
     c_type: DType,
     a_type: DType,
@@ -1136,7 +1136,7 @@ def _matmul_dynamic_scaled_fp8_impl[
         comptime if _is_sm10x_gpu(ctx.default_device_info):
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(a_scales, b_scales)
             def scale_compute_lambda_fn[
                 _dtype: DType,
@@ -1164,7 +1164,7 @@ def _matmul_dynamic_scaled_fp8_impl[
                 return scaled_val.cast[_dtype]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(a_scales, b_scales)
             def scale_compute_lambda_fn_tensor[
                 _dtype: DType,
@@ -1204,7 +1204,7 @@ def _matmul_dynamic_scaled_fp8_impl[
 
             @__parameter
             @__copy_capture(c, a_scales, b_scales)
-            @always_inline
+            @inline(.always)
             def scaled_output_fn[
                 dtype: DType, width: SIMDLength, *, alignment: Int = 1
             ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1231,7 +1231,7 @@ def _matmul_dynamic_scaled_fp8_impl[
 
             @__parameter
             @__copy_capture(c, a_scales, b_scales)
-            @always_inline
+            @inline(.always)
             def scaled_output_fn_tensor[
                 dtype: DType, width: SIMDLength, *, alignment: Int = 1
             ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1860,7 +1860,7 @@ def naive_blockwise_scaled_fp8_grouped_matmul_kernel[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def convert_e4m3fn_to_e4m3fnuz(
     input_buffer: TileTensor[mut=False, .float8_e4m3fn, ...],
     output_buffer: TileTensor[mut=True, .float8_e4m3fnuz, ...],
@@ -1884,7 +1884,7 @@ def convert_e4m3fn_to_e4m3fnuz(
         "Input and output shapes must match",
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(input_buffer, output_buffer)
     def convert_kernel[

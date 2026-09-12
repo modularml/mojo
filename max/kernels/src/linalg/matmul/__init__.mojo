@@ -42,7 +42,7 @@ from ..utils import (
 from .gpu import _matmul_gpu
 
 
-@always_inline
+@inline(.always)
 def matmul[
     transpose_a: Bool = False,
     transpose_b: Bool = False,
@@ -113,7 +113,7 @@ def matmul[
         if Int(c.dim[0]()) == 0 or Int(c.dim[1]()) == 0:
             return
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             var shape = GemmShape.get[transpose_b](c, a, b)
             # fmt: off
@@ -153,7 +153,7 @@ def matmul[
         if Int(c.dim[0]()) == 0 or Int(c.dim[1]()) == 0:
             return
 
-        @always_inline
+        @inline(.always)
         def cpu_description_fn() {imm} -> String:
             var shape = GemmShape.get[transpose_b](c, a, b)
             # fmt: off
@@ -185,7 +185,7 @@ def matmul[
             # The CPU version of matmul doesn't support compute lambda.
             # Wrap it around an epilogue lambda instead.
             @__parameter
-            @always_inline
+            @inline(.always)
             def compute_lambda_wrapper[
                 _type: DType, _width: SIMDLength, *, alignment: Int = 1
             ](coords: IndexList[2], val: SIMD[_type, _width]):

@@ -31,6 +31,7 @@
 #include "Mojo/KGENDialect/KGENOps.h"
 #include "Mojo/KGENDialect/KGENParameters.h"
 #include "Mojo/KGENDialect/KGENUtils.h"
+#include "Mojo/KGENDialect/ParameterEvaluator.h"
 #include "Mojo/LITDialect/LITOps.h"
 #include "Mojo/POPDialect/POPOps.h"
 #include "Mojo/ToolCommon/CompilationOptions.h"
@@ -41,7 +42,9 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Regex.h"
@@ -643,7 +646,12 @@ private:
   void applyExtern(SMLoc decoratorLoc, const CallNode *node);
   void applyExportLike(SMLoc loc, bool isExport, const CallNode *node,
                        IREmitter &emitter);
-  void applyAlwaysInline(const CallNode *node);
+  void applyAlwaysInline(SMLoc decoratorLoc, const CallNode *node);
+  void applyInline(SMLoc decoratorLoc, const CallNode *node);
+
+  /// Set the function's inline spec, diagnosing a second inline decorator that
+  /// disagrees with the one already applied.
+  void trySetInlineLevel(SMLoc loc, StringRef spelling, TypedAttr spec);
   void applyLLVMMetadata(SMLoc decoratorLoc, const CallNode *node);
 
   void applyArgumentless(StringRef spelling, const CallNode *callNode,
@@ -669,6 +677,9 @@ private:
 
   /// The working vector of the LLVMMetadata.
   SmallVector<Attribute> llvmMetadata;
+
+  /// The inline decorator already applied, empty until one is.
+  StringRef inlineSpelling;
 };
 } // namespace
 
@@ -753,10 +764,17 @@ LogicalResult FnSigDecorators::applyOne(ExprNode *decorator) {
     // clear, and this will suppress errors about missing self arguments.
     funcOp.setIsStatic(true);
   } else if (spelling == "always_inline") {
-    applyAlwaysInline(callNode);
+    // Mojo 2.0: remove @always_inline
+    applyAlwaysInline(decorator->getLoc(), callNode);
+  } else if (spelling == "inline") {
+    applyInline(decorator->getLoc(), callNode);
   } else if (spelling == "no_inline") {
-    applyArgumentless(spelling, callNode,
-                      [&]() { funcOp.setInlineLevel(InlineLevel::Never); });
+    // Mojo 2.0: remove @no_inline
+    applyArgumentless(spelling, callNode, [&]() {
+      trySetInlineLevel(
+          decorator->getLoc(), spelling,
+          getInlineLevelAttr(funcOp.getContext(), InlineLevel::Never));
+    });
   } else if (spelling == "__parameter" || spelling == "parameter") {
     // Temporarily accept the legacy `@parameter` spelling with a deprecation
     // warning so the rename to `@__parameter` can land without breaking
@@ -1137,11 +1155,27 @@ void FnSigDecorators::applyExportLike(SMLoc loc, bool isExport,
     getDeclResolver().registerAndCheckExport(*simpleLinkageName, loc);
 }
 
-void FnSigDecorators::applyAlwaysInline(const CallNode *callNode) {
+void FnSigDecorators::trySetInlineLevel(SMLoc loc, StringRef spelling,
+                                        TypedAttr spec) {
+  if (!inlineSpelling.empty() && spec != funcOp.getInlineLevelAttr()) {
+    emitError(loc) << "function has conflicting inline level from a previous '@"
+                   << inlineSpelling << "' decorator";
+    return;
+  }
+  inlineSpelling = spelling;
+  funcOp.setInlineLevelAttr(spec);
+}
+
+// Mojo 2.0: remove @always_inline
+void FnSigDecorators::applyAlwaysInline(SMLoc decoratorLoc,
+                                        const CallNode *callNode) {
+  StringRef spelling = "always_inline";
   size_t numOperands = callNode ? callNode->operands.size() : 0;
   if (numOperands == 0) {
     // `@always_inline` and `@always_inline()` are both allowed.
-    funcOp.setInlineLevel(InlineLevel::Always);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::Always));
     return;
   }
 
@@ -1154,13 +1188,120 @@ void FnSigDecorators::applyAlwaysInline(const CallNode *callNode) {
 
   const Operand &operand = callNode->operands[0];
   if (operand.isPositionalStringLiteral("nodebug")) {
-    funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
   } else if (operand.isPositionalStringLiteral("builtin")) {
-    funcOp.setInlineLevel(InlineLevel::AlwaysBuiltin);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysBuiltin));
   } else {
     emitError(callNode->getLoc())
         << "'@always_inline' operand must be \"nodebug\" or \"builtin\"";
   }
+}
+
+/// The level `@inline` takes from `spec`: an error if `spec` folded to a value
+/// the decorator does not accept, or nullopt while it still depends on a
+/// parameter.
+static ErrorOr<std::optional<InlineLevel>>
+inlineDecoratorLevel(TypedAttr spec) {
+  std::optional<int64_t> value = inlineLevelValueOf(spec);
+  if (!value)
+    return std::optional<InlineLevel>();
+  // AlwaysBuiltin is excluded: it also needs the foldability checks
+  // `@always_inline("builtin")` performs.
+  if (std::optional<InlineLevel> level = inlineLevelOf(spec);
+      level && *level != InlineLevel::AlwaysBuiltin)
+    return level;
+  return Error("'@inline' argument " + llvm::Twine(*value) +
+               " is not an InlineLevel; use '.always', '.nodebug', '.never' or "
+               "'.automatic'");
+}
+
+void FnSigDecorators::applyInline(SMLoc decoratorLoc,
+                                  const CallNode *callNode) {
+  size_t numOperands = callNode ? callNode->operands.size() : 0;
+  if (numOperands != 1) {
+    emitError(callNode ? callNode->getLoc() : decoratorLoc)
+        << "'@inline' decorator takes exactly 1 argument, found "
+        << numOperands;
+    return;
+  }
+
+  const Operand &operand = callNode->operands[0];
+  if (!operand.isPositional()) {
+    emitError(operand.getLoc()) << "'@inline' argument must be positional";
+    return;
+  }
+
+  // Strings were the old spelling; say so instead of failing in emitIndex.
+  if (isa<StringLiteralNode>(operand.expr)) {
+    emitError(operand.getLoc())
+        << "'@inline' argument must be an InlineLevel, not a string; use "
+           "'.always', '.nodebug', '.never' or '.automatic'";
+    return;
+  }
+
+  // `InlineLevel` conforms to `Equatable`, whose own members carry this
+  // decorator, so evaluating the argument as a value can need the decorator
+  // being resolved. Map the shorthand by name to stay out of that cycle;
+  // everything else falls through to the type checked path below.
+  if (auto *shorthand = dyn_cast<InferredAttributeRefNode>(operand.expr)) {
+    std::optional<InlineLevel> level =
+        llvm::StringSwitch<std::optional<InlineLevel>>(shorthand->spelling)
+            .Case("automatic", InlineLevel::Automatic)
+            .Case("always", InlineLevel::Always)
+            .Case("nodebug", InlineLevel::AlwaysNoDebug)
+            .Case("never", InlineLevel::Never)
+            .Default(std::nullopt);
+    if (level) {
+      trySetInlineLevel(decoratorLoc, "inline",
+                        getInlineLevelAttr(funcOp.getContext(), *level));
+      return;
+    }
+  }
+
+  // The contextual type is what lets the argument be written as `.always`,
+  // and makes anything else a type error at its own location.
+  ASTType levelType =
+      shared.lookupBuiltinType("InlineLevel", decl, operand.getLoc());
+  if (levelType.isTypeCheckErrorType())
+    return;
+
+  IREmitter emitter(sigDecl, EC_Decorator);
+  PValue pvalue = emitter.emitExprPValue(operand.expr, EC_Decorator, levelType);
+  // `emitExprPValue` has already said why.
+  if (!pvalue)
+    return;
+
+  // `InlineLevel` holds an `Int`, which is a SIMD scalar, so the level sits
+  // two fields deep.
+  SMLoc loc = operand.getLoc();
+  TypedAttr boxed =
+      ASTType::extractStructField(pvalue.get(), "_value", loc, shared);
+  if (!boxed)
+    return;
+  // The first field read leaves a rebind wrapper, which the second one cannot
+  // see through.
+  TypedAttr level = ASTType::extractStructField(stripIdentityWrappers(boxed),
+                                                "_mlir_value", loc, shared);
+  if (!level)
+    return;
+
+  // Recording a known level as itself keeps two decorators that agree from
+  // reading as a conflict.
+  ErrorOr<std::optional<InlineLevel>> known = inlineDecoratorLevel(level);
+  if (const char *rejection = known.getError()) {
+    emitError(operand.getLoc()) << rejection;
+    return;
+  }
+  if (*known) {
+    trySetInlineLevel(decoratorLoc, "inline",
+                      getInlineLevelAttr(funcOp.getContext(), **known));
+    return;
+  }
+  trySetInlineLevel(decoratorLoc, "inline", level);
 }
 
 void FnSigDecorators::applyArgumentless(StringRef spelling,
@@ -1319,12 +1460,14 @@ void FnSigDecorators::applyLLVMArgMetadata(SMLoc decoratorLoc,
 
 void FnSigDecorators::finalize() {
   if (funcOp.isExternal()) {
-    if (funcOp.getInlineLevel() != InlineLevel::Never &&
-        funcOp.getInlineLevel() != InlineLevel::Automatic) {
+    if (inlineLevelOrAutomatic(funcOp.getInlineLevel()) != InlineLevel::Never &&
+        inlineLevelOrAutomatic(funcOp.getInlineLevel()) !=
+            InlineLevel::Automatic) {
       emitError(funcOp.getLoc(), "extern functions cannot be inlined");
       return;
     }
-    funcOp.setInlineLevel(InlineLevel::Never);
+    funcOp.setInlineLevelAttr(
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::Never));
   }
 
   // If we've an exported function with no explicit linkage name, set it now.
@@ -2135,7 +2278,8 @@ LogicalResult DeclResolver::resolveSignature(FnOp funcOp, Lexer &lexer,
   fnSignature.parseResultIfPresent(p);
 
   // Parse trailing body constraints if present.
-  if (failed(parsedParamList.parseTrailingConstraintsIfPresent(p)))
+  if (failed(parsedParamList.parseTrailingConstraintsIfPresent(
+          p, decl.getIndentation())))
     return failure();
 
   // Reject where clauses on trait methods. Users almost certainly expect
@@ -2566,9 +2710,11 @@ ParseResult DeclResolver::resolveBody(FnOp funcOp, Lexer &lexer,
 
   // If this function is @always_inline("builtin"), check that its body obeys
   // the right invariants.
-  if (funcOp.getInlineLevel() == InlineLevel::AlwaysBuiltin) {
+  if (inlineLevelOrAutomatic(funcOp.getInlineLevel()) ==
+      InlineLevel::AlwaysBuiltin) {
     if (failed(FnSigDecorators::checkAlwaysInlineBuiltin(funcOp, shared)))
-      funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+      funcOp.setInlineLevelAttr(
+          getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
   }
 
   if (funcOp.isExternal()) {
@@ -2702,7 +2848,7 @@ LogicalResult DeclResolver::resolveSignature(AliasDeclOp aliasDeclOp,
   }
 
   // Parse trailing 'where' clauses if present.
-  if (parsedParams.parseTrailingConstraintsIfPresent(p))
+  if (parsedParams.parseTrailingConstraintsIfPresent(p, decl.getIndentation()))
     return failure();
 
   // The alias signature is a self-contained scope where the input parameters
@@ -2849,6 +2995,9 @@ struct ParsedTraitConstraint {
   /// Whether this constraint was for an explicitly listed trait in the
   /// conformance list (vs propagated from an ancestor).
   bool isExplicit;
+  /// Whether the entry this came from was spelled `not Trait`. See
+  /// `ParsedConformanceEntry::isNegated`.
+  bool isNegated;
 };
 
 /// A single entry in a parsed conformance list: a type expression naming a
@@ -2860,6 +3009,15 @@ struct ParsedConformanceEntry {
   ExprNode *typeExpr = nullptr;
   SMLoc loc;
   std::optional<ParsedConstraint> constraint;
+  /// Set for the `not Trait` spelling.
+  bool isNegated = false;
+};
+
+/// An explicitly listed conformance: its constraint, plus whether the entry was
+/// spelled `not Trait`.
+struct ExplicitConformance {
+  ConstraintAttr constraint;
+  bool isNegated;
 };
 
 /// Verify that each explicitly listed derived trait's constraint implies its
@@ -2880,12 +3038,17 @@ struct ParsedConformanceEntry {
 ///
 ///   struct S(Derived where condA and condB, Base where condB): ...
 ///
+/// A failure against an ancestor opted out with `not` is reported as a
+/// contradicted opt-out rather than as a constraint to strengthen, since the
+/// user wrote no constraint to strengthen.
+///
 /// Returns failure if any implication errors were found.
 static LogicalResult verifyDerivedAncestorImplication(
-    const DenseMap<TraitSymbolAttr, ConstraintAttr> &explicitConstraints,
+    const DenseMap<TraitSymbolAttr, ExplicitConformance> &explicitConstraints,
     SharedState &shared) {
   bool hasErrors = false;
-  for (const auto &[symbol, constraint] : explicitConstraints) {
+  for (const auto &[symbol, conformance] : explicitConstraints) {
+    ConstraintAttr constraint = conformance.constraint;
     TypedAttr prop = constraint.getProposition();
 
     ASTDecl &traitDecl =
@@ -2904,17 +3067,30 @@ static LogicalResult verifyDerivedAncestorImplication(
       if (it == explicitConstraints.end())
         continue; // Not explicitly listed -- handled by propagation.
 
-      TypedAttr ancestorProp = it->second.getProposition();
+      ConstraintAttr ancestorConstraint = it->second.constraint;
+      TypedAttr ancestorProp = ancestorConstraint.getProposition();
 
-      if (!isImplicationProven(ancestorProp, prop)) {
+      if (isImplicationProven(ancestorProp, prop))
+        continue;
+
+      if (it->second.isNegated) {
+        StringRef symbolName = symbol.getSymbol().getLeafReference();
+        StringRef ancestorName = ancestor.getSymbol().getLeafReference();
+        MojoInflightDiag diag = shared.emitError(constraint.getLoc());
+        diag << "trait '" << symbolName << "' requires ancestor trait '"
+             << ancestorName
+             << "', which is opted out with 'not'; remove one "
+                "of the entries";
+        diag.attachNote(ancestorConstraint.getLoc()) << "opted out here";
+      } else {
         shared.emitError(constraint.getLoc())
             << "constraint for " << symbol.getSymbol().getLeafReference()
             << " does not imply constraint for ancestor trait "
             << ancestor.getSymbol().getLeafReference()
             << "; strengthen the derived constraint by adding the ancestor's "
                "constraint with 'and'";
-        hasErrors = true;
       }
+      hasErrors = true;
     }
   }
   return failure(hasErrors);
@@ -3020,7 +3196,7 @@ static LogicalResult buildTraitConstraintsMap(
     SharedState &shared) {
   ConstraintAttr unconditional =
       getUnconditionalConstraint(shared.getContext());
-  DenseMap<TraitSymbolAttr, ConstraintAttr> explicitConstraints;
+  DenseMap<TraitSymbolAttr, ExplicitConformance> explicitConstraints;
   DenseMap<TraitSymbolAttr, SmallVector<ConstraintAttr, 2>> propagated;
   bool hasErrors = false;
 
@@ -3031,15 +3207,39 @@ static LogicalResult buildTraitConstraintsMap(
     if (pc.isExplicit) {
       auto newConstraint = ConstraintAttr::get(prop, pc.constraint.getLoc(),
                                                pc.constraint.getMessage());
-      auto [it, inserted] =
-          explicitConstraints.try_emplace(pc.traitSymbol, newConstraint);
-      // Catches cases where a trait is listed twice with different constraints.
-      // Canonicalization normalizes operand order for commutative ops, so
-      // structural equality after canonicalization suffices here.
-      if (!inserted && getCanonicalAttr(it->second.getProposition()) !=
-                           getCanonicalAttr(prop)) {
+      auto [it, inserted] = explicitConstraints.try_emplace(
+          pc.traitSymbol, ExplicitConformance{newConstraint, pc.isNegated});
+      const ExplicitConformance &prior = it->second;
+
+      if (!inserted && (prior.isNegated || pc.isNegated)) {
+        // Since an opt-out does not carry any conditions (yet), any trait that
+        // is opted out must not appear in the conformance list again.
+        StringRef traitName = pc.traitSymbol.getSymbol().getLeafReference();
+        Location optOutLoc =
+            pc.isNegated ? pc.constraint.getLoc() : prior.constraint.getLoc();
+        Location otherLoc =
+            pc.isNegated ? prior.constraint.getLoc() : pc.constraint.getLoc();
+        if (prior.isNegated && pc.isNegated) {
+          MojoInflightDiag diag = shared.emitError(optOutLoc);
+          diag << "trait '" << traitName
+               << "' must be opted out at most once; remove the duplicate "
+                  "'not'";
+          diag.attachNote(otherLoc) << "first opted out here";
+        } else {
+          MojoInflightDiag diag = shared.emitError(otherLoc);
+          diag << "trait '" << traitName
+               << "' must not be listed and also opted out with 'not'; "
+                  "remove one of the entries";
+          diag.attachNote(optOutLoc) << "opted out here";
+        }
+        hasErrors = true;
+      } else if (!inserted &&
+                 getCanonicalAttr(prior.constraint.getProposition()) !=
+                     getCanonicalAttr(prop)) {
+        // Catches when a trait is listed twice under different conditions.
+        StringRef traitName = pc.traitSymbol.getSymbol().getLeafReference();
         shared.emitError(pc.constraint.getLoc())
-            << "trait '" << pc.traitSymbol.getSymbol().getLeafReference()
+            << "trait '" << traitName
             << "' appears multiple times in the conformance list with "
                "different constraints";
         hasErrors = true;
@@ -3070,8 +3270,8 @@ static LogicalResult buildTraitConstraintsMap(
     hasErrors = true;
 
   // Merge explicit constraints into the output map (after verification).
-  traitConstraints.insert(explicitConstraints.begin(),
-                          explicitConstraints.end());
+  for (const auto &[symbol, conformance] : explicitConstraints)
+    traitConstraints.try_emplace(symbol, conformance.constraint);
 
   // Resolve propagated constraints for non-explicit ancestor traits.
   if (failed(
@@ -3098,8 +3298,13 @@ static LogicalResult buildTraitConstraintsMap(
 /// For a struct or trait declaration, parse an optional conformance list
 /// without resolving the trait types or emitting constraints.
 ///
+/// conformance_list ::= conformance ("," conformance)* [","]
+/// conformance      ::= type_expression ["where" constraint]
+///                    | "not" type_expression ["else" message]
+///
 /// Set `allowConformanceConstraints` to `false` for declarations that don't
-/// support conditional conformance (traits and extensions).
+/// support conditional conformance (traits and extensions). Both `where` and
+/// `not` are conformance conditions, so both are rejected there.
 static ParseResult parseOptionalConformanceListSyntax(
     ParserBase &p, SmallVectorImpl<ParsedConformanceEntry> &parsedConformances,
     std::optional<size_t> stmtIndent, bool allowConformanceConstraints) {
@@ -3108,8 +3313,24 @@ static ParseResult parseOptionalConformanceListSyntax(
 
   auto parseConformance = [&]() -> ParseResult {
     ParsedConformanceEntry conformance;
-    if (p.getLocation(conformance.loc) ||
-        p.parseExpression(conformance.typeExpr, stmtIndent))
+    conformance.loc = p.getToken().getLoc();
+
+    // Try to consume any `not` before the type expression.
+    if (p.consumeIf(Token::kw_not)) {
+      if (!allowConformanceConstraints)
+        return p.emitError(conformance.loc,
+                           "'not' conformances are only supported on structs");
+      // Catch a common typo / misconception: `not not Trait`.
+      if (p.getToken().is(Token::kw_not))
+        return p.emitError(p.getToken().getLoc(),
+                           "'not' must not be repeated in a conformance "
+                           "entry");
+      conformance.isNegated = true;
+      conformance.constraint.emplace();
+      conformance.constraint->loc = conformance.loc;
+    }
+
+    if (p.parseExpression(conformance.typeExpr, stmtIndent))
       return failure();
 
     SMLoc whereLoc = p.getToken().getLoc();
@@ -3120,18 +3341,36 @@ static ParseResult parseOptionalConformanceListSyntax(
             "'where' clauses in conformance lists are only supported on "
             "structs");
       }
+      // `not Trait` syntax does not support a where clause (yet).
+      if (conformance.isNegated) {
+        return p.emitError(
+            whereLoc, "'not' conformance does not support a 'where' clause");
+      }
       ParsedConstraint constraint;
       constraint.loc = whereLoc;
       ExprNode *parsed;
       if (p.parseExpression(parsed, stmtIndent))
         return failure();
-      // A message is written `where (condition, "message")`. Because the
-      // message lives inside the parentheses, the trailing comma that
-      // separates the next conformance entry is unambiguous -- no lookahead
-      // is needed here.
+      // Only the `where (condition, "message")` version is handled here.
+      // The `else` version is shared with the `not` case below.
       if (constraint.extractParenthesizedMessage(p, parsed))
         return failure();
       conformance.constraint = constraint;
+    }
+
+    // Read any "else" message that follows the conformance.
+    SMLoc elseLoc = p.getToken().getLoc();
+    if (p.getToken().is(Token::kw_else)) {
+      if (!allowConformanceConstraints)
+        return p.emitError(
+            elseLoc, "conformance messages are only supported on structs");
+      if (!conformance.constraint)
+        return p.emitError(elseLoc, "a conformance message requires a 'where' "
+                                    "clause or a 'not' conformance");
+      StringRef what =
+          conformance.isNegated ? "a 'not' conformance" : "a 'where' clause";
+      if (conformance.constraint->parseElseMessage(p, stmtIndent, what))
+        return failure();
     }
 
     parsedConformances.push_back(conformance);
@@ -3225,7 +3464,14 @@ static ParseResult resolveConformanceList(
                   shared.diags.translateLocation(conformance.loc),
                   /*message=*/StringAttr())
             : ConstraintAttr();
-    if (traitConstraints && conformance.constraint) {
+    if (traitConstraints && conformance.isNegated) {
+      // For now, record a `not Trait` as `Trait where False`, carrying any
+      // `else` reason as the constraint's message.
+      constraint = ConstraintAttr::get(
+          SIMDAttr::getScalarBool(shared.getContext(), false),
+          shared.diags.translateLocation(conformance.loc),
+          conformance.constraint->message);
+    } else if (traitConstraints && conformance.constraint) {
       IREmitter constraintEmitter(declScope, EC_Requires);
       RValue prop = constraintEmitter.emitExprScalarBool(
           conformance.constraint->propExpr, EC_Requires);
@@ -3257,7 +3503,7 @@ static ParseResult resolveConformanceList(
       if (traitConstraints) {
         for (TraitSymbolAttr symbol : reduced) {
           traitConstraints->push_back(
-              {symbol, constraint, /*isExplicit=*/true});
+              {symbol, constraint, /*isExplicit=*/true, conformance.isNegated});
         }
       }
     }
@@ -3309,8 +3555,9 @@ static ParseResult resolveConformanceList(
         // builder checks that all paths to the same ancestor agree, or
         // requires explicit listing if they disagree (diamond case).
         if (traitConstraints && ancestor != symbol)
-          traitConstraints->push_back(
-              {ancestor, constraint, /*isExplicit=*/false});
+          traitConstraints->push_back({ancestor, constraint,
+                                       /*isExplicit=*/false,
+                                       conformance.isNegated});
       }
       // Insert this `symbol` as an immediate parent. This must happen after the
       // loop, because this symbol itself is part of `canonicalParent` too.
@@ -3521,8 +3768,8 @@ static void emitExplicitDestroyRequiresArgError(SharedState &shared,
               << "@explicit_destroy requires an argument: "
                  "`@explicit_destroy(\"...\")`";
   diag.attachNote(decl)
-      << "Use `Deinitable where False` conformance to opt out of "
-         "implicit deletion. `@explicit_destroy` is no longer required.";
+      << "Use a `not Deinitable` conformance to opt out of implicit "
+         "deletion. `@explicit_destroy` is no longer required.";
 }
 
 /// Validates that an `@explicit_destroy(...)` call has exactly one string
@@ -3578,7 +3825,8 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
       parseOptionalConformanceListSyntax(
           p, parsedConformances, sigDecl.getIndentation(),
           /*allowConformanceConstraints=*/true) ||
-      parsedParams.parseTrailingConstraintsIfPresent(p) ||
+      parsedParams.parseTrailingConstraintsIfPresent(
+          p, sigDecl.getIndentation()) ||
       p.parseToken(Token::colon, "expected ':' in struct definition") ||
       decl.isErroneous())
     return failure();
@@ -3698,9 +3946,34 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
       }
     }
   }
-  if (linearTypeErrorMsg && !std::get<0>(*linearTypeErrorMsg).empty()) {
+  bool hasDecoratorMessage =
+      linearTypeErrorMsg && !std::get<0>(*linearTypeErrorMsg).empty();
+  if (hasDecoratorMessage) {
     structOp.setLinearTypeErrorMsg(
         std::make_optional(llvm::StringRef(std::get<0>(*linearTypeErrorMsg))));
+  }
+
+  // An always-false `Deinitable` conformance makes the struct linear, so its
+  // reason, if any, is recorded here.
+  if (implicitDelDecl) {
+    auto it = traitConstraints.find(
+        TraitSymbolAttr::get(implicitDelDecl->getSymbolRef()));
+    StringAttr reason =
+        it != traitConstraints.end() && isTriviallyFalseConstraint(it->second)
+            ? it->second.getMessage()
+            : StringAttr();
+    if (reason) {
+      if (hasDecoratorMessage) {
+        MojoInflightDiag diag =
+            shared.emitError(std::get<1>(*linearTypeErrorMsg));
+        diag << "@explicit_destroy and the 'Deinitable' opt-out both give a "
+                "message; keep only one";
+        diag.attachNote(it->second.getLoc()) << "opt-out message written here";
+        decl.setErroneous();
+        return failure();
+      }
+      structOp.setLinearTypeErrorMsg(reason.getValue());
+    }
   }
 
   // Build canonical trait with constraints for conditional conformance.
@@ -3723,7 +3996,7 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
                     << "@explicit_destroy is not valid on `struct` with "
                        "unconditional conformance to `Deinitable`";
         diag.attachNote(decl.getLoc())
-            << "Add `Deinitable where False` conformance or "
+            << "Add a `not Deinitable` conformance or "
                "remove `@explicit_destroy`";
         decl.setErroneous();
         return failure();

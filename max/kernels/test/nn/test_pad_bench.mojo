@@ -73,7 +73,7 @@ def test_pad_constant_nd[rank: Int, n: Int, verify: Bool = False]() raises:
     comptime d_post = 7
     comptime d = d_pre + d_post
 
-    @always_inline
+    @inline(.always)
     def get_in_out_shapes[rank: Int = 1]() -> Array[IndexList[rank], 2]:
         var in_shape = IndexList[rank]()
         var out_shape = IndexList[rank]()
@@ -142,7 +142,7 @@ def test_pad_reflect_nd[rank: Int, n: Int, verify: Bool = False]() raises:
     comptime d_post = 7
     comptime d = d_pre + d_post
 
-    @always_inline
+    @inline(.always)
     def get_in_out_shapes[rank: Int = 1]() -> Array[IndexList[rank], 2]:
         var in_shape = IndexList[rank]()
         var out_shape = IndexList[rank]()

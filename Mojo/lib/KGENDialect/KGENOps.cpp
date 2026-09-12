@@ -180,7 +180,7 @@ LogicalResult ParamDeclareOp::verify() {
 static ParseResult parseRegionOnly(OpAsmParser &p,
                                    ParamDeclArrayAttr &inputParams,
                                    TypeAttr &functionType, TypeAttr &type,
-                                   InlineLevelAttr &inlineLevel, Region &body) {
+                                   Attribute &inlineLevel, Region &body) {
   SmallVector<OpAsmParser::Argument> args;
   FunctionType functionTypeValue;
   FuncTypeGeneratorType sigGenType;
@@ -207,7 +207,7 @@ static ParseResult
 parseRegionDeclaration(OpAsmParser &p, ParamDeclAttr &paramDecl,
                        StringAttr &sourceName, ParamDeclArrayAttr &inputParams,
                        TypeAttr &functionType, TypeAttr &type,
-                       InlineLevelAttr &inlineLevel, Region &body) {
+                       Attribute &inlineLevel, Region &body) {
   StringAttr paramName;
   if (parseParamName(p, paramName))
     return failure();
@@ -231,11 +231,11 @@ parseRegionDeclaration(OpAsmParser &p, ParamDeclAttr &paramDecl,
 static void printRegionOnly(OpAsmPrinter &p, Operation *op,
                             ParamDeclArrayAttr inputParams,
                             TypeAttr functionType, TypeAttr type,
-                            InlineLevelAttr inlineLevel, Region &body) {
+                            Attribute inlineLevel, Region &body) {
   printFunctionFuncTypeGenerator(p, &body, inputParams, {},
                                  cast<FunctionType>(functionType.getValue()),
                                  cast<FuncTypeGeneratorType>(type.getValue()));
-  printOptionalInline(p, inlineLevel.getValue());
+  printOptionalInline(p, inlineLevel);
   p << ' ';
   p.printRegion(body, /*printEntryBlockArgs=*/false);
 }
@@ -245,7 +245,7 @@ static void printRegionDeclaration(OpAsmPrinter &p, Operation *op,
                                    StringAttr sourceName,
                                    ParamDeclArrayAttr inputParams,
                                    TypeAttr functionType, TypeAttr type,
-                                   InlineLevelAttr inlineLevel, Region &body) {
+                                   Attribute inlineLevel, Region &body) {
   printParamName(p, paramDecl.getName());
   if (paramDecl.getName() != sourceName) {
     p << "[";
@@ -277,6 +277,9 @@ void ParamDeclareRegionOp::collectParameterUses(
 }
 
 LogicalResult ParamDeclareRegionOp::verify() {
+  if (failed(verifyInlineLevel(*this, getInlineLevelAttr())))
+    return failure();
+
   if (ArrayAttr argsArray = getLLVMArgMetadataArray();
       !argsArray.empty() && argsArray.size() != getNumArguments())
     return emitOpError("LLVMArgMetadataArray size does not equal number of "
@@ -406,7 +409,7 @@ static ParseResult
 parseGeneratorOp(OpAsmParser &p, ExportKindAttr &exportKind,
                  StringAttr &symName, TypeAttr &signatureAttr,
                  TypeAttr &functionTypeAttr, ParamDeclArrayAttr &inputParams,
-                 InlineLevelAttr &inlineLevel, DecoratorsAttr &decorators,
+                 Attribute &inlineLevel, DecoratorsAttr &decorators,
                  NamedAttrList &attrs, Region &body) {
   if (parseSymbolExport(p, exportKind) || p.parseSymbolName(symName))
     return failure();
@@ -436,9 +439,8 @@ static void printGeneratorOp(OpAsmPrinter &p, Operation *op,
                              ExportKindAttr exportKind, StringAttr symName,
                              TypeAttr signature, TypeAttr functionType,
                              ParamDeclArrayAttr inputParams,
-                             InlineLevelAttr inlineLevel,
-                             DecoratorsAttr decorators, DictionaryAttr attrs,
-                             Region &body) {
+                             Attribute inlineLevel, DecoratorsAttr decorators,
+                             DictionaryAttr attrs, Region &body) {
   printSymbolExport(p, op, exportKind);
   p << ' ';
   p.printSymbolName(symName);
@@ -446,7 +448,7 @@ static void printGeneratorOp(OpAsmPrinter &p, Operation *op,
       p, &body, inputParams, /*resultParams=*/{},
       cast<FunctionType>(functionType.getValue()),
       cast<FuncTypeGeneratorType>(signature.getValue()));
-  printOptionalInline(p, inlineLevel.getValue());
+  printOptionalInline(p, inlineLevel);
   printOptionalDecorators(p, op, decorators);
 
   auto gen = cast<GeneratorOp>(op);
@@ -467,6 +469,9 @@ static void printGeneratorOp(OpAsmPrinter &p, Operation *op,
 }
 
 LogicalResult GeneratorOp::verify() {
+  if (failed(verifyInlineLevel(*this, getInlineLevelAttr())))
+    return failure();
+
   if (ArrayAttr argsArray = getLLVMArgMetadataArray();
       !argsArray.empty() && argsArray.size() != getNumArguments())
     return emitOpError("LLVMArgMetadataArray size does not equal number of "
@@ -502,7 +507,7 @@ LogicalResult GeneratorOp::verify() {
 
 static ParseResult parseFuncOp(OpAsmParser &p, ExportKindAttr &exportKind,
                                StringAttr &name, TypeAttr &signature,
-                               InlineLevelAttr &inlineLevel,
+                               Attribute &inlineLevel,
                                DecoratorsAttr &decorators, NamedAttrList &attrs,
                                Region &body) {
   if (parseSymbolExport(p, exportKind) || p.parseSymbolName(name))
@@ -540,7 +545,7 @@ static ParseResult parseFuncOp(OpAsmParser &p, ExportKindAttr &exportKind,
 
 static void printFuncOp(OpAsmPrinter &p, Operation *op,
                         ExportKindAttr exportKind, StringAttr name,
-                        TypeAttr signature, InlineLevelAttr inlineLevel,
+                        TypeAttr signature, Attribute inlineLevel,
                         DecoratorsAttr decorators, DictionaryAttr attrs,
                         Region &body) {
   FuncType sig = cast<FuncTypeGeneratorType>(signature.getValue()).getBody();
@@ -556,7 +561,7 @@ static void printFuncOp(OpAsmPrinter &p, Operation *op,
   printSignatureValues(p, printArg, sig.getValues(), sig.getArgConventions(),
                        sig.getFnEffects(),
                        /*optionalResultList=*/true);
-  printOptionalInline(p, inlineLevel.getValue());
+  printOptionalInline(p, inlineLevel);
   printOptionalDecorators(p, op, decorators);
 
   SmallVector<StringRef, 8> elidedAttrs{
@@ -579,6 +584,9 @@ static void printFuncOp(OpAsmPrinter &p, Operation *op,
 }
 
 LogicalResult FuncOp::verify() {
+  if (failed(verifyInlineLevel(*this, getInlineLevelAttr())))
+    return failure();
+
   // Skip body-based checks for functions whose body has not been filled in yet
   // (e.g. populate_captures stubs created before offload compilation).
   if (getBodyRegion().empty())
@@ -609,6 +617,10 @@ LogicalResult FuncOp::verify() {
 //===----------------------------------------------------------------------===//
 // ExternGeneratorOp
 //===----------------------------------------------------------------------===//
+
+TypedAttr ExternGeneratorOp::getInlineLevel() {
+  return KGEN::getInlineLevelAttr(getContext(), InlineLevel::Never);
+}
 
 static ParseResult parseExternGenerator(OpAsmParser &p, TypeAttr &signature,
                                         TypeAttr &functionType,

@@ -17,7 +17,7 @@ from std.os import abort
 from std.utils import StaticTuple
 
 
-@always_inline
+@inline(.always)
 def _strlen(ptr: ImmPointer[Byte, _]) -> Int:
     var offset = 0
     while ptr[unsafe_offset=offset]:
@@ -50,7 +50,7 @@ struct TString[origins: ImmOrigin, //, *Ts: Writable](Movable, Writable):
     """The template's NUL-separated literal parts, encoded at construction."""
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -60,13 +60,13 @@ struct TString[origins: ImmOrigin, //, *Ts: Writable](Movable, Writable):
         self._values = pack^
         self._encoded = encoded
 
-    @always_inline
+    @inline(.always)
     def _write_to_impl(
         self, mut writer: Some[Writer], encoded_bytes: ImmPointer[Byte, _]
     ):
         var offset = 0
 
-        @always_inline
+        @inline(.always)
         def write_string() {mut writer, imm} -> Int:
             var literal_start = encoded_bytes.unsafe_offset(offset)
             var literal_length = _strlen(literal_start)
@@ -100,7 +100,7 @@ struct TString[origins: ImmOrigin, //, *Ts: Writable](Movable, Writable):
         """
         self._write_to_impl(writer, self._encoded)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write a debug representation of the TString to a writer.
 
@@ -127,7 +127,7 @@ struct TString[origins: ImmOrigin, //, *Ts: Writable](Movable, Writable):
         ).fields(fields)
 
 
-@always_inline
+@inline(.always)
 def __make_tstring[
     format_string: __mlir_type.`!kgen.string`, *Ts: Writable
 ](
@@ -235,7 +235,7 @@ def _encode_format_string(format: StaticString, f: Some[def(Byte)]):
     # using `bytes[i]` as it puts less stress on the comptime interpreter
     # resulting in better compile times.
 
-    @always_inline
+    @inline(.always)
     def peek_next_is(byte: Byte) {imm} -> Bool:
         return (
             i + 1 < len(bytes)

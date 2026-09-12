@@ -41,7 +41,7 @@ comptime simd_size: Int = simd_width_of[DType.float32]()
 comptime dtype = DType.float32
 
 
-@always_inline
+@inline(.always)
 def extend_shape_5d[
     rank: Int
 ](in_shape: IndexList[rank], first: Int, last: Int) -> IndexList[5]:
@@ -62,7 +62,7 @@ def extend_shape_5d[
     return out_shape
 
 
-@always_inline
+@inline(.always)
 def extend_shape_3d[rank: Int](in_shape: IndexList[rank]) -> IndexList[3]:
     var out_shape = IndexList[3](1)
 
@@ -72,7 +72,7 @@ def extend_shape_3d[rank: Int](in_shape: IndexList[rank]) -> IndexList[3]:
     return out_shape
 
 
-@always_inline
+@inline(.always)
 def append_shape_5d[
     rank: Int
 ](in_shape: IndexList[rank], last2nd: Int, last: Int) -> IndexList[5]:
@@ -229,7 +229,7 @@ def test_conv_transposed[
                 i + output_image_size * n
             )
 
-            @always_inline
+            @inline(.always)
             def body0[
                 width: Int
             ](offset: Int) {var output_ref_ptr, var bias_ptr}:
@@ -248,11 +248,11 @@ def test_conv_transposed[
     comptime conv_attr = ConvInfoStatic[rank]()
 
     # Test epilogue
-    @always_inline
+    @inline(.always)
     @__copy_capture(output, bias_ptr)
     @__parameter
     def epilogue[_rank: Int](coords: IndexList[_rank], f_size: Int):
-        @always_inline
+        @inline(.always)
         def body1[width: Int](idx: Int) {var}:
             var curr_coords = rebind[IndexList[rank + 2]](coords)
             curr_coords[rank + 1] += idx

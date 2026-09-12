@@ -207,7 +207,12 @@ class FuzzClient:
             if remaining <= 0:
                 raise TimeoutError
             sock.settimeout(min(remaining, 0.25))
-            chunk = sock.recv(4096)
+            try:
+                chunk = sock.recv(4096)
+            except TimeoutError:
+                # The socket timeout is a poll interval so the deadline can be
+                # re-checked; only ``remaining <= 0`` above ends the wait.
+                continue
             if not chunk:
                 break
             data += chunk

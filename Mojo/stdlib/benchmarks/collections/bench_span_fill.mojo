@@ -35,7 +35,7 @@ comptime FILL_VALUE = Byte(0xA5)
 def bench_span_fill[size: Int](mut b: Bencher) raises:
     var allocation = alloc(Layout[Byte](count=black_box(size)))
 
-    @always_inline
+    @inline(.always)
     def call_fn() {mut allocation}:
         var s = allocation.unsafe_span()
         s.fill(black_box(FILL_VALUE))
@@ -48,7 +48,7 @@ def bench_span_fill[size: Int](mut b: Bencher) raises:
 def bench_unsafe_memset[size: Int](mut b: Bencher) raises:
     var allocation = alloc(Layout[Byte](count=black_box(size)))
 
-    @always_inline
+    @inline(.always)
     def call_fn() {mut allocation}:
         var ptr = allocation.unsafe_ptr()
         unsafe_memset(ptr, black_box(FILL_VALUE), allocation.layout().count())
@@ -61,7 +61,7 @@ def bench_unsafe_memset[size: Int](mut b: Bencher) raises:
 def bench_span_fill_elementwise[size: Int](mut b: Bencher) raises:
     var allocation = alloc(Layout[Byte](count=black_box(size)))
 
-    @always_inline
+    @inline(.always)
     def call_fn() {mut allocation}:
         var s = allocation.unsafe_span()
         ref value = black_box(FILL_VALUE)

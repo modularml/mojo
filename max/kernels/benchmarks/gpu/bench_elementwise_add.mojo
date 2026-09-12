@@ -58,7 +58,7 @@ def bench_add[
     var input1 = TileTensor(input1_ptr, row_major(Coord(shape)))
     var output = TileTensor(output_ptr, row_major(Coord(shape)))
 
-    @always_inline
+    @inline(.always)
     def add[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert input0.flat_rank >= idx.flat_rank
         var val = input0.load[width=simd_width](idx) + input1.load[
@@ -66,9 +66,9 @@ def bench_add[
         ](idx)
         output.store[width=simd_width](idx, val)
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher, shape: IndexList[rank]) raises {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             elementwise[simd_width=unroll_by, target="gpu"](
                 add, Coord(shape), ctx

@@ -38,7 +38,7 @@ from std.format._utils import (
 from std.os import PathLike, abort
 from std.atomic import Atomic, Ordering, fence
 from std.sys import size_of, bit_width_of
-from std.ffi import c_char, CStringSlice
+from std.ffi import c_char, CStringSpan
 from std.sys.info import is_32bit, is_apple_gpu
 
 from std.bit import count_leading_zeros
@@ -297,13 +297,13 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @stable(since="1.0")
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __deinit__(deinit self):
         """Destroy the string data."""
         self._drop_ref()
 
     @stable(since="1.1")
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         """Construct an empty string."""
         # this is UB if we ever touch the pointer, but so is
@@ -313,7 +313,7 @@ struct String(
         self._capacity_or_data = Self.FLAG_IS_INLINE
 
     @stable(since="1.1")
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, *, capacity_bytes: Int):
         """Construct an empty string with at least a given capacity.
 
@@ -328,7 +328,7 @@ struct String(
             self._len_or_data = 0
             self._set_ref_counted()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     @implicit  # does not allocate.
     def __init__(out self, data: StaticString, /):
@@ -349,7 +349,7 @@ struct String(
         # decision until mutation to avoid unnecessary unsafe_memcpy.
         self._capacity_or_data = 0
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     @implicit  # does not allocate.
     def __init__(out self, data: StringLiteral, /):
@@ -541,7 +541,7 @@ struct String(
         """
         value.write_to(self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, *, unsafe_uninit_length: Int):
         """Construct a String with the specified length, with uninitialized
         memory. This is unsafe, as it relies on the caller initializing the
@@ -571,7 +571,7 @@ struct String(
         # Copy the data.
         self = String(
             StringSlice(
-                unsafe_from_utf8=CStringSlice(
+                unsafe_from_utf8=CStringSpan(
                     unsafe_from_ptr=unsafe_from_utf8_ptr.unsafe_bitcast[Int8]()
                 )
             )
@@ -590,14 +590,14 @@ struct String(
         # Copy the data.
         self = String(
             StringSlice(
-                unsafe_from_utf8=CStringSlice(
+                unsafe_from_utf8=CStringSpan(
                     unsafe_from_ptr=unsafe_from_utf8_ptr.unsafe_bitcast[Int8]()
                 )
             )
         )
 
     @stable(since="1.0")
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, *, copy: Self):
         """Copy initialize the string from another string.
 
@@ -625,7 +625,7 @@ struct String(
     def capacity(self) -> Int:
         return self.capacity_bytes()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def capacity_bytes(self) -> Int:
         """Get the current capacity of the `String`'s internal buffer.
 
@@ -639,32 +639,32 @@ struct String(
             return self._len_or_data
         return self._capacity_or_data << 3
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _set_nul_terminated(mut self):
         self._capacity_or_data |= Self.FLAG_HAS_NUL_TERMINATOR
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _has_nul_terminator(self) -> Bool:
         return Bool(
             UInt64(self._capacity_or_data)
             & UInt64(Self.FLAG_HAS_NUL_TERMINATOR)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _clear_nul_terminator(mut self):
         self._capacity_or_data &= ~Self.FLAG_HAS_NUL_TERMINATOR
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _is_inline(self) -> Bool:
         return Bool(
             UInt64(self._capacity_or_data) & UInt64(Self.FLAG_IS_INLINE)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _set_ref_counted(mut self):
         self._capacity_or_data |= Self.FLAG_IS_REF_COUNTED
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _is_ref_counted(self) -> Bool:
         return Bool(
             UInt64(self._capacity_or_data) & UInt64(Self.FLAG_IS_REF_COUNTED)
@@ -677,14 +677,14 @@ struct String(
     # This includes helpers for the allocated atomic ref count used for
     # out-of-line strings, which is stored before the UTF-8 data.
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _refcount(self) -> ref[self._ptr_or_data.origin] Atomic[Int]:
         # The header is stored before the string data.
         return self._ptr_or_data.unsafe_offset(
             -Self.REF_COUNT_SIZE
         ).unsafe_bitcast[Atomic[Int]]()[]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _is_unique(mut self) -> Bool:
         """Return true if the refcount is 1."""
         if UInt64(self._capacity_or_data) & UInt64(Self.FLAG_IS_REF_COUNTED):
@@ -692,7 +692,7 @@ struct String(
         else:
             return False
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _add_ref(mut self):
         """Atomically increment the refcount."""
         comptime if is_apple_gpu():
@@ -704,7 +704,7 @@ struct String(
             # use of memory orderings.
             _ = self._refcount().fetch_add[ordering=Ordering.RELAXED](1)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _drop_ref(mut self):
         """Atomically decrement the refcount and deallocate self if the result
         hits zero."""
@@ -799,7 +799,7 @@ struct String(
         ...
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, *, byte: Int
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
@@ -822,7 +822,7 @@ struct String(
         return string_slice._unchecked_get_byte(idx)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__[
         I: Indexer, //
     ](self, *, byte: I) -> StringSlice[
@@ -850,7 +850,7 @@ struct String(
         return string_slice._unchecked_get_byte(idx)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, *, byte: IntLiteral
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
@@ -876,7 +876,7 @@ struct String(
         return string_slice._unchecked_get_byte(byte)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, *, byte: ContiguousSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
@@ -921,7 +921,7 @@ struct String(
         return self._interior_slice()[codepoint=codepoint]
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, *, codepoint: ContiguousSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
@@ -937,7 +937,7 @@ struct String(
         return self._interior_slice()[codepoint=codepoint]
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, *, grapheme: Some[Indexer]
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
@@ -975,7 +975,7 @@ struct String(
         # Compare memory directly
         return unsafe_memcmp(self_ptr, rhs_ptr, self_len) == 0
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     def __eq__(self, other: StringSlice) -> Bool:
         """Compares two Strings if they have the same values.
@@ -988,7 +988,7 @@ struct String(
         """
         return StringSlice(self) == other
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     def __ne__(self, other: StringSlice) -> Bool:
         """Compares two Strings if they have the same values.
@@ -1001,7 +1001,7 @@ struct String(
         """
         return StringSlice(self) != other
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __lt__(self, rhs: String) -> Bool:
         """Compare this String to the RHS using LT comparison.
 
@@ -1068,7 +1068,7 @@ struct String(
         )
         self._set_byte_length(new_length)
 
-    def __radd__(self, other: StringSlice[mut=False, _]) -> String:
+    def __radd__(self, other: StringSlice[_]) -> String:
         """Creates a string by prepending another string slice to the start.
 
         Args:
@@ -1093,7 +1093,7 @@ struct String(
         self._set_byte_length(new_len)
         self._clear_nul_terminator()
 
-    def __iadd__(mut self, other: StringSlice[mut=False, _]):
+    def __iadd__(mut self, other: StringSlice[_]):
         """Appends another string slice to this string.
 
         Args:
@@ -1133,7 +1133,7 @@ struct String(
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __bool__(self) -> Bool:
         """Checks if the string is not empty.
 
@@ -1142,7 +1142,7 @@ struct String(
         """
         return self.byte_length() > 0
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).
 
@@ -1408,7 +1408,7 @@ struct String(
         """
         return StringSlice(self).count_graphemes()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_ptr(
         self,
     ) -> Pointer[Byte, origin_of(self)]:
@@ -1454,14 +1454,26 @@ struct String(
 
         return self.unsafe_ptr().unsafe_mut_cast[True]()
 
-    @always_inline
+    @deprecated(use=as_c_string_span)
+    @inline(.always)
     def as_c_string_slice(
         mut self,
-    ) -> CStringSlice[ImmOrigin(origin_of(self))]:
-        """Return a `CStringSlice` to the underlying memory of the string.
+    ) -> CStringSpan[ImmOrigin(origin_of(self))]:
+        """Return a `CStringSpan` to the underlying memory of the string.
 
         Returns:
-            The `CStringSlice` of the string.
+            The `CStringSpan` of the string.
+        """
+        return self.as_c_string_span()
+
+    @inline(.always)
+    def as_c_string_span(
+        mut self,
+    ) -> CStringSpan[ImmOrigin(origin_of(self))]:
+        """Return a `CStringSpan` to the underlying memory of the string.
+
+        Returns:
+            The `CStringSpan` of the string.
         """
         # Add a nul terminator, making the string mutable if not already
         if not self._has_nul_terminator():
@@ -1471,7 +1483,7 @@ struct String(
             self._capacity_or_data |= Self.FLAG_HAS_NUL_TERMINATOR
 
         # Safety: we ensure the string is null-terminated above.
-        return CStringSlice(
+        return CStringSpan(
             unsafe_from_ptr=self.unsafe_ptr().unsafe_bitcast[c_char]()
         )
 
@@ -1546,7 +1558,7 @@ struct String(
         else:
             return self._len_or_data
 
-    @always_inline
+    @inline(.always)
     def count_codepoints(self) -> Int:
         """Calculates the length in Unicode codepoints encoded in the
         UTF-8 representation of this string.
@@ -1682,7 +1694,7 @@ struct String(
         """
         return StringSlice(self).isspace()
 
-    @always_inline
+    @inline(.always)
     def split(
         self, sep: StringSlice
     ) -> List[StringSlice[origin_of(self)._get_owned_interior["bytes"]]]:
@@ -1709,7 +1721,7 @@ struct String(
         """
         return self._interior_slice().split(sep)
 
-    @always_inline
+    @inline(.always)
     def split(
         self, sep: StringSlice, maxsplit: Int
     ) -> List[StringSlice[origin_of(self)._get_owned_interior["bytes"]]]:
@@ -1735,7 +1747,7 @@ struct String(
         """
         return self._interior_slice().split(sep, maxsplit=maxsplit)
 
-    @always_inline
+    @inline(.always)
     def split(
         self, sep: NoneType = None
     ) -> List[StringSlice[origin_of(self)._get_owned_interior["bytes"]]]:
@@ -1764,7 +1776,7 @@ struct String(
         """
         return self._interior_slice().split(sep)
 
-    @always_inline
+    @inline(.always)
     def split(
         self, sep: NoneType = None, *, maxsplit: Int
     ) -> List[StringSlice[origin_of(self)._get_owned_interior["bytes"]]]:
@@ -1815,7 +1827,7 @@ struct String(
         return StringSlice(self).replace(old, new)
 
     def strip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with leading and trailing characters
         removed.
@@ -1844,7 +1856,7 @@ struct String(
         return self.lstrip().rstrip()
 
     def rstrip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with trailing characters removed.
 
@@ -1870,7 +1882,7 @@ struct String(
         return self._interior_slice().rstrip()
 
     def lstrip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with leading characters removed.
 

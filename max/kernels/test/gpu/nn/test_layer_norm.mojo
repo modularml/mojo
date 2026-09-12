@@ -64,7 +64,7 @@ def run_layer_norm_gpu[
     ctx.enqueue_copy(gamma_d, gamma_h)
     ctx.enqueue_copy(beta_d, beta_h)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
@@ -74,7 +74,7 @@ def run_layer_norm_gpu[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var out_buf}:

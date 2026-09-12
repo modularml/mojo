@@ -40,7 +40,7 @@ from std.utils.numerics import max_finite
 comptime BATCH_SIZE = 2048
 
 
-@always_inline
+@inline(.always)
 def _randt_sample[
     nu: Int
 ](mut rng: NormalRandom, amp: Float64, cap: Float64) -> Float64:
@@ -60,7 +60,7 @@ def _randt_sample[
     return max(-cap, min(cap, t * amp))
 
 
-@always_inline
+@inline(.always)
 def _randt_amp[nu: Int](sigma: Float64) -> Float64:
     """Divides out the theoretical sd so a fill is one pass."""
     # Var(t_nu) = nu / (nu - 2) for nu > 2 and is undefined at or below it, so

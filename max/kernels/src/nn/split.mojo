@@ -14,7 +14,7 @@
 
 from std.collections.string import StaticString
 from std.sys import simd_width_of
-from std.sys.info import _current_target
+from std.sys.info import CompilationTarget
 
 from max.algorithm import elementwise
 from max.gpu.host import DeviceContext, get_gpu_target
@@ -94,7 +94,7 @@ def split[
     comptime for i in range(num_outputs):
         output_sizes[i] = Int(outputs[i].dim(axis))
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int, alignment: Int = 1
     ](input_coords: Coord) {var output_sizes, var input, var outputs,}:
@@ -143,12 +143,13 @@ def split[
 
     # Can vectorize only if not splitting over last dim.
     if axis != input.rank - 1:
-        comptime compile_target = _current_target() if is_cpu[
-            target
-        ]() else get_gpu_target()
-        comptime target_simd_width = simd_width_of[
-            dtype, target=compile_target
-        ]()
+        comptime target_simd_width = (
+            simd_width_of[
+                dtype, target=CompilationTarget.current()
+            ]() if is_cpu[target]() else simd_width_of[
+                dtype, target=get_gpu_target()
+            ]()
+        )
 
         elementwise[
             simd_width=target_simd_width,

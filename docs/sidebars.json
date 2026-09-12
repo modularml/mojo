@@ -55,6 +55,7 @@
         "serve/prefix-caching",
         "serve/lora-adapters",
         "serve/speculative-decoding",
+        "serve/parallelism",
         "serve/recipes",
         "serve/metrics"
       ]
@@ -436,6 +437,7 @@
                 "api/python/pipelines.architectures.deepseekV3",
                 "api/python/pipelines.architectures.deepseekV3_2",
                 "api/python/pipelines.architectures.deepseekV3_nextn",
+                "api/python/pipelines.architectures.dflash2_qwen3_5",
                 "api/python/pipelines.architectures.dflash_llama3",
                 "api/python/pipelines.architectures.diffusion_gemma",
                 "api/python/pipelines.architectures.dspark_draft",
@@ -480,6 +482,7 @@
                 "api/python/pipelines.architectures.qwen_image",
                 "api/python/pipelines.architectures.qwen_image_edit",
                 "api/python/pipelines.architectures.step3p5",
+                "api/python/pipelines.architectures.unified_dflash2_qwen3_5",
                 "api/python/pipelines.architectures.unified_dflash_gemma4_31b",
                 "api/python/pipelines.architectures.unified_dflash_kimi_k25",
                 "api/python/pipelines.architectures.unified_dflash_llama3",
@@ -601,6 +604,17 @@
                 "id": "api/python/pipelines.lib"
               },
               "items": [
+                {
+                  "type": "category",
+                  "label": "arch_lookup",
+                  "link": {
+                    "type": "doc",
+                    "id": "api/python/pipelines.lib.arch_lookup"
+                  },
+                  "items": [
+                    "__AUTOGEN:max.pipelines.lib.arch_lookup__"
+                  ]
+                },
                 {
                   "type": "category",
                   "label": "interfaces",

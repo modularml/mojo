@@ -48,16 +48,16 @@ struct _CopyDirection(Equatable, TrivialRegisterPassable):
     comptime DRAMToSRAM = Self(0)
     comptime SRAMToDRAM = Self(1)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
 
-@always_inline
+@inline(.always)
 def _thread_offset[
     N: Int, thread_cols: Int, simd_size: Int
 ](worker_idx: Int) -> Int:
@@ -66,7 +66,7 @@ def _thread_offset[
     ) * simd_size
 
 
-@always_inline
+@inline(.always)
 def _manual_copy[
     dtype: DType,
     M: Int,
@@ -100,7 +100,7 @@ def _manual_copy[
             )
 
 
-@always_inline
+@inline(.always)
 def _tile_io_copy[
     dtype: DType,
     M: Int,
@@ -155,7 +155,7 @@ def _tile_io_copy[
         ](src_ptr, dst_ptr, smem.ptr)
 
 
-@always_inline
+@inline(.always)
 def _layout_tensor_copy[
     dtype: DType,
     tensor_layout: Layout,
@@ -343,7 +343,7 @@ def layout_tensor_sram_to_dram_kernel[
     ](src_ptr, dst.ptr)
 
 
-@always_inline
+@inline(.always)
 def _assert_buffers_equal[
     dtype: DType, simd_size: Int
 ](
@@ -540,9 +540,9 @@ def bench_copy_roundtrip[
         "layout_tensor_sram_to_dram",
     )
 
-    @always_inline
+    @inline(.always)
     def bench_tile_io_roundtrip(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def tile_io_roundtrip_launch(ctx: DeviceContext) raises {var}:
             ctx.enqueue_function[tile_io_kernel](
                 src_dev,
@@ -553,9 +553,9 @@ def bench_copy_roundtrip[
 
         bencher_iter_custom(b, tile_io_roundtrip_launch, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_layout_tensor_roundtrip(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def layout_tensor_roundtrip_launch(ctx: DeviceContext) raises {var}:
             var src = LayoutTensor[dtype, tensor_layout, MutAnyOrigin](
                 src_dev.unsafe_ptr()
@@ -572,9 +572,9 @@ def bench_copy_roundtrip[
 
         bencher_iter_custom(b, layout_tensor_roundtrip_launch, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_tile_io_dram_to_sram(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def tile_io_dram_to_sram_launch(ctx: DeviceContext) raises {var}:
             ctx.enqueue_function[tile_io_dram_to_sram_kernel_type](
                 src_dev,
@@ -585,9 +585,9 @@ def bench_copy_roundtrip[
 
         bencher_iter_custom(b, tile_io_dram_to_sram_launch, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_layout_tensor_dram_to_sram(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def layout_tensor_dram_to_sram_launch(ctx: DeviceContext) raises {var}:
             var src = LayoutTensor[dtype, tensor_layout, MutAnyOrigin](
                 src_dev.unsafe_ptr()
@@ -601,9 +601,9 @@ def bench_copy_roundtrip[
 
         bencher_iter_custom(b, layout_tensor_dram_to_sram_launch, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_tile_io_sram_to_dram(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def tile_io_sram_to_dram_launch(ctx: DeviceContext) raises {var}:
             ctx.enqueue_function[tile_io_sram_to_dram_kernel_type](
                 src_dev,
@@ -614,9 +614,9 @@ def bench_copy_roundtrip[
 
         bencher_iter_custom(b, tile_io_sram_to_dram_launch, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_layout_tensor_sram_to_dram(mut b: Bencher) {var}:
-        @always_inline
+        @inline(.always)
         def layout_tensor_sram_to_dram_launch(ctx: DeviceContext) raises {var}:
             var dst = LayoutTensor[dtype, tensor_layout, MutAnyOrigin](
                 layout_tensor_dst_dev.unsafe_ptr()

@@ -18,7 +18,7 @@ from std.math.uutils import udivmod
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def pad[dtype: DType, depth: Int, size: Int]() -> Int:
     """V-SMEM row padding to avoid bank conflicts. Skipped for depth=64.
 
@@ -33,7 +33,7 @@ def pad[dtype: DType, depth: Int, size: Int]() -> Int:
     return size + padding
 
 
-@always_inline
+@inline(.always)
 def get_warp_coords[BN: Int, WN: Int]() -> IndexList[2]:
     """Return `(warp_row, warp_col)` for the current warp given a BN×WN grid.
 

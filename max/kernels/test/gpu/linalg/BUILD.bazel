@@ -115,6 +115,7 @@ _EXTRA_CONSTRAINTS = {
     "test_mxfp4_quant_amd.mojo": ["//:amd_gpu"],
     "test_mxfp6_matmul_amd_preb.mojo": ["//:mi355_gpu"],
     "test_mxfp6_matmul_amd_preb_epilogue.mojo": ["//:mi355_gpu"],
+    "test_quantize_mxfp6_lane_group.mojo": ["//:mi355_gpu"],
     "test_mxfp6_quant_amd.mojo": ["//:mi355_gpu"],
     "test_mxfp8_quant_amd_geometry.mojo": ["//:mi355_gpu"],
     "test_mxfp4_grouped_matmul_amd.mojo": ["//:amd_gpu"],

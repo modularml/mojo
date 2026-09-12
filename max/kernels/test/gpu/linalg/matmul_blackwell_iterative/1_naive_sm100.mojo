@@ -118,7 +118,7 @@ def test_kernel_1[
         comptime num_runs = 50
         comptime num_warmup = 20
 
-        @always_inline
+        @inline(.always)
         def run_kernel(ctx: DeviceContext) raises {mut a, mut b, mut c, imm}:
             ctx.enqueue_function[kernel](
                 c.device_tensor[update=False](),

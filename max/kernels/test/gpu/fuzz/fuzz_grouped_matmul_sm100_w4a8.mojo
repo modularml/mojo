@@ -61,7 +61,7 @@
 # path actually runs is ungated for batch invariance -- a known gap, not a
 # claim of coverage.
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from std.math import ceildiv, max
 from std.random import random_ui64, seed
 from std.sys.defines import get_defined_int

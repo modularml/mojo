@@ -138,7 +138,7 @@ def gated_group_rmsnorm_kernel[
         jj += WARP_SIZE
 
 
-@always_inline
+@inline(.always)
 def gated_group_rmsnorm_gpu[
     dtype: DType,
     gate_dtype: DType,

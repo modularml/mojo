@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 import yaml
 from max.benchmark.benchmark_serving import (
+    _load_workload_yaml,
     _resolve_seed,
     main_with_parsed_args,
     parse_args,
@@ -30,6 +31,11 @@ from max.benchmark.benchmark_shared.config import (
     DEFAULT_BENCHMARK_SEED,
     ServingBenchmarkConfig,
 )
+from max.benchmark.benchmark_shared.datasets import DistributionParameter
+from max.benchmark.benchmark_shared.datasets.all import (
+    _resolve_agentic_tool_profiles,
+)
+from pydantic import ValidationError
 
 
 class TestServingSweepFields:
@@ -449,3 +455,302 @@ class TestExtraBodyValidator:
         """A path that does not exist surfaces a clear, dual-cause error."""
         with pytest.raises(ValueError, match="not a readable file path"):
             self._build_with_extra("/nonexistent/payload.yaml")
+
+    def test_file_beside_a_workload_resolves(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A path in a workload YAML is relative to that file, not to cwd."""
+        _write_yaml(tmp_path / "payload.yaml", self._NESTED)
+        workload = tmp_path / "workload.yaml"
+        workload.write_text("extra-body: payload.yaml\nnum-prompts: 4\n")
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+
+        args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+        _load_workload_yaml(args)
+        assert args.extra_body == self._NESTED
+
+    def test_inline_json_in_a_workload_is_not_a_path(
+        self, tmp_path: Path
+    ) -> None:
+        """Path resolution must not touch a value that is the content itself."""
+        workload = tmp_path / "workload.yaml"
+        workload.write_text(
+            f"extra-body: '{json.dumps(self._NESTED)}'\nnum-prompts: 4\n"
+        )
+        args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+        _load_workload_yaml(args)
+        assert args.extra_body == self._NESTED
+
+
+# ---------------------------------------------------------------------------
+# --agentic-tool-profiles validation
+# ---------------------------------------------------------------------------
+
+_PROFILES: dict[str, Any] = {"tools": [{"input-len": "10", "output-len": "5"}]}
+
+
+def _fitted_config(
+    *,
+    agentic_tool_profiles: dict[str, Any] | None = None,
+    agentic_rounds_per_turn: DistributionParameter | None = None,
+) -> ServingBenchmarkConfig:
+    """A fitted multiturn run, the only shape that reaches the agent loop."""
+    return ServingBenchmarkConfig(
+        model="m",
+        dataset_name="instruct-coder",
+        fit_distributions=True,
+        num_chat_sessions=4,
+        agentic_tool_profiles=agentic_tool_profiles,
+        agentic_rounds_per_turn=agentic_rounds_per_turn,
+    )
+
+
+def test_agentic_tool_profiles_accepts_every_spelling(tmp_path: Path) -> None:
+    """A mapping, an inline JSON string and a file path resolve alike."""
+    profiles = {"tools": [{"input-len": "10", "output-len": "5"}]}
+    config = tmp_path / "tools.yaml"
+    _write_yaml(config, profiles)
+    for value in (profiles, json.dumps(profiles), str(config)):
+        # model_validate takes Any, so the str forms reach the validator the
+        # way cyclopts hands it the raw token.
+        args = ServingBenchmarkConfig.model_validate(
+            {"model": "m", "agentic_tool_profiles": value}
+        )
+        assert args.agentic_tool_profiles == profiles
+
+
+def test_agentic_tool_profiles_missing_file_is_reported() -> None:
+    """A path that does not exist names the field, not a bare parse error."""
+    with pytest.raises(
+        ValueError, match=r"agentic_tool_profiles .* not a readable file path"
+    ):
+        ServingBenchmarkConfig.model_validate(
+            {"model": "m", "agentic_tool_profiles": "/nonexistent/tools.yaml"}
+        )
+
+
+def test_agentic_absent_by_default() -> None:
+    assert (
+        _resolve_agentic_tool_profiles(ServingBenchmarkConfig(model="m"))
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("tool_profiles", "rounds_per_turn"),
+    [(_PROFILES, None), (None, 3)],
+    ids=["tools-without-rounds", "rounds-without-tools"],
+)
+def test_agentic_flags_must_be_set_together(
+    tool_profiles: dict[str, Any] | None,
+    rounds_per_turn: DistributionParameter | None,
+) -> None:
+    args = _fitted_config(
+        agentic_tool_profiles=tool_profiles,
+        agentic_rounds_per_turn=rounds_per_turn,
+    )
+    with pytest.raises(ValueError, match="must be set together"):
+        _resolve_agentic_tool_profiles(args)
+
+
+@pytest.mark.parametrize(
+    ("dataset_name", "fit_distributions", "num_chat_sessions"),
+    [
+        ("instruct-coder", False, 4),
+        # Any dataset off the fitted list takes the same branch.
+        ("random", True, 4),
+        # The agent loop lives on the multiturn path; a single-turn run would
+        # otherwise accept the flags and silently send plain requests.
+        ("instruct-coder", True, None),
+    ],
+)
+def test_agentic_needs_a_run_that_reaches_the_builder(
+    dataset_name: str, fit_distributions: bool, num_chat_sessions: int | None
+) -> None:
+    """Only a fitted multiturn run on the three datasets assembles it."""
+    args = ServingBenchmarkConfig(
+        model="m",
+        dataset_name=dataset_name,
+        fit_distributions=fit_distributions,
+        num_chat_sessions=num_chat_sessions,
+        agentic_tool_profiles=_PROFILES,
+        agentic_rounds_per_turn=3,
+    )
+    with pytest.raises(ValueError, match="needs --fit-distributions with"):
+        _resolve_agentic_tool_profiles(args)
+
+
+def test_agentic_resolves_when_fully_specified() -> None:
+    args = _fitted_config(
+        agentic_tool_profiles=_PROFILES,
+        agentic_rounds_per_turn="NB(33,0.3)",
+    )
+    tools = _resolve_agentic_tool_profiles(args)
+    assert tools is not None and len(tools) == 1
+
+
+# ---------------------------------------------------------------------------
+# The agent loop in a workload YAML
+# ---------------------------------------------------------------------------
+
+_WORKLOAD_BASE = (
+    "dataset-name: instruct-coder\n"
+    "fit-distributions: true\n"
+    "num-chat-sessions: 4\n"
+    "agentic-rounds-per-turn: '3'\n"
+)
+
+_NESTED = """agentic-tool-profiles:
+  tools:
+    - weight: 5
+      input-len: 'N(30,20)'
+      output-len: 'N(25,8)'
+"""
+_QUOTED = (
+    "agentic-tool-profiles:"
+    ' \'{"tools":[{"weight":5,"input-len":"N(30,20)",'
+    '"output-len":"N(25,8)"}]}\'\n'
+)
+_BY_FILENAME = "agentic-tool-profiles: agentic_tools.yaml\n"
+_BY_FILENAME_NO_EXT = "agentic-tool-profiles: agentic_tools\n"
+
+
+def _workload(tmp_path: Path, profiles: str) -> Path:
+    """A workload file, with a tool file beside it for the by-filename form."""
+    body = (
+        "tools:\n"
+        "  - weight: 5\n"
+        "    input-len: N(30,20)\n"
+        "    output-len: N(25,8)\n"
+    )
+    (tmp_path / "agentic_tools.yaml").write_text(body)
+    # A tool file need not be named for its format to be found.
+    (tmp_path / "agentic_tools").write_text(body)
+    workload = tmp_path / "workload.yaml"
+    workload.write_text(_WORKLOAD_BASE + profiles)
+    return workload
+
+
+@pytest.mark.parametrize(
+    "profiles",
+    [_NESTED, _QUOTED, _BY_FILENAME, _BY_FILENAME_NO_EXT],
+    ids=[
+        "nested-mapping",
+        "quoted-string",
+        "by-filename",
+        "by-filename-no-extension",
+    ],
+)
+def test_workload_yaml_spellings_agree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profiles: str
+) -> None:
+    """Three ways to write one tool resolve to that one tool.
+
+    Run from an unrelated directory, so the by-filename form is resolved
+    against the workload file rather than the caller's cwd.
+    """
+    workload = _workload(tmp_path, profiles)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+    _load_workload_yaml(args)
+    tools = _resolve_agentic_tool_profiles(args)
+
+    assert tools is not None
+    assert [(t.weight, t.input_len, t.output_len) for t in tools] == [
+        (5.0, "N(30,20)", "N(25,8)")
+    ]
+
+
+# ===----------------------------------------------------------------------=== #
+# General image-mixing flags
+# ===----------------------------------------------------------------------=== #
+
+
+class TestImageFlags:
+    """--image-fraction is mutually exclusive with --random-image-*."""
+
+    def test_defaults_allow_construction(self) -> None:
+        config = ServingBenchmarkConfig()
+        assert config.image_fraction == 0.0
+        assert config.image_turn == "first"
+
+    def test_conflicts_with_random_image_count(self) -> None:
+        with pytest.raises(ValueError, match="cannot be combined"):
+            ServingBenchmarkConfig(image_fraction=0.1, random_image_count=1)
+
+    def test_conflicts_with_random_image_size(self) -> None:
+        with pytest.raises(ValueError, match="cannot be combined"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, random_image_size="512,512"
+            )
+
+    def test_rejects_unknown_image_turn(self) -> None:
+        """Rejected by the ImageTurn literal itself, so there is no hand-rolled
+        check to keep in sync with the type.
+
+        Goes through ``model_validate`` rather than the constructor: mypy now
+        rejects a bad literal statically, which is the point of the change, so
+        the runtime check has to come in through the untyped parsing entry
+        point the CLI itself uses.
+        """
+        with pytest.raises(ValidationError, match="image_turn"):
+            ServingBenchmarkConfig.model_validate(
+                {"image_fraction": 0.1, "image_turn": "middle"}
+            )
+
+    def test_accepts_every_image_turn_value(self) -> None:
+        for value in ("first", "last", "every"):
+            config = ServingBenchmarkConfig(
+                image_fraction=0.1, image_turn=value
+            )
+            assert config.image_turn == value
+
+    def test_rejects_out_of_range_fraction(self) -> None:
+        """The description promises 0.0-1.0; -0.1 used to slip past `> 0` and
+        silently produce a text-only run."""
+        for bad in (-0.1, 1.5, float("nan"), float("inf")):
+            with pytest.raises(ValidationError):
+                ServingBenchmarkConfig(image_fraction=bad)
+
+    def test_rejects_pixel_generation_task(self) -> None:
+        with pytest.raises(ValueError, match="does not apply"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, benchmark_task="text-to-image"
+            )
+
+    def test_rejects_text_only_endpoint(self) -> None:
+        """A text-only driver would drop the images while stats still count them."""
+        with pytest.raises(ValueError, match="image-capable endpoint"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, endpoint="/v1/completions"
+            )
+
+    def test_rejects_responses_endpoint(self) -> None:
+        """/v1/responses only routes to OpenResponsesRequestDriver for
+        pixel-generation tasks, and that driver takes only
+        PixelGenerationRequestFuncInput, so it never carries input images."""
+        with pytest.raises(ValueError, match="image-capable endpoint"):
+            ServingBenchmarkConfig(image_fraction=0.1, endpoint="/v1/responses")
+
+    def test_allows_chat_completions_endpoint(self) -> None:
+        config = ServingBenchmarkConfig(
+            image_fraction=0.1, endpoint="/v1/chat/completions"
+        )
+        assert config.image_fraction == 0.1
+
+    def test_accepts_distribution_strings(self) -> None:
+        config = ServingBenchmarkConfig(
+            image_fraction=0.2,
+            image_count="DU(1,3)",
+            image_long_side="U(256,1024)",
+            image_aspect_ratio=1.0,
+            image_turn="last",
+        )
+        assert config.image_count == "DU(1,3)"
+        assert config.image_long_side == "U(256,1024)"
+        assert config.image_turn == "last"

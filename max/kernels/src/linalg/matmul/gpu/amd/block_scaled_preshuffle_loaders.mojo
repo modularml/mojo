@@ -67,7 +67,7 @@ struct PreshuffledBLoader[
 
     var bc: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         b_gmem_tile: TileTensor[.uint8, ...],
@@ -81,7 +81,7 @@ struct PreshuffledBLoader[
         """
         self.bc = make_amd_buffer_resource(b_gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load_fragment(
         self, n: Int, k_byte: Int
     ) -> SIMD[.uint8, Self.reg_bytes]:
@@ -117,53 +117,64 @@ struct PreshuffledBLoader[
             )
         return frag
 
-    @always_inline
-    def lane_plane_off(self, n: Int, lane_k_byte: Int) -> Int32:
-        """Returns the K-invariant per-lane part of a single-plane address.
+    @inline(.always)
+    def lane_plane_off[plane: Int = 0](self, n: Int, lane_k_byte: Int) -> Int32:
+        """Returns the K-invariant per-lane part of one plane's address.
 
         Pair with `load_at`, which supplies the wave-uniform whole-tile part.
         Splitting the address this way lets a caller hoist the per-lane term
         out of an unrolled K loop instead of rematerialising it per tile.
+
+        `b_plane_byte_off` is additive in `k0`: every other term depends only
+        on `n` and the lane's own K offset, and the `k0 * tile_bytes` stride is
+        the same for all planes because `tile_bytes` is derived from
+        `lane_bytes`, not from the plane width. So a multi-plane fragment
+        (FP6's 16 + 8) splits per plane exactly as a single-plane one does.
+
+        Parameters:
+            plane: Which plane of the lane fragment to address.
 
         Args:
             n: Logical N row index into the `[N, K_BYTES]` tile.
             lane_k_byte: The lane's own K byte offset within its K tile,
                 i.e. `(lane // 16) * lane_bytes`.
         """
-        comptime assert (
-            Self.lane_bytes == Shuffler[1].MFMA_LANE_BYTES
-        ), "the split address form assumes a single 16-byte plane per lane"
+        comptime assert plane < Self.num_planes, "plane out of range"
         return Int32(
             Shuffler[1].b_plane_byte_off[
                 N=Self.N,
                 K_BYTES=Self.K_BYTES,
                 lane_bytes=Self.lane_bytes,
-                plane=0,
+                plane=plane,
             ](0, n, lane_k_byte)
         )
 
-    @always_inline
-    def load_at(
-        self, lane_off: Int32, k_byte_uniform: Int
-    ) -> SIMD[.uint8, Shuffler[1].MFMA_LANE_BYTES]:
-        """Loads one 16-byte plane at `lane_off` plus a wave-uniform K offset.
+    @inline(.always)
+    def load_at[
+        plane: Int = 0
+    ](self, lane_off: Int32, k_byte_uniform: Int) -> SIMD[
+        .uint8, Shuffler[1].plane_bytes[Self.lane_bytes, plane]()
+    ]:
+        """Loads one plane at `lane_off` plus a wave-uniform K offset.
 
         `k_byte_uniform` is a whole number of `(n0, k0)` tiles, so it rides
-        `soffset` while `lane_off` stays in `voffset`.
+        `soffset` while `lane_off` stays in `voffset`. The tile stride is a
+        function of `lane_bytes` alone, so it is shared by every plane; only
+        the loaded width narrows on a partial plane (FP6's second is 8 bytes).
+
+        Parameters:
+            plane: Which plane of the lane fragment to load.
 
         Args:
             lane_off: The per-lane offset from `lane_plane_off`.
             k_byte_uniform: Logical K byte base of the tile, wave-uniform and
                 a multiple of the K0 tile width.
         """
-        comptime assert (
-            Self.lane_bytes == Shuffler[1].MFMA_LANE_BYTES
-        ), "the split address form assumes a single 16-byte plane per lane"
+        comptime assert plane < Self.num_planes, "plane out of range"
         comptime K0_BYTES = Shuffler[1].MFMA_K_LANES * Self.lane_bytes
         comptime TILE_BYTES = Shuffler[1].MFMA_MN_LANES * K0_BYTES
-        return self.bc.load[
-            .uint8, Shuffler[1].MFMA_LANE_BYTES, cache_policy=Self.cache_policy
-        ](
+        comptime PB = Shuffler[1].plane_bytes[Self.lane_bytes, plane]()
+        return self.bc.load[.uint8, PB, cache_policy=Self.cache_policy](
             lane_off,
             scalar_offset=Int32((k_byte_uniform // K0_BYTES) * TILE_BYTES),
         )
@@ -185,7 +196,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
 
     var bc: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         scale_gmem_tile: TileTensor[.uint8, ...],
@@ -199,7 +210,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
         """
         self.bc = make_amd_buffer_resource(scale_gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load_packed(self, mn: Int, k_scale: Int) -> Int32:
         """Loads the packed Int32 scale word containing logical `(mn, k_scale)`.
 
@@ -224,7 +235,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
         var v = self.bc.load[.uint8, 4](byte_off)
         return bitcast[.int32, 1](v)[0]
 
-    @always_inline
+    @inline(.always)
     def load_group[
         GROUP: Int
     ](self, mn_base: Int, k_pair_base: Int) -> SIMD[.uint8, GROUP * 4]:

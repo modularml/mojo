@@ -28,6 +28,5 @@ modular_py_library(
         "//max/python/max/pipelines/modeling",
         "//max/python/max/pipelines/weights",
         "//max/python/max/profiler",
-        "//max/python/max/support",
     ],
 )

@@ -84,7 +84,7 @@ from std.utils.static_tuple import StaticTuple
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 
 
-@always_inline
+@inline(.always)
 def elect() -> Int32:
     """Elects a single lane in the warp via the `elect.sync` PTX instruction."""
     # CAUTION: This function cannot be used to guard a `print`, else it will
@@ -169,13 +169,13 @@ struct Pack[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
         return "Pack"
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         mask: Self.MaskType,
@@ -242,7 +242,7 @@ struct MHAPosition[
         2, ceildiv(Self.group, 8)
     ) if Self.decoding else 1
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         q_row: UInt32,
@@ -262,21 +262,21 @@ struct MHAPosition[
         self.prompt_offset = seq_info.prompt_offset
         self.prompt_idx = seq_info.prompt_idx  # batch idx
 
-    @always_inline
+    @inline(.always)
     def q_head_idx(self) -> UInt32:
         comptime if Self.decoding:
             return self.head_idx * UInt32(Self.group)
         else:
             return self.head_idx
 
-    @always_inline
+    @inline(.always)
     def kv_head_idx(self) -> UInt32:
         comptime if Self.decoding:
             return self.head_idx
         else:
             return self.head_idx // UInt32(Self.group)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write(
             "(",
@@ -296,22 +296,22 @@ struct MHAPosition[
             ")",
         )
 
-    @always_inline
+    @inline(.always)
     def q_tile_num_rows(self) -> UInt32:
         comptime if Self.decoding:
             return UInt32(Self.group)
         else:
             return min(self.seq_len - self.prompt_offset, UInt32(Self.BM))
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self.q_out_offset == other.q_out_offset
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self.q_out_offset != other.q_out_offset
 
-    @always_inline
+    @inline(.always)
     def q_out_gmem_tensor[
         dtype: DType
     ](
@@ -336,7 +336,7 @@ struct MHAPosition[
             ),
         }
 
-    @always_inline
+    @inline(.always)
     def mask_status[
         MaskType: MHAMask
     ](self, mask: MaskType, kv_tile_start_row: UInt32) -> TileMaskStatus:
@@ -365,14 +365,14 @@ struct MHAPosition[
                 Index[dtype=DType.int32](Self.BM, Self.BN),
             )
 
-    @always_inline
+    @inline(.always)
     def get_score_row(self) -> UInt32:
         comptime if Self.decoding:
             return self.num_keys - 1
         else:
             return self.prompt_offset + self.start_pos
 
-    @always_inline
+    @inline(.always)
     def exp_sum_qk_max_ptr[
         partition_t: MHAPartitionScheme
     ](
@@ -408,7 +408,7 @@ struct MHAPosition[
         )
         return (exp_sum_ptr, qk_max_ptr)
 
-    @always_inline
+    @inline(.always)
     def get_start_and_end_for_partitions[
         PartitionType: MHAPartitionScheme, MaskType: MHAMask, //, page_size: Int
     ](self, partition: PartitionType, mask: MaskType) -> Tuple[UInt32, UInt32]:
@@ -427,7 +427,7 @@ struct MHAPosition[
             return (start_col, self.num_keys)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_q_gmem_row[
         MaxSeqLenType: OptionallyStaticInt, //, ragged: Bool
     ](seq_info: SeqInfo, max_seq_len: MaxSeqLenType) -> UInt32:
@@ -452,7 +452,7 @@ struct MHAPosition[
             return q_row + seq_info.prompt_offset
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_q_gmem_row[
         ragged: Bool
     ](seq_info: SeqInfo, max_seq_len: UInt32) -> UInt32:
@@ -471,7 +471,7 @@ struct MHAPosition[
         return q_row + seq_info.prompt_offset
 
 
-@always_inline
+@inline(.always)
 def get_seq_info[
     MaxSeqLenType: OptionallyStaticInt,
     ValidLengthType: OptionalPointer,
@@ -552,13 +552,13 @@ struct PositionSummary(TrivialRegisterPassable):
     var num_keys: UInt32
     var score_row: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, num_keys: UInt32, score_row: UInt32):
         self.num_keys = num_keys
         self.score_row = score_row
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_start_pos[
         KVLUTType: MHAOperand,
         //,
@@ -575,7 +575,7 @@ struct PositionSummary(TrivialRegisterPassable):
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_num_keys[
         MaxSeqLenType: OptionallyStaticInt,
         KVInputRowOffsetsType: OptionalPointer,
@@ -608,7 +608,7 @@ struct PositionSummary(TrivialRegisterPassable):
                 return cur_kv_len + start_pos
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_score_row[
         *, ragged: Bool, _is_cache_length_accurate: Bool, decoding: Bool
     ](seq_info: SeqInfo, num_keys: UInt32, start_pos: UInt32) -> UInt32:
@@ -620,7 +620,7 @@ struct PositionSummary(TrivialRegisterPassable):
             return seq_info.prompt_offset + start_pos
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create[
         KVLUTType: MHAOperand,
         KVRowOffsetsType: OptionalPointer,
@@ -780,7 +780,7 @@ comptime KVTMATile[
 ]
 
 
-@always_inline
+@inline(.always)
 def q_tma[
     dtype: DType,
     //,
@@ -851,7 +851,7 @@ def q_tma[
     return create_split_tma[smem_dim, gmem_dim, swizzle_mode](ctx, ptr, rows)
 
 
-@always_inline
+@inline(.always)
 def q_coord[
     *,
     depth: Int,
@@ -885,7 +885,7 @@ def q_coord[
     res[rank - 1] = row
 
 
-@always_inline
+@inline(.always)
 def kv_coord[
     *, depth: Int
 ](row: UInt32, head_idx: UInt32) -> StaticTuple[UInt32, 3]:
@@ -901,7 +901,7 @@ def kv_coord[
     return {0, head_idx, row}
 
 
-@always_inline
+@inline(.always)
 def output_reg_to_smem_st_matrix[
     output_type: DType,
     accum_type: DType,

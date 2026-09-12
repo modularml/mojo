@@ -232,7 +232,7 @@ struct MojoVersion(ImplicitlyCopyable, TrivialRegisterPassable):
     var patch: Int
     """The patch version number."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         """Initializes the version by reading it from the compiler at compile time.
         """

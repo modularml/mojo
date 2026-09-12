@@ -179,7 +179,7 @@ def test_grouped_gemm_epilogue[
 
     # Define epilogue lambda that adds original C value to matmul result
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def epilogue_add_c[
         _dtype: DType,
@@ -366,7 +366,7 @@ def test_grouped_gemm_epilogue[
     var c_tensor_host_lt = c_host_original.to_layout_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_host_lt)
     def epilogue_add_c_host[
         _dtype: DType,

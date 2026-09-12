@@ -321,3 +321,36 @@ def main() raises:
             N=352,
             num_experts=2,
         ](ctx, [100, 60], [1.0, 0.5])
+
+        # Many experts holding one row each, the decode routing shape. Its
+        # grid is large enough that the launcher batches column tiles per
+        # block, which is the only way to reach the batched kernel.
+        var one_row_each = List[Int]()
+        var unit_scales = List[Float32]()
+        for _ in range(128):
+            one_row_each.append(1)
+            unit_scales.append(Float32(1.0))
+        test_grouped_nvfp4_quantization[
+            DType.bfloat16,
+            NVFP4_SF_DTYPE,
+            SF_VECTOR_SIZE=NVFP4_SF_VECTOR_SIZE,
+            N=23 * 128,
+            num_experts=128,
+        ](ctx, one_row_each, unit_scales)
+
+        # The batched path with a column count that is not a multiple of
+        # SF_K_GROUP_SIZE, so tail-masking lanes run while batching is on. Row
+        # counts straddle the 128-row tile, giving some experts several row
+        # iterations and others only the first.
+        var spread_counts = List[Int]()
+        var spread_scales = List[Float32]()
+        for i in range(160):
+            spread_counts.append(1 if i % 3 else 100)
+            spread_scales.append(Float32(1.0) if i % 3 == 0 else Float32(0.5))
+        test_grouped_nvfp4_quantization[
+            DType.bfloat16,
+            NVFP4_SF_DTYPE,
+            SF_VECTOR_SIZE=NVFP4_SF_VECTOR_SIZE,
+            N=23 * 128 + 32,
+            num_experts=160,
+        ](ctx, spread_counts, spread_scales)

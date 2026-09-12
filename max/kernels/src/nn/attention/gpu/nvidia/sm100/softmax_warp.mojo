@@ -94,7 +94,7 @@ from .smem import SM100AttentionSMem
 comptime f32x2 = SIMD[.float32, 2]
 
 
-@always_inline
+@inline(.always)
 def fa4_scale_write_output[
     output_type: DType,
     //,
@@ -177,7 +177,7 @@ def fa4_scale_write_output[
     # TMEM for one o_sw_K-wide block, scale+pack (f32x2 compute, wide store; see
     # `scale_pack_o_row`), and write one 16 B row-major store.
     @__parameter
-    @always_inline
+    @inline(.always)
     def write_block[blk: Int]():
         comptime col = blk * o_sw_K
         comptime if zero_fill:
@@ -272,7 +272,7 @@ def fa4_scale_write_output[
     cp_async_bulk_wait_group[0]()
 
 
-@always_inline
+@inline(.always)
 def fa4_lse_combine_write[
     output_type: DType,
     //,
@@ -446,7 +446,7 @@ def fa4_lse_combine_write[
     cp_async_bulk_wait_group[0]()
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_exchange4[
     op: StaticString,
     *,
@@ -567,7 +567,7 @@ def fa4_ws_exchange4[
     return acc
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_level0_band[
     band_cols: Int,
 ](o_tmem: UInt32, mut o_band: Array[Scalar[DType.float32], band_cols],):
@@ -645,7 +645,7 @@ def fa4_ws_level0_band[
             o_band[ld * ld_width + i] = c_frag[i]
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_intracta_combine[
     output_type: DType,
     //,
@@ -892,7 +892,7 @@ def fa4_ws_intracta_combine[
     return (m, l_acc)
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_level1_combine[
     m_pack: Int,
     rows: Int,
@@ -1068,7 +1068,7 @@ def fa4_ws_level1_combine[
     return (m, l_acc)
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_level2_reduce_scatter_write[
     output_type: DType,
     //,
@@ -1296,7 +1296,7 @@ def fa4_ws_level2_reduce_scatter_write[
     return (ret_m, ret_l)
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_intracta_combine_partial[
     m_pack: Int,
     rows: Int,
@@ -1346,7 +1346,7 @@ def fa4_ws_intracta_combine_partial[
     return (m_wg, l_wg)
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_level2_combine_partial[
     m_pack: Int,
     rows: Int,
@@ -1439,7 +1439,7 @@ def fa4_ws_level2_combine_partial[
     return (ret_m, ret_l)
 
 
-@always_inline
+@inline(.always)
 def fa4_ws_splitk_reduce_scatter_write[
     output_type: DType,
     //,
@@ -1567,7 +1567,7 @@ def fa4_ws_splitk_reduce_scatter_write[
     named_barrier[Int32(WARPGROUP_SIZE)](Int32(0))
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def reduce_scatter_p[P_static: Int]():
         comptime bpp = ceildiv(m_pack, P_static)
         var e = elect()
@@ -1705,7 +1705,7 @@ def fa4_ws_splitk_reduce_scatter_write[
     reduce_scatter_p[P]()
 
 
-@always_inline
+@inline(.always)
 def fa4_tma_store_o_smem[
     output_type: DType,
     //,
@@ -1767,7 +1767,7 @@ def fa4_tma_store_o_smem[
     cp_async_bulk_wait_group[0]()
 
 
-@always_inline
+@inline(.always)
 def fa4_splitk_stage_partial[
     band_cols: Int,
     //,
@@ -1944,7 +1944,7 @@ def fa4_splitk_stage_partial[
                     (stage_smem + UInt32(fblk * BM * F) + row_F).store(vblk[sb])
 
 
-@always_inline
+@inline(.always)
 def fa4_splitk_combine_write[
     output_type: DType,
     band_cols: Int,
@@ -2200,7 +2200,7 @@ def fa4_splitk_combine_write[
     cp_async_bulk_wait_group[0]()
 
 
-@always_inline
+@inline(.always)
 def fa4_splitk_reduce_scatter_write[
     output_type: DType,
     //,
@@ -2282,7 +2282,7 @@ def fa4_splitk_reduce_scatter_write[
     # trailing bands, both of which are already handled below.
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def reduce_scatter_p[P_static: Int]():
         comptime bpp = ceildiv(iters_total, P_static)
         comptime for p_static in range(P_static):
@@ -2400,7 +2400,7 @@ def fa4_splitk_reduce_scatter_write[
     reduce_scatter_p[P]()
 
 
-@always_inline
+@inline(.always)
 def fa4_softmax[
     QScaleType: OptionalPointer,
     KScaleType: OptionalPointer,
@@ -2711,7 +2711,7 @@ def fa4_softmax[
     ) * Float32(0.001)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def mask_row[
         BN: Int, //, mask_strategy: MaskStrategy
     ](mut s: Array[Scalar[accum_dtype], BN], kv_row: UInt32):
@@ -2780,7 +2780,7 @@ def fa4_softmax[
         ws_o_row_off = ws_part_idx * ws_num_rows_q
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _ws_write_lse(mx: Scalar[accum_dtype], sm: Scalar[accum_dtype]):
         # Store this thread's fused per-row LSE (log2 domain) into
         # `ws_lse_ptr[p, token_row, q_head]` (layout [P, num_rows_q,
@@ -2857,7 +2857,7 @@ def fa4_softmax[
     comptime max_unroll = 8
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def apply_k_scale[
         N: Int, //, offset: Int
     ](mut s0: Array[Float32, N], k_scale_off: UInt32):
@@ -2873,7 +2873,7 @@ def fa4_softmax[
                 s0[n + 1] = sn[1]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_mask_max_impl[
         *, mask_strategy: MaskStrategy
     ](kv_row: UInt32) -> StaticTuple[Float32, max_unroll]:
@@ -2964,14 +2964,14 @@ def fa4_softmax[
         return vrow_max
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def init_load_mask_max[
         mask_strategy: MaskStrategy
     ](kv_row: UInt32) -> Float32:
         return maximum(load_mask_max_impl[mask_strategy=mask_strategy](kv_row))
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_mask_max[
         mask_strategy: MaskStrategy
     ](kv_row: UInt32, old_max: Float32) -> Float32:
@@ -2985,7 +2985,7 @@ def fa4_softmax[
     # max (no `old_max` fusion) so one reduction feeds both the running max
     # and the BLASST vote.
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_mask_tile_max[
         mask_strategy: MaskStrategy
     ](kv_row: UInt32) -> StaticTuple[Float32, max_unroll]:
@@ -2994,7 +2994,7 @@ def fa4_softmax[
         return load_mask_max_impl[mask_strategy=mask_strategy](kv_row)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_exp(max_term: Float32) -> f32x2:
         comptime exp_simd = 2
         comptime vs_len = score_cols // exp_simd  # score_cols // 2
@@ -3014,12 +3014,12 @@ def fa4_softmax[
         comptime assert (score_cols % exp_simd) == 0
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def s_load[i: Int]() -> f32x2:
             return f32x2(s[2 * i], s[2 * i + 1])
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def s_store[i: Int](v: f32x2):
             s[2 * i] = v[0]
             s[2 * i + 1] = v[1]
@@ -3048,7 +3048,7 @@ def fa4_softmax[
             vneg_max_scaled = f32x2(0)  # unused
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def score_to_logit(score: f32x2) -> f32x2:
             comptime if use_fma:
                 return fma_ftz(score, vscale, vneg_max_scaled)
@@ -3110,7 +3110,7 @@ def fa4_softmax[
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def exp_iter[idx: Int]():
             comptime if idx < vs_len // score_to_logit_ratio:
                 comptime for i in range(score_to_logit_ratio):
@@ -3383,7 +3383,7 @@ def fa4_softmax[
     # row-sum, but reproduces every barrier arrival so the MMA and correction
     # warps stay in lockstep.
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_exp_skip():
         # Match store_exp's tail ordering (no P store to fence, but keep the
         # same tcgen05 wait/fence discipline before releasing S-consumer).
@@ -3819,7 +3819,7 @@ def fa4_softmax[
     var ws_exchange_seq: UInt32 = 0
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def sk_shared_max(m: Float32) -> Float32:
         """Shared-key: agree the running row max across the warpgroup's warps.
 
@@ -3916,7 +3916,7 @@ def fa4_softmax[
         neg_scale_log2e = -scale_log2e
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def neg_scaled_max(m: Float32) -> Float32:
         # `-m*scale_log2e`, with the fp8 `p_fp8_bias` folded in via one fused
         # fma -- so store_exp needs no separate bias add and, since the bias is
@@ -3943,7 +3943,7 @@ def fa4_softmax[
     var blasst_lane0: Bool = (tid % UInt32(32)) == UInt32(0)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def blasst_observe(tile_max: Float32) -> Bool:
         m_true = max_ftz(m_true, tile_max)
         var diff_true = sub_ftz(tile_max, m_true)
@@ -4008,7 +4008,7 @@ def fa4_softmax[
         # `comptime if p_fp8_bias != 0` keeps the bf16 sink expression
         # byte-identical.
         @__parameter
-        @always_inline
+        @inline(.always)
         def sink_mass() -> Float32:
             comptime if use_fma:
                 comptime if p_fp8_bias != 0:
@@ -4273,7 +4273,7 @@ def fa4_softmax[
 
         # wait on the o_pipeline producer
         @__parameter
-        @always_inline
+        @inline(.always)
         def wait_and_write_output():
             o_prod_mbar[warp_group_idx].wait(o_phase)  # consumer wait
             tcgen05_fence_after()  # example 1
@@ -4501,7 +4501,7 @@ def fa4_softmax[
                 )
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def sk_epilogue[single_wg: Bool]():
                     # (M, L) are depth-independent, so every tile computes the
                     # same pair; keep tile 0's. They are carried OUT of the loop

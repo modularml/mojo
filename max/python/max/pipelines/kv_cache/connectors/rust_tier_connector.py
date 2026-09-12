@@ -46,10 +46,8 @@ buffer pointers and compute-stream handles to the Rust connector.
 from __future__ import annotations
 
 import logging
-import tempfile
 import time
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import NamedTuple, Protocol
 
 import psutil
@@ -65,7 +63,6 @@ from max.nn.kv_cache import (
     KVCacheGroupId,
     KVCacheMemory,
     KVCacheParamInterface,
-    KVConnectorConfigInterface,
     KVConnectorType,
 )
 from max.nn.kv_cache.metrics import KVCacheMetrics
@@ -83,76 +80,14 @@ from ..kv_connector import (
 from ..paged_kv_cache.block_manager import (
     _resolve_only_use_kv_connector_last_level_cache,
 )
+from ._offload_dir import OffloadDirectory, acquire_offload_dir
 
 logger = logging.getLogger("max.pipelines")
 
 
-# Prefix for auto-created tiered-connector disk offload directories. Owned by
-# the connectors package (which creates, warns about, and cleans up these
-# dirs); the pipeline config imports it only to name the mkdtemp it creates.
-KV_OFFLOAD_DIR_PREFIX = "max_kv_tiered_"
-
-
-def warn_stale_offload_dirs(offload_dir: str) -> None:
-    """Warns about leftover KV cache offload directories from previous runs.
-
-    The tiered connectors delete their own offload directory on graceful
-    shutdown, but a forceful shutdown (SIGKILL, OOM-kill, or a crash) skips
-    that cleanup and leaves the directory (and its cached blocks) on disk.
-    Scan the sibling directory for such leftovers and warn so operators can
-    reclaim the space.
-
-    Args:
-        offload_dir: The offload directory this run will use. Its siblings
-            matching ``{KV_OFFLOAD_DIR_PREFIX}*`` are treated as leftovers.
-    """
-    parent = Path(offload_dir).parent
-    try:
-        stale = sorted(
-            str(p)
-            for p in parent.glob(f"{KV_OFFLOAD_DIR_PREFIX}*")
-            if p.is_dir() and str(p) != offload_dir
-        )
-    except OSError:
-        return
-    if not stale:
-        return
-    logger.warning(
-        "Found %d leftover KV cache offload director%s from a previous run "
-        "in %s:\n  %s\n"
-        "MAX Serve deletes its offload directory on graceful shutdown, but a "
-        "forceful shutdown (SIGKILL / OOM-kill) leaves it behind. If no MAX "
-        "Serve process is currently using them, delete these directories to "
-        "reclaim disk space.",
-        len(stale),
-        "y" if len(stale) == 1 else "ies",
-        parent,
-        "\n  ".join(stale),
-    )
-
-
-def _resolve_disk_offload_dir(cfg: KVConnectorConfigInterface) -> str:
-    """Returns the disk offload dir, auto-creating one if unset.
-
-    A single connector serves every DP replica, so the directory is created
-    once here (not per replica). Warns about leftovers from previous runs.
-    """
-    disk_dir = cfg.disk_offload_dir
-    if disk_dir is None:
-        disk_dir = tempfile.mkdtemp(prefix=KV_OFFLOAD_DIR_PREFIX)
-        logger.info(
-            "Tiered connector: auto-created disk offload dir %s",
-            disk_dir,
-        )
-    warn_stale_offload_dirs(disk_dir)
-    return disk_dir
-
-
-def _check_disk_capacity(
-    cache_dir: Path | str, max_disk_size_bytes: int
-) -> None:
+def _check_disk_capacity(cache_dir: str, max_disk_size_bytes: int) -> None:
     """Raises when a disk offload budget exceeds free space at cache_dir."""
-    available_bytes = psutil.disk_usage(str(cache_dir)).free
+    available_bytes = psutil.disk_usage(cache_dir).free
     if max_disk_size_bytes > available_bytes:
         raise RuntimeError(
             "disk_offload_max_gb requests "
@@ -304,14 +239,14 @@ class RustTierConnector(KVConnector):
         host_offload_num_huge_blocks: int,
         host_offload_huge_page_bytes: int,
         host_offload_cache_ratios: Mapping[str, int],
-        disk_cache_dir: str | None,
+        disk_dir: OffloadDirectory | None,
         disk_offload_max_bytes: int,
         num_disk_workers: int = 32,
     ) -> None:
         """Initializes the connector over ``replica_kv_memory``'s device buffers.
 
-        ``disk_cache_dir`` is ``None`` for a host-only connector with no disk
-        last level.
+        Takes ownership of ``disk_dir``, releasing it in :py:meth:`shutdown`.
+        It is ``None`` for a host-only connector with no disk last level.
         """
         # Lazy import: OSS MAX can import this module without the extension.
         from kv_tier_connector import (  # type: ignore[import-not-found]
@@ -343,6 +278,7 @@ class RustTierConnector(KVConnector):
                     )
 
         self._leaves = leaves
+        self._disk_dir = disk_dir
         self._shutdown = False
 
         bytes_per_leaf = [leaf_cache_sizes[leaf_id] for leaf_id in leaves]
@@ -351,7 +287,7 @@ class RustTierConnector(KVConnector):
         ]
 
         only_last_level = _resolve_only_use_kv_connector_last_level_cache()
-        if only_last_level and disk_cache_dir is None:
+        if only_last_level and disk_dir is None:
             # Rust's `only_last_level` skips the host lookup, so with no disk
             # tier it would leave nothing to hit.
             only_last_level = False
@@ -373,7 +309,7 @@ class RustTierConnector(KVConnector):
             replica_memories,
             device_to_stream,
             only_last_level,
-            disk_cache_dir,
+            disk_dir.path if disk_dir is not None else None,
             disk_offload_max_bytes,
             num_disk_workers,
         )
@@ -432,16 +368,13 @@ class RustTierConnector(KVConnector):
         # A zero disk budget means no disk last level. The tier sizes its
         # capacity from the budget, so a 0 that still opened one would disable
         # eviction rather than disable the tier.
-        disk_cache_dir = (
+        disk_dir = (
             None
             if disk_offload_max_bytes == 0
-            else _resolve_disk_offload_dir(cfg)
+            else acquire_offload_dir(cfg.disk_offload_dir)
         )
-        if disk_cache_dir is not None:
-            # A configured dir need not exist yet, and the capacity check below
-            # stats it, so create it before asking how much room it has.
-            Path(disk_cache_dir).mkdir(parents=True, exist_ok=True)
-            _check_disk_capacity(disk_cache_dir, disk_offload_max_bytes)
+        if disk_dir is not None:
+            _check_disk_capacity(disk_dir.path, disk_offload_max_bytes)
 
         leaf_cache_sizes = {
             leaf_id: leaf_buffers.host_bytes_per_page
@@ -459,7 +392,7 @@ class RustTierConnector(KVConnector):
         logger.info(
             "Creating RustTierConnector: "
             f"host_offload_max_bytes={to_human_readable_bytes(host_offload_max_bytes)}, "
-            f"disk_cache_dir={disk_cache_dir or 'disabled (host-only)'}, "
+            f"disk_cache_dir={disk_dir.path if disk_dir else 'disabled (host-only)'}, "
             f"disk_offload_max_bytes={to_human_readable_bytes(disk_offload_max_bytes)}, "
             f"num_disk_workers={cfg.num_disk_workers}"
         )
@@ -482,7 +415,7 @@ class RustTierConnector(KVConnector):
             host_offload_num_huge_blocks=num_huge_blocks,
             host_offload_huge_page_bytes=huge_page_bytes,
             host_offload_cache_ratios=cache_ratios,
-            disk_cache_dir=disk_cache_dir,
+            disk_dir=disk_dir,
             disk_offload_max_bytes=disk_offload_max_bytes,
             num_disk_workers=cfg.num_disk_workers,
         )
@@ -569,6 +502,10 @@ class RustTierConnector(KVConnector):
         self._rust.shutdown()
         # Free the pinned host buffer after all Rust lanes have been drained/stopped.
         _unsafe_free_fast_pinned_buffer(self._host_buffer)
+        # Likewise the offload directory: the Rust shutdown above is what
+        # guarantees no worker is still writing into it.
+        if self._disk_dir is not None:
+            self._disk_dir.release()
 
     @property
     def host_byte_count(self) -> ByteCount:

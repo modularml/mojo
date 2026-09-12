@@ -303,13 +303,31 @@ static std::optional<int> parseArgs(State &state, llvm::opt::InputArgList &args,
   llvm::opt::InputArgList allArgs =
       options.ParseArgs(state.arguments, missingIndex, missingCount);
 
-  // Check for help before doing any other processing.
+  // Check for help before doing any other processing. The emission-kind
+  // table is target-dependent, so it is rendered from the registered
+  // TargetTraits and spliced into the `--emit` option's help block.
+  auto printHelpWithEmissionKinds = [&](std::u8string_view helpText) {
+    std::string text(reinterpret_cast<const char *>(helpText.data()),
+                     helpText.size());
+    std::string table;
+    llvm::raw_string_ostream os(table);
+    printSupportedEmissionKinds(os, /*indent=*/12);
+    size_t emitPos = text.find("--emit <FILE_TYPE>");
+    size_t insertPos = emitPos == std::string::npos
+                           ? std::string::npos
+                           : text.find("\n\n", emitPos);
+    if (insertPos == std::string::npos)
+      text += "\nEMISSION KINDS (--emit):\n" + table;
+    else
+      text.insert(insertPos + 1, table);
+    return state.printHelp(std::string_view(text));
+  };
   if (allArgs.hasArg(options::OPT_help)) {
-    return state.printHelp(
+    return printHelpWithEmissionKinds(
 #include "Build/BuildOptionsHelpText.inc"
     );
   } else if (allArgs.hasArg(options::OPT_help_hidden)) {
-    return state.printHelp(
+    return printHelpWithEmissionKinds(
 #include "Build/BuildOptionsHelpHiddenText.inc"
     );
   }
@@ -433,36 +451,6 @@ static std::optional<int> parseArgs(State &state, llvm::opt::InputArgList &args,
 // Mojo program execution
 //===----------------------------------------------------------------------===//
 
-// What output file type `mojo build` will generate.
-enum class OutputType {
-  // Produce an executable file containing machine code, e.g. a `.exe` on
-  // Windows, or an extensionless binary on Unix-like operating systems.
-  //
-  // Produced by default or when `--emit exe` is specified.
-  executable,
-  // Produce a shared (dynamic) library, with the appropriate file extension
-  // for the OS (.dylib, .so, or .dll).
-  //
-  // Produced when `--emit shared-lib` is specified.
-  sharedLibrary,
-  // Produce an object file(.o) containing machine code.
-  //
-  // Produced when `--emit object` is specified.
-  object,
-  // Produce LLVM IR, with the appropriate file extension (.ll).
-  //
-  // Produced when `--emit llvm` is specified.
-  llvm,
-  // Produce bitcode of LLVM IR, with the appropriate file extension (.bc).
-  //
-  // Produced when `--emit llvm` is specified.
-  llvmBitcode,
-  // Produce assembly code, with the appropriate file extension (.s).
-  //
-  // Produced when `--emit asm` is specified.
-  assembly,
-};
-
 /// Return the output file path for a given extension: the value of `-o` if
 /// provided, otherwise `<input-stem><fileExtension>`.
 static std::string deriveOutputPath(const llvm::opt::InputArgList &args,
@@ -495,27 +483,34 @@ createOutputFile(const State &state, const llvm::opt::InputArgList &args,
   return outFile;
 }
 
+/// The link-step product a kind requests. Every product compiles to
+/// EmitAs::OBJECT first, so EmitAs alone cannot distinguish them.
+enum class LinkProduct { kNone, kExecutable, kSharedLibrary, kObjectFile };
+
 /// Given a module representing a Mojo program, compile the program to a static
 /// archive. Returns an unsuccessful exit code if the archive could not be
 /// created successfully, and nullopt otherwise.
-static std::optional<int> compileModuleToArchive(
-    const State &state, AsyncRT::CPUDevice &cpuDevice, MLIRContext &context,
-    const CompilationOptions &options, OwningOpRef<ModuleOp> module,
-    TargetInfoAttr target, BufferRef &archive, OutputType outputType,
-    const llvm::opt::InputArgList &args, PassManagerConfigOptions pmOptions) {
-  // For --emit=asm and --emit=llvm, set offloadOutputPrefix so
-  // compileOffloads() writes offload kernel files alongside the host output.
-  // These two modes are mutually exclusive; offloadOutputKind selects which
-  // kind to produce. Must be set before runKGENPipeline().
+static std::optional<int>
+compileModuleToArchive(const State &state, AsyncRT::CPUDevice &cpuDevice,
+                       MLIRContext &context, const CompilationOptions &options,
+                       OwningOpRef<ModuleOp> module, TargetInfoAttr target,
+                       BufferRef &archive, LinkProduct product, EmitAs emitAs,
+                       const llvm::opt::InputArgList &args,
+                       PassManagerConfigOptions pmOptions) {
+  // Set offloadOutputPrefix so compileOffloads() writes offload kernel files
+  // alongside the host output; offloadOutputKind selects which kind to
+  // produce. Must be set before runKGENPipeline().
   CompilationOptions effectiveOptions = options;
-  if (outputType == OutputType::assembly || outputType == OutputType::llvm) {
-    llvm::StringRef hostExt = outputType == OutputType::llvm ? ".ll" : ".s";
+  if (emitAs == EmitAs::ASM || emitAs == EmitAs::LLVM ||
+      emitAs == EmitAs::LLVM_OPT_BITCODE) {
+    llvm::StringRef hostExt = emitAs == EmitAs::ASM    ? ".s"
+                              : emitAs == EmitAs::LLVM ? ".ll"
+                                                       : ".bc";
     std::string outPath = deriveOutputPath(args, hostExt);
     llvm::SmallString<256> prefix(outPath);
     llvm::sys::path::replace_extension(prefix, "");
     effectiveOptions.offloadOutputPrefix = prefix.str().str();
-    effectiveOptions.offloadOutputKind =
-        outputType == OutputType::llvm ? EmitAs::LLVM : EmitAs::ASM;
+    effectiveOptions.offloadOutputKind = emitAs;
   }
 
   KGENCompiler compiler(context, effectiveOptions, pmOptions);
@@ -541,22 +536,18 @@ static std::optional<int> compileModuleToArchive(
     arrayAttr.externalize(objectCompiler->getBitcodeLibs());
 
   // Generate a symbol table and an export map for the module post-compile.
+  // "object" needs no check here: objects can be linked as an executable or a
+  // shared library.
   SymbolTable symtab(*module);
-  switch (outputType) {
-  case OutputType::object:
-    // Objects can be linked as a executable or shared library.
-    break;
-  case OutputType::executable:
+  if (product == LinkProduct::kExecutable) {
     if (!symtab.lookup("main"))
       return state.reportError("module does not contain a 'main' function");
-    break;
-  case OutputType::sharedLibrary:
+  } else if (product == LinkProduct::kSharedLibrary) {
     if (symtab.lookup("main"))
       return state.reportError(
           "shared library should not contain a 'main' function");
-    break;
-  case OutputType::llvm:
-  case OutputType::llvmBitcode: {
+  } else if (emitAs == EmitAs::LLVM || emitAs == EmitAs::LLVM_BITCODE ||
+             emitAs == EmitAs::LLVM_OPT_BITCODE) {
     // Compile Module to LLVM IR
     llvm::LLVMContext llvmCtx;
     ErrorOr<std::unique_ptr<llvm::Module>> llvmModuleOr =
@@ -565,8 +556,7 @@ static std::optional<int> compileModuleToArchive(
       return state.reportError(Twine("could not lower funcs to LLVM: ") +
                                llvmModuleOr.getError());
 
-    const std::string fileExtension =
-        outputType == OutputType::llvm ? ".ll" : ".bc";
+    const std::string fileExtension = emitAs == EmitAs::LLVM ? ".ll" : ".bc";
     // Open .ll file
     auto outFile =
         createOutputFile(state, args, /*hasBinaryOutput=*/false, fileExtension);
@@ -575,7 +565,7 @@ static std::optional<int> compileModuleToArchive(
 
     // Print to .ll file
     std::unique_ptr<llvm::Module> llvmModule = llvmModuleOr.takeValue();
-    if (outputType == OutputType::llvmBitcode) {
+    if (emitAs != EmitAs::LLVM) {
       if (ErrorOrSuccess err =
               objectCompiler->emitBitcode(*llvmModule, outFile->os()))
         return state.reportError(err.getError());
@@ -586,8 +576,7 @@ static std::optional<int> compileModuleToArchive(
 
     // Return with success to avoid the link step
     return EXIT_SUCCESS;
-  } break;
-  case OutputType::assembly: {
+  } else if (emitAs == EmitAs::ASM) {
     // Compile Module to Assembly
     auto outFile =
         createOutputFile(state, args, /*hasBinaryOutput=*/false, ".s");
@@ -598,7 +587,6 @@ static std::optional<int> compileModuleToArchive(
       return state.reportError("could not emit assembly");
     outFile->keep();
     return EXIT_SUCCESS;
-  } break;
   }
 
   // Generate an archive for the module.
@@ -642,7 +630,7 @@ static int generateDSYM(const State &state, StringRef binaryOutputPath) {
 ///    archive.
 /// Returns a successful exit code if the executable was linked
 /// successfully, otherwise returns a failure code.
-static int linkOutput(OutputType outputType, const State &state,
+static int linkOutput(LinkProduct product, const State &state,
                       const llvm::opt::InputArgList &args,
                       const CompilationOptions &options, BufferRef &archive) {
   // For now we just use the system C compiler as the linker on non-windows,
@@ -673,26 +661,19 @@ static int linkOutput(OutputType outputType, const State &state,
   // Get the file base name, e.g. `foo` in `foo.mojo`.
   StringRef inputBaseName = inputName.rsplit('.').first;
 
-  std::string defaultOutputName = [outputType, inputBaseName, binaryExt] {
-    switch (outputType) {
-    case OutputType::executable:
-      return (inputBaseName + binaryExt).str();
-    case OutputType::sharedLibrary:
-      // TODO(MOCO-1772):
-      //  Determine this file extension based on the _target_ OS, not the host
-      //  that `mojo` itself was compiled for.
-      // Returns `foo.(so|dylib|dll)` for a source file called `foo.mojo`.
-      return PlatformLibrary::getSharedLibraryName(inputBaseName);
-    case OutputType::llvm:
-      return (inputBaseName + ".ll").str();
-    case OutputType::llvmBitcode:
-      return (inputBaseName + ".bc").str();
-    case OutputType::object:
-      return (inputBaseName + ".o").str();
-    case OutputType::assembly:
-      return (inputBaseName + ".asm").str();
-    }
-  }();
+  // TODO(MOCO-1772):
+  //  Determine the shared-library extension based on the _target_ OS, not the
+  //  host that `mojo` itself was compiled for.
+  // Only the link products reach linkOutput; the codegen kinds return early
+  // from compileModuleToArchive.
+  std::string defaultOutputName;
+  if (product == LinkProduct::kSharedLibrary)
+    defaultOutputName =
+        PlatformLibrary::getSharedLibraryName(inputBaseName); // foo.(so|dll)
+  else if (product == LinkProduct::kObjectFile)
+    defaultOutputName = (inputBaseName + ".o").str();
+  else
+    defaultOutputName = (inputBaseName + binaryExt).str(); // kExecutable
   // Validate this is a valid filename using the `path` ctor.
   defaultOutputName = std::filesystem::path(defaultOutputName).filename();
 
@@ -732,7 +713,7 @@ static int linkOutput(OutputType outputType, const State &state,
     }
   }
 
-  if (outputType == OutputType::object) {
+  if (product == LinkProduct::kObjectFile) {
     if (llvm::Error err = llvm::writeToOutput(outputName, [&](raw_ostream &os) {
           os << archive->getBuffer();
           return llvm::Error::success();
@@ -761,7 +742,7 @@ static int linkOutput(OutputType outputType, const State &state,
 
   // Invoke the linker command.
   SmallVector<StringRef> linkerArgs = [&] {
-    if (outputType == OutputType::executable)
+    if (product == LinkProduct::kExecutable)
       return SmallVector<StringRef>{*linker, archivePath, compilerRTPath};
 
     // Here, we use `--whole-archive` to force every symbol from the `.a` static
@@ -865,7 +846,7 @@ static int linkOutput(OutputType outputType, const State &state,
   if (linkExitCode) {
     if (!errorMsg.empty())
       errorMsg.insert(0, ": ");
-    if (outputType == OutputType::executable)
+    if (product == LinkProduct::kExecutable)
       return state.reportError("failed to link executable" + errorMsg);
     return state.reportError("failed to produce dynamic library" + errorMsg);
   }
@@ -934,26 +915,57 @@ static int build(const State &subcommandState) {
   StringRef emitFileType =
       args.getLastArgValue(options::OPT_emitted_file_type, "exe");
 
-  OutputType outputType = OutputType::executable;
-  if (emitFileType == "exe") {
-    // Link an executable from the archive (default).
-    outputType = OutputType::executable;
-  } else if (emitFileType == "shared-lib") {
-    // We have a static archive at this point, go ahead and turn it into a
-    // dynamic library.
-    outputType = OutputType::sharedLibrary;
-  } else if (emitFileType == "llvm") {
-    outputType = OutputType::llvm;
-  } else if (emitFileType == "llvm-bitcode") {
-    outputType = OutputType::llvmBitcode;
-  } else if (emitFileType == "object") {
-    outputType = OutputType::object;
-  } else if (emitFileType == "asm") {
-    outputType = OutputType::assembly;
-  } else {
-    return state.reportError(
-        Twine("Unrecognized value for `--emit`. Missing case for: ") +
-        emitFileType);
+  // The only place the link products are named.
+  LinkProduct product = llvm::StringSwitch<LinkProduct>(emitFileType)
+                            .Case("exe", LinkProduct::kExecutable)
+                            .Case("shared-lib", LinkProduct::kSharedLibrary)
+                            .Case("object", LinkProduct::kObjectFile)
+                            .Default(LinkProduct::kNone);
+
+  // Resolve what the kind compiles to from the traits that declare it: the
+  // host's for the kinds every target supports, otherwise the accelerator's,
+  // since target-declared kinds are emitted for the accelerator.
+  EmitAs emitAs;
+  {
+    ErrorOr<const TargetTraits *> hostTraitsOr =
+        TargetTraitsRegistry::get().lookup(
+            llvm::Triple(llvm::sys::getDefaultTargetTriple()));
+    const TargetTraits *hostTraits =
+        hostTraitsOr.isError() ? nullptr : *hostTraitsOr;
+    if (hostTraits && hostTraits->supportsEmissionKind(emitFileType)) {
+      emitAs = *hostTraits->emitAsForKind(emitFileType);
+    } else if (isKnownEmissionKind(emitFileType)) {
+      StringRef accel = args.getLastArgValue(options::OPT_target_accelerator);
+      const TargetTraits *traits = traitsForAcceleratorArch(accel);
+      if (!traits && !accel.empty())
+        return state.reportError(Twine("unknown accelerator architecture '") +
+                                 accel +
+                                 "' (see --print-supported-accelerators)");
+      if (!traits)
+        traits = hostTraits;
+      if (!traits)
+        return state.reportError("no target traits registered for the host");
+      ErrorOr<EmitAs> emitAsOr = traits->emitAsForKind(emitFileType);
+      if (emitAsOr.isError())
+        return state.reportError(
+            Twine(emitAsOr.getError()) +
+            "; pass a `--target-accelerator` that supports it "
+            "(see --print-supported-accelerators)");
+      emitAs = *emitAsOr;
+    } else {
+      return state.reportError(
+          Twine("unknown emission kind '") + emitFileType +
+          "' for `--emit`; see the `--emit` section of "
+          "`mojo build --help` for the kinds each target accepts");
+    }
+    // An OBJECT kind that is no link product of this tool is rejected, as is
+    // any EmitAs the tool never writes.
+    if (emitAs == EmitAs::LLVM_OPT ||
+        (emitAs == EmitAs::OBJECT && product == LinkProduct::kNone))
+      return state.reportError(
+          Twine("`--emit ") + emitFileType +
+          "` is not supported by this tool; see the `--emit` section of "
+          "`mojo build --help` for the kinds each target accepts");
   }
 
   // Lower the input file to an MLIR module.
@@ -994,14 +1006,14 @@ static int build(const State &subcommandState) {
   BufferRef archive;
   if (std::optional<int> exitCode = compileModuleToArchive(
           state, cpuDevice, mlirCtx, options, moduleOp.takeValue(), target,
-          archive, outputType, args, timing.passManagerOptions()))
+          archive, product, emitAs, args, timing.passManagerOptions()))
     return *exitCode;
 
   // Check if any warnings were promoted to errors via -Werror.
   if (warningHandler.wasErrorEmitted())
     return EXIT_FAILURE;
 
-  return linkOutput(outputType, state, args, options, archive);
+  return linkOutput(product, state, args, options, archive);
 }
 
 void M::registerBuildSubcommand(SubcommandRegistry &registry) {

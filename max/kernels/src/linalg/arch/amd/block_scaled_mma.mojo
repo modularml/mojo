@@ -111,7 +111,7 @@ struct CDNA4F8F6F4MatrixFormat(Equatable, TrivialRegisterPassable):
         abort("invalid matrix format")
 
 
-@always_inline
+@inline(.always)
 def cdna4_block_scaled_mfma[
     a_scale_byte_index: Int32,
     b_scale_byte_index: Int32,

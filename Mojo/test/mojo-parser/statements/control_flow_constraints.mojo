@@ -30,9 +30,9 @@ struct PStruct[*a: Int](Movable where False):
 # CHECK-LABEL: lit.fn @"double_where_clause
 # CHECK-SAME: {<
 # CHECK-SAME: ::@PStruct::@"predicate()"
-# CHECK-SAME: eq(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<!Int> *"x.a.values``">), 2)), #{{[[:alnum:]]+}}>, <
+# CHECK-SAME: identical(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<!Int> *"x.a.values``">), 2)), #{{[[:alnum:]]+}}>, <
 # CHECK-SAME: ::@PStruct::@"predicate()"
-# CHECK-SAME: eq(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<!Int> *"y.a.values``3">), 2)), #{{[[:alnum:]]+}}>}
+# CHECK-SAME: identical(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<!Int> *"y.a.values``3">), 2)), #{{[[:alnum:]]+}}>}
 def double_where_clause(
     x: PStruct[...], y: PStruct[...]
 ) where type_of(x).predicate() where type_of(y).predicate():

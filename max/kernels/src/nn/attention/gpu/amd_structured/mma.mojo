@@ -64,7 +64,7 @@ struct TiledMmaOp[
     comptime c_frag_size = num_matrix_reg[Self.shape[0], Self.shape[1]]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         swap_a_b: Bool = False
     ](
@@ -124,7 +124,7 @@ struct TiledMmaOp[
                     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_b[
         swizzle: Optional[Swizzle] = None,
     ](
@@ -176,7 +176,7 @@ struct TiledMmaOp[
                 reg_vec[i, 0] = dist[0, 0]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_a[
         swizzle: Optional[Swizzle] = None,
     ](
@@ -270,13 +270,13 @@ struct KVMmaOp[
         address_space=.LOCAL,
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.reg_tile = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._reg_layout
         )
 
-    @always_inline
+    @inline(.always)
     def load_prefill[
         bk_tile: Int
     ](
@@ -310,7 +310,7 @@ struct KVMmaOp[
         comptime for i in range(total_frags):
             dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](frags[Int(i)])
 
-    @always_inline
+    @inline(.always)
     def load_prefill_split[
         bk_tile: Int,
         has_hi: Bool,
@@ -400,7 +400,7 @@ struct KVMmaOp[
             var joined = lo.join(hi)
             dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](joined)
 
-    @always_inline
+    @inline(.always)
     def mma_tile_at[
         bk_tile: Int, kg: Int
     ](self) -> TileTensor[
@@ -423,7 +423,7 @@ struct KVMmaOp[
             bk_tile, 0
         ).tile[Self.num_mmas, Self.input_frag_size](kg, 0)
 
-    @always_inline
+    @inline(.always)
     def load_v_bf16[
         bk_tile: Int
     ](
@@ -546,7 +546,7 @@ struct KVMmaOp[
                     ]().vectorize[1, Self.input_frag_size]()
                     dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](frag)
 
-    @always_inline
+    @inline(.always)
     def load_v_fp8_strip[
         bk_tile: Int
     ](
@@ -604,7 +604,7 @@ struct KVMmaOp[
             )
             dst[Int(dt), 0] = rebind[type_of(dst[Int(dt), 0])](joined)
 
-    @always_inline
+    @inline(.always)
     def mma[
         swap_a_b: Bool = False,
     ](

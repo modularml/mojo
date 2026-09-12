@@ -756,7 +756,7 @@ public:
       funcOp.setConvergent(true);
 
     // Propagate InlineLevel as a passthrough LLVM attribute.
-    convertInlineLevel(funcOp, func.getInlineLevel());
+    convertInlineLevel(funcOp, inlineLevelOrAutomatic(func.getInlineLevel()));
 
     // Mark abi("C") functions so ConvertKGENCall can identify them via
     // symbol lookup regardless of conversion order.

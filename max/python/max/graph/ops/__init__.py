@@ -62,6 +62,7 @@ from . import (
 from .allgather import allgather
 from .allgather_rms_norm import (
     allgather_rms_norm,
+    allgather_rms_norm_quant_mxfp6,
     allgather_rms_norm_quant_mxfp8,
 )
 from .argsort import argsort

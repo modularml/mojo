@@ -50,10 +50,7 @@ def log_pipeline_info(
         ValueError: If no architecture is found for the model. This should not
             happen after config resolution.
     """
-    arch = PIPELINE_REGISTRY.retrieve_architecture(
-        architecture_name=pipeline_config.models.main_architecture_name,
-        prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
-    )
+    arch = PIPELINE_REGISTRY.architecture_for_config(pipeline_config)
 
     if arch is None:
         raise ValueError(
@@ -89,6 +86,10 @@ def log_pipeline_info(
             (
                 "in_flight_batching",
                 pipeline_config.runtime.enable_in_flight_batching,
+            ),
+            (
+                "spec_decode_mixed_batches",
+                pipeline_config.runtime.enable_spec_decode_mixed_batches,
             ),
         ]
     )
@@ -134,10 +135,7 @@ def log_basic_config(
         ValueError: If no architecture is found for the model. This should not
             happen after config resolution.
     """
-    arch = PIPELINE_REGISTRY.retrieve_architecture(
-        architecture_name=pipeline_config.models.main_architecture_name,
-        prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
-    )
+    arch = PIPELINE_REGISTRY.architecture_for_config(pipeline_config)
 
     if arch is None:
         model_path = (

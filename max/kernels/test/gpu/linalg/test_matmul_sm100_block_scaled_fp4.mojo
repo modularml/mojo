@@ -47,7 +47,7 @@ from linalg.fp4_utils import (
     set_scale_factor,
 )
 from std.random import random_ui64
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 
@@ -260,7 +260,7 @@ def _test_blackwell_block_scaled_matmul_tma_umma_warp_specialized_impl[
     # invoked — if TileWriter skips the lambda the result will be 1x, not 2x,
     # and the comparison against 2x reference will fail.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_device_lt)
     def epilogue_fn[
         _dtype: DType,
@@ -367,7 +367,7 @@ def run_matmul_sm100_block_scaled_fp4_suite[
         # Wrapper which forwards suite-level scales_dtype, SF_VECTOR_SIZE,
         # and scaling_kind, so call sites don't have to pass them explicitly.
         @__parameter
-        @always_inline
+        @inline(.always)
         def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
             MType: CoordLike,
             NType: CoordLike,

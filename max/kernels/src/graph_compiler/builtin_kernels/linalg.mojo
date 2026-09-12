@@ -261,7 +261,7 @@ struct Matmul:
         comptime transposed_a = False
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def epilogue_fn[
             _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[_dtype, _width]):
@@ -271,7 +271,7 @@ struct Matmul:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_compute_fn[
             _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[_dtype, _width]) -> SIMD[
@@ -336,7 +336,7 @@ struct BatchMatmul:
         var c_tile = c.to_tile_tensor[.int64]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn[
             _type: DType, _width: SIMDLength, _rank: Int, *, alignment: Int = 1
         ](coords: IndexList[_rank], val: SIMD[_type, _width]):
@@ -454,7 +454,7 @@ struct LinalgBandPart:
         exclude: InputTensor[rank=1, ...],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, _rank: Int
         ](coords: IndexList[_rank]) {var input} -> SIMD[output.dtype, width]:
@@ -481,7 +481,7 @@ struct Struct_grouped_matmul_ragged:
     """Registers the `mo.grouped.matmul.ragged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -518,7 +518,7 @@ struct Struct_grouped_matmul_block_scaled:
     operations used in Mixture of Experts (MoE) layers on SM100 GPUs.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -609,7 +609,7 @@ struct Struct_grouped_matmul_swiglu_nvfp4:
     `sigma(2i)=i, sigma(2i+1)=D+i` (where `D = moe_dim`, `N = 2D`).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -704,7 +704,7 @@ struct Struct_grouped_matmul_dynamic_scaled_fp8:
     """Registers the `mo.grouped.matmul.dynamic.scaled.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -767,7 +767,7 @@ struct Struct_grouped_matmul_rowwise_dynamic_scaled_fp8:
     NVIDIA SM100 (B200) with a correctness-first naive grouped kernel.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -827,7 +827,7 @@ struct Struct_grouped_matmul_block_scaled_mxfp6[FP6_FORMAT: Int = 0]:
         FP6_FORMAT: 0 selects E2M3, 1 selects E3M2, matching `FP6Format`.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -931,7 +931,7 @@ struct Struct_grouped_matmul_block_scaled_amd[
             (`K` at MXFP8, `K // 2` at MXFP4). Preshuffled-B path only.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1043,7 +1043,7 @@ struct Struct_batched_matmul_dynamic_scaled_fp8:
     """Registers the `mo.batched.matmul.dynamic.scaled.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1096,7 +1096,7 @@ struct Struct_matmul_dynamic_block_scaled:
     """Registers the `mo.matmul.dynamic.block.scaled` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1127,7 +1127,7 @@ struct Struct_matmul_dynamic_block_scaled:
         # so the conversion is correct on both the structured Mojo path (f32
         # accumulator) and the vendor path (`_dtype == c.dtype`).
         @__parameter
-        @always_inline
+        @inline(.always)
         def epilogue_fn[
             _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[_dtype, _width]):
@@ -1137,7 +1137,7 @@ struct Struct_matmul_dynamic_block_scaled:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_compute_fn[
             _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[_dtype, _width]) -> SIMD[
@@ -1189,7 +1189,7 @@ struct Struct_matmul_dynamic_block_scaled_amd[lane_bytes: Int = 16]:
             (`K` at MXFP8, `K // 2` at MXFP4).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1246,7 +1246,7 @@ struct Struct_matmul_dynamic_block_scaled_mxfp6[
             `mxfp6_block_scaled_matmul_amd`.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1293,7 +1293,7 @@ struct Struct_matmul_mxfp4_dequant_fp8:
     """Registers the `mo.matmul.mxfp4.dequant.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1350,7 +1350,7 @@ struct Struct_matmul_weight_only_block_scaled_apple:
     level by the caller (a post-matmul multiply), so it is NOT an input here.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1395,7 +1395,7 @@ struct Struct_matmul_weight_only_scaled_float8_apple:
     bf16 activation, so it is not an input either.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1423,7 +1423,7 @@ struct Struct_matmul_weight_only_scaled_float8_apple:
         )
 
 
-@always_inline
+@inline(.always)
 def _apple_int8_w8a8_dispatch[
     c_type: DType, has_bias: Bool, target: StaticString
 ](
@@ -1498,7 +1498,7 @@ struct Struct_matmul_int8_w8a8_apple:
     name -- the same idiom as `mo.fused_qkv_matmul.ragged.paged{,.bias}`).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1538,7 +1538,7 @@ struct Struct_matmul_int8_w8a8_apple_bias:
     name when a bias is provided, mirroring the FP8 fused-QKV op).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1567,7 +1567,7 @@ struct LayoutTransformMatmulKN2KNkni:
     """Registers the `layout_transform_KN_to_KNkni` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         a_type: DType,
@@ -1601,7 +1601,7 @@ struct LayoutTransformMatmulNK2KNkni:
     """Registers the `layout_transform_NK_to_KNkni` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         a_type: DType,
@@ -1635,7 +1635,7 @@ struct PackMatmulBShapeFunc:
     """Registers the `pack_matmul_b_shape_func` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute(b_input: InputTensor) raises:
         raise Error("Only meant to be used for shape function!")
@@ -1688,7 +1688,7 @@ struct MatmulDynamicScaledFloat8:
     """Registers the `mo.matmul_dynamic_scaled_fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_type: DType,
@@ -1734,7 +1734,7 @@ struct MatmulStaticScaledFloat8:
     """Registers the `mo.matmul_static_scaled_float8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         output_type: DType,
@@ -1768,7 +1768,7 @@ struct MatmulStaticScaledFloat8:
             # wrapper (output.dtype must equal c_type).
             @__parameter
             @__copy_capture(input_scale, weight_scale)
-            @always_inline
+            @inline(.always)
             def scaled_compute_fn[
                 dtype: DType,
                 width: SIMDLength,
@@ -1797,7 +1797,7 @@ struct MatmulStaticScaledFloat8:
 
             @__parameter
             @__copy_capture(output_tt, input_scale, weight_scale)
-            @always_inline
+            @inline(.always)
             def scaled_output_fn[
                 dtype: DType, width: SIMDLength, *, alignment: Int = 1
             ](idx: IndexList[2], val: SIMD[dtype, width]):
@@ -1841,7 +1841,7 @@ struct MergeRaggedTensors:
     """Registers the `mo.merge_ragged_tensors` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1872,7 +1872,7 @@ struct MergeRaggedTensors:
 struct Struct_lora_sgmv_ragged:
     """Registers the `mo.lora_sgmv.ragged` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1911,7 +1911,7 @@ struct Struct_lora_sgmv_qkv_shrink_ragged:
     """Registers the `mo.lora_sgmv.qkv_shrink.ragged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,
@@ -1958,7 +1958,7 @@ struct MatmulSwiGLU:
     elementwise kernel entirely.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -1986,7 +1986,7 @@ struct MatmulSwiGLUBias:
     the up column before ``silu(gate) * up`` is computed.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -2012,7 +2012,7 @@ struct MatmulSwiGLUBias:
 
 @extensibility.register("mo.lora_sgmv.qkv_expand.ragged")
 struct Struct_lora_sgmv_qkv_expand_ragged:
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         q_type: DType,
@@ -2078,7 +2078,7 @@ struct Struct_router_gate_mixed_gemv:
     custom-op parameters. `N` still selects the kernel's `check_bounds_n` guard.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -2144,7 +2144,7 @@ struct Struct_router_gate_mixed_gemv:
         var a_f32_tt = TileTensor(a_f32, row_major(Coord(M, Idx[K])))
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(a_bf16_tt, a_f32_tt)
         def _cast_bf16_to_fp32[width: Int, alignment: Int = 1](idx: Coord):
             var il = coord_to_index_list(idx)
@@ -2182,7 +2182,7 @@ struct Struct_smallm_streaming_matmul:
     batch-config change can never turn into a regression or a failure.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,

@@ -14,7 +14,7 @@
 # Meant to be run on an AVX512 system
 
 from std.math import align_up
-from std.memory import dealloc
+from std.memory import Layout as AllocLayout, dealloc
 from std.sys import align_of, simd_width_of
 
 import std.benchmark
@@ -168,13 +168,21 @@ def main():
     print(K)
 
     # FIXME: Something causes sporadic crashes on intel with TensorBuilder.Build()
-    var a_alloc = alloc[Float32].aligned[alignment](count=M * K).into_managed()
-    var b_alloc = alloc[Float32].aligned[alignment](count=K * N).into_managed()
-    var b_packed_alloc = (
-        alloc[Float32].aligned[alignment](count=K * N).into_managed()
-    )
-    var c_alloc = alloc[Float32].aligned[alignment](count=M * N).into_managed()
-    var c2_alloc = alloc[Float32].aligned[alignment](count=M * N).into_managed()
+    var a_alloc = alloc(
+        AllocLayout[Float32, alignment=.of_bytes[alignment]()](count=M * K)
+    ).into_managed()
+    var b_alloc = alloc(
+        AllocLayout[Float32, alignment=.of_bytes[alignment]()](count=K * N)
+    ).into_managed()
+    var b_packed_alloc = alloc(
+        AllocLayout[Float32, alignment=.of_bytes[alignment]()](count=K * N)
+    ).into_managed()
+    var c_alloc = alloc(
+        AllocLayout[Float32, alignment=.of_bytes[alignment]()](count=M * N)
+    ).into_managed()
+    var c2_alloc = alloc(
+        AllocLayout[Float32, alignment=.of_bytes[alignment]()](count=M * N)
+    ).into_managed()
 
     var a = TileTensor(a_alloc.unsafe_ptr(), row_major[M, K]())
 

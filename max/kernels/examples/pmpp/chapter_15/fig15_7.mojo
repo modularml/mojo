@@ -18,7 +18,7 @@ comptime tM = 8
 comptime tN = 4
 
 
-@always_inline
+@inline(.always)
 def writeTile(
     c: UnsafePointer[Float32, MutAnyOrigin],
     ldc: Int,

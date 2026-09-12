@@ -53,7 +53,7 @@ from nn.topk_bitonic import (
 )
 
 
-@always_inline
+@inline(.always)
 def _mix64(x: UInt64) -> UInt64:
     """SplitMix64's finalizer."""
     var z = x
@@ -62,18 +62,18 @@ def _mix64(x: UInt64) -> UInt64:
     return z ^ (z >> 31)
 
 
-@always_inline
+@inline(.always)
 def _u01(i: UInt64) -> Float64:
     var h = _mix64((i + 1) * 0x9E3779B97F4A7C15)
     return Float64(h >> 11) * (1.0 / 9007199254740992.0)
 
 
-@always_inline
+@inline(.always)
 def _u_val(r: Int, c: Int, N: Int, k: Int) -> Float64:
     return _u01(((UInt64(r) * UInt64(N) + UInt64(c)) << 2) + UInt64(k))
 
 
-@always_inline
+@inline(.always)
 def _u_len(r: Int) -> Float64:
     return _u01(0x8000000000000000 + UInt64(r))
 
@@ -121,7 +121,7 @@ def _launch[
     comptime if unordered:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def resident[res_vecs: Int]() raises:
             ctx.enqueue_function[
                 _histsel_resident_kernel[

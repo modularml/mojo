@@ -14,7 +14,7 @@ from std.sys.info import CompilationTarget, simd_width_of
 from std.sys.intrinsics import llvm_intrinsic
 
 
-@always_inline
+@inline(.always)
 def roundeven_to_int32[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[.int32, simd_width]:

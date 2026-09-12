@@ -33,13 +33,14 @@ from max.experimental.nn.module import (
     module_dataclass,
 )
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
     PlacementMapping,
     Replicated,
     Sharded,
+    TensorLayout,
 )
-from max.experimental.sharding.types import DistributedTensorType
-from max.experimental.tensor import Tensor, TensorType, defaults
+from max.experimental.tensor import Tensor, defaults
 from max.experimental.testing import assert_all_close
 
 
@@ -546,7 +547,7 @@ def test_compile_with_weights_auto_cast_false_arg_disables() -> None:
 
     module = SimpleModule(weight=Tensor.zeros([3, 3], dtype=DType.bfloat16))
     _, device = defaults()
-    input_type = TensorType(DType.bfloat16, [3, 3], device=device)
+    input_type = TensorLayout(DType.bfloat16, [3, 3], device=device)
     weights = {"weight": Tensor.ones([3, 3], dtype=DType.float32)}
 
     with pytest.raises(ValueError, match="not assignable"):
@@ -572,7 +573,7 @@ def test_load_state_dict_unwhitelisted_float_dtype_still_raises() -> None:
 
 def test_compile(test_module: TestModule) -> None:
     dtype, device = defaults()
-    type = TensorType(dtype, ["batch", "n"], device=device)
+    type = TensorLayout(dtype, ["batch", "n"], device=device)
     compiled = test_module.compile(type)
 
     input = random.uniform([3, 3])
@@ -592,7 +593,7 @@ def test_compile_with_weights_shape_mismatch() -> None:
 
     module = SimpleModule(weight=Tensor.zeros([3, 3], dtype=DType.float32))
     dtype, device = defaults()
-    type = TensorType(dtype, [3, 3], device=device)
+    type = TensorLayout(dtype, [3, 3], device=device)
     weights = {
         "weight": Tensor.zeros([4, 4], dtype=DType.float32),
     }
@@ -611,7 +612,7 @@ def test_compile_with_weights_dtype_mismatch() -> None:
 
     module = SimpleModule(weight=Tensor.zeros([3, 3], dtype=DType.float32))
     dtype, device = defaults()
-    type = TensorType(dtype, [3, 3], device=device)
+    type = TensorLayout(dtype, [3, 3], device=device)
     weights = {
         "weight": Tensor.zeros([3, 3], dtype=DType.int32),
     }
@@ -634,7 +635,7 @@ def test_compile_with_weights_safe_cast(
 
     module = SimpleModule(weight=Tensor.zeros([3, 3], dtype=DType.bfloat16))
     _, device = defaults()
-    input_type = TensorType(DType.bfloat16, [3, 3], device=device)
+    input_type = TensorLayout(DType.bfloat16, [3, 3], device=device)
     weights = {"weight": Tensor.ones([3, 3], dtype=DType.float32)}
 
     with caplog.at_level(logging.WARNING, logger=_AUTO_CAST_LOGGER):
@@ -655,7 +656,7 @@ def test_compile_with_weights_missing_parameter_raises() -> None:
 
     module = SimpleModule(weight=Tensor.zeros([3, 3], dtype=DType.float32))
     dtype, device = defaults()
-    type = TensorType(dtype, [3, 3], device=device)
+    type = TensorLayout(dtype, [3, 3], device=device)
 
     with pytest.raises(KeyError, match="is missing"):
         module.compile(type, weights={})
@@ -664,7 +665,7 @@ def test_compile_with_weights_missing_parameter_raises() -> None:
 def test_compile_with_weights(lazy_test_module: TestModule) -> None:
     test_module = lazy_test_module
     dtype, device = defaults()
-    type = TensorType(dtype, ["batch", "n"], device=device)
+    type = TensorLayout(dtype, ["batch", "n"], device=device)
 
     parameters = weakref.WeakValueDictionary(test_module.parameters)
 
@@ -695,13 +696,12 @@ def test_compile_with_weights_never_realized(
 ) -> None:
     test_module = lazy_test_module
     dtype, device = defaults()
-    type = TensorType(dtype, ["batch", "n"], device=device)
+    type = TensorLayout(dtype, ["batch", "n"], device=device)
 
     parameters = weakref.WeakValueDictionary(test_module.parameters)
 
     weights = {
-        name: Tensor.zeros_like(param.type)
-        for name, param in test_module.parameters
+        name: Tensor.zeros_like(param) for name, param in test_module.parameters
     }
 
     assert not any(param.real for param in parameters.values())
@@ -876,8 +876,8 @@ def test_compile_shards_single_device_weight_in_graph() -> None:
     # reduces over every element rather than only the last axis.
     expected = (x @ w).reshape([16])
 
-    input_type = DistributedTensorType(
-        _F32, ["batch", 4], _MESH, (Replicated(),)
+    input_type = TensorLayout(
+        _F32, ["batch", 4], DeviceMapping(_MESH, (Replicated(),))
     )
     replicated_x = F.transfer_to(x, _REPLICATED)
 
@@ -940,7 +940,7 @@ def test_compile_with_custom_extensions(
     device = CPU()
     dtype = DType.float32
     module = CustomAddModule(bias=Tensor.ones([64], dtype=dtype, device=device))
-    input_type = TensorType(dtype, [64], device=device)
+    input_type = TensorLayout(dtype, [64], device=device)
 
     compiled = module.compile(
         input_type,
@@ -990,7 +990,7 @@ def test_compile_with_custom_extensions_struct_params(
     device = CPU()
     dtype = DType.float32
     module = StructParamModule(_kernel_name=kernel_name, _parameters=parameters)
-    input_type = TensorType(dtype, [64], device=device)
+    input_type = TensorLayout(dtype, [64], device=device)
 
     compiled = module.compile(
         input_type,

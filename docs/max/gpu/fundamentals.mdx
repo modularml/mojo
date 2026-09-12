@@ -326,7 +326,7 @@ threads executing the kernel using the following structures:
 :::note
 
 All of these dimensions and indices are
-[`Int`](https://mojolang.org/docs/std/builtin/simd/#int) values.
+[`Int`](https://mojolang.org/docs/std/simd/#int) values.
 
 :::
 
@@ -497,7 +497,7 @@ that conform to the `DevicePassable` trait.
 
 | Host type                                                                    | Device Type                                                                        | Description                                                                                         |
 |------------------------------------------------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| [`SIMD[dtype, width]`](https://mojolang.org/docs/std/builtin/simd/SIMD/)     | `SIMD[dtype, width]`                                                               | Small vector backed by a hardware vector element                                                    |
+| [`SIMD[dtype, width]`](https://mojolang.org/docs/std/simd/SIMD/)             | `SIMD[dtype, width]`                                                               | Small vector backed by a hardware vector element                                                    |
 | [`DeviceBuffer[dtype]`](/api/mojo/max/gpu/host/device_context/DeviceBuffer/) | [`Pointer[SIMD[dtype, 1]]`](https://mojolang.org/docs/std/memory/pointer/Pointer/) | Memory buffer of `dtype` values                                                                     |
 | [`TileTensor`](/api/mojo/layout/tile_tensor/TileTensor/)                     | `TileTensor`                                                                       | A powerful abstraction for multi-dimensional data. See [Using `TileTensor`](/tile-tensor/tensors/). |
 
@@ -550,8 +550,8 @@ method creates a `DeviceBuffer` associated with that `DeviceContext`. It accepts
 the data type as a compile-time
 [`DType`](https://mojolang.org/docs/std/builtin/dtype/DType/) parameter and the
 size of the buffer as a run-time argument. So to create a buffer for 1,024
-[`Float32`](https://mojolang.org/docs/std/builtin/simd/#float32) values, you
-would execute:
+[`Float32`](https://mojolang.org/docs/std/simd/#float32) values, you would
+execute:
 
 ```mojo
 var device_buffer = ctx.enqueue_create_buffer[.float32](1024)

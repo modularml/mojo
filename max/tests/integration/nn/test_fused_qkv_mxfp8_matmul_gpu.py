@@ -222,24 +222,8 @@ def _run_path(
         ],
     ) as graph:
         layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
-        (
-            a,
-            input_row_offsets,
-            wqkv,
-            blocks,
-            cache_lengths,
-            lookup_table,
-            max_prompt_length,
-            max_cache_length,
-            *_rest,
-        ) = graph.inputs
-        kv_collection = PagedCacheValues(
-            blocks.buffer,
-            cache_lengths.tensor,
-            lookup_table.tensor,
-            max_prompt_length.tensor,
-            max_cache_length.tensor,
-        )
+        a, input_row_offsets, wqkv, *kv_inputs = graph.inputs
+        kv_collection = kv_params.unflatten_kv_inputs(iter(kv_inputs)).inputs[0]
         q_out = _build_qkv_value(
             is_mxfp8=is_mxfp8,
             a=a.tensor,
@@ -490,20 +474,10 @@ def test_fused_qkv_index_mxfp8_matmul_fp8_main_cache() -> None:
                 scales_type=DType.float8_e8m0fnu,
                 out_type=DType.float8_e4m3fn,
             )
-            main_kv = PagedCacheValues(
-                main_in[0].buffer,
-                main_in[1].tensor,
-                main_in[2].tensor,
-                main_in[3].tensor,
-                main_in[4].tensor,
-            )
-            index_kv = PagedCacheValues(
-                index_in[0].buffer,
-                index_in[1].tensor,
-                index_in[2].tensor,
-                index_in[3].tensor,
-                index_in[4].tensor,
-            )
+            main_kv = main_params.unflatten_kv_inputs(iter(main_in)).inputs[0]
+            index_kv = index_params.unflatten_kv_inputs(iter(index_in)).inputs[
+                0
+            ]
             q, index_q = _fused_qkv_index_ragged_matmul_scaled_mxfp8(
                 main_params,
                 index_params,
@@ -661,20 +635,10 @@ def test_fused_qkv_index_mxfp8_matmul_amd_stacked(
             a, iro, wqkv, *rest = graph.inputs
             main_in, index_in = rest[:n_main], rest[n_main:]
             layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
-            main_kv = PagedCacheValues(
-                main_in[0].buffer,
-                main_in[1].tensor,
-                main_in[2].tensor,
-                main_in[3].tensor,
-                main_in[4].tensor,
-            )
-            index_kv = PagedCacheValues(
-                index_in[0].buffer,
-                index_in[1].tensor,
-                index_in[2].tensor,
-                index_in[3].tensor,
-                index_in[4].tensor,
-            )
+            main_kv = main_params.unflatten_kv_inputs(iter(main_in)).inputs[0]
+            index_kv = index_params.unflatten_kv_inputs(iter(index_in)).inputs[
+                0
+            ]
             # On AMD this returns rank-2 [N, K // 32] E8M0 scales -- the
             # checkpoint layout, which the CDNA4 matmul consumes uninterleaved.
             w_q, w_scales = quantize_dynamic_block_scaled(

@@ -10,6 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# ===---------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===---------------------------------------------------------------------=== #
 """Unit tests for the GPQA logit-shift gate."""
 
 from __future__ import annotations
@@ -28,6 +40,7 @@ from calibration.gpqa_gate import (
     score_spec,
     solve_repeats,
     subset_ids,
+    subset_park_rates,
 )
 from calibration.gpqa_logit_gate import run_gate
 
@@ -82,13 +95,20 @@ def test_solve_repeats_toy_coin() -> None:
 
 
 def _write_results(
-    path: Path, n_rows: int, *, n_trunc: int, n_wrong: int
+    path: Path,
+    n_rows: int,
+    *,
+    n_trunc: int,
+    n_wrong: int,
+    prompt_ids: list[int] | None = None,
 ) -> Path:
+    ids = prompt_ids if prompt_ids is not None else list(range(15))
+    n_ids = len(ids)
     lines = [
         json.dumps(
             {
-                "prompt_index": i % 15,
-                "repeat_index": i // 15,
+                "prompt_index": ids[i % n_ids],
+                "repeat_index": i // n_ids,
                 "finish_reason": "length" if i < n_trunc else "stop",
                 "correct": i >= n_wrong,
             }
@@ -124,7 +144,11 @@ def test_verdict_requires_both_metrics(tmp_path: Path) -> None:
     assert scored.acc_cutoff is not None
     ok = score_results(
         _write_results(
-            tmp_path / "pass.jsonl", scored.cost, n_trunc=0, n_wrong=0
+            tmp_path / "pass.jsonl",
+            scored.cost,
+            n_trunc=0,
+            n_wrong=0,
+            prompt_ids=scored.spec.prompt_ids,
         ),
         scored,
     )
@@ -135,6 +159,7 @@ def test_verdict_requires_both_metrics(tmp_path: Path) -> None:
             scored.cost,
             n_trunc=scored.stop_cutoff + 1,
             n_wrong=0,
+            prompt_ids=scored.spec.prompt_ids,
         ),
         scored,
     )
@@ -145,6 +170,7 @@ def test_verdict_requires_both_metrics(tmp_path: Path) -> None:
             scored.cost,
             n_trunc=0,
             n_wrong=scored.acc_cutoff + 1,
+            prompt_ids=scored.spec.prompt_ids,
         ),
         scored,
     )
@@ -159,6 +185,7 @@ def test_verdict_ignores_disabled_metric(tmp_path: Path) -> None:
             scored.cost,
             n_trunc=0,
             n_wrong=scored.cost,
+            prompt_ids=scored.spec.prompt_ids,
         ),
         scored,
     )
@@ -170,6 +197,7 @@ def test_verdict_ignores_disabled_metric(tmp_path: Path) -> None:
             scored.cost,
             n_trunc=(scored.stop_cutoff or 0) + 1,
             n_wrong=0,
+            prompt_ids=scored.spec.prompt_ids,
         ),
         scored,
     )
@@ -182,11 +210,12 @@ def test_compare_only_report(tmp_path: Path) -> None:
         work_dir=work, hist_mode="bins", subset="noisy_15", compare_only=True
     )
     report = (work / "REPORT.md").read_text()
+    assert "## Selected" in report
     assert "## Verdict" in report
-    assert "bins:noisy_15" in report
-    assert "plus_bucket" in report
-    assert "per_prompt:ever_trunc" in report
-    assert (work / "plots" / "cost_vs_snr.svg").is_file()
+    assert "## Subset worlds" in report
+    assert "## Configurations" in report
+    assert "`bins:noisy_15`" in report
+    assert "`per_prompt:plus_bucket`" in report
 
 
 def test_compare_only_stop_only_recounts(tmp_path: Path) -> None:
@@ -204,24 +233,6 @@ def test_compare_only_stop_only_recounts(tmp_path: Path) -> None:
     assert selected["n_repeats"] < both.n_repeats
     assert selected["acc_cutoff"] is None
     assert selected["cost"] == selected["n_repeats"] * 15
-    assert "metrics: stop" in (work / "REPORT.md").read_text()
-
-
-def test_compare_only_acc_only_report(tmp_path: Path) -> None:
-    work = tmp_path / "acc"
-    run_gate(
-        work_dir=work,
-        hist_mode="bins",
-        subset="noisy_15",
-        compare_only=True,
-        want_stop=False,
-        include_catalog=False,
-    )
-    selected = json.loads((work / "selected.json").read_text())
-    assert selected["want_stop"] is False
-    assert selected["stop_cutoff"] is None
-    assert (work / "REPORT.md").is_file()
-    assert (work / "plots" / "cost_vs_snr.svg").is_file()
 
 
 def test_smoke_overrides_repeats_and_ids(tmp_path: Path) -> None:
@@ -250,7 +261,11 @@ def test_smoke_overrides_repeats_and_ids(tmp_path: Path) -> None:
 def test_score_existing_jsonl(tmp_path: Path) -> None:
     scored = score_spec(make_spec("bins", "noisy_15"))
     results = _write_results(
-        tmp_path / "results.jsonl", scored.cost, n_trunc=0, n_wrong=0
+        tmp_path / "results.jsonl",
+        scored.cost,
+        n_trunc=0,
+        n_wrong=0,
+        prompt_ids=scored.spec.prompt_ids,
     )
     work = tmp_path / "live"
     run_gate(
@@ -258,7 +273,59 @@ def test_score_existing_jsonl(tmp_path: Path) -> None:
         hist_mode="bins",
         subset="noisy_15",
         results_jsonl=results,
+        model="MiniMaxAI/MiniMax-M3",
+        base_url="http://127.0.0.1:8000/v1",
     )
     payload = json.loads((work / "verdict.json").read_text())
     assert payload["status"] == "pass"
-    assert "✅ pass" in (work / "REPORT.md").read_text()
+    assert payload["acc_status"] == "pass"
+    assert payload["stop_status"] == "pass"
+    assert payload["acc_rate"] == 1.0
+    assert payload["stop_rate"] == 1.0
+    assert payload["model"] == "MiniMaxAI/MiniMax-M3"
+    assert payload["base_url"] == "http://127.0.0.1:8000/v1"
+    report = (work / "REPORT.md").read_text()
+    assert "✅ pass" in report
+    assert "MiniMaxAI/MiniMax-M3" in report
+    assert "http://127.0.0.1:8000/v1" in report
+
+
+def test_subset_park_rates_plus_bucket() -> None:
+    acc_h, acc_r, stop_h, stop_r = subset_park_rates(
+        make_spec("per_prompt", "plus_bucket")
+    )
+    assert acc_h is not None and acc_r is not None
+    assert stop_h is not None and stop_r is not None
+    assert abs(acc_h - 0.681) < 0.002
+    assert abs(acc_r - 0.636) < 0.002
+    assert abs(stop_h - 0.896) < 0.002
+    assert abs(stop_r - 0.861) < 0.002
+
+
+def test_report_splits_acc_and_stop_verdicts(tmp_path: Path) -> None:
+    scored = score_spec(make_spec("per_prompt", "plus_bucket"))
+    assert scored.acc_cutoff is not None
+    results = _write_results(
+        tmp_path / "mixed.jsonl",
+        scored.cost,
+        n_trunc=0,
+        n_wrong=scored.acc_cutoff + 1,
+        prompt_ids=scored.spec.prompt_ids,
+    )
+    work = tmp_path / "mixed"
+    with pytest.raises(SystemExit) as exc:
+        run_gate(
+            work_dir=work,
+            hist_mode="per_prompt",
+            subset="plus_bucket",
+            results_jsonl=results,
+            include_catalog=False,
+        )
+    assert exc.value.code == 1
+    payload = json.loads((work / "verdict.json").read_text())
+    assert payload["status"] == "fail"
+    assert payload["acc_status"] == "fail"
+    assert payload["stop_status"] == "pass"
+    report = (work / "REPORT.md").read_text()
+    assert "❌ fail" in report
+    assert "✅ pass" in report

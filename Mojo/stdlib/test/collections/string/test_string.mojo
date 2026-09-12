@@ -1508,9 +1508,9 @@ def test_uninit_ctor() raises:
     assert_equal(s3._is_inline(), False)
 
 
-def test_as_c_string_slice_empty() raises:
+def test_as_c_string_span_empty() raises:
     var string = String()
-    var cslice = string.as_c_string_slice()
+    var cslice = string.as_c_string_span()
     assert_equal(string.byte_length(), 0)
     assert_true(string.capacity_bytes() > 0)
     # Safe to index `string.byte_length()` as this has a nul terminator
@@ -1520,9 +1520,9 @@ def test_as_c_string_slice_empty() raises:
     assert_true(string.as_bytes() == cslice.as_bytes())
 
 
-def test_as_c_string_slice_inlined() raises:
+def test_as_c_string_span_inlined() raises:
     var string = String("a")
-    var cslice = string.as_c_string_slice()
+    var cslice = string.as_c_string_span()
     # Safe to index `string.byte_length()` as this has a nul terminator
     assert_equal(
         string.as_bytes().unsafe_ptr()[unsafe_offset=string.byte_length()], 0
@@ -1530,9 +1530,9 @@ def test_as_c_string_slice_inlined() raises:
     assert_true(string.as_bytes() == cslice.as_bytes())
 
 
-def test_as_c_string_slice_heap() raises:
+def test_as_c_string_span_heap() raises:
     var string = String("abcdefghijlmnopqrstuvwxyz")
-    var cslice = string.as_c_string_slice()
+    var cslice = string.as_c_string_span()
     # Safe to index `string.byte_length()` as this has a nul terminator
     assert_equal(
         string.as_bytes().unsafe_ptr()[unsafe_offset=string.byte_length()], 0

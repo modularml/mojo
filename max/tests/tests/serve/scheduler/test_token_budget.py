@@ -353,3 +353,97 @@ def test_token_budget__total_context_budget__ce_after_tg() -> None:
         context, request_type=RequestType.CE
     )
     assert status == BudgetStatus.BUDGET_EXHAUSTED
+
+
+def test_token_budget__alignment_cuts_a_whole_prompt_back_to_a_boundary() -> (
+    None
+):
+    # 300 tokens fit the budget outright, but end 44 past a 128-token boundary.
+    budget = ActiveTokenBudget(
+        capacity=1024,
+        allow_chunking=True,
+        applicable_types=[RequestType.CE],
+        align_tokens=128,
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(300, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.CE)
+    assert status == BudgetStatus.BUDGET_AVAILABLE
+    assert context.tokens.active_length == 256
+
+
+def test_token_budget__alignment_moves_a_budget_forced_cut_back() -> None:
+    # The budget alone would cut at 300; the boundary before it is 256.
+    budget = ActiveTokenBudget(
+        capacity=300,
+        allow_chunking=True,
+        applicable_types=[RequestType.CE],
+        align_tokens=128,
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(900, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.CE)
+    assert status == BudgetStatus.BUDGET_REACHED
+    assert context.tokens.active_length == 256
+
+
+def test_token_budget__alignment_leaves_an_aligned_prompt_alone() -> None:
+    budget = ActiveTokenBudget(
+        capacity=1024,
+        allow_chunking=True,
+        applicable_types=[RequestType.CE],
+        align_tokens=128,
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(256, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.CE)
+    assert status == BudgetStatus.BUDGET_AVAILABLE
+    assert context.tokens.active_length == 256
+
+
+def test_token_budget__alignment_never_strands_a_short_prompt() -> None:
+    # No boundary falls inside 100 tokens, so there is nothing to cut back to.
+    budget = ActiveTokenBudget(
+        capacity=1024,
+        allow_chunking=True,
+        applicable_types=[RequestType.CE],
+        align_tokens=128,
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(100, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.CE)
+    assert status == BudgetStatus.BUDGET_AVAILABLE
+    assert context.tokens.active_length == 100
+
+
+def test_token_budget__alignment_does_not_touch_generation() -> None:
+    budget = ActiveTokenBudget(
+        capacity=1024,
+        allow_chunking=True,
+        applicable_types=RequestType.all(),
+        align_tokens=128,
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(300, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.TG)
+    assert status == BudgetStatus.BUDGET_AVAILABLE
+    assert context.tokens.active_length == 300
+
+
+def test_token_budget__alignment_off_by_default() -> None:
+    budget = ActiveTokenBudget(
+        capacity=1024,
+        allow_chunking=True,
+        applicable_types=[RequestType.CE],
+    )
+    context = TextContext(
+        tokens=TokenBuffer(np.ones(300, dtype=np.int64)), max_length=2000
+    )
+    status = budget.status_after_context(context, request_type=RequestType.CE)
+    assert status == BudgetStatus.BUDGET_AVAILABLE
+    assert context.tokens.active_length == 300

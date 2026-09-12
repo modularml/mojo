@@ -40,17 +40,15 @@ qwen3_5_arch = SupportedArchitecture(
     weight_adapters={
         WeightsFormat.safetensors: convert_qwen3_5_state_dict,
     },
-    required_arguments={
-        "enable_prefix_caching": False,  # TODO: Remove when Deltanet supports prefix caching
-    },
+    # Declaring the state leaves is what selects the Jenga pool.
+    checkpoints_recurrent_state=True,
     config=Qwen3_5Config,
     batching=Qwen3_5BatchProcessor,
     multi_gpu_supported=True,
     tool_parser="qwen3_5",
     reasoning_parser="qwen3_5",
     memory_planner=Qwen3_5MemoryPlanner,
-    # Requires Qwen3_5Model.release_warmup_state (SupportsSSMStateWarmup):
-    # each capture-warmup probe claims state pool slots that must be released
-    # before the next probe, or warmup exhausts the pool.
+    # A warmup probe's state pages are freed with its KV, so a sweep of probes
+    # cannot exhaust them.
     supports_device_graph_capture=True,
 )

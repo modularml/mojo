@@ -39,9 +39,9 @@ kgen.generator @nestedRegions() {
 kgen.generator @reorder_asserts() {
   // COM: reorder param decl to before use.
   // CHECK: kgen.param.declare q
-  // CHECK-NEXT: kgen.param.assert <ne(:scalar<index> from_builtin(q), 0)>
+  // CHECK-NEXT: kgen.param.assert <not(identical(:scalar<index> from_builtin(q), 0))>
   // CHECK-NEXT: kgen.param.declare w
-  // CHECK-NEXT: kgen.param.assert <ne(:scalar<index> from_builtin(w), 0)>
+  // CHECK-NEXT: kgen.param.assert <not(identical(:scalar<index> from_builtin(w), 0))>
   // CHECK-NEXT: kgen.param.assert <gt(:scalar<index> from_builtin(w), from_builtin(q))>
   // CHECK-NEXT: kgen.param.assert <lt(:scalar<index> from_builtin(q), from_builtin(w))>
   // CHECK-NEXT: kgen.call @g2
@@ -79,7 +79,7 @@ kgen.generator @reorder_asserts() {
 // CHECK-LABEL: @reorder_asserts_def_in_parent
 kgen.generator @reorder_asserts_def_in_parent<q, w>() {
   // COM: lift param asserts to the top of the current param scope.
-  // CHECK-NEXT: kgen.param.assert <ne(:scalar<index> from_builtin(w), 0)>
+  // CHECK-NEXT: kgen.param.assert <not(identical(:scalar<index> from_builtin(w), 0))>
   // CHECK-NEXT: kgen.param.assert <gt(:scalar<index> from_builtin(w), from_builtin(q))>
   // CHECK-NEXT: kgen.call @g2
   %0 = kgen.call @g2<q, w>() : () -> index

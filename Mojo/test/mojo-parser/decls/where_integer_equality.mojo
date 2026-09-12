@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %parse-mojo-isolated %s -split-input-file | FileCheck %s
 
-# COM: `==` between `Int` parameters emits a lane-wise `eq` over their extracted
-# COM: `_mlir_value` fields, where `==` between type values emits
-# COM: `#kgen.param.identical`. Both are identity assertions for int-like
-# COM: operands, so both feed the equality saturation behind
-# COM: `canDischargeConstraint` -- see `KGEN::getIdentityProposition`.
+# COM: `==` between `Int` parameters compares their extracted `_mlir_value`
+# COM: fields, and scalar int-like `eq` canonicalizes to `#kgen.param.identical`
+# COM: -- the same form type-value `==` already uses. Both feed the equality
+# COM: saturation behind `canDischargeConstraint` via
+# COM: `KGEN::getIdentityProposition`.
 
 
 def needs_equal[N: Int, K: Int]() where N == K:

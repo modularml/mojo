@@ -52,7 +52,7 @@ from std.utils.index import IndexList
 
 
 # Function to handle AMD-specific scheduling
-@always_inline
+@inline(.always)
 # @__parameter
 def amd_scheduling_hints[
     input_type: DType,
@@ -137,7 +137,7 @@ def amd_scheduling_hints[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_dram_32_32_8[
     dst_thread_layout: Layout,
     thread_scope: ThreadScope = ThreadScope.BLOCK,
@@ -253,7 +253,7 @@ struct AMD_MMA[
     ]
 
 
-@always_inline
+@inline(.always)
 def mma[
     k_tile_idx: Int,
     swap_a_b: Bool,
@@ -398,7 +398,7 @@ struct MMATileBuffers[
     # resource.
     var tensor: Self.BridgedTensorType
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tensor: Self.tensor_type,
@@ -436,7 +436,7 @@ struct MMATileBuffers[
         self.global_offset = Self.stride * Self.block_rows * block_idx
         self.tensor = tensor_lt
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared(self):
         """Copy data from thread-local memory to shared memory.
 
@@ -456,7 +456,7 @@ struct MMATileBuffers[
             ](),
         )
 
-    @always_inline
+    @inline(.always)
     def load_from_dram(mut self) -> None:
         """Load data from global memory (DRAM) to thread-local memory."""
         # AMD `buffer_load` `copy_dram_to_local` is `LayoutTensor`-only; bridge
@@ -476,7 +476,7 @@ struct MMATileBuffers[
         self.global_offset += Self.mma_type.BK
         self.gmem_iter._incr()
 
-    @always_inline
+    @inline(.always)
     def get_reg_tile[
         k_tile_idx: Int
     ](self) -> Self.BridgedRegTileType.SplitElementType[
@@ -497,7 +497,7 @@ struct MMATileBuffers[
             Self.mma_type.num_k_tiles
         ]()[k_tile_idx]
 
-    @always_inline
+    @inline(.always)
     def load_tile_from_shared[k_tile_idx: Int, is_a: Bool](self):
         # The MMA fragment register tile stays `LayoutTensor`; bridge + split.
         var reg_k_tile = self.mma_reg_tile.to_layout_tensor().split[
@@ -525,7 +525,7 @@ struct MMATileBuffers[
             )
 
 
-@always_inline
+@inline(.always)
 def compute_relative_error_kernel[
     dtype: DType,
     layout: TensorLayout,
@@ -586,7 +586,7 @@ def compute_relative_error_kernel[
     output[idx, idy] = rel_error
 
 
-@always_inline
+@inline(.always)
 def max_reduce_kernel[
     dtype: DType,
     layout: TensorLayout,

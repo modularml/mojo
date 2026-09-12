@@ -76,10 +76,9 @@ class ChatMessage(BaseModel):
     # TODO: wire sys_prompt_ratio support with "system" role through the
     # multi-turn path.
     role: str
-    # content is always list[TextContentBlock] in prompts produced by this
-    # codebase.  The str variant exists to match the OpenAI spec and to support
-    # _prepend_run_prefix_to_formatted_prompt, which handles both shapes
-    # defensively.
+    # Usually list[TextContentBlock], but not guaranteed: agentic-code passes
+    # plain-string content straight through from its dataset. Consumers that
+    # index or append to content must handle both shapes.
     content: str | list[TextContentBlock | ImageContentBlock]
 
 
@@ -127,6 +126,9 @@ class PixelGenerationSampledRequest(SampledRequest):
 
 MessageSource = Literal["user", "assistant", "system"]
 
+# Which user turn(s) of a multi-turn session get images.
+ImageTurn = Literal["first", "last", "every"]
+
 
 @dataclass
 class SessionMessage:
@@ -134,6 +136,11 @@ class SessionMessage:
     content: str
     num_tokens: int
     delay_until_next_message: float | None = None
+    # An agent-loop round; the wire role is still "user".
+    is_agentic: bool = False
+    # Any image tokens are already counted in `num_tokens`, so consumers
+    # must not add them again.
+    images: list[OpenAIImage] = field(default_factory=list)
 
 
 @dataclass
@@ -144,7 +151,7 @@ class ChatSession:
 
     @property
     def num_turns(self) -> int:
-        """Number of user-initiated turns (model invocations) in the session."""
+        """Model invocations, agent-loop rounds included: the request count."""
         return sum(1 for m in self.messages if m.source == "user")
 
 

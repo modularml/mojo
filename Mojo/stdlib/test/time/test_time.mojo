@@ -23,12 +23,12 @@ from std.time.time import _CTimeSpec
 from std.testing import assert_equal, assert_true, TestSuite
 
 
-@always_inline
+@inline(.always)
 def time_me():
     sleep(1.0)
 
 
-@always_inline
+@inline(.always)
 def time_me_templated[
     dtype: DType,
 ]():

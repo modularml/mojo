@@ -23,7 +23,7 @@ from std.utils.index import Index
 
 
 def bench_scatter(mut m: Bench, spec: ScatterSpec) raises:
-    @always_inline
+    @inline(.always)
     def bench_scatter_wrapper(
         mut b: Bencher, concrete_spec: ScatterSpec
     ) raises {}:
@@ -76,9 +76,9 @@ def bench_scatter(mut bencher: Bencher, spec: ScatterSpec) raises:
         output_alloc.unsafe_ptr(), input_shape
     )
 
-    @always_inline
+    @inline(.always)
     def bench_fn() raises {mut output_tensor, imm}:
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             _dtype: DType, width: SIMDLength
         ](

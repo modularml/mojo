@@ -14,8 +14,6 @@
 from std.collections.string import (
     ImmStringSpan,
     ImmStringSlice,
-    MutStringSpan,
-    MutStringSlice,
 )
 from std.collections.string.string_span import (
     _to_string_list,
@@ -64,10 +62,10 @@ def test_string_span_layout() raises:
     # `llvm::StringRef`
 
     # StringSpan should be two words in size.
-    assert_equal(size_of[StringSpan[MutAnyOrigin]](), 2 * size_of[Int]())
+    assert_equal(size_of[StringSpan[ImmutAnyOrigin]](), 2 * size_of[Int]())
     assert_equal(
-        size_of[StringSlice[MutAnyOrigin]](),
-        size_of[StringSpan[MutAnyOrigin]](),
+        size_of[StringSlice[ImmutAnyOrigin]](),
+        size_of[StringSpan[ImmutAnyOrigin]](),
     )
 
     var string_span = StringSpan("")
@@ -83,15 +81,12 @@ def test_string_span_layout() raises:
 
 
 def test_constructors() raises:
-    def some_func_immut(b: StringSlice[mut=False, ...]) raises:
-        assert_false(b.mut)
-
-    def some_func_mut(b: StringSlice[mut=True, ...]) raises:
-        assert_true(b.mut)
+    def take_string_span(b: StringSlice[_]) raises:
+        comptime assert not type_of(b.as_bytes()).mut
 
     var a = "123"
-    some_func_immut(a)
-    some_func_mut(StringSlice(a))
+    take_string_span(a)
+    take_string_span(StringSlice(a))
 
 
 def test_string_slice_from_string_static_repr() raises:
@@ -103,15 +98,22 @@ def test_string_slice_from_string_static_repr() raises:
     var s1 = String("foo")
     assert_true(is_static_string(s1))
 
-    # Borrowing as immutable doesn't change `s1`
-    var str1 = StringSlice[mut=False, ...](s1)
+    # Borrowing doesn't change `s1`.
+    var str1 = StringSlice(s1)
     assert_equal(str1, "foo")
     assert_true(is_static_string(s1))
 
-    # Borrowing as mutable changes `s1` to a different representation
-    var str2 = StringSlice[mut=True, ...](s1)
-    assert_equal(str2, "foo")
-    assert_false(is_static_string(s1))
+
+def test_string_span_from_shared_heap_string_does_not_copy() raises:
+    var original = String("a long string that uses reference-counted storage")
+    original += "!"
+    assert_true(original._is_ref_counted())
+    var shared = original
+    assert_equal(Int(original.unsafe_ptr()), Int(shared.unsafe_ptr()))
+
+    var span = StringSpan(original)
+    assert_equal(Int(span.unsafe_ptr()), Int(original.unsafe_ptr()))
+    assert_equal(Int(original.unsafe_ptr()), Int(shared.unsafe_ptr()))
 
 
 def test_string_literal_byte_span() raises:
@@ -881,11 +883,6 @@ def test_strip_mutable_chars() raises:
     assert_equal(StringSlice("himojohi").rstrip(chars), "himojo")
     assert_equal(StringSlice("himojohi").strip(chars), "mojo")
 
-    var mut_chars = MutStringSpan(chars)
-    assert_equal(StringSlice("himojohi").lstrip(mut_chars), "mojohi")
-    assert_equal(StringSlice("himojohi").rstrip(mut_chars), "himojo")
-    assert_equal(StringSlice("himojohi").strip(mut_chars), "mojo")
-
     var self_aliasing = StaticString("aabbaa")
     assert_equal(self_aliasing.lstrip(self_aliasing), "")
     assert_equal(self_aliasing.rstrip(self_aliasing), "")
@@ -1211,22 +1208,7 @@ def test_grapheme_indexing() raises:
     assert_equal(StringSlice("👨‍🚀🧑‍🌾क्षि")[grapheme=2], "क्षि")
 
 
-def test_mut_string_slice_alias() raises:
-    def capitalize(s: MutStringSpan[_]):
-        s.as_bytes()[0] -= Byte(ord("a") - ord("A"))
-
-    def capitalize_compat(s: MutStringSlice[_]):
-        capitalize(s)
-
-    var canonical_data = String("hello")
-    var compatibility_data = String("world")
-    capitalize(canonical_data)
-    capitalize_compat(compatibility_data)
-    assert_equal(canonical_data, "Hello")
-    assert_equal(compatibility_data, "World")
-
-
-def test_imm_string_slice_alias() raises:
+def test_immutable_string_span_compatibility_aliases() raises:
     def byte_sum(s: ImmStringSpan[_]) -> Int:
         var total = 0
         for b in s.as_bytes():

@@ -11,6 +11,7 @@ modular_py_library(
         "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        "//max/python/max/pipelines/kv_cache",
         requirement("pydantic"),
         requirement("typing-extensions"),
     ],

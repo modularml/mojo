@@ -478,12 +478,14 @@ def store_k_scale_cache_ragged(
         values=[
             x_k_scale,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
             kv_collection.max_prompt_length,
             kv_collection.max_cache_length,
             kv_collection.kv_scales,
+            kv_collection.scales_page_stride(),
             kv_collection.scales_lookup_table or kv_collection.lookup_table,
             layer_idx,
         ],
@@ -540,6 +542,7 @@ def _rope_split_store_ragged_unfused(
 
     # Store K and V to cache individually.
     kv_blocks = kv_collection.kv_blocks
+    page_stride = kv_collection.values_page_stride()
     cache_lengths = kv_collection.cache_lengths
     lookup_table = kv_collection.lookup_table
     max_prompt_length = kv_collection.max_prompt_length
@@ -550,6 +553,7 @@ def _rope_split_store_ragged_unfused(
         values=[
             xk_rope,
             kv_blocks,
+            page_stride,
             cache_lengths,
             lookup_table,
             input_row_offsets,
@@ -565,6 +569,7 @@ def _rope_split_store_ragged_unfused(
         values=[
             x_v,
             kv_blocks,
+            page_stride,
             cache_lengths,
             lookup_table,
             input_row_offsets,
@@ -2388,7 +2393,15 @@ def kv_cache_store_paged_ragged(
     *,
     key_or_value: int,
 ) -> None:
-    """Stores key or value tensor into the paged KV cache (ragged inputs)."""
+    """Stores key or value tensor into the paged KV cache (ragged inputs).
+
+    Args:
+        kv_collection: The paged KV cache collection to write into.
+        x_cache: The rank-3 tensor of new projections to store.
+        input_row_offsets: Ragged row offsets of shape ``[batch + 1]``.
+        layer_idx: Scalar layer index identifying which layer's cache to write.
+        key_or_value: Whether to store into the key or the value cache.
+    """
     _check_dtype(DType.uint32, input_row_offsets=input_row_offsets)
     _check_rank(3, x_cache=x_cache)
     _check_rank(1, input_row_offsets=input_row_offsets)
@@ -2404,6 +2417,7 @@ def kv_cache_store_paged_ragged(
         values=[
             x_cache,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
@@ -2491,6 +2505,7 @@ def kv_cache_store_paged_padded(
         values=[
             x_cache,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             valid_lengths,
@@ -3389,6 +3404,99 @@ def msa_sparse_attention_ragged_mxfp8(
             "group": group,
             "topk": topk,
             "sparse_block_size": sparse_block_size,
+        },
+    )
+    return results[0].tensor, results[1].tensor
+
+
+def msa_sparse_attention_ragged_mxfp6(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    cache_row_offsets: TensorValue,
+    total_context_length: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    block_indices: TensorValue,
+    *,
+    group: int,
+    topk: int,
+    scale: float,
+    fp6_format: str = "e2m3",
+) -> tuple[TensorValue, TensorValue]:
+    """Computes MiniMax-M3 block-sparse attention, emitting packed MXFP6 + scales.
+
+    AMD (gfx950) variant of :func:`msa_sparse_attention_ragged` whose output
+    is the o_proj-ready MXFP8 activation instead of BF16: quantized data
+    ``[num_rows, n_heads, head_dim]`` in ``float8_e4m3fn`` plus E8M0 block
+    scales ``[num_rows, n_heads * head_dim // 32]`` -- the same pair
+    :func:`quantize_dynamic_block_scaled` produces from the BF16 output, so
+    it feeds :func:`dynamic_block_scaled_matmul_amd` directly and the
+    separate quantize dispatch is skipped. Bit-identical to that unfused
+    pair; on split-K decode shapes the quantize fuses into the reduce and
+    saves a dispatch.
+
+    Args:
+        kv_params: Key-value cache parameters for the main KV cache.
+        input: Query tensor ``[total_q, n_heads, head_dim]`` (prefill) or
+            ``[batch, n_heads, head_dim]`` (decode); dtype matches the KV
+            cache (BF16 or FP8 e4m3).
+        input_row_offsets: Ragged query offsets ``[batch + 1]`` uint32.
+        cache_row_offsets: Ragged valid-cache offsets ``[batch + 1]`` uint32.
+        total_context_length: Total padded cache length for the batch, CPU
+            scalar ``[1]`` uint32.
+        kv_collection: Main paged KV cache (BF16 or FP8 e4m3, no scales).
+        layer_idx: Layer index, uint32, on CPU.
+        block_indices: Selected block ids. Prefill: ``[n_kv_heads, total_q,
+            topk]``; decode: ``[n_kv_heads, batch, topk]``. int32.
+        group: Query heads per kv-head (``n_heads // n_kv_heads``).
+        topk: Number of gathered KV blocks per token.
+        scale: QK scale.
+
+    Returns:
+        The quantized attention output ``[total_q, n_heads, head_dim]``
+        ``float8_e4m3fn`` and its E8M0 block scales ``[total_q,
+        n_heads * head_dim // 32]``.
+    """
+    values = _msa_sparse_attention_ragged_values(
+        input=input,
+        input_row_offsets=input_row_offsets,
+        cache_row_offsets=cache_row_offsets,
+        total_context_length=total_context_length,
+        kv_collection=kv_collection,
+        layer_idx=layer_idx,
+        block_indices=block_indices,
+        topk=topk,
+        scale=scale,
+    )
+
+    row_width = input.shape[1] * input.shape[2]
+    if int(row_width) % _MX_SF_VECTOR_SIZE != 0:
+        raise ValueError(
+            "n_heads * head_dim must be a multiple of"
+            f" {_MX_SF_VECTOR_SIZE}, got {row_width}"
+        )
+
+    results = ops.inplace_custom(
+        "mo.msa.attention.ragged.paged.mxfp6",
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.uint8,
+                shape=[input.shape[0], input.shape[1], input.shape[2] * 3 // 4],
+                device=input.device,
+            ),
+            TensorType(
+                dtype=DType.float8_e8m0fnu,
+                shape=[input.shape[0], row_width // _MX_SF_VECTOR_SIZE],
+                device=input.device,
+            ),
+        ],
+        parameters={
+            "group": group,
+            "topk": topk,
+            "FP6_FORMAT": _FP6_FORMAT_CODE[fp6_format],
         },
     )
     return results[0].tensor, results[1].tensor
@@ -5473,7 +5581,9 @@ def moe_sink_gate_router(
         logits: Raw (pre-sigmoid) gate logits, routed experts followed by
             sink experts. Must be float32, which is the only dtype the
             kernel's joint softmax has been validated at. Shape:
-            [num_tokens, n_routed_experts + n_shared_experts].
+            [num_tokens, at least n_routed_experts + n_shared_experts]; a
+            wider row's tail is not read, so a gate weight padded for
+            alignment needs no slice.
         expert_bias: Per-routed-expert selection bias. Shape: [n_routed_experts].
         global_scale: Scalar output-scaling weight. Shape: [1].
         n_routed_experts: Total number of routed experts. Must be a positive
@@ -5544,9 +5654,13 @@ def moe_sink_gate_router(
             " n_experts_per_tok or n_routed_experts"
         )
 
-    if logits.shape[1] != n_routed_experts + n_shared_experts:
+    logits_width = logits.shape[1]
+    if (
+        not isinstance(logits_width, StaticDim)
+        or int(logits_width) < n_routed_experts + n_shared_experts
+    ):
         raise ValueError(
-            "expected logits of shape [num_tokens, n_routed_experts +"
+            "expected logits of shape [num_tokens, at least n_routed_experts +"
             f" n_shared_experts] but got {logits.shape}"
         )
     if expert_bias.shape[0] != n_routed_experts:

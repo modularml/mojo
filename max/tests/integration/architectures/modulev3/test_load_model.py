@@ -23,7 +23,12 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
-from max.driver import Buffer, load_devices, scan_available_devices
+from max.driver import (
+    Buffer,
+    accelerator_count,
+    load_devices,
+    scan_available_devices,
+)
 from max.engine import InferenceSession, Model
 from max.experimental import functional as F
 from max.graph.weights import SafetensorWeights
@@ -305,7 +310,9 @@ def test_load_model_gemma4_modulev3() -> None:
 
 
 def _build_gemma4_model(
-    hf_config: PretrainedConfig, weights: SafetensorWeights
+    hf_config: PretrainedConfig,
+    weights: SafetensorWeights,
+    num_devices: int = 1,
 ) -> Gemma4Model:
     """Construct a ``Gemma4Model`` the way ``assert_load_model_succeeds`` does.
 
@@ -313,7 +320,7 @@ def _build_gemma4_model(
     only ``InferenceSession`` is mocked, so config parsing, weight adaptation
     and module construction all run for real.
     """
-    device_specs = scan_available_devices()[:1]
+    device_specs = scan_available_devices()[:num_devices]
     pipeline_config = make_pipeline_config_factory(
         hf_config, "google/gemma-4-31B-it"
     )(device_specs)
@@ -373,3 +380,30 @@ def test_load_model_gemma4_modulev3_text_only_skips_vision() -> None:
     model = _build_gemma4_model(hf_config, make_gemma4_zero_weights(hf_config))
     assert model.vision_model is None
     assert model.language_model is not None
+
+
+def make_small_gemma4_tp2_config() -> PretrainedConfig:
+    """Small gemma4 vision config with TP=2-divisible head counts.
+
+    The base small config's global KV head count (1) is not divisible by 2,
+    so this bumps ``num_global_key_value_heads`` to 2 and widens
+    ``global_head_dim`` to 48 to keep the global KV width (2*48=96) distinct
+    from the sliding KV width (4*16=64) and hidden_size (64).
+    """
+    hf_config = make_small_gemma4_vision_config()
+    hf_config.text_config.num_global_key_value_heads = 2
+    hf_config.text_config.global_head_dim = 48
+    return hf_config
+
+
+@pytest.mark.skipif(
+    accelerator_count() < 2,
+    reason="requires at least 2 GPUs",
+)
+def test_load_model_gemma4_modulev3_tp2() -> None:
+    """A 2-device load must compile both towers under tensor parallelism."""
+    hf_config = make_small_gemma4_tp2_config()
+    weights = make_gemma4_vision_zero_weights(hf_config)
+    model = _build_gemma4_model(hf_config, weights, num_devices=2)
+    assert model.vision_model is not None
+    assert len(model.devices) == 2

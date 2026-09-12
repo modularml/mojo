@@ -122,7 +122,7 @@ def test_dynamic_scaled_fp8_quant[
     var out_tensor = TileTensor(out_device, shape)
     var scales_tensor = TileTensor(scales_device, scales_shape)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var in_tensor} -> SIMD[in_dtype, width]:
@@ -227,7 +227,7 @@ def test_dynamic_fp8_quant[
     var out_tensor = TileTensor(out_device, shape)
     var scales_tensor = TileTensor(scales_device, scales_shape)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var in_tensor} -> SIMD[in_dtype, width]:
@@ -342,7 +342,7 @@ def test_batched_dynamic_fp8_quant[
     var out_tensor = TileTensor(out_device, shape)
     var scales_tensor = TileTensor(scales_device, scales_shape)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](batch: Int, row: Int, col: Int) {var in_tensor} -> SIMD[in_dtype, width]:
@@ -468,7 +468,7 @@ def test_dynamic_fp8_quant_near_zero[
     var out_tensor = TileTensor(out_device, shape)
     var scales_tensor = TileTensor(scales_device, scales_shape)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var in_tensor} -> SIMD[in_dtype, width]:
@@ -562,7 +562,7 @@ def test_dynamic_tensor_fp8_quant_near_zero[
     var out_tensor = TileTensor(out_device, shape)
     var scales_tensor = TileTensor(scales_device, scales_shape)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var in_tensor} -> SIMD[in_dtype, width]:

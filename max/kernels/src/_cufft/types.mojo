@@ -24,7 +24,7 @@ struct LibraryProperty(Equatable, TrivialRegisterPassable, Writable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.MAJOR_VERSION:
             return writer.write_string("MAJOR_VERSION")
@@ -65,7 +65,7 @@ struct Status(Equatable, Identifiable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUFFT_SUCCESS:
             return writer.write_string("CUFFT_SUCCESS")
@@ -129,7 +129,7 @@ struct Type(Equatable, Identifiable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUFFT_R2C:
             return writer.write_string("CUFFT_R2C")
@@ -165,7 +165,7 @@ struct Compatibility(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUFFT_COMPATIBILITY_FFTW_PADDING:
             return writer.write_string("CUFFT_COMPATIBILITY_FFTW_PADDING")
@@ -190,7 +190,7 @@ struct Property(Equatable, Identifiable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.NVFFT_PLAN_PROPERTY_INT64_PATIENT_JIT:
             return writer.write_string("NVFFT_PLAN_PROPERTY_INT64_PATIENT_JIT")

@@ -87,7 +87,7 @@ comptime _APPLE_STATIC_SHMEM_USABLE_COUNT[T: AnyType] = (
 ) // size_of[T]()
 
 
-@always_inline
+@inline(.always)
 def top_k_shape_impl[
     dtype: DType
 ](
@@ -126,7 +126,7 @@ def top_k_shape_impl[
     return shape
 
 
-@always_inline
+@inline(.always)
 def _adjust_top_p[
     T: DType,
     address_space: AddressSpace = .GENERIC,
@@ -305,7 +305,7 @@ def _top_k_cpu[
 
             comptime if largest:
 
-                @always_inline
+                @inline(.always)
                 def _val_greater_than(
                     lhs: Int64, rhs: Int64
                 ) {mut indices, input, axis} -> Bool:
@@ -321,7 +321,7 @@ def _top_k_cpu[
                     _ = partition(idxs, k_val, _val_greater_than)
             else:
 
-                @always_inline
+                @inline(.always)
                 def _val_less_than(
                     lhs: Int64, rhs: Int64
                 ) {mut indices, input, axis} -> Bool:
@@ -384,7 +384,7 @@ def _top_k_cpu[
     )
 
 
-@always_inline
+@inline(.always)
 def fused_token_sampling_cpu[
     dtype: DType,
     out_idx_type: DType,
@@ -717,7 +717,7 @@ def _top_k_sampling[
     dealloc(out_idxs_tmp_alloc^)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _topk_dead_val[T: DType, largest: Bool = True]() -> Scalar[T]:
     comptime if largest:
         return min_or_neg_inf[T]()
@@ -776,7 +776,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
     var idxs: Array[Int32, Self.M]
     var threshold: Scalar[Self.T]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.vals = Array[Scalar[Self.T], Self.M](
             fill=_topk_dead_val[Self.T, Self.largest]()
@@ -784,7 +784,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
         self.idxs = Array[Int32, Self.M](fill=Int32(-1))
         self.threshold = _topk_dead_val[Self.T, Self.largest]()
 
-    @always_inline
+    @inline(.always)
     def insert(mut self, val: Scalar[Self.T], idx: Int):
         """Insert an element, evicting the worst if full."""
         # Fast reject against threshold. When the heap has empty slots
@@ -820,7 +820,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
                     inserted = True
         self._update_threshold()
 
-    @always_inline
+    @inline(.always)
     def _update_threshold(mut self):
         """Recompute eviction threshold (worst value in the heap)."""
         self.threshold = self.vals[0]
@@ -832,7 +832,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
                 if self.vals[i] > self.threshold:
                     self.threshold = self.vals[i]
 
-    @always_inline
+    @inline(.always)
     def best(self) -> TopK_2[Self.T, Self.largest]:
         """Return the best element, ties broken by smallest index.
 
@@ -855,7 +855,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
                     best_p = self.idxs[i]
         return TopK_2[Self.T, Self.largest](p=Int(best_p), u=best_u)
 
-    @always_inline
+    @inline(.always)
     def remove(mut self, idx: Int):
         """Remove element by global index, replacing with dead value."""
         var idx32 = Int32(idx)
@@ -866,7 +866,7 @@ struct TopKHeap[T: DType, largest: Bool, M: Int]:
 
 
 # Function to perform warp-level reduction to find the maximum TopK_2
-@always_inline
+@inline(.always)
 @__parameter
 def _warp_reduce_topk[
     T: DType,
@@ -941,7 +941,7 @@ def _warp_reduce_topk[
 
 
 # Function to perform block-level reduction to find the maximum TopK_2
-@always_inline
+@inline(.always)
 def _block_reduce_topk[
     T: DType,
     //,
@@ -1666,7 +1666,7 @@ def _topk_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def topk_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -2041,7 +2041,7 @@ def _topk_topp_sampling_fi[
     )
 
 
-@always_inline
+@inline(.always)
 def fused_token_sampling_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -2575,7 +2575,7 @@ def _gumbel_argmax_fused_kernel[
                 out_idxs.ptr[batch_id] = Int(total.p).cast[out_idx_type]()
 
 
-@always_inline
+@inline(.always)
 def gumbel_sampling_fused_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -2722,7 +2722,7 @@ def gumbel_sampling_fused_gpu[
         )
 
 
-@always_inline
+@inline(.always)
 def gumbel_sampling_gpu[
     dtype: DType,
     out_idx_type: DType,

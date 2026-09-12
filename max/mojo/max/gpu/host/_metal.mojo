@@ -31,7 +31,7 @@ comptime MTLDevice = Pointer[_MTLDevice, MutAnyOrigin]
 # Accessor function to get access to the underlying MTLDevice from an abstract DeviceContext.
 # Use `var metal_device: MTLDevice = metal_device(ctx)` where ctx is a `DeviceContext` to get access to the
 # underlying MTLDevice.
-@always_inline
+@inline(.always)
 def metal_device(ctx: DeviceContext) raises -> MTLDevice:
     var result = Optional[MTLDevice]()
     # const char *AsyncRT_DeviceContext_metal_device(MTL::Device **result, const DeviceContext *ctx)

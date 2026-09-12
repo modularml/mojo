@@ -115,7 +115,7 @@ comptime _V_TILE_ELTS = KV_BLOCK * DEPTH  # 16384 — the logical V tile.
 # write/read both preserve exactly; the `+1` keeps every cell nonzero so
 # an accidental zero-fill (a scrambled write landing out of the read
 # window) is caught rather than silently matching a zeroed slot.
-@always_inline
+@inline(.always)
 def _pattern_fp8(key: Int, depth: Int) -> Float8_e4m3fn:
     return Float8_e4m3fn(Float32(((key + depth) % 7) + 1))
 

@@ -867,6 +867,10 @@ class StructuredOutputHelper:
             if draft_token < 0 or draft_token >= vocab_size:
                 break
 
+            # A terminated matcher accepts nothing more; feeding it only warns.
+            if matcher_copy.is_stopped():
+                break
+
             # EOS-class tokens are not part of the grammar — they signal end of
             # generation. Skip the matcher so it stays in a clean terminal
             # state. ``restore_grammar_state`` undoes this transient flip.

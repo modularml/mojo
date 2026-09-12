@@ -30,7 +30,7 @@ struct Result(Equatable, TrivialRegisterPassable, Writable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SUCCESS:
             return writer.write_string("SUCCESS")

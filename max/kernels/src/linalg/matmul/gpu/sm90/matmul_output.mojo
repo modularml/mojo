@@ -154,7 +154,7 @@ struct MatmulTileWriter[
     var block_y: Int
     var block_x: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tensor: Self.CTensorType,
@@ -179,7 +179,7 @@ struct MatmulTileWriter[
         self.block_y = block_y
         self.block_x = block_x
 
-    @always_inline
+    @inline(.always)
     def _calculate_output_bounds(self) -> Tuple[UInt32, UInt32]:
         """Calculate valid output bounds for the current block's tile."""
         var rows = self.tensor.dim[0]()
@@ -197,7 +197,7 @@ struct MatmulTileWriter[
 
         return max_row, max_col
 
-    @always_inline
+    @inline(.always)
     def _apply_epilogue[
         F: ImplicitlyCopyable & RegisterPassable & Self.lambda_type
     ](
@@ -249,7 +249,7 @@ struct MatmulTileWriter[
                 ](IndexList[2](Int(row), Int(col)), shared_value)
                 shared_fragment.store(Coord(Idx[i], Idx[0]), shared_value)
 
-    @always_inline
+    @inline(.always)
     def _write_tile_to_gmem[
         accum_type: DType,
         reg_tile_layout: Layout,
@@ -322,7 +322,7 @@ struct MatmulTileWriter[
                 (row_tile, col_tile),
             )
 
-    @always_inline
+    @inline(.always)
     def _write_tile_stmatrix[
         tma_rank: Int,
         tma_tile_shape: IndexList[tma_rank],
@@ -496,7 +496,7 @@ struct MatmulTileWriter[
 
             named_barrier[Int32(Self.num_consumer_threads)](10)
 
-    @always_inline
+    @inline(.always)
     def write_tile[
         tma_rank: Int,
         tma_tile_shape: IndexList[tma_rank],

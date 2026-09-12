@@ -47,6 +47,10 @@ unified_dflash_gemma4_31b_arch = SupportedArchitecture(
     config=UnifiedDflashGemma4_31BConfig,
     memory_planner=Gemma4MemoryPlanner,
     supports_device_graph_capture=True,
+    # The unified graph commits per-row (dummy-draft prefill rows
+    # commit their prompt chunk), so mixed prefill+decode batches may
+    # keep verifying drafts.
+    supports_spec_decode_mixed_batches=True,
     batching=UnifiedDflashGemma4_31BBatchProcessor,
     tool_parser="gemma4",
     reasoning_parser="gemma4",

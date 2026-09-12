@@ -448,6 +448,41 @@ SERVE_METRICS: dict[str, SupportedInstruments] = {
         unit="attempts",
         description="Cumulative dKV reconnect attempts across all clients, reported as a gauge of the current lifetime total.",
     ),  # type: ignore
+    # Cross-node pull. Counters, not gauges: reset_metrics clears these every
+    # batch, so each publish carries that window's delta. Mach exports the same
+    # set under dkv.connector.peer_attach_count, peer_drop_count,
+    # peer_load_count and hint_rejected_count, splitting success from failure
+    # by an outcome tag rather than by metric name.
+    "maxserve.dkv.peer_attaches": _meter.create_counter(
+        "maxserve.dkv.peer_attaches",
+        unit="attaches",
+        description="Remote dKV peers attached from a cache hint. An attach is cached per peer, so a stable peer set leaves this at zero while cross-node pulls keep succeeding; maxserve.dkv.peer_loads is the steady-state signal.",
+    ),  # type: ignore
+    "maxserve.dkv.peer_attach_failures": _meter.create_counter(
+        "maxserve.dkv.peer_attach_failures",
+        unit="attaches",
+        description="Peer attaches that failed at dial, probe, handshake, or the attach timeout.",
+    ),  # type: ignore
+    "maxserve.dkv.peers_dropped": _meter.create_counter(
+        "maxserve.dkv.peers_dropped",
+        unit="peers",
+        description="Remote dKV peers dropped, whether replaced after a peer restart, evicted over the peer table's cap, or torn down by the caller. Read against maxserve.dkv.peer_attaches to tell a churning peer table from a stable one.",
+    ),  # type: ignore
+    "maxserve.dkv.peer_loads": _meter.create_counter(
+        "maxserve.dkv.peer_loads",
+        unit="loads",
+        description="Loads served from the dKV peer a cache hint named. Counted per batch on the fused load path and per hinted lookup on the two-phase path, so it is not a request count.",
+    ),  # type: ignore
+    "maxserve.dkv.peer_load_failures": _meter.create_counter(
+        "maxserve.dkv.peer_load_failures",
+        unit="loads",
+        description="Hinted peer loads that fell through to the next source or to the co-located dKV. Memo-capped rather than per-request: a failed source suppresses further attempts against the same instance and epoch for a fixed window, so one dead peer charges roughly one failure per window however many requests it affects.",
+    ),  # type: ignore
+    "maxserve.dkv.hints_rejected": _meter.create_counter(
+        "maxserve.dkv.hints_rejected",
+        unit="hints",
+        description="Cache hints that arrived but were unusable: bytes that did not parse, an unknown version, a chain that does not describe the request, or no entry for the requested group. Counted per entry on the two-phase load path and per call on the fused one.",
+    ),  # type: ignore
     "maxserve.spec_decode.acceptance_rate_per_position": _meter.create_histogram(
         "maxserve.spec_decode.acceptance_rate_per_position",
         unit="percent",
@@ -1487,6 +1522,60 @@ class _AsyncMetrics:
         self.client.send_measurement(
             MaxMeasurement(
                 "maxserve.dkv.reconnect_attempts",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_peer_attaches(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.peer_attaches",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_peer_attach_failures(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.peer_attach_failures",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_peers_dropped(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.peers_dropped",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_peer_loads(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.peer_loads",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_peer_load_failures(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.peer_load_failures",
+                value,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_hints_rejected(self, value: int) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.hints_rejected",
                 value,
                 self.extra_attributes,
             ),

@@ -100,40 +100,40 @@ struct GroupedBlockScaledSmem[
     var tensormap_c: TMADescriptor
 
     # ========== Tile Accessors (forwarding) ==========
-    @always_inline
+    @inline(.always)
     def a_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.ATileArray:
         """Get A tile array accessor."""
         return self.core.a_tiles()
 
-    @always_inline
+    @inline(.always)
     def b_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.BTileArray:
         """Get B tile array accessor."""
         return self.core.b_tiles()
 
-    @always_inline
+    @inline(.always)
     def c_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.CTileArray:
         """Get C tile array accessor."""
         return self.core.c_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfa_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.SFATileArray:
         """Get SFA tile array accessor."""
         return self.core.sfa_tiles()
 
-    @always_inline
+    @inline(.always)
     def sfb_tiles(ref[AddressSpace.SHARED] self) -> Self.Core.SFBTileArray:
         """Get SFB tile array accessor."""
         return self.core.sfb_tiles()
 
     # ========== Size Utilities ==========
     @staticmethod
-    @always_inline
+    @inline(.always)
     def tensormap_storage_size() -> Int:
         """Size of tensormap storage in bytes (5 x 128 = 640 bytes)."""
         return NUM_GROUPED_TENSORMAPS * TMA_DESCRIPTOR_BYTES
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def total_tile_size() -> Int:
         """Total tile storage size (A+B+SFA+SFB+C) in elements."""
         return Self.Core.total_tile_size()

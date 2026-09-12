@@ -228,14 +228,14 @@ comptime _ACC_WIDTH = 4
 # MMA_N=192 cut 16.5% of the instructions and came out +2.5% in cycles -- a wash.
 # Hence prefer a DIVISOR of the token count over a multiple: 3 tokens at nh=32
 # (96 columns) takes the same exactness as 6 while staying on the 2-CTA/SM side.
-@always_inline
+@inline(.always)
 def _ctas_per_sm[MMA_N: Int]() -> Int:
     return 2 if MMA_N <= 128 else 1
 
 
 # Keys a slot COSTS, padded so every slot base keeps the 128-byte alignment TMA
 # needs of a shared-memory destination.
-@always_inline
+@inline(.always)
 def _ks_slot_elems[ks_dtype: DType, BM_key: Int]() -> Int:
     comptime esize = size_of[Scalar[ks_dtype]]()
     return align_up(flat_scale_window[ks_dtype, BM_key]() * esize, 128) // esize
@@ -904,7 +904,7 @@ def _fp8_index_score_prefill_kernel_sm100[
         var stage_tid = tid
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def stage_qs(col: Int):
             var qs_tok = Int32(col // num_heads)
             if tok0 + qs_tok < seq_len:
@@ -1051,7 +1051,7 @@ def _fp8_index_score_prefill_kernel_sm100[
             # comptime. A *runtime* token index would spill `acc` to local
             # memory.
             @__parameter
-            @always_inline
+            @inline(.always)
             def consume_group[
                 col: Int
             ](frag: Array[Scalar[AT], EPI_CHUNK], mut acc: SIMD[AT, ACCW],):
@@ -1234,7 +1234,7 @@ def _fp8_index_score_prefill_kernel_sm100[
             # worth 8 fewer instructions of uniform-datapath setup per sidecar, and
             # consistency with every other SM100 producer.
             @__parameter
-            @always_inline
+            @inline(.always)
             def issue_k[
                 with_q: Bool = False
             ](it: Int32, state: PipelineState[NSTAGE]):
@@ -1340,7 +1340,7 @@ comptime _KEYSPLIT_MIN_KEY_TILES = 64
 # tile, not just the key split.
 
 
-@always_inline
+@inline(.always)
 def _is_keysplit_shape[
     num_heads: Int, BM_key: Int
 ](max_seq_len: Int, max_num_keys: Int) -> Bool:
@@ -1372,7 +1372,7 @@ def _is_keysplit_shape[
     )
 
 
-@always_inline
+@inline(.always)
 def fp8_index_score_sm100_prefill[
     dtype: DType,
     KOperand: MHAOperand,

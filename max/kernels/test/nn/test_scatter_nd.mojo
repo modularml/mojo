@@ -17,7 +17,7 @@ from nn.gather_scatter import scatter_nd_generator
 from std.testing import assert_equal
 
 
-@always_inline
+@inline(.always)
 def use_update[
     dtype: DType, width: SIMDLength, //
 ](input_val: SIMD[dtype, width], update_val: SIMD[dtype, width]) -> SIMD[
@@ -427,7 +427,7 @@ def main() raises:
             8,
         ]
 
-        @always_inline
+        @inline(.always)
         def _add[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:
@@ -639,7 +639,7 @@ def main() raises:
             8,
         ]
 
-        @always_inline
+        @inline(.always)
         def _max[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:
@@ -851,7 +851,7 @@ def main() raises:
             8,
         ]
 
-        @always_inline
+        @inline(.always)
         def _min[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:
@@ -1063,7 +1063,7 @@ def main() raises:
             8,
         ]
 
-        @always_inline
+        @inline(.always)
         def _mul[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:
@@ -1109,7 +1109,7 @@ def main() raises:
         var output_ptr = List(length=rows * cols, fill=Float32(0))
         var output = TileTensor(output_ptr, row_major[rows, cols]())
 
-        @always_inline
+        @inline(.always)
         def _add[
             ty: DType, width: SIMDLength
         ](v1: SIMD[ty, width], v2: SIMD[ty, width]) -> SIMD[ty, width]:

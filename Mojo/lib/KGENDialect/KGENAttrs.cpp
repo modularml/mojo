@@ -1989,8 +1989,29 @@ void TargetParamAttr::print(AsmPrinter &p) const { getTarget().print(p); }
 
 Type TargetParamAttr::getType() const { return TargetType::get(getContext()); }
 
-/// Always a constant.
-bool TargetParamAttr::isConstant() const { return true; }
+//===----------------------------------------------------------------------===//
+// GetTargetPluginAttr
+//===----------------------------------------------------------------------===//
+
+TypedAttr GetTargetPluginAttr::get(TypedAttr target, Type type) {
+  if (auto targetAttr = dyn_cast<TargetParamAttr>(target)) {
+    if (auto plugin = dyn_cast_if_present<TypedAttr>(
+            targetAttr.getTarget().getOpaquePlugin()))
+      if (plugin.getType() == type)
+        return plugin;
+  }
+
+  return Base::get(target.getContext(), target, type);
+}
+
+bool GetTargetPluginAttr::isConstant() const { return false; }
+
+/// A target is a constant unless its opaque plugin payload carries an
+/// unevaluated parameter expression.
+bool TargetParamAttr::isConstant() const {
+  Attribute plugin = getTarget().getOpaquePlugin();
+  return !plugin || ParameterAttr::isSimpleConstant(plugin);
+}
 
 //===----------------------------------------------------------------------===//
 // StructAttr
@@ -3632,7 +3653,23 @@ static Attribute simplifyMod(SmallVectorImpl<TypedAttr> &operands) {
                       });
 }
 
+/// A lane-wise `eq` is the same proposition as `#kgen.param.identical` exactly
+/// when it answers one scalar bool over an int-like dtype. Floats are excluded:
+/// IEEE equality is not identity (`+0.0` vs `-0.0`, NaN). A wider integer `eq`
+/// stays lane-wise, because `identical` cannot represent a per-lane result.
+static bool isIdentityEQType(Type type) {
+  auto simdType = sugarDynCast<SIMDType>(type);
+  if (!simdType)
+    return false;
+  std::optional<KGENDType> dtype = simdType.getResolvedDType();
+  std::optional<int64_t> size = simdType.getResolvedSize();
+  return dtype && dtype->isIntLike() && size == 1;
+}
+
 static Attribute simplifyEQ(SmallVectorImpl<TypedAttr> &operands) {
+  if (isIdentityEQType(operands[0].getType()))
+    return ParamIdenticalAttr::get(operands);
+
   // Make sure parameters are ordered correctly, which also matters if they
   // don't fold.
   llvm::stable_sort(operands, ParameterAttr::compare);

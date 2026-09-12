@@ -38,8 +38,6 @@ from std.collections.string import (
     Codepoint,
     ImmStringSpan,
     ImmStringSlice,
-    MutStringSpan,
-    MutStringSlice,
     StaticString,
     String,
     StringSpan,
@@ -66,6 +64,7 @@ from std.builtin.builtin_slice import Slice, slice
 from std.builtin.comparable import Comparable, Equatable
 from std.builtin.debug_assert import debug_assert
 from std.builtin.dtype import DType
+from std.builtin.inline_level import InlineLevel
 from std.builtin.error import Error
 from std.builtin.float_literal import FloatLiteral
 from std.builtin.floatable import Floatable, FloatableRaising
@@ -95,7 +94,7 @@ from std.builtin.range import range
 from std.builtin.rebind import rebind, rebind_var
 from std.builtin.reversed import ReversibleRange, reversed
 from std.builtin.simd_length import SIMDLength
-from std.builtin.simd import (
+from std.simd import (
     SIMD,
     BFloat16,
     Byte,

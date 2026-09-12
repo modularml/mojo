@@ -162,20 +162,20 @@ from std.sys import get_defined_bool, get_defined_int, size_of
 # AMDGPU instruction-priority + IGroupLP scheduling helpers.
 
 
-@always_inline
+@inline(.always)
 def _s_setprio[priority: Int16]():
     """Sets MFMA wave instruction priority (0 = normal, 1 = high)."""
     llvm_intrinsic["llvm.amdgcn.s.setprio", NoneType](priority)
 
 
-@always_inline
+@inline(.always)
 def _sched_barrier_zero():
     """`sched_barrier(0)`: hard reordering barrier that pins
     surrounding instructions to their source order."""
     llvm_intrinsic["llvm.amdgcn.sched.barrier", NoneType](Int32(0))
 
 
-@always_inline
+@inline(.always)
 def _asm_label[asm_str: StaticString]():
     """Emits an AMDGPU asm comment at the call site so disassembly diff
     against a reference kernel can be done by grep. Gated on
@@ -205,7 +205,7 @@ def _asm_label[asm_str: StaticString]():
         ]()
 
 
-@always_inline
+@inline(.always)
 def _s_barrier_raw():
     """Bare `s_barrier`, with NO release/acquire fences. Mojo's stdlib
     `barrier()` would also inject `s_waitcnt vmcnt(0) lgkmcnt(0)`, which
@@ -214,7 +214,7 @@ def _s_barrier_raw():
     llvm_intrinsic["llvm.amdgcn.s.barrier", NoneType]()
 
 
-@always_inline
+@inline(.always)
 def _cluster_barrier():
     """Cluster boundary: `sched_barrier(0)` + bare `s_barrier` +
     `sched_barrier(0)`. The `sched_barrier(0)` fences pin the
@@ -463,7 +463,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     comptime _SCHED_EPI_C9_DSREAD = 13
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_q[
         layout: TensorLayout
     ](
@@ -565,7 +565,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     comptime prescale_q = not Self.config.dtype.is_float8()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_q_and_scale[
         layout: TensorLayout
     ](
@@ -605,7 +605,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     # are agnostic to paged-vs-contiguous KV.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _make_k_tile[
         k_t: MHAOperand,
         //,
@@ -615,7 +615,12 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         kv_head_idx: UInt32,
         t: Int,
         num_keys: Int,
-    ) -> TileTensor[Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        Self.config.dtype,
+        Self._KvPerTileLayoutT,
+        ImmutAnyOrigin,
+        Engine=k_t.Engine,
+    ]:
         """Builds the per-tile K gmem TileTensor at `(batch, t*KV_BLOCK,
         kv_head, 0)` via `MHAOperand.block_paged_tile`. For
         LayoutTensorMHAOperand this resolves to a pointer-arithmetic
@@ -634,7 +639,10 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         # config.dtype.
         return rebind[
             TileTensor[
-                Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin
+                Self.config.dtype,
+                Self._KvPerTileLayoutT,
+                ImmutAnyOrigin,
+                Engine=k_t.Engine,
             ]
         ](
             k_op.block_paged_tile[Self.KV_BLOCK](
@@ -649,7 +657,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _make_v_tile[
         v_t: MHAOperand,
         //,
@@ -659,7 +667,12 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         kv_head_idx: UInt32,
         t: Int,
         num_keys: Int,
-    ) -> TileTensor[Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        Self.config.dtype,
+        Self._KvPerTileLayoutT,
+        ImmutAnyOrigin,
+        Engine=v_t.Engine,
+    ]:
         """Builds the per-tile V gmem TileTensor (see `_make_k_tile`).
 
         `num_keys` clamps the runtime `dim[0]` identically to
@@ -671,7 +684,10 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         var valid_rows = min(Self.KV_BLOCK, num_keys - t * Self.KV_BLOCK)
         return rebind[
             TileTensor[
-                Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin
+                Self.config.dtype,
+                Self._KvPerTileLayoutT,
+                ImmutAnyOrigin,
+                Engine=v_t.Engine,
             ]
         ](
             v_op.block_paged_tile[Self.KV_BLOCK](
@@ -686,7 +702,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _dma_k[
         k_t: MHAOperand,
         //,
@@ -753,7 +769,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _dma_v[
         v_t: MHAOperand,
         //,
@@ -792,7 +808,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     # without any in-cluster `ds_read`.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_k_reg(
         mut k_reg: RegTile[
             Self.config.dtype, Self._K_LAYOUT_T, MutUntrackedOrigin
@@ -802,7 +818,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         Self._MmaOp.load_K(k_reg, k_smem_slot)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _qk_with_kreg(
         mut att_block: RegTile[
             Self._SOFTMAX_DTYPE, Self._ATT_LAYOUT_T, MutUntrackedOrigin
@@ -869,7 +885,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
                     ).cast[Self._SOFTMAX_DTYPE]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_v_reg(
         mut v_reg: RegTile[
             Self.config.dtype, Self._V_LAYOUT_T, MutUntrackedOrigin
@@ -881,7 +897,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         Self._MmaOp.load_V(v_reg, v_smem_slot)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _att_bf16_subtile_jit[
         subtile_idx: Int,
     ](
@@ -938,7 +954,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         return result
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _att_bf16_full(
         mut dst: RegTile[
             Self.config.dtype, Self._ATT_BF16_FULL_LAYOUT_T, MutUntrackedOrigin
@@ -997,7 +1013,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
                 dst_v[sub, 0, 0] = bf16.slice[8, offset=_half * 8]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _pv_whole(
         v_reg: RegTile[Self.config.dtype, Self._V_LAYOUT_T, MutUntrackedOrigin],
         att_bf16_full: RegTile[
@@ -1016,7 +1032,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
             Self._MmaOp.mma_PV(o_reg, v_sub, att_sub)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _pv_strip_with_partial_softmax[
         sched_group: Int,
     ](
@@ -1091,7 +1107,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         return pending_scale
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _pv_whole_with_partial_softmax[
         sched_group: Int,
     ](
@@ -1132,7 +1148,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         _s_setprio[Int16(0)]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _store_o_to_gmem[
         output_dtype: DType,
         epilogue_chunk_width: Int = 1,
@@ -1188,7 +1204,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
                     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _tail_softmax_unconditional[
         sched_group: Int,
     ](
@@ -1219,7 +1235,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _qk_tail_softmax_cluster[
         sched_group: Int,
     ](
@@ -1269,7 +1285,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _full_softmax_unconditional[
         sched_group: Int,
     ](
@@ -2390,7 +2406,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         )
 
 
-@always_inline
+@inline(.always)
 def mha_prefill_v2_ragged[
     k_t: MHAOperand,
     v_t: MHAOperand,
@@ -2401,9 +2417,9 @@ def mha_prefill_v2_ragged[
     config: MhaConfigV2,
     cross_attention: Bool = False,
     sink: Bool = False,
-    compile_options: StaticString = CompilationTarget[
-        DeviceContext.default_device_info.target()
-    ].default_compile_options(),
+    compile_options: StaticString = CompilationTarget.from[
+        DeviceContext.default_device_info
+    ]().default_compile_options(),
 ](
     q_ptr: UnsafePointer[Scalar[qkv_dtype], ImmutAnyOrigin],
     k: k_t,
@@ -2513,7 +2529,7 @@ def mha_prefill_v2_ragged[
     )
 
 
-@always_inline
+@inline(.always)
 def mha_prefill_v2[
     k_t: MHAOperand,
     v_t: MHAOperand,
@@ -2521,9 +2537,9 @@ def mha_prefill_v2[
     //,
     config: MhaConfigV2,
     sink: Bool = False,
-    compile_options: StaticString = CompilationTarget[
-        DeviceContext.default_device_info.target()
-    ].default_compile_options(),
+    compile_options: StaticString = CompilationTarget.from[
+        DeviceContext.default_device_info
+    ]().default_compile_options(),
 ](
     q: TileTensor[mut=False, ...],
     k: k_t,

@@ -55,7 +55,7 @@ def _verify_xyz[dim: StaticString]():
     ), "the dimension must be x, y, or z"
 
 
-@always_inline
+@inline(.always)
 def _get_gcn_idx[offset: Int, dtype: DType]() -> Int:
     var ptr = llvm_intrinsic[
         "llvm.amdgcn.implicitarg.ptr",
@@ -70,7 +70,7 @@ def _get_gcn_idx[offset: Int, dtype: DType]() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def lane_id() -> Int:
     """Returns the lane ID of the current thread within its warp.
 
@@ -84,7 +84,7 @@ def lane_id() -> Int:
     return _lane_id()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _lane_id() -> Int:
     comptime assert is_gpu(), "This function only applies to GPUs."
 
@@ -126,7 +126,7 @@ def _lane_id() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def warp_id[*, broadcast: Bool = False]() -> Int:
     """Returns the warp ID of the current thread within its block.
     The warp ID is a unique identifier for each warp within a block, ranging
@@ -144,7 +144,7 @@ def warp_id[*, broadcast: Bool = False]() -> Int:
     return _warp_id[broadcast=broadcast]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _warp_id[
     *,
     broadcast: Bool = False,
@@ -163,7 +163,7 @@ def _warp_id[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def sm_id() -> Int:
     """Returns the Streaming Multiprocessor (SM) ID of the current thread.
 
@@ -205,11 +205,11 @@ struct _ThreadIdx(Defaultable, TrivialRegisterPassable):
     a thread within a block.
     """
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def _get_intrinsic_name[dim: StringLiteral]() -> StaticString:
         comptime if is_nvidia_gpu():
@@ -223,7 +223,7 @@ struct _ThreadIdx(Defaultable, TrivialRegisterPassable):
                 operation=__get_current_function_name(),
             ]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StringLiteral](self) -> Int:
         """Gets the `x`, `y`, or `z` coordinates of a thread within a block.
 
@@ -250,11 +250,11 @@ struct _BlockIdx(Defaultable, TrivialRegisterPassable):
     a block within a grid.
     """
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def _get_intrinsic_name[dim: StringLiteral]() -> StaticString:
         comptime if is_nvidia_gpu():
@@ -268,7 +268,7 @@ struct _BlockIdx(Defaultable, TrivialRegisterPassable):
                 operation=__get_current_function_name(),
             ]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StringLiteral](self) -> Int:
         """Gets the `x`, `y`, or `z` coordinates of a block within a grid.
 
@@ -293,11 +293,11 @@ struct _BlockDim(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` dimensions of a
     block."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StaticString](self) -> Int:
         """Gets the `x`, `y`, or `z` dimension of the block.
 
@@ -353,11 +353,11 @@ struct _GridDim(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` dimensions of a
     grid."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StaticString](self) -> Int:
         """Gets the `x`, `y`, or `z` dimension of the grid.
 
@@ -414,11 +414,11 @@ struct _GlobalIdx(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` global offset of
     the kernel launch."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StringLiteral](self) -> Int:
         """Gets the `x`, `y`, or `z` dimension of the program.
 
@@ -447,11 +447,11 @@ struct _ClusterDim(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` dimensions of a
     cluster."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StaticString](self) -> Int:
         """Gets the `x`, `y`, or `z` dimension of the cluster.
 
@@ -482,16 +482,16 @@ struct _ClusterIdx(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` coordinates of
     a cluster within a grid."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def _get_intrinsic_name[dim: StringLiteral]() -> StaticString:
         return "llvm.nvvm.read.ptx.sreg.clusterid." + dim
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StringLiteral](self) -> Int:
         """Gets the `x`, `y`, or `z` coordinates of a cluster within a grid.
 
@@ -521,16 +521,16 @@ struct _ClusterBlockIdx(Defaultable, TrivialRegisterPassable):
     """Provides accessors for getting the `x`, `y`, and `z` coordinates of
     a threadblock within a cluster."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def _get_intrinsic_name[dim: StringLiteral]() -> StaticString:
         return "llvm.nvvm.read.ptx.sreg.cluster.ctaid." + dim
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getattr_param__[dim: StringLiteral](self) -> Int:
         """Gets the `x`, `y`, or `z` coordinates of a threadblock within a cluster.
 

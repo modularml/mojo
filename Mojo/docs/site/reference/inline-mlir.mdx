@@ -605,7 +605,7 @@ name. This example defines a region and passes it to
 execution and later resumes by running the provided region:
 
 ```mojo
-@always_inline
+@inline(.always)
 def _suspend_async[
     body: def(AnyCoroutine) capturing -> None
 ]():
@@ -674,8 +674,7 @@ They serve as a reference for common use cases.
 
 ### Wrapper structs
 
-<!-- VERIFIED: builtin/bool.mojo, builtin/int.mojo,
-     builtin/simd.mojo -->
+<!-- VERIFIED: builtin/bool.mojo, builtin/int.mojo, simd.mojo -->
 
 The most common pattern: a Mojo struct wraps a raw MLIR type in
 a field called `_mlir_value`. The struct provides a Mojo-friendly

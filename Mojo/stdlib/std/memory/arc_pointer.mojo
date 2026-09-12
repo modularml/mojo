@@ -265,7 +265,7 @@ struct ArcPointer[T: Movable & Deinitable](
         """
         self._inner = _inner
 
-    @no_inline
+    @inline(.never)
     def __deinit__(deinit self):
         """Delete the smart pointer.
 
@@ -544,7 +544,7 @@ struct WeakPointer[T: Movable & Deinitable](
             copy._inner.unsafe_value()[].add_weak()
         self._inner = copy._inner
 
-    @no_inline
+    @inline(.never)
     def __deinit__(deinit self):
         """Decrement the weak count and free the allocation if last."""
         if self._inner and self._inner.unsafe_value()[].drop_weak():

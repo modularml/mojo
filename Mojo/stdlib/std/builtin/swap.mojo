@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-@always_inline
+@inline(.always)
 def swap[T: Movable](mut lhs: T, mut rhs: T):
     """Swaps the two given arguments.
 

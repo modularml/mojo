@@ -287,7 +287,7 @@ def test_bicubic_constant_field[dtype: DType](ctx: DeviceContext) raises:
             )
 
 
-@always_inline
+@inline(.always)
 def _cubic_weight(x: Float32) -> Float32:
     """Catmull-Rom cubic weight for host-side reference computation."""
     var a: Float32 = -0.75

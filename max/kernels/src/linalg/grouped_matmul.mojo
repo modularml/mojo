@@ -640,7 +640,7 @@ def grouped_matmul_amd_kernel_launcher[
     var b_ptr = b_tensor.ptr + expert_id * Int32(N) * Int32(K)
     var c_ptr = c_tensor.ptr + a_start_row * UInt32(N)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def elementwise_epilogue_fn_wrapper[
         dtype: DType, width: SIMDLength, *, alignment: Int = 1
@@ -707,7 +707,7 @@ def grouped_matmul_amd_kernel_launcher[
 
             var elements_to_process = thread_end - thread_start
 
-            @always_inline
+            @inline(.always)
             def process_elements[width: Int](idx: Int) {mut}:
                 var elem_idx = thread_start + idx
                 var tile_row, tile_col = divmod(elem_idx, BN)
@@ -746,7 +746,7 @@ def grouped_matmul_amd_kernel_launcher[
             vectorize[vec_width](elements_to_process, process_elements)
 
 
-@always_inline
+@inline(.always)
 def dispatch_amd_matmul_by_block_shape[
     c_type: DType,
     a_type: DType,
@@ -805,7 +805,7 @@ def dispatch_amd_matmul_by_block_shape[
                 return
 
     # Fallback to default config
-    @always_inline
+    @inline(.always)
     @__parameter
     def default_config_launcher[
         block_m: Int,
@@ -886,7 +886,7 @@ def grouped_matmul_amd[
 
     comptime block_dim = 256
 
-    @always_inline
+    @inline(.always)
     def launch_kernel[
         config: MatmulConfig[a_type, b_type, c_type, transpose_b]
     ]() raises {
@@ -944,7 +944,7 @@ def grouped_matmul_amd[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul[
     *,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1046,7 +1046,7 @@ def grouped_matmul[
         and not elementwise_lambda_fn
     )
 
-    @always_inline
+    @inline(.always)
     def description_fn() {var c, var a, var b, imm} -> String:
         # fmt: off
         return String(
@@ -1071,7 +1071,7 @@ def grouped_matmul[
         # caller-supplied `host_stats`; otherwise copy them from
         # `expert_usage_stats` (device->host + sync). The SM100 persistent path
         # reads the device tensor directly and never calls this.
-        @always_inline
+        @inline(.always)
         @__parameter
         def resolve_usage_stats() raises -> Tuple[Int, Int]:
             if host_stats:
@@ -1250,7 +1250,7 @@ def grouped_matmul[
             )
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul[
     *,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1296,7 +1296,7 @@ def grouped_matmul[
     _ = usage_stats_buf^
 
 
-@always_inline
+@inline(.always)
 def naive_grouped_matmul[
     *,
     transpose_b: Bool = True,
@@ -1513,7 +1513,7 @@ def grouped_matmul_rowwise_scaled_fp8_kernel[
         c_by_expert[m * N + n] = accum.cast[c_type]()
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul_rowwise_dynamic_scaled_fp8[
     c_type: DType,
     a_type: DType,
@@ -1664,7 +1664,7 @@ def grouped_matmul_rowwise_dynamic_scaled_fp8[
         )
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul_vendor[
     *,
     transpose_b: Bool = True,
@@ -1703,7 +1703,7 @@ def grouped_matmul_vendor[
     var b_N = Int(b.dim[1]())
     var b_K = Int(b.dim[2]())
 
-    @always_inline
+    @inline(.always)
     def vendor_description_fn() {var c, var a, var b, imm} -> String:
         # fmt: off
         return String(

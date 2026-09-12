@@ -216,15 +216,15 @@ public:
                                        llvm::StringRef originalTriple) const {}
 
   /// Writes `module` as bitcode to `os`. The base implementation writes
-  /// standard LLVM bitcode; backends may override (e.g. Metal emits AIR
-  /// bitcode).
+  /// standard LLVM bitcode; backends with their own bitcode format
+  /// override it.
   virtual void emitBitcode(llvm::Module &module,
                            llvm::raw_pwrite_stream &os) const;
 
   /// Builds the backend's complete LLVM pass pipeline into `mpm`, returning
   /// true if it fully owns the pipeline (so the generic optimization pipeline
   /// is skipped). The default returns false; backends that need a fully custom
-  /// pipeline (e.g. Metal's AIR legalization) override it.
+  /// pipeline override it.
   virtual bool buildLLVMPipeline(llvm::ModulePassManager &mpm,
                                  llvm::PassBuilder &passBuilder,
                                  const CompilationOptions &options) const {

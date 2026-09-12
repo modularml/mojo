@@ -296,7 +296,13 @@ def test_device_pinned_buffer_to_numpy_is_zero_copy_view() -> None:
     reason="staging Buffer GPU tests require GPU",
 )
 def test_buffer_staging_matches_device_pinned() -> None:
-    """Buffer(usage=STAGING) allocates what DevicePinnedBuffer allocates."""
+    """Buffer(usage=STAGING) allocates what DevicePinnedBuffer allocates.
+
+    The allocations are the same; the intents differ by one flag. A pinned
+    buffer's contract is that its caller owns ordering, so it also requests
+    ``UNTRACKED`` -- which is why the hazard layer skips it and a plain
+    staging buffer is tracked.
+    """
     gpu = Accelerator()
     buf = Buffer(
         dtype=DType.float32, shape=[10], device=gpu, usage=Usage.STAGING
@@ -304,8 +310,12 @@ def test_buffer_staging_matches_device_pinned() -> None:
     pinned = DevicePinnedBuffer(dtype=DType.float32, shape=[10], device=gpu)
 
     assert buf.pinned == pinned.pinned == True  # noqa: E712
-    assert buf.usage == pinned.usage == Usage.STAGING
     assert not buf.device.is_host
+
+    assert buf.usage == Usage.STAGING
+    assert pinned.usage == Usage.STAGING | Usage.UNTRACKED
+    assert buf._host_hazard_tracked
+    assert not pinned._host_hazard_tracked
 
 
 @pytest.mark.skipif(
@@ -348,12 +358,12 @@ def test_staging_zeros() -> None:
 )
 @pytest.mark.parametrize("make_buffer", ["staging", "device_pinned"])
 def test_staging_dlpack_does_not_synchronize(make_buffer: str) -> None:
-    """The staging read returns while gated work is still pending.
+    """Neither staging export drains the device; only one of them waits at all.
 
-    Inverse of DRIV-311 contract 1: a host read of staging memory must NOT
-    absorb pending device work. The stream is gated on a host-signalled
-    CompletionFlag; a non-synchronizing read finishes while the gate is
-    held. DevicePinnedBuffer is parametrized alongside to pin parity.
+    Both allocate the same pinned memory, so what separates them is the hazard
+    layer: ``Buffer(usage=STAGING)`` is tracked and waits for the copy this
+    test enqueues behind the gate, while ``DevicePinnedBuffer`` is the
+    caller-owns-ordering escape hatch and returns with the copy still pending.
     """
     gpu = Accelerator()
     if gpu.api not in ("cuda", "hip"):
@@ -385,7 +395,28 @@ def test_staging_dlpack_does_not_synchronize(make_buffer: str) -> None:
         worker_thread.join(timeout=60.0)
 
     assert not worker_thread.is_alive()
-    assert completed_while_gated, (
-        "to_numpy()/__dlpack__ on a staging buffer blocked on gated device"
-        " work; the staging export must not synchronize"
-    )
+    if make_buffer == "staging":
+        assert not completed_while_gated, (
+            "a tracked staging read returned while the copy filling it was"
+            " still gated; the hazard layer did not wait on its producer"
+        )
+    else:
+        assert completed_while_gated, (
+            "to_numpy()/__dlpack__ on an untracked pinned buffer blocked on"
+            " gated device work; nothing may be waited on there"
+        )
+
+
+@pytest.mark.skipif(
+    accelerator_count() == 0,
+    reason="DevicePinnedBuffer GPU tests require GPU",
+)
+def test_device_pinned_stays_untracked() -> None:
+    """Pinned buffers keep caller-owns-ordering; the hazard layer skips them.
+
+    This is what makes the subclass's re-binding of shadowed methods inert.
+    The CPU suite pins that re-binding set but cannot reach this half.
+    """
+    gpu = Accelerator()
+    buffer = DevicePinnedBuffer(dtype=DType.float32, shape=[10], device=gpu)
+    assert not buffer._host_hazard_tracked

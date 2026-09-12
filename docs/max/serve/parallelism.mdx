@@ -1,0 +1,181 @@
+---
+title: Parallelism
+description: Distribute a model across multiple GPUs with tensor, data, or expert parallelism
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Parallelism distributes model computation or incoming requests across multiple
+GPUs. You might consider parallelism when a model doesn't fit comfortably on a
+single GPU or when distributing work could help meet your throughput or
+concurrency goals.
+
+MAX supports tensor parallelism, data parallelism, and expert parallelism on a
+single node. For certain models, you can combine strategies to match the model
+architecture and available hardware.
+
+## Supported strategies
+
+The following table summarizes how each strategy works, when to use it, and the
+relevant MAX CLI options.
+
+| Strategy                | How it works                                                              | When to use it                                                              | CLI options                                                                         |
+|-------------------------|---------------------------------------------------------------------------|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| Tensor parallelism (TP) | Splits model weights and layer computation across GPUs                    | A model doesn't fit on one GPU                                              | [`--devices`](/cli/serve/#--devices-devices) with multiple GPU IDs                  |
+| Data parallelism (DP)   | Runs multiple model replicas and distributes incoming requests among them | A model fits in each replica, and you need higher throughput or concurrency | [`--data-parallel-degree`](/cli/serve/#--data-parallel-degree-data_parallel_degree) |
+| Expert parallelism (EP) | Distributes Mixture of Experts (MoE) weights across GPUs                  | You need to distribute the expert weights of a supported MoE model          | [`--ep-size`](/cli/serve/#--ep-size-ep_size)                                        |
+
+:::note
+
+MAX currently doesn't support pipeline parallelism.
+
+:::
+
+For more conceptual information, see
+[data, tensor, pipeline, expert, and hybrid parallelism](https://handbook.modular.com/inference-optimization/data-tensor-pipeline-expert-hybrid-parallelism/)
+in the LLM Inference Handbook.
+
+## Serve a model on multiple GPUs
+
+As summarized in the table above, you can serve a model across multiple GPUs
+using one or more parallelism strategies. The following sections provide more
+information about how to parallelize a model with `max serve` on a single node.
+
+### Tensor parallelism
+
+For a model that supports tensor parallelism, use `--devices` to select the GPUs
+you want to shard across. This example serves a model with TP=4:
+
+```bash
+max serve \
+  --model google/gemma-3-27b-it \
+  --devices gpu:0,1,2,3
+```
+
+MAX applies tensor parallelism automatically across the devices you give it.
+
+### Data parallelism
+
+Set `--data-parallel-degree` to the number of replicas you want, combined
+with `--devices` to select which GPUs to use.
+
+For a single-node deployment, `--data-parallel-degree` must be either `1` (the
+default), which serves one replica with tensor parallelism across all the
+devices, or the total GPU count, which serves one replica per device. Values
+in between are not supported.
+
+This example serves two independent replicas, one per GPU:
+
+```bash
+max serve \
+  --model meta-llama/Llama-3.1-8B-Instruct \
+  --devices gpu:0,1 \
+  --data-parallel-degree 2
+```
+
+When data parallelism is active, `--max-batch-size` sets the maximum batch size
+**per replica**, not across the whole server. For example,
+`--data-parallel-degree 8` with `--max-batch-size 32` allows up to 32 requests
+per replica and 256 requests across the server.
+
+### Expert parallelism
+
+Expert parallelism applies only to supported MoE models. Set `--ep-size` to the
+total number of GPUs:
+
+```bash
+max serve \
+  --model nvidia/DeepSeek-V3.1-NVFP4 \
+  --devices gpu:0,1,2,3,4,5,6,7 \
+  --ep-size 8
+```
+
+For a single-node deployment, `--ep-size` must be either `1` (EP disabled, the
+default) or the total GPU count. Values in between are not supported.
+
+### Hybrid parallelism
+
+Some models and inference workloads benefit from combining parallelism
+strategies. This approach can distribute model computation, requests, and MoE
+expert weights in different ways across the same set of GPUs. The available
+combinations depend on support for the selected model.
+
+Because the tensor parallelism degree is derived rather than set directly, you
+choose a hybrid configuration by combining a device count, a data parallelism
+degree, and an expert parallelism size. The following examples show the
+`max serve` command for each hybrid combination:
+
+<Tabs>
+  <TabItem value="tp-ep" label="TP+EP">
+
+Keep `--data-parallel-degree` at the default of `1` and set `--ep-size` to the
+device count:
+
+```bash
+max serve \
+  --model nvidia/DeepSeek-V3.1-NVFP4 \
+  --devices gpu:0,1,2,3,4,5,6,7 \
+  --data-parallel-degree 1 \
+  --ep-size 8
+```
+
+  </TabItem>
+  <TabItem value="dp-ep" label="DP+EP">
+
+To give each GPU a separate batch shard for attention, set both
+`--data-parallel-degree` and `--ep-size` to the device count. Dense components
+such as attention and MLP layers, along with shared experts, are replicated on
+each GPU, while routed experts are divided across all eight GPUs:
+
+```bash
+max serve \
+  --model nvidia/DeepSeek-V3.1-NVFP4 \
+  --devices gpu:0,1,2,3,4,5,6,7 \
+  --data-parallel-degree 8 \
+  --ep-size 8
+```
+
+  </TabItem>
+</Tabs>
+
+Not every model supports parallelism, and support for the hybrid combinations
+above is added per architecture. To check whether a specific model supports
+multi-GPU execution, see the **Multi-GPU** column in [MAX models](/models).
+
+:::note
+
+The examples on this page cover a single node. For multi-node and large-scale
+workloads, use [Modular Cloud](https://docs.modular.com/), which manages
+distributed deployment for you.
+
+:::
+
+## Tune parallelism
+
+After choosing a strategy, use the following flags to tune the behavior. The
+**Config** column shows the config class each flag maps to when you configure a
+pipeline programmatically.
+
+| Flag                                    | Description                                                                                                                                                                                                          | Config                                                                               |
+|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `--ep-use-allreduce`                    | Uses allreduce for cross-device communication in expert parallelism. Performance depends on the model and interconnect, so benchmark your deployment first.                                                          | [`PipelineRuntimeConfig`](/api/python/generated/max.pipelines.PipelineRuntimeConfig) |
+| `--eplb-profile`                        | Enables expert-parallel load balancing (EPLB) MoE routing histogram profiling. You can also set the `MAX_SERVE_EPLB_PROFILE` environment variable. See [Environment variables](/environment-variables).              | [`PipelineRuntimeConfig`](/api/python/generated/max.pipelines.PipelineRuntimeConfig) |
+| `--eplb-replicas-per-gpu`               | Adds redundant expert replicas per GPU to reduce routing imbalance when EPLB is active. The default, `0`, adds no replication. Setting `k` adds `k` extra replicas per GPU; total redundant slots = k * ep_size.     | [`PipelineRuntimeConfig`](/api/python/generated/max.pipelines.PipelineRuntimeConfig) |
+| `--enable-dp-cross-replica-prefix-copy` | Lets MAX serve a prefix-cache hit that lives on the GPU of another data-parallel replica by copying the block device-to-device. Enabled by default. See [Prefix caching with PagedAttention](/serve/prefix-caching). | [`KVCacheConfig`](/api/python/generated/max.pipelines.kv_cache.KVCacheConfig/)       |
+
+:::caution
+
+The `--eplb-*` flags are experimental and support only a subset of the MoE
+models available in MAX. Behavior and model coverage can change.
+
+:::
+
+## Next steps
+
+- [Benchmark MAX on NVIDIA or AMD GPUs](/serve/benchmark): Measure the
+  throughput and latency of a parallelism configuration before committing to it.
+- [Prefix caching with PagedAttention](/serve/prefix-caching): Combine
+  parallelism with prefix caching.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud): Take a
+  multi-GPU configuration to a cloud deployment.

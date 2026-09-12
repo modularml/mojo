@@ -52,7 +52,7 @@ async def test_kv_cache_multi_gpu() -> None:
         kv_inputs = kv_manager.runtime_inputs_for_leaf([batch])
         for i in range(num_devices):
             kv_inputs_per_device = kv_inputs.inputs[i]
-            assert len(kv_inputs_per_device.flatten()) == 6
+            assert len(kv_inputs_per_device.flatten()) == 7
             assert kv_inputs_per_device.attention_dispatch_metadata is not None
 
 

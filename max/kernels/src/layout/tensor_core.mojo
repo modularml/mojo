@@ -88,7 +88,7 @@ from layout.swizzle import (
     make_ldmatrix_swizzle,
 )
 from std.memory.unsafe import bitcast
-from std.builtin.simd import _has_native_f8_support
+from std.simd import _has_native_f8_support
 
 from std.utils import IndexList
 from std.utils.index import Index
@@ -301,7 +301,7 @@ struct TensorCore[
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
 
-    @always_inline
+    @inline(.always)
     def load_a[
         swizzle: Optional[Swizzle] = None
     ](
@@ -337,7 +337,7 @@ struct TensorCore[
         else:
             return self._load_a_amd[swizzle](a)
 
-    @always_inline
+    @inline(.always)
     def _load_a_amd[
         swizzle: Optional[Swizzle]
     ](
@@ -399,7 +399,7 @@ struct TensorCore[
         a_reg_tile.vectorize[1, simd_width]().copy_from(a_reg_frags)
         return a_reg_tile
 
-    @always_inline
+    @inline(.always)
     def _load_a_nvidia(
         self,
         a: LayoutTensor,
@@ -466,7 +466,7 @@ struct TensorCore[
         return a_reg_tile
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
-    @always_inline
+    @inline(.always)
     def load_b[
         swizzle: Optional[Swizzle] = None
     ](
@@ -509,7 +509,7 @@ struct TensorCore[
             return self._load_b_amd[swizzle](b)
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
-    @always_inline
+    @inline(.always)
     def _load_b_amd[
         swizzle: Optional[Swizzle]
     ](
@@ -580,7 +580,7 @@ struct TensorCore[
         return b_reg_tile
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
-    @always_inline
+    @inline(.always)
     def _load_b_nvidia(
         self,
         b: LayoutTensor,
@@ -649,7 +649,7 @@ struct TensorCore[
         return b_reg_tile
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
-    @always_inline
+    @inline(.always)
     def load_c(self, c: LayoutTensor, out res: Self.c_reg_tile_type):
         """
         Load the C matrix fragments.
@@ -669,7 +669,7 @@ struct TensorCore[
         else:
             return self._load_c_amd(c)
 
-    @always_inline
+    @inline(.always)
     def _load_c_amd(self, c: LayoutTensor, out res: Self.c_reg_tile_type):
         comptime mma_m = Self.shape[0]
         comptime mma_n = Self.shape[1]
@@ -690,7 +690,7 @@ struct TensorCore[
         c_reg_tile.vectorize[1, 4]().copy_from(c_ram_frags)
         return c_reg_tile
 
-    @always_inline
+    @inline(.always)
     def _load_c_nvidia(self, c: LayoutTensor, out res: Self.c_reg_tile_type):
         comptime mma_m = Self.shape[0]
         comptime mma_n = Self.shape[1]
@@ -720,7 +720,7 @@ struct TensorCore[
             comptime assert False, "No valid type to load matrix fragment c"
         return c_reg_tile
 
-    @always_inline
+    @inline(.always)
     def store_d(self, d_dst: LayoutTensor[mut=True, ...], d_src: LayoutTensor):
         """
         Store matrix D to destination memory.
@@ -737,7 +737,7 @@ struct TensorCore[
         else:
             self._store_d_amd(d_dst, d_src)
 
-    @always_inline
+    @inline(.always)
     def _store_d_amd(
         self, d_dst: LayoutTensor[mut=True, ...], d_src: LayoutTensor
     ):
@@ -768,7 +768,7 @@ struct TensorCore[
             var dst = d_dst.vectorize[4, 1]().distribute[warp_layout](lane_id())
             dst.copy_from(d_src.vectorize[1, 4]())
 
-    @always_inline
+    @inline(.always)
     def _store_d_nvidia(
         self, d_dst: LayoutTensor[mut=True, ...], d_src: LayoutTensor
     ):
@@ -804,7 +804,7 @@ struct TensorCore[
             comptime assert False, "No valid type to store to LayoutTensor d"
 
     # need always_inline, otherwise the stack allocated LayoutTensor will not be valid
-    @always_inline
+    @inline(.always)
     def mma_op(
         self,
         a: LayoutTensor,
@@ -836,7 +836,7 @@ struct TensorCore[
         ](d_reg)
         return d
 
-    @always_inline
+    @inline(.always)
     def load_a[
         swizzle: Optional[Swizzle] = None,
         *,
@@ -871,7 +871,7 @@ struct TensorCore[
         else:
             self._load_a_amd[swizzle](warp_tile, fragments, mma_tile_coord_k)
 
-    @always_inline
+    @inline(.always)
     def _load_a_amd[
         swizzle: Optional[Swizzle],
         *,
@@ -897,7 +897,7 @@ struct TensorCore[
             var a = load_to_simd(self.load_a[swizzle](mma_tile))
             fragments[i, 0] = rebind[frag_type](a)
 
-    @always_inline
+    @inline(.always)
     def _load_a_nvidia[
         swizzle: Optional[Swizzle],
         *,
@@ -923,7 +923,7 @@ struct TensorCore[
                 _load_matrix_frag[swizzle](mma_tile, swizzle_offset)
             )
 
-    @always_inline
+    @inline(.always)
     def load_b[
         swizzle: Optional[Swizzle] = None,
         *,
@@ -973,7 +973,7 @@ struct TensorCore[
                 warp_tile, fragments, mma_tile_coord_k, warp_tile_coord_n
             )
 
-    @always_inline
+    @inline(.always)
     def _load_b_amd[
         swizzle: Optional[Swizzle],
         *,
@@ -1008,7 +1008,7 @@ struct TensorCore[
                 var frag = load_to_simd(self.load_b[swizzle](mma_tile))
                 fragments[i, 0] = rebind[frag_type](frag)
 
-    @always_inline
+    @inline(.always)
     def _load_b_nvidia(
         self,
         warp_tile: LayoutTensor,
@@ -1146,7 +1146,7 @@ struct TensorCore[
                             vec
                         )
 
-    @always_inline
+    @inline(.always)
     def load_b(
         self,
         warp_tile: LayoutTensor,
@@ -1190,7 +1190,7 @@ struct TensorCore[
         comptime pack_factor = 8
         comptime repack_tile = Index(64, 16)
 
-        @always_inline
+        @inline(.always)
         def int4tobf16(i4: Int32, scale: BFloat16) -> SIMD[.bfloat16, 2]:
             comptime MASK: Int32 = 0x000F000F
             comptime I4s_TO_BF16s_MAGIC_NUM: Int32 = 0x43004300
@@ -1232,7 +1232,7 @@ struct TensorCore[
             v2 = int4tobf16(q_int, bitcast[.bfloat16, 1](scales[i + 1, 0]))
             fragments[i + 1, 0] = rebind[frag_type](v1.join(v2))
 
-    @always_inline
+    @inline(.always)
     def mma(
         self,
         a_frag: LayoutTensor,
@@ -1281,7 +1281,7 @@ struct TensorCore[
                 )
 
 
-@always_inline
+@inline(.always)
 def _load_matrix_frag[
     # Refactor the three parameters with ComposedLayout
     # swizzle: OptionalReg[_swizzle_signature] = None,
@@ -1359,7 +1359,7 @@ def _load_matrix_frag[
     )
 
 
-@always_inline
+@inline(.always)
 def get_mma_shape[
     input_type: DType, accum_type: DType, shape_id: Int = 0
 ]() -> IndexList[3]:
@@ -1446,7 +1446,7 @@ def get_mma_shape[
                 comptime assert False, "Unsupported CDNA mma shape."
 
 
-@always_inline
+@inline(.always)
 def get_fragment_size[mma_shape: IndexList[3]]() -> IndexList[3]:
     """Calculates the fragment size per thread for a given MMA shape.
 
@@ -1496,7 +1496,7 @@ struct TiledTensorCore[
     """The underlying TensorCore instance for MMA operations."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         swap_a_b: Bool = False
     ](
@@ -1578,7 +1578,7 @@ struct TiledTensorCore[
             )
 
 
-@always_inline
+@inline(.always)
 def _load_tr16_b64_row[
     swizzle: Optional[Swizzle] = Optional[Swizzle](),
 ](tile: LayoutTensor[_, _, address_space=.SHARED, ...]) -> SIMD[tile.dtype, 4]:
@@ -1627,7 +1627,7 @@ def _load_tr16_b64_row[
     return ds_read_tr16_b64(ptr)
 
 
-@always_inline
+@inline(.always)
 def _load_tr16_b64_warp[
     mma_shape: IndexList[3],
     swizzle: Optional[Swizzle] = Optional[Swizzle](),
@@ -1658,7 +1658,7 @@ def _load_tr16_b64_warp[
     return _load_tr16_b64_row[swizzle](shared_b_tile)
 
 
-@always_inline
+@inline(.always)
 def load_b_tr[
     mma_shape: IndexList[3],
     swizzle: Optional[Swizzle] = Optional[Swizzle](),
@@ -1728,7 +1728,7 @@ def load_b_tr[
     return part_1.join(part_2)
 
 
-@always_inline
+@inline(.always)
 def load_b_nt[
     mma_shape: IndexList[3],
     swizzle: Optional[Swizzle] = Optional[Swizzle](),

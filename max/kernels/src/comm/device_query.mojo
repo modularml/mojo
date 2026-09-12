@@ -108,7 +108,7 @@ struct DefaultCommTuningConfig(CommTuningConfig, TrivialRegisterPassable):
         )
 
 
-@always_inline
+@inline(.always)
 def dispatch_select_comm_config[
     TuningTableType: CommTuningConfig,
     //,

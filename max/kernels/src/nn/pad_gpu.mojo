@@ -43,7 +43,7 @@ def _fill_strides_indexlist[
         strides[axis] = curr_axis_stride
 
 
-@always_inline
+@inline(.always)
 def _vectorized_copy_row[
     dtype: DType,
     simd_width: Int,

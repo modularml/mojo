@@ -18,6 +18,7 @@
 
 #include "ExprNodes.h"
 #include "IREmitter.h"
+#include "Mojo/KGENDialect/KGENUtils.h"
 #include "Mojo/MojoParser/ASTDecl.h"
 #include "Mojo/MojoParser/DeclResolver.h"
 #include "MojoUtils.h"
@@ -1749,7 +1750,8 @@ static bool shouldEmitParameterCall(RValue callee,
           ParamOperatorAttr::stripRebind(callee.getIfPValue()))) {
     if (ASTDecl *calleeDecl = shared.getDeclResolver().getDeclForFuncSymbol(
             calleeSymbolCst.getSymbol())) {
-      if (cast<FnOp>(calleeDecl->getIfOperation()).getInlineLevel() ==
+      if (inlineLevelOrAutomatic(
+              cast<FnOp>(calleeDecl->getIfOperation()).getInlineLevel()) ==
           InlineLevel::AlwaysBuiltin)
         return true;
     }

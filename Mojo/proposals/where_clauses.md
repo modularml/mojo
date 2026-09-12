@@ -176,6 +176,40 @@ Notice how this puts the constraints where they belong - put the constraints
 for the SIMD type as a whole on the struct, and put the constraints for the
 method on the method itself.
 
+### The `not Trait` opt-out
+
+`not Trait` is accepted as the preferred syntax for opting out of a trait
+conformance that is auto-applied by the language:
+
+```mojo
+struct Handle(not Movable, Writable):
+    ...
+```
+
+Because the negation is recorded explicitly, a trait that is opted out and then
+mentioned again in the same list is reported as a repeated trait. That covers
+the transitive case, where a listed trait drags an opted-out ancestor in:
+
+```mojo
+struct Bad(not Movable, Copyable):  # `Copyable` refines `Movable`
+    ...
+```
+
+The reverse is not an error. `False` implies anything, so opting out of a
+*derived* trait while keeping its ancestor is consistent — `not Copyable,
+Movable` is a struct that moves but does not copy.
+
+An opt-out takes a reason with the same `else` spelling a `where` clause uses,
+and under the same string-literal restriction:
+
+```mojo
+struct Handle(not Movable else "a Handle is pinned to the port it opened"):
+    ...
+```
+
+The reason is recorded as the message on the `Trait where False` constraint the
+opt-out lowers to.
+
 ### Constraints in the type system
 
 A parameterized entity (struct, function, or comptime expression) that has not
@@ -274,6 +308,24 @@ list — in `(Trait where cond, "msg", Trait2)` the comma also separates the nex
 entry. Putting the comma inside the parentheses removes the ambiguity: the
 message is simply the second element of a two-element tuple expression, and the
 entry-separator comma is unambiguous.
+
+**The `else` spelling.** `where condition else "message"` is accepted as a new,
+preferred alternative, and reads as a condition with an explanation rather
+than as a tuple:
+
+```mojo
+def foo[sc: Int]() where sc > 1 else "scaling factor must be greater than 1":
+    ...
+```
+
+It escapes the ambiguity that ruled out the bare comma because `else` is a
+keyword rather than a separator, so it cannot be confused with the comma
+between conformance-list entries. It does not collide with the conditional
+expression `a if c else b` either: the expression parser only consumes an
+`else` for which it has already consumed a matching `if`, so a trailing `else`
+after a complete condition is always the message. The two forms differ only in
+surface syntax — both produce the same `message` field on the constraint — and
+writing both on one clause is an error.
 
 **String literals only, for now.** Unlike `comptime assert` (below) — whose
 message is checked by the elaborator and so may be any comptime string

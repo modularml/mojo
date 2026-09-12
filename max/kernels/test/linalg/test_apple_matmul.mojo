@@ -167,7 +167,7 @@ def test_matmul[
             else:
                 pack_transposed_b_ndbuffer[a_type, c_type](b, bp)
 
-    @always_inline
+    @inline(.always)
     def bench_fn_matmul() raises {var}:
         if kernel_type_m != 0:
             _matmul_cpu[
@@ -301,7 +301,7 @@ def test_matmul[
             c[i, j] = 0
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c)
     def epilogue_fn[
         _type: DType, width: SIMDLength, *, alignment: Int = 1
@@ -517,7 +517,7 @@ def test_batched_matmul[
                 golden[batch, i, j] = 0
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c)
     def epilogue_fn[
         _type: DType,
@@ -531,7 +531,7 @@ def test_batched_matmul[
             rebind[SIMD[c.dtype, width]](val + some_constant),
         )
 
-    @always_inline
+    @inline(.always)
     def bench_fn_batched_matmul() raises {var}:
         comptime if has_lambda:
             batched_matmul[

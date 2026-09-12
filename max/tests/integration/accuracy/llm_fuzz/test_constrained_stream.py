@@ -19,7 +19,9 @@ from scenarios._constrained_stream import (
     accumulate_stream,
     classify_served_json,
     constrained_document_errors,
+    enforcement_overrun,
     grade_admission,
+    leading_json,
     parse_json_document,
 )
 
@@ -265,6 +267,78 @@ def test_length_truncation_is_not_conformance() -> None:
     )
 
     assert classify_served_json(body, _SCHEMA) == ("truncated", None)
+
+
+def test_leading_json_returns_the_value_and_what_follows() -> None:
+    assert leading_json(f"{_VALID_DOCUMENT} and then some prose") == (
+        json.loads(_VALID_DOCUMENT),
+        "and then some prose",
+    )
+
+
+def test_leading_json_returns_empty_trailing_for_a_lone_document() -> None:
+    assert leading_json(f"  {_VALID_DOCUMENT}  \n") == (
+        json.loads(_VALID_DOCUMENT),
+        "",
+    )
+
+
+def test_leading_json_is_none_when_the_text_opens_with_prose() -> None:
+    # raw_decode anchors at index 0, so this is unknown rather than bad.
+    assert leading_json(f"Here you go: {_VALID_DOCUMENT}") is None
+
+
+def test_leading_json_is_none_for_a_truncated_document() -> None:
+    assert leading_json('{"answer": 3, "unit": "sec') is None
+
+
+def test_leading_json_is_none_for_empty_output() -> None:
+    assert leading_json("   ") is None
+
+
+def test_overrun_reports_a_document_followed_by_unconstrained_text() -> None:
+    detail = enforcement_overrun(f"{_VALID_DOCUMENT} and then some prose")
+
+    assert detail is not None
+    assert "and then some prose" in detail
+
+
+def test_overrun_reports_a_repeated_document() -> None:
+    assert enforcement_overrun(_VALID_DOCUMENT * 2) is not None
+
+
+def test_a_truncated_document_is_not_an_overrun() -> None:
+    assert enforcement_overrun('{"answer": 3, "unit": "sec') is None
+
+
+def test_a_lone_document_is_not_an_overrun() -> None:
+    assert enforcement_overrun(f"  {_VALID_DOCUMENT}  \n") is None
+
+
+def test_leading_prose_is_not_judged_an_overrun() -> None:
+    # Unparseable at position 0, so the shape is unknown rather than bad.
+    assert enforcement_overrun(f"Here you go: {_VALID_DOCUMENT} bye") is None
+
+
+def test_empty_output_is_not_an_overrun() -> None:
+    assert enforcement_overrun("   ") is None
+
+
+def test_length_finish_with_trailing_text_is_invalid_not_truncated() -> None:
+    body = json.dumps(
+        {
+            "choices": [
+                {
+                    "message": {"content": _VALID_DOCUMENT * 2},
+                    "finish_reason": "length",
+                }
+            ]
+        }
+    )
+
+    grade, detail = classify_served_json(body, _SCHEMA)
+    assert grade == "invalid"
+    assert detail is not None and "unconstrained" in detail
 
 
 def test_complete_invalid_json_is_not_conformance() -> None:

@@ -22,7 +22,7 @@ from std.builtin.dtype import _unsigned_integral_type_of
 from std.math import align_up, align_down
 
 
-@always_inline
+@inline(.always)
 def ufloordiv(a: Int, b: Int) -> Int:
     """Perform unsigned floor division (`//`) on Int arguments.
 
@@ -41,7 +41,7 @@ def ufloordiv(a: Int, b: Int) -> Int:
     return Int(UInt(a) // UInt(b))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def udiv_unchecked(a: Int, b: Int) -> Int:
     """Unsigned division without zero-guard.
 
@@ -62,7 +62,7 @@ def udiv_unchecked(a: Int, b: Int) -> Int:
     return Int(UInt(a) / UInt(b))
 
 
-@always_inline
+@inline(.always)
 def umod[
     dtype: DType, width: SIMDLength, //
 ](a: SIMD[dtype, width], b: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -93,7 +93,7 @@ def umod[
     return (a.cast[utype]() % b.cast[utype]()).cast[dtype]()
 
 
-@always_inline
+@inline(.always)
 def udivmod(a: Int, b: Int) -> Tuple[Int, Int]:
     """Perform unsigned divmod on Int arguments.
 
@@ -115,7 +115,7 @@ def udivmod(a: Int, b: Int) -> Tuple[Int, Int]:
     return Int(q), Int(r)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def udivmod_unchecked(a: Int, b: Int) -> Tuple[Int, Int]:
     """Unsigned divmod without zero-guard.
 
@@ -140,7 +140,7 @@ def udivmod_unchecked(a: Int, b: Int) -> Tuple[Int, Int]:
     return Int(q), Int(ua - q * ub)
 
 
-@always_inline
+@inline(.always)
 def ualign_up(value: Int, alignment: Int) -> Int:
     """Returns the closest multiple of alignment that is greater than or equal
     to value.
@@ -156,7 +156,7 @@ def ualign_up(value: Int, alignment: Int) -> Int:
     return Int(align_up(UInt(value), UInt(alignment)))
 
 
-@always_inline
+@inline(.always)
 def ualign_down(value: Int, alignment: Int) -> Int:
     """Returns the closest multiple of alignment that is less than or equal to
     value.
@@ -172,7 +172,7 @@ def ualign_down(value: Int, alignment: Int) -> Int:
     return Int(align_down(UInt(value), UInt(alignment)))
 
 
-@always_inline
+@inline(.always)
 def uceildiv(numerator: Int, denominator: Int) -> Int:
     """Return the rounded-up result of dividing numerator by denominator.
 

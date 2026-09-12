@@ -72,7 +72,7 @@ def _6bit_to_byte[width: SIMDLength](input: Bytes[width]) -> Bytes[width]:
                 res[4 * i + j] = 3 * i + perm[j]
         return res
 
-    @always_inline
+    @inline(.always)
     def combine[
         mask: Bytes[4], shift: Int
     ](shuffled: Bytes[width]) -> Bytes[width]:
@@ -206,7 +206,7 @@ def load_incomplete_simd[
     return result
 
 
-@no_inline
+@inline(.never)
 def _b64encode(input_bytes: ImmSpan[Byte, _], mut result: String):
     comptime simd_width = simd_byte_width()
     comptime input_simd_width = simd_width * 3 // 4
@@ -296,7 +296,7 @@ def _rshift_bits_in_u16[shift: Int](input: Bytes) -> type_of(input):
     return bitcast[.uint8, input.length](res)
 
 
-@always_inline
+@inline(.always)
 def _sub_with_saturation[
     width: SIMDLength, //
 ](a: SIMD[.uint8, width], b: SIMD[.uint8, width]) -> SIMD[.uint8, width]:

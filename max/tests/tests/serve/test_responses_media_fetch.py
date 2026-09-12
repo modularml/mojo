@@ -225,29 +225,19 @@ async def test_truncated_image_rejected(
         )
 
 
-async def test_server_level_cap_applies(
+async def test_request_budget_applies(
     serve_media: _ServeMedia,
 ) -> None:
-    """``Settings.max_bytes`` bounds the responses fetch.
+    """``Settings.max_media_bytes`` bounds the responses fetch.
 
     The old path had no cap at all, so a large body was downloaded in full and
-    then base64-expanded in memory.
+    then base64-expanded in memory. The former per-call and server-level
+    per-item ``max_bytes`` caps are gone: one aggregate budget covers it.
     """
     serve_media(b"\x00" * 4096)
-    with pytest.raises(InputError, match="image exceeds the maximum"):
+    with pytest.raises(InputError, match="exceeds the maximum"):
         await fetch_media_data_uri(
-            "https://example.com/big.png", _settings(max_bytes=1024)
-        )
-
-
-async def test_per_call_cap_applies(
-    serve_media: _ServeMedia,
-) -> None:
-    """An explicit ``max_bytes`` bounds the fetch even with no server cap."""
-    serve_media(b"\x00" * 4096)
-    with pytest.raises(InputError, match="image exceeds the maximum"):
-        await fetch_media_data_uri(
-            "https://example.com/big.png", _settings(), max_bytes=1024
+            "https://example.com/big.png", _settings(max_media_bytes=1024)
         )
 
 

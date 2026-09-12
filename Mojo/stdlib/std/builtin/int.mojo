@@ -62,7 +62,7 @@ trait Indexer:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def index[T: Indexer](idx: T, /) -> Int:
     """Returns the value of `__mlir_index__` for the given value.
 

@@ -18,22 +18,30 @@ from __future__ import annotations
 import math
 
 import pytest
+from max.driver import Buffer, accelerator_count
 from max.dtype import DType
 from max.graph import BufferType, DeviceRef, TensorType
 from max.nn.kv_cache import (
+    BatchCharacteristics,
+    KVCacheAssignments,
     KVCacheParams,
     KVCacheQuantizationConfig,
     KVConnectorType,
     MHAKVCacheParams,
     MultiKVCacheParams,
+    RecurrentStateParams,
     compute_max_seq_len_fitting_in_cache,
     compute_num_device_blocks,
     estimated_memory_size,
+    recurrent_leaf,
 )
 from max.nn.kv_cache.input_types import (
     KVCacheInputs,
     MultiKVCacheInputs,
+    RecurrentStateInputs,
+    RecurrentStateRegion,
 )
+from max.nn.kv_cache.utils import MultiAttnKey
 from max.pipelines.kv_cache.config import KVConnectorConfig
 
 
@@ -411,8 +419,8 @@ class TestDeepNestedKVCacheTree:
         symbolic = root.get_symbolic_inputs()
 
         flat = symbolic.flatten()
-        # Each leaf (single GPU) contributes 6 tensors; 6 leaves → 36 total.
-        assert len(flat) == 6 * 6
+        # Each leaf (single GPU) contributes 7 tensors; 6 leaves → 42 total.
+        assert len(flat) == 6 * 7
 
         it = iter(flat)
         reconstructed = symbolic.unflatten(it)
@@ -547,7 +555,7 @@ class TestDeepTreeParallelism:
     def test_deep_tree_parallelism_propagated_to_deepest_node(
         self, n_devices: int, dp_degree: int
     ) -> None:
-        """Parallelism metadata must reach the deepest subtree (e, depth 4)."""
+        """Parallelism metadata must reach the deepest subtree (e, num_blocks 4)."""
         tp = n_devices // dp_degree
         root = _build_deep_tree(n_devices=n_devices, dp_degree=dp_degree)
         draft = root.children["draft"]
@@ -583,7 +591,7 @@ class TestDeepTreeParallelism:
             .get_symbolic_inputs()
             .flatten()
         )
-        assert len(flat) == n_devices * 2 * 6
+        assert len(flat) == n_devices * 2 * 7
 
     def test_deep_tree_flatten_unflatten_roundtrip(
         self, n_devices: int, dp_degree: int
@@ -592,8 +600,8 @@ class TestDeepTreeParallelism:
         root = _build_deep_tree(n_devices=n_devices, dp_degree=dp_degree)
         symbolic = root.get_symbolic_inputs()
         flat = symbolic.flatten()
-        # 6 leaves x n_devices entries x 6 items per device
-        assert len(flat) == 6 * n_devices * 6
+        # 6 leaves x n_devices entries x 7 items per device
+        assert len(flat) == 6 * n_devices * 7
 
         it = iter(flat)
         reconstructed = symbolic.unflatten(it)
@@ -654,14 +662,14 @@ class TestPerLayerBuffers:
         )
 
     def test_default_off_is_byte_identical(self) -> None:
-        """Off by default: no per-layer field and 6 flat items per device."""
+        """Off by default: no per-layer field and 7 flat items per device."""
         params = self._mha(num_layers=4, per_layer_buffers=False)
         symbolic = params.get_symbolic_inputs()
         assert symbolic.inputs[0].kv_blocks_per_layer is None
-        assert len(symbolic.flatten()) == 6
+        assert len(symbolic.flatten()) == 7
 
     def test_per_layer_appends_num_layers_at_tail(self) -> None:
-        """On: ``num_layers`` single-layer buffers appended after the 6 fields."""
+        """On: ``num_layers`` single-layer buffers appended after the 7 fields."""
         num_layers = 4
         params = self._mha(num_layers=num_layers, per_layer_buffers=True)
         symbolic = params.get_symbolic_inputs()
@@ -675,7 +683,7 @@ class TestPerLayerBuffers:
             == per_device.kv_blocks_per_layer[0].shape
         )
         assert int(per_device.kv_blocks.shape[2]) == 1
-        assert len(symbolic.flatten()) == 6 + num_layers
+        assert len(symbolic.flatten()) == 7 + num_layers
 
     def test_per_layer_flatten_unflatten_roundtrip(self) -> None:
         """flatten -> unflatten fully consumes the iterator and rebuilds tail."""
@@ -690,14 +698,14 @@ class TestPerLayerBuffers:
         assert len(rec.kv_blocks_per_layer) == num_layers
 
     def test_multi_tree_only_flagged_child_extends(self) -> None:
-        """In a tree, only the per-layer child grows; others stay 6 per device."""
+        """In a tree, only the per-layer child grows; others stay 7 per device."""
         sliding = self._mha(num_layers=2, per_layer_buffers=True)
         full = self._mha(num_layers=5, per_layer_buffers=False)
         root = MultiKVCacheParams.from_params(
             {"sliding": sliding, "full": full}
         )
-        # sliding: 6 + 2 (per-layer tail); full: 6; one device each.
-        assert len(root.get_symbolic_inputs().flatten()) == (6 + 2) + 6
+        # sliding: 7 + 2 (per-layer tail); full: 7; one device each.
+        assert len(root.get_symbolic_inputs().flatten()) == (7 + 2) + 7
 
     def test_allocate_zero_layers_raises(self) -> None:
         """``num_layers == 0`` fails fast with a clear error, not IndexError.
@@ -844,6 +852,27 @@ class TestPagePoolSymbolicNamespace:
         assert scales is not None
         assert str(scales.shape[0]) == "total_num_pages"
 
+    def test_quantized_scale_leaf_pads_to_the_tma_alignment(self) -> None:
+        """A padded scale page keeps the flat scale TMA's 16-byte start."""
+        leaf = MHAKVCacheParams(
+            dtype=DType.float8_e4m3fn,
+            n_kv_heads=1,
+            head_dim=128,
+            num_layers=4,
+            devices=[DeviceRef.GPU()],
+            page_size=128,
+            kvcache_quant_config=KVCacheQuantizationConfig(
+                scale_dtype=DType.float8_e8m0fnu
+            ),
+        )
+        leaves = leaf.leaves()
+        scales = next(r for i, r in leaves.items() if i.endswith("/scales"))
+        # One scale per token here, so a row alone would let the planner pad to
+        # any byte and break `create_index_scale_tma_tile`.
+        assert leaf.scale_row_bytes == 1
+        assert scales.row_bytes % 16 == 0
+        assert scales.bytes_per_page % scales.row_bytes == 0
+
     def test_quantized_sibling_scales_page_dim_namespaced(self) -> None:
         def quant_leaf() -> KVCacheParams:
             return MHAKVCacheParams(
@@ -872,3 +901,259 @@ class TestPagePoolSymbolicNamespace:
         assert str(g_scales.shape[0]) == "global_total_num_pages"
         assert str(loc_scales.shape[0]) == "local_total_num_pages"
         assert str(g_scales.shape[0]) == _page_dim(g)
+
+
+def create_state_params(
+    attn: KVCacheParams,
+    *,
+    num_layers: int = 4,
+    leaf_prefix: str = "state",
+) -> RecurrentStateParams:
+    """A two-leaf state child drawing from ``attn``'s pool."""
+    return RecurrentStateParams(
+        devices=attn.devices,
+        data_parallel_degree=attn.data_parallel_degree,
+        regions=(
+            RecurrentStateRegion(
+                leaf_id=f"{leaf_prefix}/conv",
+                num_layers=num_layers,
+                row_shape=(64, 3),
+                dtype=DType.bfloat16,
+            ),
+            RecurrentStateRegion(
+                leaf_id=f"{leaf_prefix}/recurrent",
+                num_layers=num_layers,
+                row_shape=(8, 16, 16),
+                dtype=DType.bfloat16,
+            ),
+        ),
+    )
+
+
+class TestRecurrentState:
+    """The state is a child of the root cache, and there is one of it."""
+
+    def test_the_state_declares_none_of_the_pool_it_draws_from(self) -> None:
+        """It carries what it reads and nothing else."""
+        attn = create_kv_cache_params(page_size=256)
+        state = create_state_params(attn)
+        assert state.devices == attn.devices
+        assert state.data_parallel_degree == attn.data_parallel_degree
+        for absent in (
+            "page_size",
+            "enable_prefix_caching",
+            "kv_hash_algo",
+            "kv_connector_config",
+            "num_draft_tokens",
+        ):
+            assert not hasattr(state, absent), absent
+        # ...and the tree it joins still agrees with itself.
+        MultiKVCacheParams.from_params({"attn": attn, "state": state})
+
+    def test_two_attention_caches_share_one_state(self) -> None:
+        """The shape a field on an attention cache could not express."""
+        target = create_kv_cache_params()
+        draft = create_kv_cache_params(num_layers=1)
+        root = MultiKVCacheParams.from_params(
+            {
+                "target": target,
+                "draft": draft,
+                "state": create_state_params(target),
+            }
+        )
+        assert recurrent_leaf(root) is root.children["state"]
+        assert set(root.children) == {"target", "draft", "state"}
+
+    def test_a_branch_may_not_declare_a_state(self) -> None:
+        """A request holds one state, so it belongs to the root cache."""
+        attn = create_kv_cache_params()
+        branch = MultiKVCacheParams.from_params(
+            {"attn": attn, "state": create_state_params(attn)}
+        )
+        with pytest.raises(ValueError, match="must be declared on the root"):
+            MultiKVCacheParams.from_params({"target": branch})
+
+    def test_one_state_per_cache(self) -> None:
+        """A request holds one, so two would leave the num_blocks ambiguous."""
+        attn = create_kv_cache_params()
+        with pytest.raises(ValueError, match="only 0 or 1 is allowed"):
+            MultiKVCacheParams.from_params(
+                {
+                    "attn": attn,
+                    "first": create_state_params(attn),
+                    "second": create_state_params(attn),
+                }
+            )
+
+    def test_a_cache_of_nothing_but_a_state_is_refused(self) -> None:
+        """A state shares an attention cache's pool; it does not stand one up."""
+        state = create_state_params(create_kv_cache_params())
+        with pytest.raises(
+            ValueError, match="requires at least one attention cache"
+        ):
+            MultiKVCacheParams.from_params({"state": state})
+
+    def test_a_state_declared_first_does_not_answer_for_the_pool(self) -> None:
+        """Which child answers cannot fall to declaration order."""
+        attn = create_kv_cache_params(page_size=256)
+        root = MultiKVCacheParams.from_params(
+            {"state": create_state_params(attn), "attn": attn}
+        )
+        assert root.replicates_kv_across_tp == attn.replicates_kv_across_tp
+        assert root.tensor_parallel_degree == attn.tensor_parallel_degree
+        assert root.enable_prefix_caching == attn.enable_prefix_caching
+
+    def test_no_state_reads_as_none(self) -> None:
+        attn = create_kv_cache_params()
+        assert recurrent_leaf(attn) is None
+        assert (
+            recurrent_leaf(MultiKVCacheParams.from_params({"attn": attn}))
+            is None
+        )
+
+    @pytest.mark.skipif(
+        accelerator_count() == 0,
+        reason="resolve_attn_key materializes a device",
+    )
+    def test_the_state_is_absent_from_attention_aggregates(self) -> None:
+        attn = create_kv_cache_params()
+        state = create_state_params(attn)
+        root = MultiKVCacheParams.from_params({"attn": attn, "state": state})
+        # A state page is a per-request cost, so folding it into
+        # bytes_per_block would scale every estimate by the context.
+        assert root.bytes_per_block == attn.bytes_per_block
+        key = root.resolve_attn_key(1, 1, 1)
+        assert isinstance(key, MultiAttnKey)
+        assert {name for name, _ in key.children} == {"attn"}
+        assert root.graph_capture_probe_cache_lengths(
+            512
+        ) == attn.graph_capture_probe_cache_lengths(512)
+
+    def test_a_slab_views_as_the_rows_its_kernels_index(self) -> None:
+        """Each leaf's view is cut from its own geometry."""
+        state = create_state_params(create_kv_cache_params(), num_layers=3)
+        conv, rec = state.regions
+        # A huge block is the least common multiple of the leaves' page
+        # sizes, which is what makes it a whole number of every leaf's rows.
+        huge_block = math.lcm(conv.bytes_per_state, rec.bytes_per_state)
+        slab = _cpu_buffer(2, huge_block, dtype=DType.uint8)
+
+        views = state.slab_to_row_views([slab])
+
+        assert list(views) == [conv.leaf_id, rec.leaf_id]
+        for region in (conv, rec):
+            (view,) = views[region.leaf_id]
+            row_bytes = region.row_elements * region.dtype.size_in_bytes
+            assert view.shape == (
+                slab.num_elements // row_bytes,
+                *region.row_shape,
+            )
+            assert view.dtype == region.dtype
+
+    def test_a_page_folds_to_the_rows_its_layers_occupy(self) -> None:
+        # A page holds every layer of one state, so page p of a 3-layer leaf
+        # is rows 3p..3p+2.
+        state = create_state_params(create_kv_cache_params(), num_layers=3)
+
+        assert state.regions[0].rows_of(1) == range(3, 6)
+        assert state.regions[0].rows_of(4) == range(12, 15)
+
+    def test_leaves_carry_the_state_unprefixed(self) -> None:
+        attn = create_kv_cache_params()
+        state = create_state_params(attn)
+        root = MultiKVCacheParams.from_params({"attn": attn, "state": state})
+        leaves = root.leaves()
+        for region in state.regions:
+            leaf = leaves[region.leaf_id]
+            assert leaf.group_id.is_recurrent()
+            assert leaf.bytes_per_page == region.bytes_per_state
+        # The attention leaves keep their child prefix.
+        assert any(leaf_id.startswith("attn.") for leaf_id in leaves)
+
+    def test_symbolic_inputs_include_the_state(self) -> None:
+        attn = create_kv_cache_params()
+        state = create_state_params(attn)
+        root = MultiKVCacheParams.from_params({"attn": attn, "state": state})
+        symbolic = root.get_symbolic_inputs()
+        assert isinstance(symbolic, MultiKVCacheInputs)
+        state_inputs = symbolic.children["state"]
+        assert isinstance(state_inputs, RecurrentStateInputs)
+        # Two pools, and the row tensor each one is addressed by.
+        assert len(state_inputs.flatten()) == 4
+
+    def test_unflatten_basic_kv_tree_returns_attention_only(self) -> None:
+        attn = create_kv_cache_params()
+        root = MultiKVCacheParams.from_params(
+            {"attn": attn, "state": create_state_params(attn)}
+        )
+        flat = root.flattened_kv_inputs()
+        (only,) = root.unflatten_basic_kv_tree(iter(flat))
+        assert len(only) == len(attn.get_symbolic_inputs().inputs)
+
+
+def _cpu_buffer(*shape: int, dtype: DType = DType.uint32) -> Buffer:
+    return Buffer.zeros(list(shape), dtype, DeviceRef.CPU().to_device())
+
+
+def _staged_state(
+    state: RecurrentStateParams, batch_size: int = 2
+) -> dict[str, Buffer]:
+    """One device's staged entries for a state, as the manager leaves them."""
+    staged: dict[str, Buffer] = {}
+    for region in state.regions:
+        staged[region.leaf_id] = _cpu_buffer(batch_size, region.num_layers)
+        staged[region.pool_key] = _cpu_buffer(4, *region.row_shape)
+    return staged
+
+
+def _assignment(*, staged: dict[str, Buffer]) -> KVCacheAssignments:
+    """A minimal replica assignment; only its staged buffers are read here."""
+    return KVCacheAssignments(
+        cache_lengths_by_device=[],
+        staged_by_device=[staged],
+        max_prompt_length=_cpu_buffer(1),
+        max_cache_length=_cpu_buffer(1),
+        batch_characteristics=BatchCharacteristics(
+            batch_size=2, max_prompt_length=1, max_cache_valid_length=1
+        ),
+    )
+
+
+class TestRuntimeInputComposition:
+    """Every child builds itself, so declaration order needs no restoring."""
+
+    @pytest.mark.parametrize("keys", [["attn"], ["target", "draft"]])
+    def test_the_state_flattens_after_every_child(
+        self, keys: list[str]
+    ) -> None:
+        """Flatten order is the graph's input order: children, then state."""
+        attn = create_kv_cache_params()
+        root = MultiKVCacheParams.from_params(
+            {key: create_kv_cache_params() for key in keys}
+            | {"state": create_state_params(attn)}
+        )
+        symbolic = root.get_symbolic_inputs()
+        assert list(symbolic.children) == [*keys, "state"]
+        state_inputs = symbolic.children["state"]
+
+        tail = len(state_inputs.flatten())
+        assert symbolic.flatten()[-tail:] == state_inputs.flatten()
+
+    def test_the_state_child_reads_only_its_assignment(self) -> None:
+        """It takes no paged buffer: its pool is staged under the leaf."""
+        state = create_state_params(create_kv_cache_params())
+        staged = _staged_state(state)
+        built = state.build_runtime_inputs(
+            [_assignment(staged=staged)], buffers=[]
+        )
+        assert isinstance(built, RecurrentStateInputs)
+        (device,) = built.inputs
+        for region in state.regions:
+            leaf = device.by_leaf(region.leaf_id)
+            assert leaf.pool is staged[region.pool_key]
+            assert leaf.live_row_ids is staged[region.leaf_id]
+
+    def test_a_missing_assignment_names_the_leaves(self) -> None:
+        state = create_state_params(create_kv_cache_params())
+        with pytest.raises(ValueError, match="state/conv"):
+            state.build_runtime_inputs([_assignment(staged={})], buffers=[])

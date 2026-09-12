@@ -24,7 +24,7 @@ def test_vectorize() raises:
     var vector_stack: Array[Float32, 5] = [1.0, 2.0, 3.0, 4.0, 5.0]
     var vector = Span(vector_stack)
 
-    @always_inline
+    @inline(.always)
     def add_two[width: Int](idx: Int) {var vector}:
         vector.unsafe_ptr().unsafe_store[width=width](
             idx, vector.unsafe_ptr().unsafe_load[width=width](idx) + 2
@@ -38,7 +38,7 @@ def test_vectorize() raises:
     assert_equal(vector[3], 6.0)
     assert_equal(vector[4], 7.0)
 
-    @always_inline
+    @inline(.always)
     def add[width: Int](idx: Int) {var vector}:
         vector.unsafe_ptr().unsafe_store[width=width](
             idx,
@@ -60,7 +60,7 @@ def test_vectorize_evl() raises:
     var vector_stack: Array[Float32, 5] = [1.0, 2.0, 3.0, 4.0, 5.0]
     var vector = Span(vector_stack)
 
-    @always_inline
+    @inline(.always)
     def add_two[width: Int](idx: Int, evl: Int) {var vector}:
         if evl == width:
             vector.unsafe_ptr().unsafe_store[width=width](
@@ -78,7 +78,7 @@ def test_vectorize_evl() raises:
     assert_equal(vector[3], 6.0)
     assert_equal(vector[4], 7.0)
 
-    @always_inline
+    @inline(.always)
     def add[width: Int](idx: Int, evl: Int) {var vector}:
         if evl == width:
             vector.unsafe_ptr().unsafe_store[width=width](
@@ -115,7 +115,7 @@ def test_vectorize_unroll() raises:
         vec[i] = Float32(i)
         buf[i] = Float32(i)
 
-    @always_inline
+    @inline(.always)
     def double_buf[simd_width: Int](idx: Int) {var buf}:
         buf.unsafe_ptr().unsafe_store[width=simd_width](
             idx,
@@ -123,7 +123,7 @@ def test_vectorize_unroll() raises:
             + buf.unsafe_ptr().unsafe_load[width=simd_width](idx),
         )
 
-    @always_inline
+    @inline(.always)
     def double_vec[simd_width: Int](idx: Int) {var vec}:
         vec.unsafe_ptr().unsafe_store[width=simd_width](
             idx,

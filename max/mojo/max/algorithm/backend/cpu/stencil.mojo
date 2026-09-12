@@ -112,7 +112,7 @@ def _stencil_impl_cpu[
 
     comptime unroll_factor = 8  # TODO: Comeup with a cost heuristic.
 
-    @always_inline
+    @inline(.always)
     def task_func(i: Int) {imm}:
         var start_parallel_offset = i * chunk_size
         var end_parallel_offset = min((i + 1) * chunk_size, parallelism_size)
@@ -128,7 +128,7 @@ def _stencil_impl_cpu[
                 parallel_offset, shape
             )
 
-            @always_inline
+            @inline(.always)
             def func_wrapper[
                 simd_width: Int
             ](idx: Int) {

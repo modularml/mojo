@@ -41,7 +41,7 @@ from std.sys import align_of, size_of
 comptime _InvalidTypeIndex: Int = -1
 
 
-@always_inline
+@inline(.always)
 def _get_type_index[T: AnyType, *Ts: AnyType]() -> Int:
     comptime for i in range(Ts.length):
         comptime if Ts[i] == T:
@@ -121,14 +121,14 @@ struct _DefaultNicheStorage[T: AnyType](
 
     var _memory: MaybeUninit[Self.T]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self._memory = {}
 
     def __deinit__(deinit self):
         self._memory^.unsafe_forget()
 
-    @always_inline
+    @inline(.always)
     def as_uninit[
         U: AnyType
     ](ref self) -> Pointer[MaybeUninit[U], origin_of(self)]:
@@ -149,11 +149,11 @@ struct _CustomNicheStorage[Storage: UnsafeCustomNicheStorage](
 
     var _memory: Self.Storage.NicheStorage
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
-    @always_inline
+    @inline(.always)
     def as_uninit[
         T: AnyType
     ](ref self) -> Pointer[MaybeUninit[T], origin_of(self)]:
@@ -199,7 +199,7 @@ struct _NichedOptionalStorage[
     def _check[U: AnyType]():
         comptime assert U == Self.T or U == Self.EmptyType, "unexpected type"
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert (
             Self.T.niche_count() > 0
@@ -207,7 +207,7 @@ struct _NichedOptionalStorage[
         self._memory = {}
         Self.T.write_niche[index=0](self._memory.as_uninit[Self.T]())
 
-    @always_inline
+    @inline(.always)
     def __init__[U: Movable](out self, var value: U):
         Self._check[U]()
         comptime if U == Self.T:
@@ -221,11 +221,11 @@ struct _NichedOptionalStorage[
             _ = value
             self = Self()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, unsafe_uninitialized: ()):
         self._memory = {}
 
-    @always_inline
+    @inline(.always)
     def unsafe_set_active[U: AnyType](mut self):
         Self._check[U]()
         comptime if U != Self.T:
@@ -234,7 +234,7 @@ struct _NichedOptionalStorage[
             # only the empty case needs to stamp the niche here.
             Self.T.write_niche[index=0](self._memory.as_uninit[Self.T]())
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, deinit move: Self):
         comptime assert conforms_to(Self.T, Movable)
         if move.isa[Self.T]():
@@ -242,7 +242,7 @@ struct _NichedOptionalStorage[
         else:
             self = Self()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, copy: Self):
         comptime assert conforms_to(Self.T, Copyable)
         if copy.isa[Self.T]():
@@ -250,7 +250,7 @@ struct _NichedOptionalStorage[
         else:
             self = Self()
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         comptime assert conforms_to(Self.T, Deinitable)
         if self.isa[Self.T]():
@@ -258,7 +258,7 @@ struct _NichedOptionalStorage[
                 Self.T
             ]()[].unsafe_ptr().unsafe_deinit_pointee()
 
-    @always_inline
+    @inline(.always)
     def isa[U: AnyType](self) -> Bool:
         Self._check[U]()
         var niche = Self.T.classify_niche(self._memory.as_uninit[Self.T]())
@@ -268,7 +268,7 @@ struct _NichedOptionalStorage[
         else:
             return not is_some
 
-    @always_inline
+    @inline(.always)
     def unsafe_ptr[U: AnyType](ref self) -> Pointer[U, origin_of(self)]:
         Self._check[U]()
         # The niche backing only has a slot for `Self.T`, so address that slot
@@ -305,21 +305,21 @@ struct _DefaultVariantStorage[*Ts: AnyType](
     ]
     var _impl: Self._mlir_type
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, unsafe_uninitialized: ()):
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
-    @always_inline
+    @inline(.always)
     def __init__[T: Movable](out self, var value: T):
         self = Self(unsafe_uninitialized=())
         self.get_discriminant() = UInt8(_get_type_index[T, *Self.Ts]())
         self.unsafe_ptr[T]().unsafe_write(value^)
 
-    @always_inline
+    @inline(.always)
     def unsafe_set_active[T: AnyType](mut self):
         self.get_discriminant() = UInt8(_get_type_index[T, *Self.Ts]())
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, copy: Self):
         self = Self(unsafe_uninitialized=())
         self.get_discriminant() = copy.get_discriminant()
@@ -332,7 +332,7 @@ struct _DefaultVariantStorage[*Ts: AnyType](
                 self.unsafe_ptr[T]().unsafe_write(copy=copy.unsafe_ptr[T]()[])
                 return
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, deinit move: Self):
         self = Self(unsafe_uninitialized=())
         self.get_discriminant() = move.get_discriminant()
@@ -347,7 +347,7 @@ struct _DefaultVariantStorage[*Ts: AnyType](
                 )
                 return
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         comptime for i in range(Self.Ts.length):
             comptime T = Self.Ts[i]
@@ -357,7 +357,7 @@ struct _DefaultVariantStorage[*Ts: AnyType](
                 self.unsafe_ptr[T]().unsafe_deinit_pointee()
                 return
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_discriminant(ref self) -> ref[self] UInt8:
         var discr_ptr = __mlir_op.`pop.variant.discr_gep`[
             _type=__mlir_type.`!kgen.pointer<scalar<ui8>>`
@@ -366,12 +366,12 @@ struct _DefaultVariantStorage[*Ts: AnyType](
             _mlir_value=discr_ptr
         ).unsafe_bitcast[UInt8]()[]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def isa[T: AnyType](self) -> Bool:
         comptime discriminant = UInt8(_get_type_index[T, *Self.Ts]())
         return self.get_discriminant() == discriminant
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_ptr[T: AnyType](ref self) -> Pointer[T, origin_of(self)]:
         comptime idx = _get_type_index[T, *Self.Ts]()
         return {
@@ -635,7 +635,7 @@ struct Variant[*Ts: AnyType](
     # ===-------------------------------------------------------------------===#
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem_param__[
         T: AnyType
     ](ref self) -> ref[origin_of(self)._get_owned_interior["value"]] T:
@@ -661,7 +661,7 @@ struct Variant[*Ts: AnyType](
             T
         ]()._get_ref_with_unsafe_interior_origin["value", origin_of(self)]()
 
-    @always_inline
+    @inline(.always)
     def __eq__(
         self, other: Self
     ) -> Bool where Self.Ts.all_conforms_to[Equatable]():
@@ -684,7 +684,7 @@ struct Variant[*Ts: AnyType](
                 return self.unsafe_get[T]() == other.unsafe_get[T]()
         return False
 
-    @always_inline
+    @inline(.always)
     def __ne__(
         self, other: Self
     ) -> Bool where Self.Ts.all_conforms_to[Equatable]():
@@ -736,7 +736,7 @@ struct Variant[*Ts: AnyType](
 
                 return
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where Self.Ts.all_conforms_to[Writable]():
@@ -747,7 +747,7 @@ struct Variant[*Ts: AnyType](
         """
         self._write_value_to[is_repr=False](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where Self.Ts.all_conforms_to[Writable]():
@@ -766,7 +766,7 @@ struct Variant[*Ts: AnyType](
             write_field
         )
 
-    @always_inline
+    @inline(.always)
     def unwrap[T: Movable](deinit self) -> T:
         """Take the current value of the variant with the provided type.
 
@@ -787,11 +787,11 @@ struct Variant[*Ts: AnyType](
 
         return self._storage^.unwrap[T]()
 
-    @always_inline
+    @inline(.always)
     def _unsafe_unchecked_unwrap[T: Movable](deinit self) -> T:
         return self._storage^.unwrap[T]()
 
-    @always_inline
+    @inline(.always)
     def unsafe_unwrap[T: Movable](deinit self) -> T:
         """Unsafely take the current value of the variant with the provided type.
 
@@ -812,7 +812,7 @@ struct Variant[*Ts: AnyType](
         assert self.isa[T](), "taking wrong type"
         return self._storage^.unwrap[T]()
 
-    @always_inline
+    @inline(.always)
     def replace[
         Tin: Movable & Deinitable,
         Tout: Movable,
@@ -840,7 +840,7 @@ struct Variant[*Ts: AnyType](
 
         return self.unsafe_replace[Tin, Tout](value^)
 
-    @always_inline
+    @inline(.always)
     def unsafe_replace[
         Tin: Movable, Tout: Movable
     ](mut self, var value: Tin) -> Tout:
@@ -954,7 +954,7 @@ struct Variant[*Ts: AnyType](
         Self._check[T]()
         return self._storage.isa[T]()
 
-    @always_inline
+    @inline(.always)
     def _unsafe_unchecked_get[T: AnyType](ref self) -> ref[self] T:
         return self._storage.unsafe_ptr[T]().unsafe_origin_cast[
             origin_of(self)

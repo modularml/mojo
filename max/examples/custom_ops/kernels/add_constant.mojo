@@ -34,7 +34,7 @@ struct AddConstant[value: Int]:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def add_constant[width: Int](idx: Coord) -> SIMD[x.dtype, width]:
             return x.load[width](idx) + Scalar[output.dtype](Self.value)
 

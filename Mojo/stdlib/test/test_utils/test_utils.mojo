@@ -14,7 +14,7 @@
 
 from std.ffi import external_call
 
-from std.builtin.simd import _simd_apply
+from std.simd import _simd_apply
 from std.testing import assert_equal, assert_true
 
 
@@ -61,7 +61,7 @@ def check_write_to(
     assert_true(contains in string)
 
 
-@always_inline
+@inline(.always)
 def libm_call[
     dtype: DType,
     width: SIMDLength,
@@ -84,13 +84,13 @@ def libm_call[
         The result of calling the libm function.
     """
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _float32_dispatch[
         input_type: DType, result_type: DType
     ](arg: Scalar[input_type]) -> Scalar[result_type]:
         return external_call[fn_fp32, Scalar[result_type]](arg)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _float64_dispatch[
         input_type: DType, result_type: DType
     ](arg: Scalar[input_type]) -> Scalar[result_type]:

@@ -18,7 +18,7 @@ from std.benchmark import Bench, BenchConfig, Bencher, BenchId, keep
 # Benchmarks
 # ===-----------------------------------------------------------------------===#
 def bench_stringify_small_integers(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         for i in range(1_000):
             var a = String(i)

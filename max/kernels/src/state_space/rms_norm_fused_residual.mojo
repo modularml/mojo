@@ -258,7 +258,7 @@ def rms_norm_fused_residual_cpu[
     var prod_all_but_last_dim = shape.flattened_length() // last_dim
 
     # Create 2D wrapper lambdas that translate indices at runtime
-    @always_inline
+    @inline(.always)
     def input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) {shape, input_fn} -> SIMD[dtype, simd_width]:
@@ -266,7 +266,7 @@ def rms_norm_fused_residual_cpu[
         indices[rank - 1] = col
         return input_fn[simd_width, rank](indices)
 
-    @always_inline
+    @inline(.always)
     def residual_input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) {shape, residual_input_fn} -> SIMD[dtype, simd_width]:
@@ -274,7 +274,7 @@ def rms_norm_fused_residual_cpu[
         indices[rank - 1] = col
         return residual_input_fn[simd_width, rank](indices)
 
-    @always_inline
+    @inline(.always)
     def output_fn_2d[
         simd_width: SIMDLength, alignment: Int
     ](row: Int, col: Int, val: SIMD[dtype, simd_width]) {
@@ -284,7 +284,7 @@ def rms_norm_fused_residual_cpu[
         indices[rank - 1] = col
         output_fn[simd_width, alignment](indices, val)
 
-    @always_inline
+    @inline(.always)
     def output_residual_fn_2d[
         simd_width: SIMDLength, alignment: Int
     ](row: Int, col: Int, val: SIMD[dtype, simd_width]) {
@@ -294,7 +294,7 @@ def rms_norm_fused_residual_cpu[
         indices[rank - 1] = col
         output_residual_fn[simd_width, alignment](indices, val)
 
-    @always_inline
+    @inline(.always)
     def residual_read_fn_2d[
         sw: Int
     ](row: Int, col: Int) {shape, residual_read_fn} -> SIMD[dtype, sw]:
@@ -373,7 +373,7 @@ def _rms_norm_fused_residual_cpu_entry[
         # Nothing to do.
         return
 
-    @always_inline
+    @inline(.always)
     def residual_read_fn[
         width: Int, _rank: Int
     ](coords: IndexList[_rank]) {
@@ -520,7 +520,7 @@ def rms_norm_fused_residual_gpu_block[
 
         # Second stage: apply RMSNorm using shared memory as input
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(shared_mem)
         def shared_mem_input_fn[
             width: Int
@@ -605,7 +605,7 @@ def rms_norm_fused_residual_gpu[
     var cols = last_dim
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def output_fn_2d[
         simd_width: SIMDLength, alignment: Int
     ](row: Int, col: Int, val: SIMD[dtype, simd_width]) -> None:
@@ -614,7 +614,7 @@ def rms_norm_fused_residual_gpu[
         output_fn[simd_width, alignment](indices.canonicalize(), val)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def output_residual_fn_2d[
         simd_width: SIMDLength, alignment: Int
     ](row: Int, col: Int, val: SIMD[dtype, simd_width]) -> None:
@@ -623,7 +623,7 @@ def rms_norm_fused_residual_gpu[
         output_residual_fn[simd_width, alignment](indices.canonicalize(), val)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) -> SIMD[dtype, simd_width]:
@@ -632,7 +632,7 @@ def rms_norm_fused_residual_gpu[
         return input_fn[simd_width](indices.canonicalize())
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def residual_input_fn_2d[
         simd_width: Int
     ](row: Int, col: Int) -> SIMD[dtype, simd_width]:
@@ -751,7 +751,7 @@ def _rms_norm_fused_residual_impl[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def rms_norm_fused_residual[
     dtype: DType,
     rank: Int,
@@ -817,21 +817,21 @@ def rms_norm_fused_residual[
     """
     comptime assert gamma.flat_rank == 1, "gamma must have rank 1"
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_fn_wrapper[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[rank], val: SIMD[dtype, width]) -> None:
         output_0_fn[width, rank, alignment](idx, val)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_residual_fn_wrapper[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[rank], val: SIMD[dtype, width]) -> None:
         output_residual_fn[width, rank, alignment](idx, val)
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return trace_arg("input", shape, dtype)
 

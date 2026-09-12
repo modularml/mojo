@@ -15,7 +15,7 @@
 from std.collections.string.string_span import get_static_string
 from std.math import align_down, ceildiv, iota
 from std.sys import align_of, bit_width_of, simd_width_of, size_of
-from std.sys.info import CompilationTarget, _current_target, is_apple_gpu
+from std.sys.info import CompilationTarget, is_apple_gpu
 from std.utils.numerics import neg_inf
 
 from max.algorithm import elementwise, sync_parallelize, unsafe_parallel_memcpy
@@ -41,7 +41,7 @@ from std.utils import IndexList, StaticTuple
 from std.collections import OptionalReg
 
 
-@always_inline
+@inline(.always)
 def _unsafe_normalize_neg_index[
     dtype: DType, width: SIMDLength, out_type: DType = .int
 ](idx: SIMD[dtype, width], dim_size: Int) -> SIMD[out_type, width]:
@@ -51,7 +51,7 @@ def _unsafe_normalize_neg_index[
     )
 
 
-@always_inline
+@inline(.always)
 def normalize_neg_index[
     dtype: DType, width: SIMDLength, out_type: DType = .int
 ](idx: SIMD[dtype, width], dim_size: Int) raises -> SIMD[out_type, width]:
@@ -92,20 +92,20 @@ struct Axis(Indexer, Intable, TrivialRegisterPassable):
 
     var axis: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, axis: Int):
         self.axis = axis
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, axis: Int, rank: Int) raises:
         self.axis = normalize_neg_index(axis, rank)
 
-    @always_inline
+    @inline(.always)
     def __int__(self) -> Int:
         return self.axis
 
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.
 
@@ -115,7 +115,7 @@ struct Axis(Indexer, Intable, TrivialRegisterPassable):
         return self.axis.__mlir_index__()
 
 
-@always_inline
+@inline(.always)
 def gather_reduce[
     dtype: DType,
     gather_axis: Int,
@@ -201,7 +201,7 @@ def gather_reduce[
 
     var gather_axis_size = Int(input.dim(gather_axis))
 
-    @always_inline
+    @inline(.always)
     def task_func(
         task_id: Int,
     ) {
@@ -246,11 +246,11 @@ def gather_reduce[
         for i in range(out_vec_start, out_vec_end):
             # TODO(MOCO-4664): `var i` copy-captures the loop variable to work
             # around wrong debug-info scopes on implicit nested-scope captures.
-            @always_inline
+            @inline(.always)
             def gather_k_tile[
                 simd_width: Int
             ](k: Int) {var i, var input, var indices, var output, imm}:
-                @always_inline
+                @inline(.always)
                 def reduce_j_tile[
                     unroll_factor: Int
                 ](
@@ -342,7 +342,7 @@ def gather[
 
     @__parameter
     @__copy_capture(end_indices_ptr)
-    @always_inline
+    @inline(.always)
     def prefetch_fn[
         _input_rank: Int, _indices_rank: Int
     ](
@@ -383,7 +383,7 @@ def gather[
             )
             input.prefetch(input_coords)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, _rank: Int, element_alignment: Int
     ](index: IndexList[_rank]) {var input} -> SIMD[dtype, width]:
@@ -393,7 +393,7 @@ def gather[
             width=width, alignment=element_alignment * align_of[dtype]()
         ](coords)
 
-    @always_inline
+    @inline(.always)
     def indices_fn[
         width: Int, _rank: Int
     ](index: IndexList[_rank]) {var indices} -> SIMD[indices_type, width]:
@@ -403,7 +403,7 @@ def gather[
             coords
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, _rank: Int, element_alignment: Int
     ](index: IndexList[_rank], val: SIMD[dtype, width]) {var output}:
@@ -474,7 +474,7 @@ def gather_guards(
         raise Error("gather: axis must be less than input rank")
 
 
-@always_inline
+@inline(.always)
 def gather_elementwise_fn_wrapper[
     dtype: DType,
     indices_type: DType,
@@ -614,7 +614,7 @@ def gather_elementwise_fn_wrapper[
 
 
 # TODO: Delete / for testing purposes (test_gather.mojo)
-@always_inline
+@inline(.always)
 def gather[
     dtype: DType,
     indices_type: DType,
@@ -678,9 +678,11 @@ def gather[
         output_fn: Callback that stores values into the output tensor.
         context: Device context for execution.
     """
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
 
     gather_guards(axis, input_shape, indices_shape, output_shape)
     with Trace[TraceLevel.OP, target=target](
@@ -700,7 +702,7 @@ def gather[
                 MutPointer[Int, MutAnyOrigin](to=error_index)
             )
 
-        @always_inline
+        @inline(.always)
         def gather_elementwise_fn[
             simd_width: Int, alignment: Int = 1
         ](idx: Coord) {
@@ -745,7 +747,7 @@ def gather[
             )
         else:
             elementwise[
-                simd_width=simd_width_of[dtype, target=compile_target](),
+                simd_width=target_simd_width,
                 target=target,
                 _trace_description="gather",
             ](
@@ -791,7 +793,7 @@ struct ScatterOobIndexStrategy(Equatable, ImplicitlyCopyable, Writable):
     which case the corresponding update will be skipped."""
 
 
-@always_inline
+@inline(.always)
 def _atomic_reduce[
     dtype: DType,
     //,
@@ -826,7 +828,7 @@ def _atomic_reduce[
             return
 
 
-@always_inline
+@inline(.always)
 def scatter_nd_generator[
     output_type: DType,
     indices_type: DType,
@@ -956,7 +958,7 @@ def scatter_nd_generator[
         var r_minus_m = data.rank - last_shape_of_indices
         comptime updates_rank = updates.rank
 
-        @always_inline
+        @inline(.always)
         def update_func[
             simd_width: Int,
             alignment: Int = 1,
@@ -1049,7 +1051,7 @@ def scatter_nd_generator[
                         updates_offset + i
                     ]
 
-        @always_inline
+        @inline(.always)
         def update_element_func[
             simd_width: Int,
             alignment: Int = 1,
@@ -1201,7 +1203,7 @@ def scatter_nd_generator[
             ](update_func, Coord(iter_shape), context)
 
 
-@always_inline
+@inline(.always)
 def scatter_nd[
     output_type: DType,
     indices_type: DType,
@@ -1235,7 +1237,7 @@ def scatter_nd[
     scatter_nd_generator[target=target](data, indices, updates, output, context)
 
 
-@always_inline
+@inline(.always)
 def scatter_nd_shape[
     input_type: DType,
     indices_type: DType,
@@ -1302,7 +1304,7 @@ def scatter_nd_shape[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def gather_shape[
     output_rank: Int,
     input_type: DType,
@@ -1361,7 +1363,7 @@ def gather_shape[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def scatter_elements[
     rank: Int,
     input_type: DType,
@@ -1458,7 +1460,7 @@ def scatter_elements[
     elementwise[1](update_func, indices.shape_coord(), ctx)
 
 
-@always_inline
+@inline(.always)
 def scatter_elements_shape[
     input_type: DType,
     indices_type: DType,
@@ -1514,7 +1516,7 @@ def scatter_elements_shape[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def gather_elements[
     input_type: DType,
     indices_type: DType,
@@ -1588,7 +1590,7 @@ def gather_elements[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def gather_nd_shape[
     output_rank: Int,
     input_type: DType,
@@ -1742,10 +1744,11 @@ def gather_nd[
             output_coord, data.load[width=simd_width, alignment=1](data_coord)
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
 
     # Only use SIMD if:
     #   - the input data is contiguous
@@ -1839,7 +1842,7 @@ def scatter_set_constant[
     if Int(indices.dim[1]()) != 2:
         raise Error("scatter_set: indices must have shape [total_seq_len, 2]")
 
-    @always_inline
+    @inline(.always)
     def scatter_set_constant_fn[
         width: Int, alignment: Int = 1
     ](idx: Coord) {var}:
@@ -1900,7 +1903,7 @@ def apply_packed_bitmask[
     comptime assert logits.flat_rank == 2, "apply_packed_bitmask: logits rank 2"
     comptime assert packed.flat_rank == 2, "apply_packed_bitmask: packed rank 2"
 
-    @always_inline
+    @inline(.always)
     def apply_packed_bitmask_fn[
         width: Int, alignment: Int = 1
     ](idx: Coord) {var}:

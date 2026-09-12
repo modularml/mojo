@@ -35,7 +35,7 @@ from std.memory import unsafe_stack_allocation
 from nn.topk import TopK_2, _block_reduce_topk, _topk_dead_val
 
 
-@always_inline
+@inline(.always)
 def block_select_topk[
     T: DType,
     out_idx_type: DType,

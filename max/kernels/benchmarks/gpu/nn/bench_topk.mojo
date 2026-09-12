@@ -155,11 +155,11 @@ def bench_topk_batched[
 
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {var K_dev_buffer, var top_p_dev_buffer, imm,}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             _topk_gpu[sampling=sampling, largest=largest](
                 ctx,
@@ -333,9 +333,9 @@ def bench_topk_multi_rank[
         )
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {var k, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             topk_gpu[sampling=sampling, largest=largest](
                 ctx,
@@ -467,9 +467,9 @@ def bench_topk_fi[
     ctx.synchronize()
     var seed_tt = TileTensor(seed_device_buffer, row_major(batch_size))
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             _topk_topp_sampling_fi[dtype, out_idx_type](
                 ctx,
@@ -573,9 +573,9 @@ def bench_topk_topp_dist[
     ctx.enqueue_copy(seed_dev, seed_host)
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {mut tokens_dev, mut dist_dev, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(
             ctx: DeviceContext,
         ) raises {mut tokens_dev, mut dist_dev, imm}:
@@ -688,9 +688,9 @@ def bench_topk_topp_masked[
     ctx.enqueue_copy(top_k_dev, top_k_host)
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) {mut probs_dev, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {mut probs_dev, imm}:
             topk_topp_masked_probs[dtype](
                 ctx,
@@ -977,9 +977,9 @@ def bench_dispatch[
     )
     var iter0 = 0
 
-    @always_inline
+    @inline(.always)
     def do_bench(mut bb: Bencher) raises {mut iter0, imm}:
-        @always_inline
+        @inline(.always)
         def launch(
             dctx: DeviceContext,
         ) raises {
@@ -1087,9 +1087,9 @@ def bench_gumbel_from_probs() raises:
                     .as_immut()
                 )
 
-                @always_inline
+                @inline(.always)
                 def bench_fn(mut bb: Bencher) raises {imm}:
-                    @always_inline
+                    @inline(.always)
                     def launch(dctx: DeviceContext) raises {imm}:
                         gumbel_sampling_fused_gpu[from_probs=True](
                             dctx, probs, out, seed=seeds
@@ -1135,9 +1135,9 @@ def bench_bitonic_topk(
     scores_buf.enqueue_fill(Scalar[dtype](0.5))
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut bb: Bencher) {mut idxs_buf, imm}:
-        @always_inline
+        @inline(.always)
         def launch(dctx: DeviceContext) raises {mut idxs_buf, imm}:
             persistent_topk_block(
                 dctx,

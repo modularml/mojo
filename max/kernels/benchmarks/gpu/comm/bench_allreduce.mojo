@@ -55,7 +55,7 @@ from std.testing import assert_almost_equal, assert_true
 from std.utils.index import StaticTuple
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _per_gpu_value[
     dtype: DType,
@@ -227,11 +227,11 @@ def bench_reduce[
             raise "Vendor CCL not available; skipping vendor path."
         vendor_ccl.init_comms(ngpus)
 
-    @always_inline
+    @inline(.always)
     def bench_iter(
         mut b: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_tensors, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_tensors, imm}:

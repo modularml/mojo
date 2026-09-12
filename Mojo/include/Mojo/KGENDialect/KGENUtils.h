@@ -101,8 +101,8 @@ bool isTypeExprType(Type type);
 /// Returns whether the given attribute is a KGEN type expression.
 bool isTypeExpr(TypedAttr attr);
 
-/// If `prop` asserts that its two operands denote the same value -- so that a
-/// consumer may substitute either one for the other -- return the pair.
+/// If `prop` is a binary `#kgen.param.identical` -- so that a consumer may
+/// substitute either operand for the other -- return the pair.
 std::optional<std::pair<TypedAttr, TypedAttr>>
 getIdentityProposition(TypedAttr prop);
 
@@ -426,8 +426,24 @@ void printFunctionFuncTypeGenerator(OpAsmPrinter &p, Region *region,
                                     ParamDeclPrintHookTy printResultElt = {});
 
 /// Parse the always_inline related keywords if present.
-ParseResult parseOptionalInline(OpAsmParser &parser, InlineLevelAttr &attr);
-void printOptionalInline(AsmPrinter &p, InlineLevel level);
+ParseResult parseOptionalInline(OpAsmParser &parser, Attribute &attr);
+void printOptionalInline(AsmPrinter &p, Attribute attr);
+
+/// The integer `spec` holds, in either the plain or the `InlineLevel` form.
+std::optional<int64_t> inlineLevelValueOf(TypedAttr spec);
+
+/// The level `spec` names, or nullopt while it still depends on a parameter.
+std::optional<InlineLevel> inlineLevelOf(TypedAttr spec);
+
+/// The level `spec` names, or Automatic while it depends on a parameter.
+InlineLevel inlineLevelOrAutomatic(TypedAttr spec);
+
+/// Builds the stored form of `level`; an op's own accessor reads one.
+TypedAttr getInlineLevelAttr(MLIRContext *ctx, InlineLevel level);
+
+/// Diagnose an `inlineLevel` that is not integral, or that folded to a value
+/// naming no level.
+LogicalResult verifyInlineLevel(Operation *op, Attribute spec);
 
 /// Parse and print a decorator list if present.
 ParseResult parseOptionalDecorators(AsmParser &p, DecoratorsAttr &decorators);

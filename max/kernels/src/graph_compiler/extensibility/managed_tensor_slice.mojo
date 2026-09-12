@@ -101,7 +101,7 @@ struct IO(Equatable, TrivialRegisterPassable):
     def __init__(out self, value: Int):
         self.value = value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def is_fused(self) -> Bool:
         """True when this IO represents any fused variant (input, output, or
         compute-output)."""
@@ -156,7 +156,7 @@ struct IOSpec[mut: Bool, input: IO](TrivialRegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _dot_prod[rank: Int](x: IndexList[rank], y: IndexList[rank]) -> Int:
     var offset = 0
 
@@ -561,7 +561,7 @@ struct StaticTensorSpec[
         self.alignment = internals.alignment
         self.address_space = internals.address_space
 
-    @always_inline
+    @inline(.always)
     def to_unfused(
         self,
     ) -> StaticTensorSpec[
@@ -583,7 +583,7 @@ struct StaticTensorSpec[
     # require all parameters to be bound.
     comptime get_unknown = _get_unknown_tensor_spec[Self.dtype, Self.rank]
 
-    @always_inline
+    @inline(.always)
     def with_tile_layout[
         new_layout: TensorLayout,
     ](
@@ -598,7 +598,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_tile_layout[
         new_rank: Int,
         new_layout: TensorLayout,
@@ -615,7 +615,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_tile_layout_and_alignment[
         new_layout: TensorLayout,
     ](self, new_alignment: Int) -> StaticTensorSpec[
@@ -628,7 +628,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_tile_layout_and_alignment[
         new_rank: Int,
         new_layout: TensorLayout,
@@ -643,7 +643,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_int_tuple_layout[
         new_rank: Int, new_shape: IntTuple, new_strides: IndexList
     ](
@@ -660,7 +660,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_int_tuple_layout_and_alignment[
         new_rank: Int, new_shape: IntTuple, new_strides: IndexList
     ](self, new_alignment: Int) -> StaticTensorSpec[
@@ -675,7 +675,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_row_major_int_tuple_layout[
         new_rank: Int, new_shape: IntTuple
     ](
@@ -690,7 +690,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_input_fusion[
         F: InputFusion
     ](self) -> StaticTensorSpec[
@@ -708,7 +708,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_output_fusion[
         F: OutputFusion
     ](self) -> StaticTensorSpec[
@@ -726,7 +726,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_compute_fusion[
         F: ComputeOutputFusion
     ](self) -> StaticTensorSpec[
@@ -744,7 +744,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_compute_fusion_tile[
         F: ComputeOutputFusionTile
     ](self) -> StaticTensorSpec[
@@ -762,7 +762,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def with_output_fusion_tile[
         F: OutputFusionTile
     ](self) -> StaticTensorSpec[
@@ -780,7 +780,7 @@ struct StaticTensorSpec[
             self.address_space,
         }
 
-    @always_inline
+    @inline(.always)
     def to_layout(self) -> Layout:
         return Layout(
             coord_to_int_tuple[*Self.static_layout._shape_types](),
@@ -820,7 +820,7 @@ struct StaticTensorSpecInternal[dtype: DType, rank: Int](ImplicitlyCopyable):
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def _gcd_pow2[a: Int, b: Int]() -> Int:
     # alignments should always be powers of 2
     comptime assert (
@@ -841,7 +841,7 @@ def _gcd_pow2[a: Int, b: Int]() -> Int:
 # They are set to be inlined further down graph compiler stack.
 @doc_hidden
 @register_internal("simd_store_into_managed_tensor_slice")
-@always_inline
+@inline(.always)
 def simd_store_into_managed_tensor_slice[
     dtype: DType,
     rank: Int,
@@ -870,7 +870,7 @@ def simd_store_into_managed_tensor_slice[
 
     # Stride = 1
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_stride1():
         comptime if dtype == .bool:
             var v = value.cast[.uint8]()
@@ -880,7 +880,7 @@ def simd_store_into_managed_tensor_slice[
 
     # Stride > 1
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_strided(stride: Int):
         comptime if dtype == .bool:
             var v = value.cast[.uint8]()
@@ -915,7 +915,7 @@ def simd_store_into_managed_tensor_slice[
 
 @doc_hidden
 @register_internal("simd_store_into_tensor_pointer")
-@always_inline
+@inline(.always)
 def simd_store_into_tensor_pointer[
     dtype: DType,
     rank: Int,
@@ -964,7 +964,7 @@ def simd_store_into_tensor_pointer[
 # which doesn't work correctly due to closure capture limitations.
 @doc_hidden
 @register_internal("simd_load_from_tensor_pointer")
-@always_inline
+@inline(.always)
 def simd_load_from_tensor_pointer[
     dtype: DType,
     rank: Int,
@@ -1011,7 +1011,7 @@ def simd_load_from_tensor_pointer[
 
 @doc_hidden
 @register_internal("simd_load_from_managed_tensor_slice")
-@always_inline
+@inline(.always)
 def simd_load_from_managed_tensor_slice[
     dtype: DType,
     rank: Int,
@@ -1039,7 +1039,7 @@ def simd_load_from_managed_tensor_slice[
 
     # Stride = 1
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_stride1() -> SIMD[dtype, simd_width]:
         comptime if dtype == .bool:
             var v = tensor._ptr.unsafe_bitcast[UInt8]().unsafe_load[
@@ -1054,7 +1054,7 @@ def simd_load_from_managed_tensor_slice[
 
     # Stride > 1
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_strided(stride: Int) -> SIMD[dtype, simd_width]:
         comptime if dtype == .bool:
             var v = strided_load[simd_width, invariant=invariant](
@@ -1119,7 +1119,7 @@ comptime DynamicTensor[dtype: DType, rank: Int] = ManagedTensorSlice[
 ]
 
 
-@always_inline
+@inline(.always)
 def _index_list_to_static_coord[
     element_types: TypeList[Trait=CoordLike, ...],
 ](values: IndexList) -> Coord[*element_types]:
@@ -1248,7 +1248,7 @@ struct ManagedTensorSlice[
     var output_fusion_tile: Self.OutFusionTile
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sentinel_in_fusion() -> Self.InFusion:
         """Return a sentinel InFusion value, or an uninitialized placeholder
         when the type parameter is a real fusion struct (never reached at
@@ -1263,7 +1263,7 @@ struct ManagedTensorSlice[
             return f
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sentinel_out_fusion() -> Self.OutFusion:
         """Return a sentinel OutFusion value, or an uninitialized placeholder
         when the type parameter is a real fusion struct."""
@@ -1277,7 +1277,7 @@ struct ManagedTensorSlice[
             return f
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sentinel_compute_fusion() -> Self.ComputeFusion:
         """Return a sentinel ComputeFusion value, or an uninitialized
         placeholder when the type parameter is a real fusion struct."""
@@ -1291,7 +1291,7 @@ struct ManagedTensorSlice[
             return f
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sentinel_compute_fusion_tile() -> Self.ComputeFusionTile:
         """Return a sentinel ComputeFusionTile value, or an uninitialized
         placeholder when the type parameter is a real fusion struct."""
@@ -1305,7 +1305,7 @@ struct ManagedTensorSlice[
             return f
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sentinel_output_fusion_tile() -> Self.OutFusionTile:
         """Return a sentinel OutFusionTile value, or an uninitialized
         placeholder when the type parameter is a real fusion struct."""
@@ -1319,7 +1319,7 @@ struct ManagedTensorSlice[
             return f
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _make_runtime_layout(
         shape: IndexList[Self.rank], strides: IndexList[Self.rank]
     ) -> Self.RuntimeLayout:
@@ -1401,7 +1401,7 @@ struct ManagedTensorSlice[
         self.compute_fusion_tile = Self._sentinel_compute_fusion_tile()
         self.output_fusion_tile = Self._sentinel_output_fusion_tile()
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, indices: IndexList[Self.rank]) -> Scalar[Self.dtype]:
         """Gets the value at the specified indices.
 
@@ -1417,7 +1417,7 @@ struct ManagedTensorSlice[
         var offset = self._compute_offset(indices)
         return self._ptr[unsafe_offset=offset]
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, *indices: Int) -> Scalar[Self.dtype]:
         """Gets the value at the specified indices.
 
@@ -1435,7 +1435,7 @@ struct ManagedTensorSlice[
         ), "mismatch between requested index and rank"
         return self[IndexList[Self.rank](*indices)]
 
-    @always_inline
+    @inline(.always)
     def __setitem__(self, *indices: Int, val: Scalar[Self.dtype]):
         """Stores the value at the specified indices.
 
@@ -1452,7 +1452,7 @@ struct ManagedTensorSlice[
         ), "mismatch between requested index and rank"
         self[IndexList[Self.rank](*indices)] = val
 
-    @always_inline
+    @inline(.always)
     def __setitem__(
         self, indices: IndexList[Self.rank], val: Scalar[Self.dtype]
     ):
@@ -1469,7 +1469,7 @@ struct ManagedTensorSlice[
         var offset = self._compute_offset(indices)
         self._ptr[unsafe_offset=offset] = val
 
-    @always_inline
+    @inline(.always)
     def shape(self) -> IndexList[Self.rank]:
         """Gets the shape of this tensor slice, as an `IndexList`.
 
@@ -1483,7 +1483,7 @@ struct ManagedTensorSlice[
 
         return result
 
-    @always_inline
+    @inline(.always)
     def shape_coord(
         self,
     ) -> Coord[*Self.RuntimeLayout.shape_types]:
@@ -1500,7 +1500,7 @@ struct ManagedTensorSlice[
         """
         return self._runtime_layout.shape_coord()
 
-    @always_inline
+    @inline(.always)
     def strides_coord(
         self,
     ) -> Coord[*Self.RuntimeLayout.stride_types]:
@@ -1517,7 +1517,7 @@ struct ManagedTensorSlice[
         """
         return self._runtime_layout.stride_coord()
 
-    @always_inline
+    @inline(.always)
     def runtime_layout(self) -> Self.RuntimeLayout:
         """Gets the runtime layout of this tensor slice.
 
@@ -1529,7 +1529,7 @@ struct ManagedTensorSlice[
         """
         return self._runtime_layout
 
-    @always_inline
+    @inline(.always)
     def dim_size(self, index: Int) -> Int:
         """Gets the size of a given dimension of this tensor slice using a run
         time value.
@@ -1542,7 +1542,7 @@ struct ManagedTensorSlice[
         """
         return self.shape()[index]
 
-    @always_inline
+    @inline(.always)
     def dim_size[index: Int](self) -> Int:
         """Gets the size of a given dimension of this tensor slice using a
         compile time value.
@@ -1561,7 +1561,7 @@ struct ManagedTensorSlice[
 
         return Int(self._runtime_layout.shape[index]().value())
 
-    @always_inline
+    @inline(.always)
     def strides(self) -> IndexList[Self.rank]:
         """Gets the strides of this tensor slice, as an `IndexList`.
 
@@ -1575,7 +1575,7 @@ struct ManagedTensorSlice[
 
         return result
 
-    @always_inline
+    @inline(.always)
     def stride_length(self, index: Int) -> Int:
         """Gets the length of the stride of a given dimension of this tensor
         slice using a run time value.
@@ -1588,7 +1588,7 @@ struct ManagedTensorSlice[
         """
         return self.strides()[index]
 
-    @always_inline
+    @inline(.always)
     def stride_length[index: Int](self) -> Int:
         """Gets the length of the stride of a given dimension of this tensor
         slice using a compile time value.
@@ -1607,7 +1607,7 @@ struct ManagedTensorSlice[
 
         return Int(self._runtime_layout.stride[index]().value())
 
-    @always_inline
+    @inline(.always)
     def size(self) -> Int:
         """Computes the tensor slice's number of elements.
 
@@ -1616,7 +1616,7 @@ struct ManagedTensorSlice[
         """
         return Int(self._runtime_layout.size())
 
-    @always_inline
+    @inline(.always)
     def bytecount(self) -> Int:
         """Returns the size of the tensor slice in bytes.
 
@@ -1625,7 +1625,7 @@ struct ManagedTensorSlice[
         """
         return self.size() * size_of[Self.dtype]()
 
-    @always_inline
+    @inline(.always)
     def unsafe_ptr[
         _dtype: DType = Self.dtype
     ](self) -> Pointer[Scalar[_dtype], MutAnyOrigin]:
@@ -1643,7 +1643,7 @@ struct ManagedTensorSlice[
         """
         return rebind[Pointer[Scalar[_dtype], MutAnyOrigin]](self._ptr)
 
-    @always_inline
+    @inline(.always)
     def to_device_buffer(self, ctx: DeviceContext) -> DeviceBuffer[Self.dtype]:
         var size = self.size()
         if size > 0:
@@ -1656,7 +1656,7 @@ struct ManagedTensorSlice[
         else:
             return DeviceBuffer[Self.dtype].empty(ctx)
 
-    @always_inline
+    @inline(.always)
     def load[
         width: Int,
         # Necessary to make it simpler on the call site.
@@ -1686,7 +1686,7 @@ struct ManagedTensorSlice[
             simd_width=width, element_alignment=element_alignment
         ](self, ridx)
 
-    @always_inline
+    @inline(.always)
     def load[
         width: Int,
         element_alignment: Int = 1,
@@ -1708,7 +1708,7 @@ struct ManagedTensorSlice[
             rebind[IndexList[Self.rank]](coord_to_index_list(index))
         )
 
-    @always_inline
+    @inline(.always)
     def _fused_load[
         width: Int,
         # Necessary to make it simpler on the call site.
@@ -1727,7 +1727,7 @@ struct ManagedTensorSlice[
                 simd_width=width, element_alignment=element_alignment
             ](self, ridx)
 
-    @always_inline
+    @inline(.always)
     def _fused_load[
         width: Int,
         element_alignment: Int = 1,
@@ -1737,7 +1737,7 @@ struct ManagedTensorSlice[
             rebind[IndexList[Self.rank]](coord_to_index_list(index))
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _lambda_load[
         width: Int,
         _rank: Int,
@@ -1753,7 +1753,7 @@ struct ManagedTensorSlice[
             Self.dtype, Self.rank, width, element_alignment
         ](ridx)
 
-    @always_inline
+    @inline(.always)
     def _lambda_load[
         width: Int,
         element_alignment: Int = 1,
@@ -1763,7 +1763,7 @@ struct ManagedTensorSlice[
             rebind[IndexList[Self.rank]](coord_to_index_list(index))
         )
 
-    @always_inline
+    @inline(.always)
     def _compute_offset(self, index: IndexList[Self.rank]) -> Int:
         comptime if Self.rank == 0:
             return 0
@@ -1796,7 +1796,7 @@ struct ManagedTensorSlice[
 
         return offset
 
-    @always_inline
+    @inline(.always)
     def _compute_offset(self, index: Coord) -> Int:
         comptime assert index.rank == Self.rank
 
@@ -1816,7 +1816,7 @@ struct ManagedTensorSlice[
         return Int(crd2idx[out_type=DType.int](index, shape, strides))
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def store[
         width: SIMDLength,
         # Necessary to make it simpler on the call site.
@@ -1847,7 +1847,7 @@ struct ManagedTensorSlice[
         ](self, ridx, val)
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def store[
         width: SIMDLength,
         element_alignment: Int = 1,
@@ -1872,7 +1872,7 @@ struct ManagedTensorSlice[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_store[
         width: SIMDLength,
         # Necessary to make it simpler on the call site.
@@ -1897,7 +1897,7 @@ struct ManagedTensorSlice[
             ](self, ridx, val)
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_store[
         width: SIMDLength,
         element_alignment: Int = 1,
@@ -1912,7 +1912,7 @@ struct ManagedTensorSlice[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _lambda_store[
         width: SIMDLength,
         # Necessary to make it simpler on the call site.
@@ -1937,7 +1937,7 @@ struct ManagedTensorSlice[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _lambda_store[
         width: SIMDLength,
         element_alignment: Int = 1,
@@ -1955,7 +1955,7 @@ struct ManagedTensorSlice[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_compute_output_lambda[
         width: SIMDLength,
         # Necessary to make it simpler on the call site.
@@ -1977,7 +1977,7 @@ struct ManagedTensorSlice[
             return val
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_compute_output_lambda[
         width: SIMDLength,
         element_alignment: Int = 1,
@@ -1992,7 +1992,7 @@ struct ManagedTensorSlice[
         ](rebind[IndexList[Self.rank]](coord_to_index_list(index)), val)
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_compute_output_tile_lambda[
         _rank: Int,
         LayoutType: TensorLayout,
@@ -2014,7 +2014,7 @@ struct ManagedTensorSlice[
             return val
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def _fused_compute_output_tile_lambda[
         LayoutType: TensorLayout,
         Copier: TileCopier,
@@ -2031,7 +2031,7 @@ struct ManagedTensorSlice[
             val,
         )
 
-    @always_inline
+    @inline(.always)
     def with_tile_layout[
         new_layout: TensorLayout,
     ](
@@ -2052,7 +2052,7 @@ struct ManagedTensorSlice[
         )
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_input[
         F: InputFusion
     ](
@@ -2087,7 +2087,7 @@ struct ManagedTensorSlice[
         }
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_output[
         F: OutputFusion
     ](
@@ -2119,7 +2119,7 @@ struct ManagedTensorSlice[
         }
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_compute_output[
         F: OutputFusion
     ](
@@ -2151,7 +2151,7 @@ struct ManagedTensorSlice[
         }
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_compute_output[
         F: ComputeOutputFusion
     ](
@@ -2183,7 +2183,7 @@ struct ManagedTensorSlice[
         }
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_compute_output_tile[
         F: ComputeOutputFusionTile
     ](
@@ -2215,7 +2215,7 @@ struct ManagedTensorSlice[
         }
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def _bind_to_fused_output_tile[
         F: OutputFusionTile
     ](
@@ -2247,7 +2247,7 @@ struct ManagedTensorSlice[
             fusion,
         }
 
-    @always_inline
+    @inline(.always)
     def to_layout_tensor(
         self,
         out result: LayoutTensor[
@@ -2263,7 +2263,7 @@ struct ManagedTensorSlice[
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def to_tile_tensor[
         coord_dtype: DType = .int64
     ](
@@ -2327,7 +2327,7 @@ struct ManagedTensorSlice[
 
 # TODO: Move to Mojo/stdlib/stdlib/runtime/tracing.mojo and
 # rename to trace_arg
-@always_inline
+@inline(.always)
 def trace_slice_arg(name: String, buf: ManagedTensorSlice) -> String:
     """Helper to stringify the type and shape of a kernel argument for tracing.
 
@@ -2476,13 +2476,13 @@ struct _FusionPack[*Ts: TrivialRegisterPassable](TrivialRegisterPassable):
     ]
     var _mlir_value: Self._mlir_type
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, *args: *Self.Ts):
         self._mlir_value = __mlir_op.`kgen.rebind`[_type=Self._mlir_type](
             args.get_loaded_kgen_pack()
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem_param__[i: Int](self) -> Self.Ts[i]:
         return __mlir_op.`kgen.struct.extract`[index=i.__mlir_index__()](
             self._mlir_value
@@ -2687,7 +2687,9 @@ def get_kernel_simd_width[dtype: DType, target: StaticString]() -> Int:
     comptime if _is_gpu[target]():
         # We hardcode simd width to 16B for Nvidia GPUs but >= sm_100
         # arch support 32B load/store to global memory, see KERN-2037.
-        comptime if CompilationTarget[get_gpu_target()]._is_arch["sm_100a"]():
+        comptime if CompilationTarget.current_accelerator()._is_arch[
+            "sm_100a"
+        ]():
             return 32 // size_of[dtype]()
 
         return simd_width_of[dtype, target=get_gpu_target()]()
@@ -2747,7 +2749,7 @@ def foreach[
         ctx: The call context (forward this from the custom operation).
     """
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int,
         alignment: Int = 1,
@@ -2760,6 +2762,61 @@ def foreach[
         target=target,
         _trace_description=_trace_name,
     ](elementwise_fn_wrapper, tensor.shape_coord(), ctx)
+
+
+def foreach[
+    dtype: DType,
+    rank: Int,
+    //,
+    FuncType: ImplicitlyCopyable
+    & RegisterPassable
+    & (def[width: Int](Coord) -> SIMD[dtype, width]),
+    *,
+    target: StaticString = "cpu",
+    simd_width: Int = get_kernel_simd_width[dtype, target](),
+    _trace_name: StaticString = "mogg.for_each",
+](
+    var func: FuncType,
+    tensor: ManagedTensorSlice[mut=True, dtype=dtype, rank=rank, ...],
+    ctx: DeviceContext,
+) raises:
+    """Apply a `RegisterPassable` body to each element of the tensor slice.
+
+    Value-argument twin of the `foreach` overload above: the body is a runtime
+    closure passed by value rather than a comptime parameter, so callers write
+    a unified closure instead of a `capturing` one. The body receives the
+    element index as a `Coord`; use `coord_to_index_list` to convert it to an
+    `IndexList` if integer index arithmetic is needed.
+
+    The wrapper captures both `func` and `tensor` and routes the store through
+    `tensor._fused_store`, which preserves the fused store path that
+    `FusedOutputTensor` depends on.
+
+    Parameters:
+        dtype: The data type of the elements in the tensor slice.
+        rank: The rank of the tensor slice.
+        FuncType: The type of the per-element body closure.
+        target: Indicates the type of the target device (e.g. "cpu", "gpu").
+        simd_width: The SIMD width for the target (usually leave this as its default value).
+        _trace_name: Name of the executed operation displayed in the trace_description.
+
+    Args:
+        func: The function to apply to each element of the tensor slice.
+        tensor: The output tensor slice which receives the return values from `func`.
+        ctx: The call context (forward this from the custom operation).
+    """
+
+    def wrapper[
+        width: Int, alignment: Int = 1
+    ](index: Coord) {var func^, var tensor}:
+        var val = func[width](index)
+        tensor._fused_store[element_alignment=alignment](index, val)
+
+    elementwise[
+        simd_width=simd_width,
+        target=target,
+        _trace_description=_trace_name,
+    ](wrapper, tensor.shape_coord(), ctx)
 
 
 def _shape_types_compatible[

@@ -92,13 +92,13 @@ def _run_splitk_arg[
     var output_row = List(length=1, fill=Int64(0))
     var output_ptr = output_row.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {input_ptr} -> SIMD[dtype, width]:
         return input_ptr.unsafe_load[width=width](Int(coords[1].value()))
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[.int64, width]) {output_ptr}:

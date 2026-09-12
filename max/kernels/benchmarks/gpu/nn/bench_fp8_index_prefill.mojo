@@ -344,7 +344,7 @@ def execute_fp8_index_prefill[
         for i in range(o_size):
             o_host[i] = -Float32.MAX
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(launch_ctx: DeviceContext) raises {mut o_tile, imm}:
         _launch_scorer[num_heads, depth, type_of(k_collection)](
             o_tile,
@@ -358,7 +358,7 @@ def execute_fp8_index_prefill[
             launch_ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

@@ -102,7 +102,7 @@ def _init_dylib() -> OwnedDLHandle:
         return OwnedDLHandle(unsafe_uninitialized=True)
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -116,7 +116,7 @@ def _get_dylib_function[
     ]()
 
 
-@always_inline
+@inline(.always)
 def get_cblas_f32_function() raises -> cblas_gemm_type:
     """Loads and returns the `cblas_sgemm` function pointer from the Apple Accelerate library.
 
@@ -145,7 +145,7 @@ def get_cblas_f32_function() raises -> cblas_gemm_type:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def use_apple_accelerate_lib[
     c_type: DType,
     a_type: DType,
@@ -180,7 +180,7 @@ struct _CBLASTranspose(TrivialRegisterPassable):
 
 
 # _cblas_f32 used by apple_batched_matmul (via the corresponding apple_matmul)
-@always_inline
+@inline(.always)
 def _cblas_f32[
     *,
     transpose_b: Bool = False,
@@ -218,7 +218,7 @@ def _cblas_f32[
 
 # _cblas_f32 used by apple_matmul (except via the apple_matmul in
 # apple_batched_matmul)
-@always_inline
+@inline(.always)
 def _cblas_f32[
     *,
     transpose_b: Bool = False,
@@ -262,7 +262,7 @@ def _cblas_f32[
 # Currently, use is limited in Apple Float32 case.
 # apple_matmul (which internally calls cblas_sgemm, which in turns calls a
 # cblas_sgemv has been found to have suboptimal performance compared to this.
-@always_inline
+@inline(.always)
 def apple_gemv[
     *,
     b_packed: Bool,
@@ -339,7 +339,7 @@ def apple_gemv[
 
     comptime simd_width = simd_width_of[c.dtype]()
 
-    @always_inline
+    @inline(.always)
     def process_rows(
         start_row: Int, end_row: Int
     ) {var c, var a, var b, var K, imm}:
@@ -347,7 +347,7 @@ def apple_gemv[
             var acc_vector = SIMD[c.dtype, simd_width]()
             var acc_scalar = Scalar[c.dtype]()
 
-            @always_inline
+            @inline(.always)
             def compute_fn[width: Int](k: Int) {a, b, c, transposed_b, mut}:
                 var a_val = a.load[width=width](Coord(Idx[0], k)).cast[
                     c.dtype
@@ -397,7 +397,7 @@ def apple_gemv[
 
 
 # apple_matmul used by apple_batched_matmul
-@always_inline
+@inline(.always)
 def apple_matmul[
     *,
     transpose_b: Bool = False,
@@ -462,7 +462,7 @@ def apple_matmul[
         comptime epilogue = elementwise_lambda_fn.value()
         comptime simd_size = simd_width_of[c.dtype]()
 
-        @always_inline
+        @inline(.always)
         def epilogue_on_col_chunk[
             simd_width: Int, alignment: Int = 1
         ](idx: Coord) {var}:
@@ -479,7 +479,7 @@ def apple_matmul[
 
 
 # apple_matmul used by all matmuls except apple_batched_matmul
-@always_inline
+@inline(.always)
 def apple_matmul[
     *,
     transpose_b: Bool = False,
@@ -519,7 +519,7 @@ def apple_matmul[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def apple_batched_matmul[
     rank: Int,
     *,

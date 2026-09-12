@@ -451,3 +451,44 @@ class _Glm5NextHFConfig(PretrainedConfig):
 
 
 AutoConfig.register("glm5_next", _Glm5NextHFConfig, exist_ok=True)
+
+
+class _Qwen4ExpTextHFConfig(PretrainedConfig):
+    """Shim for the ``qwen4_exp_text`` decoder config.
+
+    Every field is forwarded verbatim; only ``intermediate_size`` is
+    defaulted, because :class:`Llama3Config` reads it directly while this
+    model has no dense MLP to declare one -- every layer's feed-forward is
+    the MoE block.
+    """
+
+    model_type = "qwen4_exp_text"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
+        if not hasattr(self, "intermediate_size"):
+            self.intermediate_size = getattr(self, "moe_intermediate_size", 0)
+
+
+class _Qwen4ExpHFConfig(PretrainedConfig):
+    """Shim for the top-level ``qwen4_exp`` model type."""
+
+    model_type = "qwen4_exp"
+    sub_configs = {"text_config": _Qwen4ExpTextHFConfig}
+
+    def __init__(
+        self,
+        text_config: Any = None,
+        vision_config: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        self.text_config = _Qwen4ExpTextHFConfig(**(text_config or {}))
+        self.vision_config = PretrainedConfig(**(vision_config or {}))
+        super().__init__(**kwargs)
+
+
+AutoConfig.register("qwen4_exp_text", _Qwen4ExpTextHFConfig, exist_ok=True)
+AutoConfig.register("qwen4_exp", _Qwen4ExpHFConfig, exist_ok=True)

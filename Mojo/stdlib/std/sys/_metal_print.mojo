@@ -34,7 +34,7 @@ from std.memory import (
 comptime _CHUNK_SIZE = 64
 
 
-@always_inline
+@inline(.always)
 def _metal_os_log_chunk(data: Pointer[UInt8, MutUntrackedOrigin]):
     """Emit a single 64-byte chunk via the os_log sentinel.
 
@@ -47,7 +47,7 @@ def _metal_os_log_chunk(data: Pointer[UInt8, MutUntrackedOrigin]):
     external_call["__mojo_metal_os_log_64", NoneType](data)
 
 
-@always_inline
+@inline(.always)
 def _metal_print_write(text: StringSlice[_]):
     """Write bytes to Metal GPU output via os_log chunking.
 

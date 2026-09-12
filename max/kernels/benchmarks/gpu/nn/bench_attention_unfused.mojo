@@ -146,7 +146,7 @@ def bench_flash[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, _kernel_launch, ctx)
 
@@ -297,7 +297,7 @@ def bench_naive[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, _kernel_launch, ctx)
 
@@ -391,7 +391,7 @@ def bench_manual[
 
     # In-register compute lambda: multiply by scale, kernel does the store.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(scale)
     def scale_compute_lambda[
         _dtype: DType,
@@ -486,7 +486,7 @@ def bench_manual[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, _kernel_launch, ctx)
 

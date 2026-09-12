@@ -46,7 +46,7 @@ comptime MaxHardwareBarriers = 16
 """Maximum number of hardware barriers available per block."""
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def named_barrier[
     num_threads: Int32,
 ](id: Int32 = 0):
@@ -83,7 +83,7 @@ def named_barrier[
     ](to_i32(id), to_i32(num_threads))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def named_barrier_arrive[
     num_threads: Int32,
 ](id: Int32 = 0):
@@ -112,7 +112,7 @@ def named_barrier_arrive[
     __mlir_op.`nvvm.barrier.arrive`(to_i32(id), to_i32(num_threads))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def barrier():
     """Performs a synchronization barrier at the block level.
 
@@ -258,7 +258,7 @@ struct AMDScheduleBarrierMask(
         return Int(self._value)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def schedule_barrier(
     mask: AMDScheduleBarrierMask = AMDScheduleBarrierMask.NONE,
 ):
@@ -285,7 +285,7 @@ def schedule_barrier(
     llvm_intrinsic["llvm.amdgcn.sched.barrier", NoneType](Int32(Int(mask)))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def schedule_group_barrier(
     mask: AMDScheduleBarrierMask, size: Int32, sync_id: Int32
 ):
@@ -363,7 +363,7 @@ struct _WaitCountArg:
         return Self.MAX & (cnt << 8)
 
 
-@always_inline
+@inline(.always)
 def s_waitcnt[
     *,
     vmcnt: UInt32 = _WaitCountArg.MAX_VM_CNT,
@@ -400,7 +400,7 @@ def s_waitcnt[
     llvm_intrinsic["llvm.amdgcn.s.waitcnt", NoneType](waitcnt_val)
 
 
-@always_inline
+@inline(.always)
 def s_waitcnt_barrier[
     *,
     vmcnt: UInt32 = _WaitCountArg.MAX_VM_CNT,
@@ -435,7 +435,7 @@ def s_waitcnt_barrier[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def syncwarp(mask: Int = -1):
     """Synchronizes threads within a warp using a barrier.
 
@@ -484,7 +484,7 @@ def syncwarp(mask: Int = -1):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _mbarrier_impl[
     type: AnyType, address_space: AddressSpace
 ](address: Pointer[mut=True, type, _, address_space=address_space]):
@@ -509,7 +509,7 @@ def _mbarrier_impl[
         comptime assert False, "invalid address space"
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _mbarrier_noinc_impl[
     type: AnyType, address_space: AddressSpace
 ](address: Pointer[mut=True, type, _, address_space=address_space]):
@@ -531,7 +531,7 @@ def _mbarrier_noinc_impl[
         comptime assert False, "invalid address space"
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def async_copy_arrive[
     type: AnyType, address_space: AddressSpace, *, noinc: Bool = False
 ](address: Pointer[mut=True, type, _, address_space=address_space]):
@@ -567,7 +567,7 @@ def async_copy_arrive[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_init[
     type: AnyType
 ](
@@ -598,7 +598,7 @@ def mbarrier_init[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_arrive[
     type: AnyType
 ](shared_mem: Pointer[mut=True, type, _, address_space=.SHARED]) -> Int:
@@ -628,7 +628,7 @@ def mbarrier_arrive[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_test_wait[
     type: AnyType
 ](
@@ -662,7 +662,7 @@ def mbarrier_test_wait[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_arrive_expect_tx_shared[
     type: AnyType  # The type of the memory barrier
 ](addr: Pointer[mut=True, type, _, address_space=.SHARED], tx_count: Int32,):
@@ -690,7 +690,7 @@ def mbarrier_arrive_expect_tx_shared[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_arrive_expect_tx_relaxed[
     type: AnyType,  # The type of the memory barrier
     scope: Scope = Scope.BLOCK,
@@ -754,7 +754,7 @@ def mbarrier_arrive_expect_tx_relaxed[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def mbarrier_try_wait_parity_shared[
     type: AnyType  # The type of the memory barrier
 ](
@@ -787,7 +787,7 @@ def mbarrier_try_wait_parity_shared[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def umma_arrive_leader_cta[
     type: AnyType
 ](mbar_ptr: Pointer[mut=True, type, _, address_space=.SHARED]):
@@ -811,7 +811,7 @@ def umma_arrive_leader_cta[
     ](Int32(Int(mbar_ptr)) & 0xFEFFFFFF)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def umma_arrive_peer_cta[
     type: AnyType
 ](mbar_ptr: Pointer[mut=True, type, _, address_space=.SHARED]):
@@ -838,7 +838,7 @@ def umma_arrive_peer_cta[
     ](Int32(Int(mbar_ptr)) | 0x01000000)
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_commit_group():
     """Commits all prior initiated but uncommitted cp.async.bulk instructions into a cp.async.bulk-group.
 
@@ -863,7 +863,7 @@ def cp_async_bulk_commit_group():
         ]()
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_wait_group[n: Int32, read: Bool = True]():
     """Waits for completion of asynchronous bulk memory transfer groups.
 

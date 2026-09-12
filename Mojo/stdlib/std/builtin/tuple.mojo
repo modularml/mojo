@@ -69,7 +69,7 @@ struct Tuple[*Ts: Movable](
     var _mlir_value: Self._mlir_type
     """The underlying storage for the tuple."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(
         out self,
     ) where Self.Ts.all_conforms_to[Defaultable]():
@@ -91,7 +91,7 @@ struct Tuple[*Ts: Movable](
         comptime for i in range(Self.__len__()):
             Pointer(to=self[i]).unsafe_write({})
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, var *args: *Self.Ts):
         """Construct the tuple.
 
@@ -139,7 +139,7 @@ struct Tuple[*Ts: Movable](
         """
         self^.consume_elements[deinit_func]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(
         out self, *, copy: Self
     ) where Self.Ts.all_conforms_to[Copyable]():
@@ -158,7 +158,7 @@ struct Tuple[*Ts: Movable](
             # uninitialized memory.
             Pointer(to=self[i]).unsafe_write(copy=copy[i])
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, *, deinit move: Self):
         """Move construct the tuple.
 
@@ -186,7 +186,7 @@ struct Tuple[*Ts: Movable](
         """
         return Self.Ts.length
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__(self) -> Int:
         """Get the number of elements in the tuple.
 
@@ -195,7 +195,7 @@ struct Tuple[*Ts: Movable](
         """
         return Self.__len__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem_param__[idx: Int](ref self) -> ref[self] Self.Ts[idx]:
         """Get a reference to an element in the tuple.
 
@@ -216,7 +216,7 @@ struct Tuple[*Ts: Movable](
         ](storage_kgen_ptr)
         return Pointer[_, origin_of(self)](_mlir_value=elt_kgen_ptr)[]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __contains__[T: Equatable](self, value: T) -> Bool:
         """Return whether the tuple contains the specified value.
 
@@ -245,7 +245,7 @@ struct Tuple[*Ts: Movable](
 
         return False
 
-    @always_inline
+    @inline(.always)
     def __eq__(
         self, other: Self
     ) -> Bool where Self.Ts.all_conforms_to[Equatable]():
@@ -276,7 +276,7 @@ struct Tuple[*Ts: Movable](
         comptime for i in range(type_of(self).__len__()):
             self[i].__hash__(hasher)
 
-    @no_inline
+    @inline(.never)
     def _write_tuple_to[
         *, is_repr: Bool
     ](self, mut writer: Some[Writer]) where Self.Ts.all_conforms_to[Writable]():
@@ -304,7 +304,7 @@ struct Tuple[*Ts: Movable](
         comptime if Self.__len__() == 1:
             writer.write_string(",")
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where Self.Ts.all_conforms_to[Writable]():
@@ -320,7 +320,7 @@ struct Tuple[*Ts: Movable](
         self._write_tuple_to[is_repr=False](writer)
         writer.write_string(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where Self.Ts.all_conforms_to[Writable]():
@@ -343,7 +343,7 @@ struct Tuple[*Ts: Movable](
             fields
         )
 
-    @always_inline
+    @inline(.always)
     def _compare(
         self, other: Self
     ) -> Int where Self.Ts.all_conforms_to[Comparable]():
@@ -354,7 +354,7 @@ struct Tuple[*Ts: Movable](
                 return 1
         return 0
 
-    @always_inline
+    @inline(.always)
     def __lt__(
         self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
@@ -368,7 +368,7 @@ struct Tuple[*Ts: Movable](
         """
         return self._compare(other) < 0
 
-    @always_inline
+    @inline(.always)
     def __le__(
         self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
@@ -382,7 +382,7 @@ struct Tuple[*Ts: Movable](
         """
         return self._compare(other) <= 0
 
-    @always_inline
+    @inline(.always)
     def __gt__(
         self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
@@ -397,7 +397,7 @@ struct Tuple[*Ts: Movable](
 
         return self._compare(other) > 0
 
-    @always_inline
+    @inline(.always)
     def __ge__(
         self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
@@ -412,7 +412,7 @@ struct Tuple[*Ts: Movable](
 
         return self._compare(other) >= 0
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reverse(deinit self, out result: Tuple[*Self.Ts.reverse()]):
         """Return a new tuple with the elements in reverse order.
 
@@ -439,7 +439,7 @@ struct Tuple[*Ts: Movable](
                 )
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def concat[
         *OtherTs: Movable
     ](
@@ -487,7 +487,7 @@ struct Tuple[*Ts: Movable](
                 ](Pointer(to=other[i]))
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def consume_elements[
         elt_handler: def[idx: Int](var elt: Self.Ts[idx]) capturing
     ](deinit self):

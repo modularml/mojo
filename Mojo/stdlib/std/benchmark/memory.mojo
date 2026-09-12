@@ -25,7 +25,7 @@ from std.atomic import Ordering, fence
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def clobber_memory():
     """Forces all pending memory writes to be flushed to memory.
 

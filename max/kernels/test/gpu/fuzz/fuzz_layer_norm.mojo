@@ -117,14 +117,14 @@ def run_one_case[
     var beta = TileTensor(beta_d, row_major(Coord(param_shape)))
     var epsilon = Float32(1e-5)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
         var idx = data_buf.layout(coords)
         return data_buf.raw_load[width=width, alignment=alignment](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var out_buf}:

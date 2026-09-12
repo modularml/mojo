@@ -61,13 +61,13 @@ def run_rms_norm_cpu[
     var weight_offset = Scalar[dtype](0.0)
 
     @__copy_capture(input_buf)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
         var idx = input_buf.layout(coords)
         return input_buf.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_buf)
     @__parameter
     def identity_output_fn[

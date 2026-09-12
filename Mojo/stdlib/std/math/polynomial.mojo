@@ -25,7 +25,7 @@ from std.math.polynomial import polynomial_evaluate
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def polynomial_evaluate[
     dtype: DType,
     width: SIMDLength,
@@ -54,7 +54,7 @@ def polynomial_evaluate[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _horner_evaluate[
     dtype: DType,
     width: SIMDLength,

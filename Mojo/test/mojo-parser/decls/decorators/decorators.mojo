@@ -68,6 +68,53 @@ def test_always_inline_no_debug():
     pass
 
 
+# ===----------------------------------------------------------------------=== #
+# @inline
+# ===----------------------------------------------------------------------=== #
+
+
+# CHECK: lit.fn @"test_inline_always()"() -> index always_inline
+@inline(.always)
+def test_inline_always() -> __mlir_type.index:
+    return Int(1).__mlir_index__()
+
+
+# CHECK: lit.fn @"test_inline_never()"() -> index no_inline
+@inline(.never)
+def test_inline_never() -> __mlir_type.index:
+    return Int(2).__mlir_index__()
+
+
+# COM: automatic is the default level, so it prints no keyword at all.
+# CHECK: lit.fn @"test_inline_automatic()"() -> index attributes
+@inline(.automatic)
+def test_inline_automatic() -> __mlir_type.index:
+    return Int(3).__mlir_index__()
+
+
+# CHECK: lit.fn @"test_inline_nodebug()"() -> index always_inline_no_debug
+@inline(.nodebug)
+def test_inline_nodebug() -> __mlir_type.index:
+    return Int(7).__mlir_index__()
+
+
+# COM: Two inline decorators that agree are not a conflict.
+# CHECK: lit.fn @"test_inline_agrees()"() -> index always_inline
+@inline(.always)
+@always_inline
+def test_inline_agrees() -> __mlir_type.index:
+    return Int(5).__mlir_index__()
+
+
+# COM: A parameter is not known here, so the level rides along as the field
+# COM: reads that produce it until elaboration binds `policy`.
+# CHECK-LABEL: lit.fn @"test_inline_parametric
+# CHECK-SAME: inline<#lit.struct.extract<:!alias_Int1 #lit.struct.extract<:!InlineLevel policy, "_value">, "_mlir_value">
+@inline(policy)
+def test_inline_parametric[policy: InlineLevel]():
+    pass
+
+
 # CHECK-LABEL: lit.fn @"math{{.*}} always_inline_builtin
 @always_inline("builtin")
 def math(a: __mlir_type.index, b: __mlir_type.index) -> __mlir_type.index:

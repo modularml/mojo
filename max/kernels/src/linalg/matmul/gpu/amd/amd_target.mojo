@@ -299,7 +299,7 @@ def append_amd_hints(
             remaining_mmas, total_stores
         )
 
-    @always_inline
+    @inline(.always)
     def _hint(mut ker: List[ScheduleEntry], mask: Int, count: Int):
         var slot = len(ker)
         ker.append(

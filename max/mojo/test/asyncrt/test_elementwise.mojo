@@ -47,7 +47,7 @@ def run_elementwise[dtype: DType](ctx: DeviceContext) raises:
     var in_buffer = Span(unsafe_ptr=in0.unsafe_ptr(), length=length)
     var out_buffer = Span(unsafe_ptr=out.unsafe_ptr(), length=length)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_buffer, out_buffer)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):

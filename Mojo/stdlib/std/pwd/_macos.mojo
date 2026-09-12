@@ -61,7 +61,7 @@ def _getpw_macos(uid: UInt32) raises -> Passwd:
 def _getpw_macos(var name: String) raises -> Passwd:
     var passwd_ptr = external_call[
         "getpwnam", OptionalPointer[_C_Passwd, UntrackedOrigin[mut=True]]
-    ](name.as_c_string_slice())
+    ](name.as_c_string_span())
     try:
         return _build_pw_struct(passwd_ptr[])
     except:

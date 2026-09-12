@@ -421,7 +421,7 @@ def _fa4_splitk_combine_kernel[
                 output_ptr[rh * ov_depth + d] = acc[j].cast[output_type]()
 
 
-@always_inline
+@inline(.always)
 def fa4_splitk_combine[
     output_type: DType,
     ov_depth: Int,
@@ -477,7 +477,7 @@ def fa4_splitk_combine[
     comptime sm_count = ctx.default_device_info.sm_count
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def enqueue[P_STATIC: Int]() raises:
         comptime kernel = _fa4_splitk_combine_kernel[
             output_type, ov_depth, intermediate_type, P_STATIC=P_STATIC

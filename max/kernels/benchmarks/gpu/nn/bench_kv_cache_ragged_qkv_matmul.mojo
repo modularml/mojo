@@ -247,7 +247,7 @@ def execute_kv_cache_ragged_matmul[
     var k_cache_device = kv_collection_device.get_key_cache(layer_idx)
     var v_cache_device = kv_collection_device.get_value_cache(layer_idx)
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) raises {
@@ -258,7 +258,7 @@ def execute_kv_cache_ragged_matmul[
         var output_device,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             _fused_qkv_matmul_kv_cache_ragged_impl[target="gpu"](
                 hidden_state_device.to_layout_tensor(),

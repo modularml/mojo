@@ -23,6 +23,7 @@
 #ifndef KGEN_TARGET_TARGETTRAITS_H
 #define KGEN_TARGET_TARGETTRAITS_H
 
+#include "Mojo/KGENDialect/KGENEnums.h"
 #include "Support/ErrorOr.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -34,6 +35,7 @@
 
 namespace llvm {
 class Triple;
+class raw_ostream;
 template <class C>
 struct object_creator;
 } // namespace llvm
@@ -103,6 +105,41 @@ public:
   /// File extension for this target's object output (e.g. ".o").
   virtual llvm::StringRef getObjectExtension() const = 0;
 
+  /// File extension for this target's LLVM bitcode output.
+  virtual llvm::StringRef getBitcodeExtension() const = 0;
+
+  /// One emission kind accepted by `--emit` for this target.
+  struct EmissionKind {
+    llvm::StringRef kind;
+    /// What the compiler emits for this kind; link products (exe,
+    /// shared-lib) compile to OBJECT, the linking is on the tool.
+    EmitAs emitAs;
+    llvm::StringRef description;
+  };
+
+  /// The emission kinds this target accepts, in display order; `-emit`
+  /// validation rejects anything else. Dispatchers return an empty list and
+  /// are omitted from the `--help` emission-kind table.
+  virtual llvm::ArrayRef<EmissionKind> supportedEmissionKinds() const = 0;
+
+  /// The emission kinds every code-generating target shares. Targets return
+  /// this directly or append their own kinds; identical descriptions merge
+  /// into one row in the `--help` table.
+  static llvm::ArrayRef<EmissionKind> commonEmissionKinds();
+
+  /// Whether this target accepts `kind` as an emission kind. Non-virtual:
+  /// derived from `supportedEmissionKinds` so acceptance cannot diverge
+  /// from the declared table.
+  bool supportsEmissionKind(llvm::StringRef kind) const;
+
+  /// Errors if this target does not accept `kind` as an emission kind,
+  /// naming the kinds it does accept. Non-virtual, as above.
+  ErrorOrSuccess validateEmissionKind(llvm::StringRef kind) const;
+
+  /// The EmitAs this target's `kind` compiles to; errors like
+  /// `validateEmissionKind` if the target does not accept `kind`.
+  ErrorOr<EmitAs> emitAsForKind(llvm::StringRef kind) const;
+
   /// One accelerator architecture accepted by `--target-accelerator`.
   struct AcceleratorArch {
     llvm::StringRef arch;
@@ -149,6 +186,16 @@ private:
 
   std::vector<std::unique_ptr<TargetTraits>> Targets;
 };
+
+/// Print one kind-sorted `kind (target, ...) - description` row per distinct
+/// (kind, description) pair, for the tools' `--emit` help output.
+void printSupportedEmissionKinds(llvm::raw_ostream &os, unsigned indent = 2);
+
+/// Whether any registered target accepts `kind` as an emission kind.
+bool isKnownEmissionKind(llvm::StringRef kind);
+
+/// The traits listing `arch` among their accelerator archs, or null.
+const TargetTraits *traitsForAcceleratorArch(llvm::StringRef arch);
 
 /// Errors if not `isBastTarget` and MAX is not installed.
 ErrorOrSuccess requireMaxForAccelerator(bool isMaxOnly);

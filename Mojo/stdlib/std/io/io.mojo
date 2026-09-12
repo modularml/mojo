@@ -24,7 +24,7 @@ from std.ffi import (
     c_size_t,
     c_ssize_t,
     external_call,
-    CStringSlice,
+    CStringSpan,
     OptionalPointer,
 )
 from std.memory.unsafe_pointer import unsafe_cast
@@ -52,7 +52,7 @@ from .file_descriptor import FileDescriptor
 
 # FIXME(MOCO-3871): Alias is to workaround function type comparison bug.
 comptime _PrintEmitPluginHookFnType = def[O: Origin](
-    cstr: CStringSlice[O],
+    cstr: CStringSpan[O],
     file_value: FileDescriptor,
 ) thin -> None
 """Plugin-hook signature for `PluginHooks.print_emit_fn`; keep in sync with the `print` emit path."""
@@ -76,7 +76,7 @@ struct _fdopen[mode: StaticString = "a"](ImplicitlyCopyable, RegisterPassable):
 
         self.handle = fdopen(
             dup(Int32(stream_id.value)),
-            Self.mode.as_c_string_slice(),
+            Self.mode.as_c_string_span(),
         )
 
     def __enter__(self) -> Self:
@@ -180,7 +180,7 @@ struct _fdopen[mode: StaticString = "a"](ImplicitlyCopyable, RegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
         _ = fflush(fd.handle)
@@ -200,12 +200,12 @@ def _printf_cpu[
         # themselves rather than references to them.
         _ = external_call["KGEN_CompilerRT_fprintf", Int32, num_fixed_args=2](
             fd,
-            get_static_string[fmt]().as_c_string_slice(),
+            get_static_string[fmt]().as_c_string_span(),
             args.get_loaded_kgen_pack(),
         )
 
 
-@no_inline
+@inline(.never)
 def _printf[
     fmt: StaticString, *types: AnyType
 ](*args: *types, file: FileDescriptor = stdout):
@@ -220,7 +220,7 @@ def _printf[
         var loaded_pack = args.get_loaded_kgen_pack()
 
         _ = external_call["vprintf", Int32](
-            get_static_string[fmt]().as_c_string_slice(),
+            get_static_string[fmt]().as_c_string_span(),
             Pointer(to=loaded_pack),
         )
     elif is_amd_gpu():
@@ -319,7 +319,7 @@ def _printf[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def _snprintf[
     fmt: StaticString, *types: AnyType
 ](str: MutPointer[UInt8, _], size: Int, *args: *types) -> Int:
@@ -345,7 +345,7 @@ def _snprintf[
         external_call["snprintf", Int32, num_fixed_args=3](
             str,
             size,
-            get_static_string[fmt]().as_c_string_slice(),
+            get_static_string[fmt]().as_c_string_span(),
             args.get_loaded_kgen_pack(),
         )
     )
@@ -356,7 +356,7 @@ def _snprintf[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def print[
     *Ts: Writable
 ](

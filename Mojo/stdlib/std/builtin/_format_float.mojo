@@ -34,17 +34,17 @@ from std.sys import is_apple_gpu
 from std.utils.numerics import FPUtils, isinf, isnan
 
 
-@always_inline
+@inline(.always)
 def _UInt128(hi: UInt64, lo: UInt64) -> UInt128:
     return UInt128(hi) << 64 | UInt128(lo)
 
 
-@always_inline
+@inline(.always)
 def _uint128_high(x: UInt128) -> UInt64:
     return (x >> 64).cast[.uint64]()
 
 
-@always_inline
+@inline(.always)
 def _uint128_low(x: UInt128) -> UInt64:
     return x.cast[.uint64]()
 
@@ -734,7 +734,7 @@ def _check_divisibility_and_divide_by_pow10[
     return result
 
 
-@always_inline
+@inline(.always)
 def _truncate[
     dtype: DType, S: SIMDLength, //, TruncateType: DType
 ](u: SIMD[dtype, S]) -> SIMD[dtype, S]:

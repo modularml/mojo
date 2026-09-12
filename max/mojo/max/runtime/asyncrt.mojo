@@ -41,7 +41,7 @@ def parallelism_level(ctx: Optional[DeviceContext]) -> Int:
     return std_parallelism_level()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def task_id_for_device(device_id: Int) -> Int:
     """Maps a device ID to a preferred AsyncRT worker thread ID for CPU affinity.
 

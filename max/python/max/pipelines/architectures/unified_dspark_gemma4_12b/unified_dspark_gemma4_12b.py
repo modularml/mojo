@@ -275,7 +275,8 @@ class UnifiedDSparkGemma4_12B(Module):
             inputs.input_row_offsets[1:] - inputs.input_row_offsets[:-1]
         ).rebind(["batch_size"])
         decode_commit = (num_accepted + 1).cast(DType.uint32)
-        commit_lengths = ops.where(is_prefill, prompt_lens, decode_commit)
+        mixed_commit = ops.where(is_dummy_draft, prompt_lens, decode_commit)
+        commit_lengths = ops.where(is_prefill, prompt_lens, mixed_commit)
 
         target_tokens = ops.concat([recovered, bonus], axis=1)
         gather_idx = ops.where(

@@ -79,7 +79,7 @@ struct _OutputFusionTileConsumer[
 
     var fusion: Self.FusionType
 
-    @always_inline
+    @inline(.always)
     def __call__[
         dtype: DType,
         LayoutType: TensorLayout,
@@ -161,7 +161,7 @@ struct _NaiveRMSNormTileAdapter[
     var weight_offset: Scalar[Self.dtype]
     var tile_consumer: OptionalReg[Self.TileConsumerType]
 
-    @always_inline
+    @inline(.always)
     def __call__(self) capturing:
         comptime TM = Self.tile_shape[0]
         comptime TN = Self.tile_shape[1]

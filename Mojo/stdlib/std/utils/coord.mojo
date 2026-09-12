@@ -120,7 +120,7 @@ struct ComptimeInt[val: Int](CoordLike, TrivialRegisterPassable):
         pass
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__() -> Int:
         """Get the length (always 1 for scalar types).
 
@@ -145,7 +145,7 @@ struct ComptimeInt[val: Int](CoordLike, TrivialRegisterPassable):
         """
         t"ComptimeInt[{self.value()}]()".write_to(writer)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def product(self) -> Scalar[Self.DTYPE]:
         """Calculate the product (returns the value for scalar types).
 
@@ -154,7 +154,7 @@ struct ComptimeInt[val: Int](CoordLike, TrivialRegisterPassable):
         """
         return self.value()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def sum(self) -> Scalar[Self.DTYPE]:
         """Calculate the sum (returns the value for scalar types).
 
@@ -163,7 +163,7 @@ struct ComptimeInt[val: Int](CoordLike, TrivialRegisterPassable):
         """
         return self.value()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def value(self) -> Scalar[Self.DTYPE]:
         """Get the scalar value.
 
@@ -172,7 +172,7 @@ struct ComptimeInt[val: Int](CoordLike, TrivialRegisterPassable):
         """
         return Scalar[Self.DTYPE](Self.val)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def tuple(var self) -> Coord[*Self.ParamListType]:
         """Get as a tuple (not valid for `ComptimeInt`).
 
@@ -229,7 +229,7 @@ struct _All(CoordLike, TrivialRegisterPassable):
         pass
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__() -> Int:
         return 1
 
@@ -239,19 +239,19 @@ struct _All(CoordLike, TrivialRegisterPassable):
     def write_repr_to(self, mut writer: Some[Writer]):
         writer.write("All")
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def product(self) -> Scalar[Self.DTYPE]:
         return Scalar[Self.DTYPE](1)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def sum(self) -> Scalar[Self.DTYPE]:
         return Scalar[Self.DTYPE](0)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def value(self) -> Scalar[Self.DTYPE]:
         return Scalar[Self.DTYPE](-2)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def tuple(var self) -> Coord[*Self.ParamListType]:
         comptime assert False, "_All is not a tuple type"
 
@@ -286,7 +286,6 @@ struct Coord[*element_types: CoordLike](
     comptime static_value: Int = -1
     """Always -1 for tuple types (value not applicable)."""
 
-    # TODO(GPUA-11): Expand `Coord.DTYPE` so that it can take narrower dtypes.
     comptime DTYPE = DType.int
     """The scalar dtype used for tuple-level aggregate operations."""
 
@@ -370,7 +369,7 @@ struct Coord[*element_types: CoordLike](
             Pointer(to=self[i]).write(rebind[type_of(self[i])](array[i]))
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def size() -> Int:
         """Get the total number of elements including nested ones.
 
@@ -410,7 +409,7 @@ struct Coord[*element_types: CoordLike](
         """
         return Self.__len__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, var *args: *Self.element_types):
         """Construct tuple from variadic arguments.
 
@@ -420,7 +419,7 @@ struct Coord[*element_types: CoordLike](
         self._storage = _RegTuple[*Self.element_types](*args^)
 
     @implicit
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, var tuple: Tuple[*Self.element_types]):
         """Construct from a Tuple with matching element types.
 
@@ -432,7 +431,7 @@ struct Coord[*element_types: CoordLike](
         comptime for i in range(Self.rank):
             self._storage[i] = tuple[i]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem_param__[
         idx: Int
     ](ref self) -> ref[self._storage] Self.element_types[idx]:
@@ -446,28 +445,43 @@ struct Coord[*element_types: CoordLike](
         """
         return self._storage[idx]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def product(self) -> Scalar[Self.DTYPE]:
         """Calculate the product of all elements recursively.
 
         Returns:
             The product of all leaf values in the `Coord`.
         """
-        var result: Scalar[Self.DTYPE] = 1
+        return self.product[Self.DTYPE]()
+
+    @inline(.nodebug)
+    def product[result_dtype: DType](self) -> Scalar[result_dtype]:
+        """Calculate the product of all elements recursively at `result_dtype`
+        precision.
+
+        Parameters:
+            result_dtype: The dtype the product is accumulated and returned in.
+
+        Returns:
+            The product of all leaf values in the `Coord`.
+        """
+        var result: Scalar[result_dtype] = 1
 
         # `Coord` is a heterogeneous tuple: children may have different
         # `DTYPE`s (e.g. `CompileTimeInt` with `DType.int` alongside a
-        # `Int32`). Aggregating into `Self.DTYPE` is
-        # intentional — callers expect a single integer answer at the
-        # tuple's dtype, regardless of per-leaf dtype.
+        # `Int32`). Aggregating into a single `T` is intentional — callers
+        # expect one answer at the dtype they asked for, regardless of
+        # per-leaf dtype. A nested child still forms its own sub-product at
+        # its `DTYPE` before being narrowed to `T`, since `CoordLike` only
+        # guarantees the unparameterized `product()`.
         # TODO(GPUA-12): Add comptime asserts to make sure that Coord's
         # product and sum do not overflow.
         comptime for i in range(Self.__len__()):
-            result *= Scalar[Self.DTYPE](self[i].product())
+            result *= Scalar[result_dtype](self[i].product())
 
         return result
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def sum(self) -> Scalar[Self.DTYPE]:
         """Calculate the sum of all elements recursively.
 
@@ -485,7 +499,7 @@ struct Coord[*element_types: CoordLike](
 
         return result
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def value(self) -> Scalar[Self.DTYPE]:
         """Get the value (not valid for `Coord` tuples).
 
@@ -494,7 +508,7 @@ struct Coord[*element_types: CoordLike](
         """
         comptime assert False, "Coord is not a value type"
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def inner_product[
         *other_types: CoordLike
     ](self, other: Coord[*other_types]) -> Int:
@@ -535,7 +549,7 @@ struct Coord[*element_types: CoordLike](
 
         return result
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__[
         *other_types: CoordLike
     ](self, other: Coord[*other_types]) -> Bool:
@@ -579,7 +593,7 @@ struct Coord[*element_types: CoordLike](
 
         return True
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__[
         *other_types: CoordLike
     ](self, other: Coord[*other_types]) -> Bool:
@@ -596,7 +610,7 @@ struct Coord[*element_types: CoordLike](
         """
         return not self == other
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def tuple(var self) -> Coord[*Self.ParamListType]:
         """Get this `Coord` as a tuple.
 
@@ -605,7 +619,7 @@ struct Coord[*element_types: CoordLike](
         """
         return rebind[Coord[*Self.ParamListType]](self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reverse(
         var self,
     ) -> Coord[*Self.element_types.reverse()]:
@@ -616,7 +630,7 @@ struct Coord[*element_types: CoordLike](
         """
         return {self._storage.reverse()}
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def concat[
         *other_element_types: CoordLike
     ](var self, var other: Coord[*other_element_types]) -> Coord[
@@ -646,7 +660,7 @@ struct Coord[*element_types: CoordLike](
             ](self._storage.concat(other._storage))
         }
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def flatten(
         var self,
     ) -> Coord[*_Flattened[*Self.element_types]]:
@@ -699,7 +713,7 @@ struct Coord[*element_types: CoordLike](
 
         return Coord(flat_tuple)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def make_dynamic[
         dtype: DType
     ](self) -> Coord[*_CoordToDynamic[dtype, Self.element_types]]:
@@ -797,7 +811,7 @@ struct Coord[*element_types: CoordLike](
                 w.write(", ")
         w.write(")")
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def cast[
         dtype: DType
     ](self) -> Coord[*_CoordCast[dtype, Self.element_types]]:
@@ -1251,7 +1265,7 @@ def idx2crd[
     return result
 
 
-@always_inline
+@inline(.always)
 def coord_to_index_list[
     element_types: TypeList[Trait=CoordLike, ...]
 ](value: Coord[*element_types]) -> IndexList[value.rank]:
@@ -1274,7 +1288,7 @@ def coord_to_index_list[
     return result
 
 
-@always_inline
+@inline(.always)
 def dyn_coord[
     dtype: DType, *element_types: Movable & Deinitable
 ](
@@ -1735,14 +1749,14 @@ struct _RegTuple[*element_types: CoordLike](
     """The underlying storage for the tuple."""
 
     # Overload that crushes down IR generated on the caller side.
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self: _RegTuple[]):
         """Construct an empty tuple."""
         __mlir_op.`lit.ownership.mark_initialized`(
             __get_mvalue_as_litref(self._mlir_value)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, var *args: *Self.element_types):
         """Construct the tuple.
 
@@ -1773,7 +1787,7 @@ struct _RegTuple[*element_types: CoordLike](
         comptime result = Self.element_types.length
         return result
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__(self) -> Int:
         """Get the number of elements in the tuple.
 
@@ -1782,7 +1796,7 @@ struct _RegTuple[*element_types: CoordLike](
         """
         return Self.__len__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem_param__[
         idx: Int
     ](ref self) -> ref[self] Self.element_types[idx]:
@@ -1805,7 +1819,7 @@ struct _RegTuple[*element_types: CoordLike](
         ](storage_kgen_ptr)
         return Pointer[_, origin_of(self)](_mlir_value=elt_kgen_ptr)[]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[*elt_types: CoordLike](out self: _RegTuple[*elt_types]):
         """Construct a tuple with default-initialized elements.
 
@@ -1821,7 +1835,7 @@ struct _RegTuple[*element_types: CoordLike](
         comptime for i in range(type_of(self).__len__()):
             Pointer(to=self[i]).write(elt_types[i]())
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reverse(
         self,
         out result: _RegTuple[*Self.element_types.reverse()],
@@ -1852,7 +1866,7 @@ struct _RegTuple[*element_types: CoordLike](
                 )
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def concat[
         *other_element_types: CoordLike
     ](
@@ -1898,7 +1912,7 @@ struct _RegTuple[*element_types: CoordLike](
                 rebind[type_of(result[self_len + i])](other[i])
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __contains__[T: Equatable](self, value: T) -> Bool:
         """Return whether the tuple contains the specified value.
 
@@ -2039,12 +2053,12 @@ comptime _CoordCast[
 """Computes the result element types for `Coord.cast[dtype]()`."""
 
 
-@always_inline
+@inline(.always)
 def _linear_idx_to_coord(idx: Int, stride: Int, shape: Int) -> Int:
     return umod(ufloordiv(idx, stride), shape)
 
 
-@always_inline
+@inline(.always)
 def _coerce_dynamic[T: CoordLike](value: Int) -> T:
     comptime if T == Int:
         return rebind[T](value)

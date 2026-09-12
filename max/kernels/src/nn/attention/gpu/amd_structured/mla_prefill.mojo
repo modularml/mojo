@@ -38,7 +38,7 @@ from .mma import TiledMmaOp
 
 
 __extension Attention:
-    @always_inline
+    @inline(.always)
     def mla_prefill[
         k_rope_t: MHAOperand,
         //,
@@ -175,7 +175,7 @@ __extension Attention:
         comptime accum_type = get_accum_type[Self.k_t.dtype]()
 
         # Phase 1: Q_nope @ K^T (depth // BK iterations)
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_qk_nope():
             comptime MmaOp = TiledMmaOp[
@@ -195,7 +195,7 @@ __extension Attention:
                     )
 
         # Phase 2: Q_rope @ K_rope^T (rope_depth // BK iterations)
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_qk_rope():
             comptime MmaOp = TiledMmaOp[
@@ -214,7 +214,7 @@ __extension Attention:
                         self.p_reg_buffer.stage_tile[0](),
                     )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_pv():
             comptime PVMmaOp = TiledMmaOp[
@@ -263,7 +263,7 @@ __extension Attention:
 
         comptime has_interior_full_mask = Self.mask_t != CausalMask
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def process_tile[slot: Int, has_next: Bool]():
             comptime next_slot = 1 - slot

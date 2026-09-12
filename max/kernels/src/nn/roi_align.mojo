@@ -35,7 +35,7 @@ struct Weighted2DPoint[dtype: DType](TrivialRegisterPassable):
         self.w = weight
 
 
-@always_inline
+@inline(.always)
 def _bilinear_interpolate[
     dtype: DType
 ](
@@ -109,7 +109,7 @@ def _bilinear_interpolate[
     return (p1, p2, p3, p4)
 
 
-@always_inline
+@inline(.always)
 def roi_align_nhwc[
     dtype: DType,
     //,
@@ -209,7 +209,7 @@ def roi_align_nhwc[
 
         # Pooling init/update/finalize functions parameterized by mode
         @__parameter
-        @always_inline
+        @inline(.always)
         def init_fn[dtype: DType]() -> Scalar[dtype]:
             comptime if mode == "AVG":
                 return 0
@@ -217,7 +217,7 @@ def roi_align_nhwc[
                 return min_or_neg_inf[dtype]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def update_fn[
             dtype: DType
         ](a: Scalar[dtype], b: Scalar[dtype]) -> Scalar[dtype]:
@@ -227,7 +227,7 @@ def roi_align_nhwc[
                 return max(a, b)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def reduce_fn[
             dtype: DType
         ](a: Scalar[dtype], b: Scalar[dtype]) -> Scalar[dtype]:

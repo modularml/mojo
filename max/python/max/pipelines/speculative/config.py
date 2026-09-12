@@ -52,7 +52,7 @@ draft slots before any real draft exists. Defined here so the graph side
 (``architectures``) and the runtime side (``lib``) agree on a single value.
 """
 
-SpeculativeMethod = Literal["eagle", "mtp", "dflash"]
+SpeculativeMethod = Literal["eagle", "mtp", "dflash", "dflash2"]
 """The supported methods for speculative decoding."""
 
 _ONE_TOKEN_PER_STEP: tuple[SpeculativeMethod, ...] = ("eagle", "mtp")
@@ -117,6 +117,7 @@ class SpeculativeConfig(ConfigFileModel):
     The CLI surfaces these fields as ``--speculative-method``,
     ``--num-speculative-tokens``,
     ``--num-speculative-tokens-per-batch-size``,
+    ``--num-speculative-tokens-mixed-batch``,
     ``--rejection-sampling-strategy``, and ``--synthetic-acceptance-rate``.
     Construct the config directly when configuring a pipeline
     programmatically:
@@ -140,8 +141,8 @@ class SpeculativeConfig(ConfigFileModel):
     )
     """The speculative decoding method to use.
 
-    One of ``"eagle"``, ``"mtp"``, or ``"dflash"``. When ``None``,
-    speculative decoding is disabled.
+    One of ``"eagle"``, ``"mtp"``, ``"dflash"``, or ``"dflash2"``. When
+    ``None``, speculative decoding is disabled.
     """
 
     num_speculative_tokens: int | None = Field(
@@ -232,6 +233,33 @@ class SpeculativeConfig(ConfigFileModel):
             VerifyWidthRange(batch_start=start, batch_end=end, num_tokens=count)
             for start, end, count in normalized
         ]
+
+    num_speculative_tokens_mixed_batch: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "How many drafted tokens the target verifies on a mixed "
+            "prefill+decode batch. Unset uses the count a pure decode batch "
+            "of the same size would."
+        ),
+    )
+    """How many of the drafted tokens the target verifies on a mixed batch.
+
+    Narrows for a different reason than
+    :attr:`num_speculative_tokens_per_batch_size`: that schedule trades
+    acceptance for decode throughput at large batch sizes, while this trades it
+    for the latency of the prefill rows sharing the step, which sit on the
+    critical path of a prompt's time to first token.
+
+    Capped at :attr:`num_speculative_tokens` where it is read, not here:
+    ``dflash`` leaves that width for the architecture to resolve from the draft
+    checkpoint, so the ceiling is not yet known at config-validation time.
+
+    ``None`` leaves mixed batches on the batch-size schedule, which is the
+    behavior when the field is unset. Reachable only alongside
+    ``--enable-spec-decode-mixed-batches``; without it a mixed batch verifies
+    nothing at all.
+    """
 
     rejection_sampling_strategy: RejectionSamplingStrategy | None = Field(
         default=None,
@@ -397,8 +425,21 @@ class SpeculativeConfig(ConfigFileModel):
         return self.speculative_method == "mtp"
 
     def is_dflash(self) -> bool:
-        """Returns whether the configured method is DFlash."""
-        return self.speculative_method == "dflash"
+        """Returns whether the configured method is a DFlash block draft.
+
+        True for both ``"dflash"`` and ``"dflash2"``: v2 keeps v1's fused
+        graph shape and block-drafting contract, so consumers that only
+        need "the draft arrives a block at a time" -- pipeline-class
+        selection, KV cache sizing -- want both. Architecture selection is
+        the exception: each fused graph is built for one drafter, so the
+        v1 and Eagle arms in ``lib.config`` exclude v2 and a v2 target
+        gets its own arm. Use :meth:`is_dflash2` where they differ.
+        """
+        return self.speculative_method in ("dflash", "dflash2")
+
+    def is_dflash2(self) -> bool:
+        """Returns whether the configured method is DFlash2 specifically."""
+        return self.speculative_method == "dflash2"
 
     def uses_greedy_rejection(self) -> bool:
         """Returns whether the ``"greedy"`` rejection sampling strategy is selected."""

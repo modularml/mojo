@@ -15,24 +15,24 @@
 import std.subprocess
 import std.tempfile
 from std.pathlib import Path
-from std.sys.info import CompilationTarget, _accelerator_arch, _TargetType
+from std.sys.info import CompilationTarget
 
 from std.compile import CompiledFunctionInfo, compile_info
 from std._gpu.host import get_gpu_target
 
-from .info import A100, GPUInfo
+from .info import GPUInfo
 
 # ===-----------------------------------------------------------------------===#
 # Compilation
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _cross_compilation() -> Bool:
     return __mlir_attr.`#kgen.param.expr<cross_compilation> : i1`
 
 
-@always_inline
+@inline(.always)
 def _compile_code[
     func_type: TrivialRegisterPassable,
     //,
@@ -40,10 +40,8 @@ def _compile_code[
     /,
     *,
     emission_kind: StaticString = "asm",
-    target: _TargetType = get_gpu_target(),
-    compile_options: StaticString = CompilationTarget[
-        target
-    ].default_compile_options(),
+    target: CompilationTarget = CompilationTarget.current_accelerator(),
+    compile_options: StaticString = target.default_compile_options(),
     link_options: StaticString = "",
 ]() -> CompiledFunctionInfo[func_type, func, target]:
     return compile_info[
@@ -60,9 +58,9 @@ def _compile_code[
 # ===-----------------------------------------------------------------------===#
 
 
-@no_inline
+@inline(.never)
 def _to_sass[
-    target: _TargetType = get_gpu_target()
+    target: CompilationTarget = CompilationTarget.current_accelerator()
 ](asm: String, *, nvdisasm_opts: String = "") raises -> String:
     comptime nvdisasm_path = Path("/usr/local/cuda/bin/nvdisasm")
     if not nvdisasm_path.exists():
@@ -86,9 +84,9 @@ def _to_sass[
 # ===-----------------------------------------------------------------------===#
 
 
-@no_inline
+@inline(.never)
 def _ptxas_compile[
-    target: _TargetType = get_gpu_target()
+    target: CompilationTarget = CompilationTarget.current_accelerator()
 ](
     asm: String, *, options: String = "", output_file: Optional[Path] = None
 ) raises -> String:
@@ -104,7 +102,7 @@ def _ptxas_compile[
             String(
                 ptxas_path,
                 " --gpu-name ",
-                CompilationTarget[target]._arch(),
+                target._arch(),
                 " -O4 ",
                 ptx_file,
                 " ",

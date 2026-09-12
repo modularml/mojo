@@ -19,7 +19,7 @@ from std.memory import bitcast
 from .fp4_utils import E4M3_MAXABS_RECIP
 
 
-@always_inline
+@inline(.always)
 def compute_mxfp8_block_scale[
     scales_dtype: DType
 ](group_max: Float32) -> Tuple[Scalar[scales_dtype], Float32, Bool]:

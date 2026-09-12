@@ -158,7 +158,7 @@ struct LaunchAttributeID(Equatable, TrivialRegisterPassable, Writable):
     and the CUDA driver can choose a different configuration if required for
     the launch."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two `LaunchAttribute` instances are equal.
 
@@ -172,7 +172,7 @@ struct LaunchAttributeID(Equatable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, other: Self) -> Bool:
         """Checks if two `LaunchAttribute` instances are not equal.
 
@@ -184,7 +184,7 @@ struct LaunchAttributeID(Equatable, TrivialRegisterPassable, Writable):
         """
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the string representation of the attribute to a writer.
 
@@ -271,7 +271,7 @@ struct AccessProperty(Equatable, TrivialRegisterPassable, Writable):
     comptime PERSISTING = Self(2)
     """Persisting access is more likely to persist in cache, optimized for reused data."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, other: Self) -> Bool:
         """Compares two `AccessProperty` instances for equality.
 
@@ -283,7 +283,7 @@ struct AccessProperty(Equatable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, other: Self) -> Bool:
         """Compares two `AccessProperty` instances for inequality.
 
@@ -295,7 +295,7 @@ struct AccessProperty(Equatable, TrivialRegisterPassable, Writable):
         """
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes a string representation of the `AccessProperty` to a writer.
 
@@ -455,7 +455,7 @@ struct AccessPolicyWindow(
         self.hit_prop = hit_prop
         self.miss_prop = miss_prop
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes a string representation of the `AccessPolicyWindow` to a writer.
 

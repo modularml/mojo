@@ -68,7 +68,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
     comptime BLOCK_SCALED_1D2D_FP8 = Self(3)
     """BLOCK_SCALED_1D2D_FP8 type."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Convert GEMM kind to an integer value.
 
@@ -77,7 +77,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return Int(self._value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Check if two GEMM kinds are equal.
 
@@ -89,7 +89,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Check if two GEMM kinds are not equal.
 
@@ -101,7 +101,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Write the GEMM kind to a writer.
 
@@ -119,7 +119,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         else:
             writer.write("kind::unknown")
 
-    @always_inline
+    @inline(.always)
     def __str__(self) -> String:
         """Convert GEMM kind to a string."""
         if self == Self.GEMM:
@@ -294,8 +294,17 @@ def _maximize_pipeline_stages[
     num_tma_epilogue_pipeline_stages: Int = 2,
     AB_swapped: Bool = False,
     epilogue_is_1d: Bool = False,
+    reserved_smem: Int = 0,
 ) -> Int:
-    """Calculate max pipeline stages based on shared memory budget."""
+    """Calculate max pipeline stages based on shared memory budget.
+
+    `reserved_smem` carves a fixed byte block out of the budget before the
+    per-stage division (unlike `extra_smem_per_stage`, which scales with the
+    stage count). A persistent megakernel that hosts an extra warp-class
+    needing its own fixed SMEM region (e.g. an EP-dispatch send buffer) passes
+    that region's size here so the FFN pipeline shrinks to leave room; 0
+    (default) is the standalone-matmul behavior.
+    """
     comptime b200_smem = B200.shared_memory_per_multiprocessor - 1024
 
     var c_smem_bytes = (
@@ -355,6 +364,7 @@ def _maximize_pipeline_stages[
 
     return (
         b200_smem
+        - reserved_smem
         - output_smem_bytes
         - clc_smem_bytes
         - mma_output_smem_bytes
@@ -725,9 +735,11 @@ struct MatmulConfig[
             ), "MatmulConfig requested num_pipeline_stages exceeds smem budget."
             self.num_pipeline_stages = num_pipeline_stages.value()
         else:
-            self.num_pipeline_stages = (
-                max_num_pipeline_stages if max_num_pipeline_stages <= 16 else 16
-            )
+            # Every tile whose smem budget reaches past 16 stages is
+            # faster with the deeper prefetch, by 2-9% at M<=96 on B200.
+            # min() with the computed budget so the cap can never
+            # overcommit smem.
+            self.num_pipeline_stages = min(max_num_pipeline_stages, 24)
 
         # SM100 kernel only supports k grouping when num_pipeline_stages is a multiple of k_group_size.
         self.num_pipeline_stages = align_down(
@@ -915,7 +927,7 @@ def choose_config[
     else:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def select_mma_mn(M: Int, N: Int, _swapAB: Bool = False):
             for bm in [64, 128]:
                 var N_aligned = align_up(N, 16)
@@ -1183,6 +1195,10 @@ struct BlockScaledMatmulConfig[
     var is_small_bn: Bool
     var gemm_kind: GEMMKind
     var prefetch_tiles_n: Int
+    # Epilogue warpgroups, each owning its own output band, staging buffer and
+    # barrier id. 1 (default) is the single-pipeline epilogue every existing
+    # caller has; 2 gives a second, independent store-block pipeline.
+    var num_epilogue_warpgroups: Int
 
     def __init__(
         out self,
@@ -1204,6 +1220,11 @@ struct BlockScaledMatmulConfig[
         register_based_epilogue: Bool = True,
         gemm_kind: GEMMKind = GEMMKind.GEMM,
         prefetch_tiles_n: Int = 0,
+        num_epilogue_warpgroups: Int = 1,
+        # Fixed SMEM (bytes) reserved out of the pipeline budget for a
+        # co-resident non-matmul warp-class (persistent megakernel). 0
+        # (default) = standalone matmul, auto-max stages unchanged.
+        reserved_smem: Int = 0,
     ):
         comptime assert block_scaled_operands_compatible[
             Self.a_type, Self.b_type
@@ -1227,6 +1248,7 @@ struct BlockScaledMatmulConfig[
         )
 
         self.gemm_kind = gemm_kind
+        self.num_epilogue_warpgroups = num_epilogue_warpgroups
         self.prefetch_tiles_n = prefetch_tiles_n
 
         # Scaling factors configuration (SFA, SFB)
@@ -1301,6 +1323,7 @@ struct BlockScaledMatmulConfig[
             self.num_clc_pipeline_stages,
             self.num_accum_pipeline_stages,
             sf_smem_per_stage,
+            reserved_smem=reserved_smem,
         )
 
         if num_pipeline_stages:
@@ -1502,7 +1525,7 @@ def choose_block_scaled_config[
     else:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def select_mma_mn(M: Int, N: Int, _swapAB: Bool = False):
             var N_alignby64 = align_up(N, 64)
             var max_mma_n = min(N_alignby64, 256)

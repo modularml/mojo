@@ -87,7 +87,7 @@ struct RuntimeLayout[
     stride dimensions.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize a `RuntimeLayout` with default values.
 
@@ -107,7 +107,7 @@ struct RuntimeLayout[
         self.shape = {}
         self.stride = {}
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         shape: RuntimeTuple[Self.layout.shape, element_type=Self.element_type],
@@ -126,7 +126,7 @@ struct RuntimeLayout[
         self.stride = stride
 
     # FIXME: This should probably better done in the RuntimeTuple constructor
-    @always_inline
+    @inline(.always)
     def __call__(self, idx: Int) -> Scalar[Self.linear_idx_type]:
         """Convert a single index to a flat linear index.
 
@@ -138,7 +138,7 @@ struct RuntimeLayout[
         """
         return self.__call__(RuntimeTuple[IntTuple(UNKNOWN_VALUE)](idx))
 
-    @always_inline
+    @inline(.always)
     def __call__[
         t: IntTuple
     ](self, idx: RuntimeTuple[t, ...]) -> Scalar[Self.linear_idx_type]:
@@ -157,7 +157,7 @@ struct RuntimeLayout[
             idx, self.shape, self.stride
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def idx2crd[
         t: IntTuple
     ](self, idx: RuntimeTuple[t, ...]) -> RuntimeTuple[
@@ -180,7 +180,7 @@ struct RuntimeLayout[
         """
         return idx2crd(idx, self.shape, self.stride)
 
-    @always_inline
+    @inline(.always)
     def size(self) -> Int:
         """Calculate the total number of elements in the layout.
 
@@ -190,7 +190,7 @@ struct RuntimeLayout[
         """
         return product(self.shape)
 
-    @always_inline
+    @inline(.always)
     def bound_check_required(self) -> Bool:
         """Determine if bounds checking is required for this layout.
 
@@ -205,7 +205,7 @@ struct RuntimeLayout[
                 return True
         return False
 
-    @always_inline
+    @inline(.always)
     def cast[
         _element_type: DType,
         /,
@@ -296,7 +296,7 @@ struct RuntimeLayout[
             c_stride *= dim
         return {shape.cast[Self.element_type](), stride}
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Write a string representation of the layout to a writer.
 

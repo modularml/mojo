@@ -206,7 +206,7 @@ comptime KTMATileT[
 ] = SplitLastDimTMATensorTile[dtype, Index(BM_key, 1, depth), _INDEX_SWIZZLE]
 
 
-@always_inline
+@inline(.always)
 def _fp8_index_body[
     dtype: DType,
     KOperand: MHAOperand,
@@ -792,7 +792,7 @@ def _fp8_index_score_kernel_sm100_split[
     )
 
 
-@always_inline
+@inline(.always)
 def fp8_index_score_sm100[
     dtype: DType,
     KOperand: MHAOperand,

@@ -25,7 +25,7 @@ from max.config import ConfigFileModel
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from .backend_names import Backend
-from .datasets import DatasetMode, DistributionParameter
+from .datasets import DatasetMode, DistributionParameter, ImageTurn
 from .utils import int_or_none, parse_comma_separated
 
 # Fixed default seed for the workload generator and request sampling. Scheduled
@@ -106,6 +106,13 @@ VIDEO_GEN_DEFAULT_ENDPOINT: Mapping[Backend, Endpoint] = {
 PIXEL_GENERATION_ENDPOINTS: frozenset[Endpoint] = frozenset(
     set(PIXEL_GEN_DEFAULT_ENDPOINT.values())
     | set(VIDEO_GEN_DEFAULT_ENDPOINT.values())
+)
+
+# Endpoints whose request drivers actually put input images on the wire.
+# Mixing images into a workload aimed anywhere else would inflate num_tokens
+# and --dry-run image stats for content the server never receives.
+IMAGE_MIXING_ENDPOINTS: frozenset[Endpoint] = frozenset(
+    {"/v1/chat/completions"}
 )
 
 
@@ -256,6 +263,62 @@ class BaseBenchmarkConfig(ConfigFileModel):
         if isinstance(value, str):
             return int_or_none(value)
         return value
+
+
+def _mapping_from_argument(value: object, field: str) -> dict[str, Any]:
+    """Resolve one argument into a mapping, from any of its three spellings.
+
+    A field holding structured data is reachable three ways: as a mapping
+    (from a config or workload YAML), as an inline JSON object string, and as
+    a path to a YAML/JSON file.
+
+    Args:
+        value: The raw argument.
+        field: The field's name, for error messages.
+
+    Returns:
+        The resolved mapping.
+
+    Raises:
+        ValueError: If the string is neither an inline object nor a readable
+            file, the content fails to parse, or it does not resolve to an
+            object.
+    """
+    if isinstance(value, Mapping):
+        return dict(value)
+    if not isinstance(value, str):
+        raise ValueError(
+            f"{field} must be a mapping, an inline JSON string, or a path "
+            f"to a YAML/JSON file; got {type(value).__name__}."
+        )
+    text = value.strip()
+    if text.startswith("{"):
+        source, origin = text, "inline JSON"
+    else:
+        path = Path(text)
+        if not path.is_file():
+            raise ValueError(
+                f"{field} {text!r} is not a readable file path; "
+                "an inline value must be a JSON object starting "
+                "with '{'."
+            )
+        try:
+            source = path.read_text()
+        except OSError as e:
+            raise ValueError(
+                f"{field} {text!r} is not a readable file path: {e}"
+            ) from e
+        origin = f"file {text!r}"
+    try:
+        parsed = yaml.safe_load(source)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Failed to parse {field} ({origin}): {e}") from e
+    if not isinstance(parsed, Mapping):
+        raise ValueError(
+            f"{field} ({origin}) must be a mapping/object, got "
+            f"{type(parsed).__name__}."
+        )
+    return dict(parsed)
 
 
 class BaseServingBenchmarkConfig(BaseBenchmarkConfig):
@@ -705,6 +768,34 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
         description="Size of random images to generate.",
         json_schema_extra={"group": "Dataset-Specific Parameters"},
     )
+    image_fraction: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Fraction (0.0-1.0) of requests (single-turn) or chat sessions (multi-turn) that get at least one generated image mixed in, on top of whatever dataset is selected via --dataset-name. Mutually exclusive with --random-image-count/--random-image-size.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_count: DistributionParameter = Field(
+        default=1,
+        description="Distribution for the number of images on a request/turn selected to have images (used with --image-fraction). E.g. 'DU(1,4)'.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_long_side: DistributionParameter = Field(
+        default=512,
+        description="Distribution for each generated image's longer side, in pixels (used with --image-fraction). E.g. 'U(224,1024)'.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_aspect_ratio: DistributionParameter = Field(
+        default=1.0,
+        description="Distribution for each generated image's width/height ratio (used with --image-fraction). 1.0 produces square images.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_turn: ImageTurn = Field(
+        default="first",
+        description="Which user turn(s) in a multi-turn chat session get images when selected: 'first', 'last', or 'every'. Ignored for single-turn requests.",
+        json_schema_extra={"group": "Multimodal"},
+    )
     random_input_len: DistributionParameter = Field(
         default=1024,
         description="Number of input tokens per request, used by the random and artificial-analysis datasets. Use ';' to separate first-turn and remaining-turn distributions for multiturn.",
@@ -728,6 +819,37 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
     random_sys_prompt_ratio: float = Field(
         default=0.0,
         description="Ratio to determine the system prompt length, used only for random sampling.",
+        json_schema_extra={"group": "Dataset-Specific Parameters"},
+    )
+    # accepts_keys=False for the same reason extra_body needs it: cyclopts
+    # would otherwise want scalar key=value pairs rather than one token.
+    agentic_tool_profiles: Annotated[
+        dict[str, Any] | None, Parameter(accepts_keys=False)
+    ] = Field(
+        default=None,
+        description=(
+            "Load shapes for the agent-loop rounds that follow each human"
+            " turn, synthesized rather than replayed. These are not tool"
+            " definitions: nothing here is sent as the OpenAI 'tools' field."
+            " A path to a YAML file, or an inline YAML/JSON mapping holding"
+            " a 'tools' list, e.g."
+            ' \'{"tools":[{"input-len":"N(200,80)",'
+            '"output-len":"N(190,60)"}]}\'; it can also be nested directly'
+            " in a --workload-config YAML. Each round is one request"
+            " carrying one tool result. Requires --fit-distributions and"
+            " --agentic-rounds-per-turn, on a multiturn dataset that"
+            " supports fitting."
+        ),
+        json_schema_extra={"group": "Dataset-Specific Parameters"},
+    )
+    agentic_rounds_per_turn: DistributionParameter | None = Field(
+        default=None,
+        description=(
+            "Number of agent-loop rounds following each human turn,"
+            " sampled once per turn. Accepts a constant or a distribution"
+            " string (same format as --random-input-len). Requires"
+            " --agentic-tool-profiles."
+        ),
         json_schema_extra={"group": "Dataset-Specific Parameters"},
     )
     fit_distributions: bool = Field(
@@ -978,61 +1100,29 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
             return parse_comma_separated(value, float)
         return value
 
+    @field_validator("agentic_tool_profiles", mode="before")
+    @classmethod
+    def _parse_agentic_tool_profiles(cls, value: object) -> object:
+        """Parse the flag from a mapping, inline JSON, or a file path.
+
+        Raises:
+            ValueError: If the value does not resolve to a mapping.
+        """
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return _mapping_from_argument(value, "agentic_tool_profiles")
+
     @field_validator("extra_body", mode="before")
     @classmethod
     def _parse_extra_body(cls, value: object) -> dict[str, Any]:
-        """Parse ``extra_body`` into a dict from one of three inputs:
-
-        - a mapping (e.g. from a ``--config-file`` YAML), used directly;
-        - an inline JSON object string (leading ``{``), parsed with ``yaml.safe_load``;
-        - any other non-empty string, treated as a YAML/JSON file path.
+        """Parse ``extra_body`` from a mapping, inline JSON, or a file path.
 
         Raises:
-            ValueError: If the string is neither an inline object nor a readable
-                file, the content fails to parse, or it does not resolve to an
-                object.
+            ValueError: If the value does not resolve to a mapping.
         """
-        if value is None:
+        if value is None or (isinstance(value, str) and not value.strip()):
             return {}
-        if isinstance(value, Mapping):
-            return dict(value)
-        if isinstance(value, str):
-            text = value.strip()
-            if not text:
-                return {}
-            if text.startswith("{"):
-                source, origin = text, "inline JSON"
-            else:
-                path = Path(text)
-                if not path.is_file():
-                    raise ValueError(
-                        f"extra_body {text!r} is not a readable file path; "
-                        "an inline value must be a JSON object starting "
-                        "with '{'."
-                    )
-                try:
-                    source = path.read_text()
-                except OSError as e:
-                    raise ValueError(
-                        f"extra_body {text!r} is not a readable file path: {e}"
-                    ) from e
-                origin = f"file {text!r}"
-            try:
-                parsed = yaml.safe_load(source)
-            except yaml.YAMLError as e:
-                raise ValueError(
-                    f"Failed to parse extra_body ({origin}): {e}"
-                ) from e
-            if not isinstance(parsed, Mapping):
-                raise ValueError(
-                    f"extra_body ({origin}) must be a mapping/object, got "
-                    f"{type(parsed).__name__}."
-                )
-            return dict(parsed)
-        raise ValueError(
-            "extra_body must be a mapping, an inline JSON string, or a path "
-            f"to a YAML/JSON file; got {type(value).__name__}."
-        )
+        return _mapping_from_argument(value, "extra_body")
 
     @model_validator(mode="after")
     def _check_warmup_runtime_estimates(self) -> ServingBenchmarkConfig:
@@ -1045,6 +1135,35 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
                 "--warmup-delay-estimated-ttft-ms /"
                 " --warmup-delay-estimated-tpot-ms require"
                 " --warmup-delay-biased to be set."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_image_flags_mutually_exclusive(self) -> ServingBenchmarkConfig:
+        """--image-fraction and --random-image-* are separate mechanisms."""
+        if self.image_fraction > 0 and (
+            self.random_image_count or self.random_image_size
+        ):
+            raise ValueError(
+                "--image-fraction cannot be combined with"
+                " --random-image-count/--random-image-size; use one"
+                " mechanism or the other."
+            )
+        if (
+            self.image_fraction > 0
+            and self.endpoint not in IMAGE_MIXING_ENDPOINTS
+        ):
+            raise ValueError(
+                f"--image-fraction requires an image-capable endpoint"
+                f" ({', '.join(sorted(IMAGE_MIXING_ENDPOINTS))}); got"
+                f" {self.endpoint!r}, whose driver sends text only."
+            )
+        if self.image_fraction > 0 and self.benchmark_task in (
+            PIXEL_GENERATION_TASKS + VIDEO_GENERATION_TASKS
+        ):
+            raise ValueError(
+                "--image-fraction mixes generated images into text prompts and"
+                f" does not apply to the {self.benchmark_task!r} task."
             )
         return self
 

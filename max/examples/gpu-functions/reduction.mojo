@@ -104,11 +104,11 @@ struct SumKernelBenchmarkParams:
 
 
 # Benchmark function for sum_kernel
-@always_inline
+@inline(.always)
 def sum_kernel_benchmark(
     mut b: Bencher, input_data: SumKernelBenchmarkParams
 ) raises:
-    @always_inline
+    @inline(.always)
     def kernel_launch_sum(ctx: DeviceContext) raises {imm}:
         comptime kernel = sum_kernel[SIZE, BATCH_SIZE]
         var out_ptr = input_data.out_ptr

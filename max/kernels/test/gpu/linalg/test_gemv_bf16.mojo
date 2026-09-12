@@ -62,7 +62,7 @@ def run_matvec(M: Int, N: Int, K: Int, *, ctx: DeviceContext) raises:
     comptime WARPS_PER_BLOCK = 32
     comptime kernel = gemv_kernel[.float32, .bfloat16, .bfloat16]
 
-    @always_inline
+    @inline(.always)
     def run_func_gemv(ctx: DeviceContext) raises {imm}:
         ctx.enqueue_function[kernel](
             c_device,
@@ -114,7 +114,7 @@ def run_matvec(M: Int, N: Int, K: Int, *, ctx: DeviceContext) raises:
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             .float32,

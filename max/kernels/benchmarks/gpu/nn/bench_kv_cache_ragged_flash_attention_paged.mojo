@@ -395,7 +395,7 @@ def execute_kv_cache_ragged_flash_attention[
 
     if run_benchmark:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut b: Bencher,
         ) raises {
@@ -408,7 +408,7 @@ def execute_kv_cache_ragged_flash_attention[
             var sink_weights_view,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext) raises {imm}:
                 comptime if local_window_size > 0:
                     comptime assert (

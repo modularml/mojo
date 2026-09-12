@@ -44,7 +44,7 @@ struct NoneType(
         """
         self._value = value
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes `None` to a writer.
 
@@ -53,7 +53,7 @@ struct NoneType(
         """
         writer.write_string("None")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes `None` to a writer.
 

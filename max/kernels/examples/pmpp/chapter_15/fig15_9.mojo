@@ -17,7 +17,7 @@ comptime tM = 8
 comptime tN = 4
 
 
-@always_inline
+@inline(.always)
 def mm_optimized(
     k: Int,
     a: UnsafePointer[Float32, _, address_space=.SHARED],
