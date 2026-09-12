@@ -166,7 +166,8 @@ public:
   /// wrap a function pointer to be used as a closure (`_PtrWrapper`).
   ASTDecl *createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
                                  FnTypeGeneratorType signatureType,
-                                 SMLoc location);
+                                 SMLoc location,
+                                 ArrayRef<ParamDeclRefAttr> bodyCaptures = {});
 
   /// Generate a stateless extension struct that extends one closure trait to
   /// a structurally compatible one.
@@ -175,6 +176,8 @@ public:
                                  ASTType sourceMetaType, SMLoc location);
   Type getConcreteClosureWrapperTypeForFnSymbol(ASTDecl &declScope, SMLoc loc,
                                                 PValue fnPValue);
+  /// True if wrapping `fnSymbol` as a PtrWrapper produces `wrapper`.
+  bool isWrapperStructForFnSymbol(PValue fnSymbol, LIT::StructType wrapper);
 
 private:
   MLIRContext *ctx;

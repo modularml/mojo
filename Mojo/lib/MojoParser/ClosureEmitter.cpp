@@ -47,6 +47,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SetVector.h"
@@ -557,9 +558,78 @@ static FnTypeGeneratorType replaceTraitWitnessLookupsWithParamWitnessLookups(
   return cast<FnTypeGeneratorType>(replacer.replace(sig));
 }
 
+static FnTypeGeneratorType
+implTypeWithCaptures(FnTypeGeneratorType signatureType,
+                     ArrayRef<ParamDeclRefAttr> signatureCaptures,
+                     ArrayRef<ParamDeclRefAttr> bodyCaptures) {
+  SmallVector<ParamDeclRefAttr> allCaptures;
+  allCaptures.reserve(signatureCaptures.size() + bodyCaptures.size());
+  llvm::append_range(allCaptures, signatureCaptures);
+  llvm::append_range(allCaptures, bodyCaptures);
+  auto implType = FnTypeGeneratorType::prependParams(
+      signatureType, llvm::map_to_vector(allCaptures, [](ParamDeclRefAttr ref) {
+        return ParamDeclAttr::get(ref);
+      }));
+  return cast<FnTypeGeneratorType>(getCanonicalType(implType));
+}
+
+/// ParamDeclRefs in a function symbol's parameter values that are not already
+/// signature captures or the function's own parameters
+static SmallVector<ParamDeclRefAttr>
+bodyParamDeclRefs(ArrayRef<TypedAttr> symbolBindings,
+                  ArrayRef<ParamDeclRefAttr> signatureCaptures,
+                  FnTypeGeneratorType fnType) {
+  llvm::SmallDenseSet<StringAttr, 8> seen;
+  llvm::SmallDenseSet<StringAttr, 8> signatureNames;
+  for (ParamDeclRefAttr capture : signatureCaptures) {
+    seen.insert(capture.getName());
+    signatureNames.insert(capture.getName());
+  }
+  if (PogListAttr pogs = fnType.getParamListAttrs()) {
+    for (PogMetadataAttr pog : pogs.getPogs())
+      seen.insert(pog.getName());
+  }
+
+  // This parameter can be bound without binding the signature capture
+  auto typeRefersToSignatureCapture = [&](Type type) {
+    if (signatureNames.empty())
+      return false;
+    bool mentions = false;
+    type.walk([&](ParamDeclRefAttr ref) {
+      if (signatureNames.contains(ref.getName()))
+        mentions = true;
+    });
+    return mentions;
+  };
+
+  llvm::SmallSetVector<ParamDeclRefAttr, 4> bodyOnlyCaptures;
+  for (TypedAttr binding : symbolBindings) {
+    auto ref = dyn_cast<ParamDeclRefAttr>(binding);
+    if (!ref)
+      continue;
+    if (!seen.insert(ref.getName()).second)
+      continue;
+    if (!typeRefersToSignatureCapture(ref.getType()))
+      continue;
+    bodyOnlyCaptures.insert(ref);
+  }
+  return bodyOnlyCaptures.takeVector();
+}
+
+static SmallVector<ParamDeclRefAttr>
+bodyParamDeclRefsForFn(PValue fnPValue,
+                       ArrayRef<ParamDeclRefAttr> signatureCaptures) {
+  auto symbol = dyn_cast<SymbolConstantAttr>(fnPValue.get());
+  if (!symbol)
+    return {};
+  return bodyParamDeclRefs(symbol.getParamValues(), signatureCaptures,
+                           cast<FnTypeGeneratorType>(fnPValue.getType()));
+}
+
 static std::pair<TypedAttr, SmallVector<TypedAttr>>
 selfContainedSymbolAndCaptures(PValue fnPValue,
                                FnTypeGeneratorType wrapperImplType,
+                               ArrayRef<ParamDeclRefAttr> bodyCaptures,
                                SharedState &shared, Location loc);
 
 static SymbolConstantAttr
@@ -955,13 +1025,15 @@ static std::string formatClosureSignature(FnTypeGeneratorType sig,
 ASTDecl *
 ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
                                       FnTypeGeneratorType rawSignatureType,
-                                      SMLoc smLocation) {
+                                      SMLoc smLocation,
+                                      ArrayRef<ParamDeclRefAttr> bodyCaptures) {
   FnTypeGeneratorType signatureType =
       cast<FnTypeGeneratorType>(getCanonicalType(rawSignatureType));
-  auto [capturedRefs, selfContainedSignature] =
+  auto [capturedRefs, signatureOnlySignature] =
       DeclResolver::createSelfContainedSignature(signatureType);
-  selfContainedSignature =
-      cast<FnTypeGeneratorType>(getCanonicalType(selfContainedSignature));
+  (void)signatureOnlySignature;
+  FnTypeGeneratorType selfContainedSignature =
+      implTypeWithCaptures(signatureType, capturedRefs, bodyCaptures);
 
   // The struct we're trying to create looks like this:
   // struct FnClosureWrapper[Impl: def() -> Int](`def() -> Int`):
@@ -969,9 +1041,10 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
   //     pass
   //   def __call__(self) -> Int:
   //     return Impl()
+  //
+  // Signature captures are trait aliases. Body captures are extra struct
+  // params (not aliases) and are part of the cached wrapper name.
 
-  // The wrapper relies only on the function signature. Use that as the struct
-  // name.
   SmallString<128> name(ASTType(selfContainedSignature).getAsString({&shared}));
   name += "_PtrWrapper";
   TraitDeclOp trait = cast<TraitDeclOp>(traitDecl.getIfOperation());
@@ -1014,6 +1087,27 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
     }
     assert(aliasCount == capturedRefs.size() &&
            "expected top-level wrapper captures to mirror trait aliases");
+    mlir::AttrTypeReplacer namedCaptureReplacer;
+    llvm::SmallDenseMap<StringAttr, TypedAttr, 8> signatureCaptureByName;
+    for (auto [ref, param] : llvm::zip_equal(
+             capturedRefs,
+             ArrayRef(captureParams).take_front(capturedRefs.size())))
+      signatureCaptureByName.try_emplace(ref.getName(),
+                                         ParamDeclRefAttr::get(param));
+    namedCaptureReplacer.addReplacement([&](ParamDeclRefAttr ref) -> TypedAttr {
+      auto it = signatureCaptureByName.find(ref.getName());
+      if (it == signatureCaptureByName.end())
+        return {};
+      return it->second;
+    });
+    for (ParamDeclRefAttr bodyCapture : bodyCaptures) {
+      StringAttr captureName =
+          b.getStringAttr("__capture_" + bodyCapture.getName().getValue());
+      Type bodyCaptureType =
+          namedCaptureReplacer.replace(bodyCapture.getType());
+      captureParams.push_back(
+          ParamDeclAttr::get(ctx, captureName, bodyCaptureType));
+    }
   }
   llvm::append_range(implParameters, captureParams);
   ParamDeclAttr implType = ParamDeclAttr::get(implName, selfContainedSignature);
@@ -1157,17 +1251,52 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
     TypedAttr callee = ParamDeclRefAttr::get(implType);
     SmallVector<TypedAttr> paramArgs;
     ArrayRef<ParamDeclAttr> callParams = parameters;
-    ArrayRef<ParamDeclAttr> auxiliaryParams;
-    if (!captureParams.empty()) {
-      assert(parameters.size() >= captureParams.size() &&
-             "wrapper auxiliary parameters must correspond to captures");
-      auxiliaryParams = parameters.take_front(captureParams.size());
-      callParams = parameters.drop_front(captureParams.size());
+    const size_t numSignatureCaptures = capturedRefs.size();
+    ArrayRef<ParamDeclAttr> signatureAux;
+    // Signature captures always bind from __call__ auxiliary params.
+    if (numSignatureCaptures > 0) {
+      assert(parameters.size() >= numSignatureCaptures &&
+             "wrapper auxiliary parameters must correspond to signature "
+             "captures");
+      signatureAux = parameters.take_front(numSignatureCaptures);
+      llvm::append_range(paramArgs,
+                         llvm::map_range(signatureAux, [](ParamDeclAttr param) {
+                           return TypedAttr(ParamDeclRefAttr::get(param));
+                         }));
+      callParams = parameters.drop_front(numSignatureCaptures);
     }
-    llvm::append_range(
-        paramArgs, llvm::map_range(auxiliaryParams, [](ParamDeclAttr param) {
-          return TypedAttr(ParamDeclRefAttr::get(param));
-        }));
+    // Body-capture types mention the struct's `__capture_*` copies. Rewrite
+    // those refs onto the function aux params so sequential bind sees one
+    // dtype decl.
+    if (!bodyCaptures.empty()) {
+      assert(captureParams.size() ==
+                 numSignatureCaptures + bodyCaptures.size() &&
+             "wrapper struct params must be signature captures then body "
+             "captures");
+      mlir::AttrTypeReplacer structCaptureToCallAux;
+      llvm::SmallDenseMap<StringAttr, TypedAttr, 8> structToAux;
+      for (auto [structParam, auxParam] : llvm::zip_equal(
+               ArrayRef(captureParams).take_front(numSignatureCaptures),
+               signatureAux))
+        structToAux.try_emplace(structParam.getName(),
+                                ParamDeclRefAttr::get(auxParam));
+      structCaptureToCallAux.addReplacement(
+          [&](ParamDeclRefAttr ref) -> TypedAttr {
+            auto it = structToAux.find(ref.getName());
+            if (it == structToAux.end())
+              return {};
+            return it->second;
+          });
+      for (ParamDeclAttr bodyParam :
+           ArrayRef(captureParams).drop_front(numSignatureCaptures)) {
+        TypedAttr bodyRef = ParamDeclRefAttr::get(bodyParam);
+        Type rewrittenType = structCaptureToCallAux.replace(bodyRef.getType());
+        paramArgs.push_back(
+            rewrittenType == bodyRef.getType()
+                ? bodyRef
+                : ParamOperatorAttr::getRebind(bodyRef, rewrittenType));
+      }
+    }
     llvm::append_range(
         paramArgs,
         llvm::map_range(callParams, [](ParamDeclAttr p) -> TypedAttr {
@@ -1202,8 +1331,12 @@ Type ClosureEmitter::getConcreteClosureWrapperTypeForFnSymbol(
   auto fnSig = cast<FnTypeGeneratorType>(fnPValue.getType());
   ASTDecl &moduleDecl = *declScope.getNearestDeclOfType<FileModuleOp>();
   auto rvClosureTrait = shared.getOrCreateClosureTrait(loc, moduleDecl, fnSig);
-  ASTDecl *wrapper =
-      createFnStructWrapper(moduleDecl, *rvClosureTrait, fnSig, loc);
+  auto [signatureCaptures, _] =
+      DeclResolver::createSelfContainedSignature(fnSig);
+  SmallVector<ParamDeclRefAttr> bodyCaptures =
+      bodyParamDeclRefsForFn(fnPValue, signatureCaptures);
+  ASTDecl *wrapper = createFnStructWrapper(moduleDecl, *rvClosureTrait, fnSig,
+                                           loc, bodyCaptures);
   if (!wrapper)
     return {};
   auto structDeclOp = cast<StructDeclOp>(wrapper->getIfOperation());
@@ -1211,11 +1344,50 @@ Type ClosureEmitter::getConcreteClosureWrapperTypeForFnSymbol(
   auto [fnVal, captureBindings] = selfContainedSymbolAndCaptures(
       fnPValue,
       cast<FnTypeGeneratorType>(structDeclOp.getInputParams().back().getType()),
-      shared, shared.diags.translateLocation(loc));
+      bodyCaptures, shared, shared.diags.translateLocation(loc));
   SmallVector<TypedAttr> wrapperBindings;
   llvm::append_range(wrapperBindings, captureBindings);
   wrapperBindings.push_back(fnVal);
   return structDeclOp.bindReference(wrapperBindings);
+}
+
+bool ClosureEmitter::isWrapperStructForFnSymbol(PValue fnSymbol,
+                                                LIT::StructType wrapper) {
+  if (!fnSymbol)
+    return false;
+  auto fnSig = dyn_cast<FnTypeGeneratorType>(fnSymbol.getType());
+  if (!fnSig)
+    return false;
+  ASTDecl &decl =
+      shared.declResolver->getDeclForTypeSymbol(wrapper.getSymbolRef());
+  auto structOp = dyn_cast<StructDeclOp>(decl.getIfOperation());
+  if (!structOp)
+    return false;
+
+  auto [signatureCaptures, _] =
+      DeclResolver::createSelfContainedSignature(fnSig);
+  SmallVector<ParamDeclRefAttr> bodyCaptures =
+      bodyParamDeclRefsForFn(fnSymbol, signatureCaptures);
+  SmallVector<ParamDeclRefAttr> allCaptures;
+  llvm::append_range(allCaptures, signatureCaptures);
+  llvm::append_range(allCaptures, bodyCaptures);
+  FnTypeGeneratorType selfContainedSig =
+      implTypeWithCaptures(fnSig, signatureCaptures, bodyCaptures);
+  if (!structOp.getDefinesClosure() ||
+      structOp.getInputParams().size() != 1 + allCaptures.size())
+    return false;
+  auto wrapperImplType = dyn_cast<FuncTypeGeneratorType>(
+      structOp.getInputParams().back().getType());
+  if (!wrapperImplType ||
+      !isTypeRebindableTo(selfContainedSig, wrapperImplType))
+    return false;
+  return llvm::all_of(
+      llvm::zip(signatureCaptures,
+                structOp.getInputParams().take_front(signatureCaptures.size())),
+      [](auto it) {
+        auto [capture, param] = it;
+        return isEqualCanon(capture.getType(), param.getType());
+      });
 }
 
 ASTDecl *ClosureEmitter::getOrCreateClosureTrait(
@@ -1235,26 +1407,27 @@ ASTDecl *ClosureEmitter::getOrCreateClosureTrait(
 static std::pair<TypedAttr, SmallVector<TypedAttr>>
 selfContainedSymbolAndCaptures(PValue fnPValue,
                                FnTypeGeneratorType wrapperImplType,
-                               SharedState &shared, Location loc) {
-  // Rebuild the symbol with captures materialized as leading parameters.
+                               ArrayRef<ParamDeclRefAttr> bodyCaptures,
+                               [[maybe_unused]] SharedState &shared,
+                               [[maybe_unused]] Location loc) {
+  // Rebuild the symbol with signature and body captures as leading parameters.
   auto fnSig = cast<FnTypeGeneratorType>(fnPValue.getType());
-  auto [captures, selfContainedSig] =
+  auto [signatureCaptures, _] =
       DeclResolver::createSelfContainedSignature(fnSig);
-  selfContainedSig =
-      cast<FnTypeGeneratorType>(getCanonicalType(selfContainedSig));
-  // Remove captures in signature from symbol.
+  SmallVector<ParamDeclRefAttr> captures;
+  llvm::append_range(captures, signatureCaptures);
+  llvm::append_range(captures, bodyCaptures);
+  FnTypeGeneratorType selfContainedSig =
+      implTypeWithCaptures(fnSig, signatureCaptures, bodyCaptures);
   auto symbol = cast<SymbolConstantAttr>(fnPValue.get());
   IndexRefRemapper toIdx(captures);
   SmallVector<TypedAttr> params;
 
-  // The parameter index that the current unbound parameter will be wired to,
-  // starting right after the captures since captures are prepended in
+  // `_` wires to the generator input after the captures prepended in
   // `selfContainedSig`.
   size_t unboundIdx = captures.size();
   for (TypedAttr binding : symbol.getParamValues()) {
     TypedAttr replaced = toIdx.replace(binding);
-    // If this is a `_`, wire it to the corresponding generator input parameter
-    // that we are going to create later.
     if (isa<UnboundAttr>(replaced)) {
       params.push_back(ParamIndexRefAttr::get(
           unboundIdx, selfContainedSig.getInputParamTypes()[unboundIdx]));
@@ -1271,10 +1444,11 @@ selfContainedSymbolAndCaptures(PValue fnPValue,
       }));
     }
     params.push_back(replaced);
-  };
+  }
 
   FuncSymbolAttr fnSymbol = FuncSymbolAttr::get(
       symbol.getSymbol(), selfContainedSig.getBody(), params);
+
   TypedAttr fnVal =
       GeneratorAttr::get(selfContainedSig.getInputParamTypes(), fnSymbol,
                          selfContainedSig.getParamListAttrs());
@@ -1293,6 +1467,7 @@ selfContainedSymbolAndCaptures(PValue fnPValue,
   for (ParamDeclRefAttr capture : captures)
     captureBindings.push_back(
         cast<TypedAttr>(evaluator.getReboundAttribute(capture)));
+
   return {fnVal, captureBindings};
 }
 
