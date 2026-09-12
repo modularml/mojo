@@ -25,6 +25,15 @@ This version is still a work in progress.
       ...
   ```
 
+- A struct can now opt out of a trait by writing `not <Trait>` in its
+  conformance list. It is the preferred alternative to the existing
+  `<Trait> where False`, which will continue to work:
+
+  ```mojo
+  struct Handle(not Movable, Writable):
+      ...
+  ```
+
 ## Language changes
 
 ## Library stabilizations

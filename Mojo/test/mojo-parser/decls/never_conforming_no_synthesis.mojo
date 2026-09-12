@@ -12,13 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 
 # Synthesis-suppression matrix for never-conforming traits. A conformance whose
-# condition can never hold -- whether spelled literally `where False`,
-# contradicted by the struct's own arithmetic where-clause, contradicted via a
-# `conforms_to` negation, or living in an unsatisfiable (`where False`) ambient
-# scope -- is an opt-out: no special member (move ctor, copy ctor,
-# default-trait-method wrapper) is synthesized, and no "does not implement all
-# requirements" error fires. Every spelling in a trait's row reaches the same
-# verdict; that equality is the invariant under test (MOCO-4135).
+# condition can never hold -- whether spelled `not Trait` or literally
+# `where False`, contradicted by the struct's own arithmetic where-clause,
+# contradicted via a `conforms_to` negation, or living in an unsatisfiable
+# (`where False`) ambient scope -- is an opt-out: no special member (move ctor,
+# copy ctor, default-trait-method wrapper) is synthesized, and no "does not
+# implement all requirements" error fires. Every spelling in a trait's row
+# reaches the same verdict; that equality is the invariant under test
+# (MOCO-4135). `not Trait` is surface syntax for `Trait where False`, so it
+# belongs in every row rather than in a matrix of its own.
 #
 # The use-site "value has no attribute" diagnostics for these opt-outs are
 # pinned separately in `traits_errors.mojo`.
@@ -42,6 +44,11 @@ trait Greeter:
 # CHECK-LABEL: lit.struct.decl @MovableLiteral
 # CHECK-NOT: __init__(move:
 struct MovableLiteral(Movable where False):
+    pass
+
+# CHECK-LABEL: lit.struct.decl @MovableNot
+# CHECK-NOT: __init__(move:
+struct MovableNot(not Movable):
     pass
 
 # CHECK-LABEL: lit.struct.decl @MovableArith
@@ -71,6 +78,11 @@ struct MovableAmbient[T: AnyType](
 struct CopyableLiteral(Copyable where False):
     pass
 
+# CHECK-LABEL: lit.struct.decl @CopyableNot
+# CHECK-NOT: )Copyable
+struct CopyableNot(not Copyable):
+    pass
+
 # CHECK-LABEL: lit.struct.decl @CopyableArith
 # CHECK-NOT: )Copyable
 struct CopyableArith[n: Int](Copyable where not (n > 0)) where n > 0:
@@ -98,6 +110,11 @@ struct CopyableAmbient[T: AnyType](
 struct GreeterLiteral(Greeter where False):
     pass
 
+# CHECK-LABEL: lit.struct.decl @GreeterNot
+# CHECK-NOT: greet(
+struct GreeterNot(not Greeter):
+    pass
+
 # CHECK-LABEL: lit.struct.decl @GreeterArith
 # CHECK-NOT: greet(
 struct GreeterArith[n: Int](Greeter where not (n > 0)) where n > 0:
@@ -123,6 +140,11 @@ struct GreeterAmbient[T: AnyType](
 # CHECK-LABEL: lit.struct.decl @IDLiteral
 # CHECK-SAME: does not conform to 'Deinitable' and must be explicitly destroyed
 struct IDLiteral(Deinitable where False):
+    pass
+
+# CHECK-LABEL: lit.struct.decl @IDNot
+# CHECK-SAME: does not conform to 'Deinitable' and must be explicitly destroyed
+struct IDNot(not Deinitable):
     pass
 
 # CHECK-LABEL: lit.struct.decl @IDArith

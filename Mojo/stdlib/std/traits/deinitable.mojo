@@ -104,8 +104,8 @@ trait Deinitable:
 
     - Implement this trait when your type owns resources that need cleanup
     - Ensure the destructor properly frees all owned resources
-    - Consider using a `Deinitable where False` conformance on types
-      that should never be deleted implicitly.
+    - Consider using a `not Deinitable` conformance on types that should
+      never be deleted implicitly.
     - Use composition to automatically handle nested resource cleanup
     """
 

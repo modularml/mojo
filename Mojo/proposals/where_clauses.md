@@ -176,6 +176,29 @@ Notice how this puts the constraints where they belong - put the constraints
 for the SIMD type as a whole on the struct, and put the constraints for the
 method on the method itself.
 
+### The `not Trait` opt-out
+
+`not Trait` is accepted as the preferred syntax for opting out of a trait
+conformance that is auto-applied by the language:
+
+```mojo
+struct Handle(not Movable, Writable):
+    ...
+```
+
+Because the negation is recorded explicitly, a trait that is opted out and then
+mentioned again in the same list is reported as a repeated trait. That covers
+the transitive case, where a listed trait drags an opted-out ancestor in:
+
+```mojo
+struct Bad(not Movable, Copyable):  # `Copyable` refines `Movable`
+    ...
+```
+
+The reverse is not an error. `False` implies anything, so opting out of a
+*derived* trait while keeping its ancestor is consistent — `not Copyable,
+Movable` is a struct that moves but does not copy.
+
 ### Constraints in the type system
 
 A parameterized entity (struct, function, or comptime expression) that has not

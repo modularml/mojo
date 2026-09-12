@@ -2971,6 +2971,9 @@ struct ParsedTraitConstraint {
   /// Whether this constraint was for an explicitly listed trait in the
   /// conformance list (vs propagated from an ancestor).
   bool isExplicit;
+  /// Whether the entry this came from was spelled `not Trait`. See
+  /// `ParsedConformanceEntry::isNegated`.
+  bool isNegated;
 };
 
 /// A single entry in a parsed conformance list: a type expression naming a
@@ -2982,6 +2985,15 @@ struct ParsedConformanceEntry {
   ExprNode *typeExpr = nullptr;
   SMLoc loc;
   std::optional<ParsedConstraint> constraint;
+  /// Set for the `not Trait` spelling.
+  bool isNegated = false;
+};
+
+/// An explicitly listed conformance: its constraint, plus whether the entry was
+/// spelled `not Trait`.
+struct ExplicitConformance {
+  ConstraintAttr constraint;
+  bool isNegated;
 };
 
 /// Verify that each explicitly listed derived trait's constraint implies its
@@ -3002,12 +3014,17 @@ struct ParsedConformanceEntry {
 ///
 ///   struct S(Derived where condA and condB, Base where condB): ...
 ///
+/// A failure against an ancestor opted out with `not` is reported as a
+/// contradicted opt-out rather than as a constraint to strengthen, since the
+/// user wrote no constraint to strengthen.
+///
 /// Returns failure if any implication errors were found.
 static LogicalResult verifyDerivedAncestorImplication(
-    const DenseMap<TraitSymbolAttr, ConstraintAttr> &explicitConstraints,
+    const DenseMap<TraitSymbolAttr, ExplicitConformance> &explicitConstraints,
     SharedState &shared) {
   bool hasErrors = false;
-  for (const auto &[symbol, constraint] : explicitConstraints) {
+  for (const auto &[symbol, conformance] : explicitConstraints) {
+    ConstraintAttr constraint = conformance.constraint;
     TypedAttr prop = constraint.getProposition();
 
     ASTDecl &traitDecl =
@@ -3026,17 +3043,30 @@ static LogicalResult verifyDerivedAncestorImplication(
       if (it == explicitConstraints.end())
         continue; // Not explicitly listed -- handled by propagation.
 
-      TypedAttr ancestorProp = it->second.getProposition();
+      ConstraintAttr ancestorConstraint = it->second.constraint;
+      TypedAttr ancestorProp = ancestorConstraint.getProposition();
 
-      if (!isImplicationProven(ancestorProp, prop)) {
+      if (isImplicationProven(ancestorProp, prop))
+        continue;
+
+      if (it->second.isNegated) {
+        StringRef symbolName = symbol.getSymbol().getLeafReference();
+        StringRef ancestorName = ancestor.getSymbol().getLeafReference();
+        MojoInflightDiag diag = shared.emitError(constraint.getLoc());
+        diag << "trait '" << symbolName << "' requires ancestor trait '"
+             << ancestorName
+             << "', which is opted out with 'not'; remove one "
+                "of the entries";
+        diag.attachNote(ancestorConstraint.getLoc()) << "opted out here";
+      } else {
         shared.emitError(constraint.getLoc())
             << "constraint for " << symbol.getSymbol().getLeafReference()
             << " does not imply constraint for ancestor trait "
             << ancestor.getSymbol().getLeafReference()
             << "; strengthen the derived constraint by adding the ancestor's "
                "constraint with 'and'";
-        hasErrors = true;
       }
+      hasErrors = true;
     }
   }
   return failure(hasErrors);
@@ -3142,7 +3172,7 @@ static LogicalResult buildTraitConstraintsMap(
     SharedState &shared) {
   ConstraintAttr unconditional =
       getUnconditionalConstraint(shared.getContext());
-  DenseMap<TraitSymbolAttr, ConstraintAttr> explicitConstraints;
+  DenseMap<TraitSymbolAttr, ExplicitConformance> explicitConstraints;
   DenseMap<TraitSymbolAttr, SmallVector<ConstraintAttr, 2>> propagated;
   bool hasErrors = false;
 
@@ -3153,15 +3183,39 @@ static LogicalResult buildTraitConstraintsMap(
     if (pc.isExplicit) {
       auto newConstraint = ConstraintAttr::get(prop, pc.constraint.getLoc(),
                                                pc.constraint.getMessage());
-      auto [it, inserted] =
-          explicitConstraints.try_emplace(pc.traitSymbol, newConstraint);
-      // Catches cases where a trait is listed twice with different constraints.
-      // Canonicalization normalizes operand order for commutative ops, so
-      // structural equality after canonicalization suffices here.
-      if (!inserted && getCanonicalAttr(it->second.getProposition()) !=
-                           getCanonicalAttr(prop)) {
+      auto [it, inserted] = explicitConstraints.try_emplace(
+          pc.traitSymbol, ExplicitConformance{newConstraint, pc.isNegated});
+      const ExplicitConformance &prior = it->second;
+
+      if (!inserted && (prior.isNegated || pc.isNegated)) {
+        // Since an opt-out does not carry any conditions (yet), any trait that
+        // is opted out must not appear in the conformance list again.
+        StringRef traitName = pc.traitSymbol.getSymbol().getLeafReference();
+        Location optOutLoc =
+            pc.isNegated ? pc.constraint.getLoc() : prior.constraint.getLoc();
+        Location otherLoc =
+            pc.isNegated ? prior.constraint.getLoc() : pc.constraint.getLoc();
+        if (prior.isNegated && pc.isNegated) {
+          MojoInflightDiag diag = shared.emitError(optOutLoc);
+          diag << "trait '" << traitName
+               << "' must be opted out at most once; remove the duplicate "
+                  "'not'";
+          diag.attachNote(otherLoc) << "first opted out here";
+        } else {
+          MojoInflightDiag diag = shared.emitError(otherLoc);
+          diag << "trait '" << traitName
+               << "' must not be listed and also opted out with 'not'; "
+                  "remove one of the entries";
+          diag.attachNote(optOutLoc) << "opted out here";
+        }
+        hasErrors = true;
+      } else if (!inserted &&
+                 getCanonicalAttr(prior.constraint.getProposition()) !=
+                     getCanonicalAttr(prop)) {
+        // Catches when a trait is listed twice under different conditions.
+        StringRef traitName = pc.traitSymbol.getSymbol().getLeafReference();
         shared.emitError(pc.constraint.getLoc())
-            << "trait '" << pc.traitSymbol.getSymbol().getLeafReference()
+            << "trait '" << traitName
             << "' appears multiple times in the conformance list with "
                "different constraints";
         hasErrors = true;
@@ -3192,8 +3246,8 @@ static LogicalResult buildTraitConstraintsMap(
     hasErrors = true;
 
   // Merge explicit constraints into the output map (after verification).
-  traitConstraints.insert(explicitConstraints.begin(),
-                          explicitConstraints.end());
+  for (const auto &[symbol, conformance] : explicitConstraints)
+    traitConstraints.try_emplace(symbol, conformance.constraint);
 
   // Resolve propagated constraints for non-explicit ancestor traits.
   if (failed(
@@ -3220,8 +3274,12 @@ static LogicalResult buildTraitConstraintsMap(
 /// For a struct or trait declaration, parse an optional conformance list
 /// without resolving the trait types or emitting constraints.
 ///
+/// conformance_list ::= conformance ("," conformance)* [","]
+/// conformance      ::= ["not"] type_expression ["where" constraint]
+///
 /// Set `allowConformanceConstraints` to `false` for declarations that don't
-/// support conditional conformance (traits and extensions).
+/// support conditional conformance (traits and extensions). Both `where` and
+/// `not` are conformance conditions, so both are rejected there.
 static ParseResult parseOptionalConformanceListSyntax(
     ParserBase &p, SmallVectorImpl<ParsedConformanceEntry> &parsedConformances,
     std::optional<size_t> stmtIndent, bool allowConformanceConstraints) {
@@ -3230,8 +3288,22 @@ static ParseResult parseOptionalConformanceListSyntax(
 
   auto parseConformance = [&]() -> ParseResult {
     ParsedConformanceEntry conformance;
-    if (p.getLocation(conformance.loc) ||
-        p.parseExpression(conformance.typeExpr, stmtIndent))
+    conformance.loc = p.getToken().getLoc();
+
+    // Try to consume any `not` before the type expression.
+    if (p.consumeIf(Token::kw_not)) {
+      if (!allowConformanceConstraints)
+        return p.emitError(conformance.loc,
+                           "'not' conformances are only supported on structs");
+      // Catch a common typo / misconception: `not not Trait`.
+      if (p.getToken().is(Token::kw_not))
+        return p.emitError(p.getToken().getLoc(),
+                           "'not' must not be repeated in a conformance "
+                           "entry");
+      conformance.isNegated = true;
+    }
+
+    if (p.parseExpression(conformance.typeExpr, stmtIndent))
       return failure();
 
     SMLoc whereLoc = p.getToken().getLoc();
@@ -3241,6 +3313,11 @@ static ParseResult parseOptionalConformanceListSyntax(
             whereLoc,
             "'where' clauses in conformance lists are only supported on "
             "structs");
+      }
+      // `not Trait` syntax does not support a where clause (yet).
+      if (conformance.isNegated) {
+        return p.emitError(
+            whereLoc, "'not' conformance does not support a 'where' clause");
       }
       ParsedConstraint constraint;
       constraint.loc = whereLoc;
@@ -3346,7 +3423,13 @@ static ParseResult resolveConformanceList(
                   shared.diags.translateLocation(conformance.loc),
                   /*message=*/StringAttr())
             : ConstraintAttr();
-    if (traitConstraints && conformance.constraint) {
+    if (traitConstraints && conformance.isNegated) {
+      // For now, record a `not Trait` as `Trait where False`.
+      constraint = ConstraintAttr::get(
+          SIMDAttr::getScalarBool(shared.getContext(), false),
+          shared.diags.translateLocation(conformance.loc),
+          /*message=*/StringAttr());
+    } else if (traitConstraints && conformance.constraint) {
       IREmitter constraintEmitter(declScope, EC_Requires);
       RValue prop = constraintEmitter.emitExprScalarBool(
           conformance.constraint->propExpr, EC_Requires);
@@ -3378,7 +3461,7 @@ static ParseResult resolveConformanceList(
       if (traitConstraints) {
         for (TraitSymbolAttr symbol : reduced) {
           traitConstraints->push_back(
-              {symbol, constraint, /*isExplicit=*/true});
+              {symbol, constraint, /*isExplicit=*/true, conformance.isNegated});
         }
       }
     }
@@ -3430,8 +3513,9 @@ static ParseResult resolveConformanceList(
         // builder checks that all paths to the same ancestor agree, or
         // requires explicit listing if they disagree (diamond case).
         if (traitConstraints && ancestor != symbol)
-          traitConstraints->push_back(
-              {ancestor, constraint, /*isExplicit=*/false});
+          traitConstraints->push_back({ancestor, constraint,
+                                       /*isExplicit=*/false,
+                                       conformance.isNegated});
       }
       // Insert this `symbol` as an immediate parent. This must happen after the
       // loop, because this symbol itself is part of `canonicalParent` too.
@@ -3642,8 +3726,8 @@ static void emitExplicitDestroyRequiresArgError(SharedState &shared,
               << "@explicit_destroy requires an argument: "
                  "`@explicit_destroy(\"...\")`";
   diag.attachNote(decl)
-      << "Use `Deinitable where False` conformance to opt out of "
-         "implicit deletion. `@explicit_destroy` is no longer required.";
+      << "Use a `not Deinitable` conformance to opt out of implicit "
+         "deletion. `@explicit_destroy` is no longer required.";
 }
 
 /// Validates that an `@explicit_destroy(...)` call has exactly one string
@@ -3845,7 +3929,7 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
                     << "@explicit_destroy is not valid on `struct` with "
                        "unconditional conformance to `Deinitable`";
         diag.attachNote(decl.getLoc())
-            << "Add `Deinitable where False` conformance or "
+            << "Add a `not Deinitable` conformance or "
                "remove `@explicit_destroy`";
         decl.setErroneous();
         return failure();
