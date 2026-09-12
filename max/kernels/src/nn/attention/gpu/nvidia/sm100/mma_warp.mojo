@@ -45,7 +45,7 @@ from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from .smem import SM100AttentionSMem
 
 
-@always_inline
+@inline(.always)
 def fa4_mma[
     MaskType: MHAMask,
     //,
@@ -337,12 +337,12 @@ def fa4_mma[
     # Called after consumer_s[*].wait(phase), which orders the vote write
     # (softmax) before this read. Peel writes no vote -> reads 0 -> never skips.
     @__parameter
-    @always_inline
+    @inline(.always)
     def blasst_should_skip(wg: UInt32, phase: UInt32) -> Bool:
         return blasst_vote_unanimous(blasst_vote, wg, phase)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _commit(
         mbar: UnsafePointer[address_space=.SHARED, ...],
     ):
@@ -387,7 +387,7 @@ def fa4_mma[
     # read pre-rebase would over-count by the window start and run P@V over V
     # pages the producer never loaded (`0 * stale-NaN = NaN`).
     @__parameter
-    @always_inline
+    @inline(.always)
     def _vkm_tile0(v_eff: UInt32) -> UInt32:
         """Loaded `MMA_K` blocks of KV tile 0.
 
@@ -398,7 +398,7 @@ def fa4_mma[
         return ceildiv(min(v_eff, UInt32(BN)), UInt32(UMMA1Type.MMA_K))
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _vkm_final(v_eff: UInt32, total_iters: UInt32) -> UInt32:
         """Loaded `MMA_K` blocks of the LAST KV tile.
 
@@ -424,7 +424,7 @@ def fa4_mma[
     # wrappers below (`CUT_LAST_TILE` adds only `ws_shared_key`, which implies
     # `use_ws`). Assert it rather than comment it.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _pv[
         partial: Bool = False
     ](
@@ -490,7 +490,7 @@ def fa4_mma[
     # `CUT_LAST_TILE`, not `PARTIAL_K`: the two are equal wherever these are
     # instantiated (see `_pv`'s assert), and one constant beats two.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _pv_tile0(
         s_tmem: UInt32,
         v: MMASmemDescriptorPair,
@@ -521,7 +521,7 @@ def fa4_mma[
     # `iter_count == 0`, taking a full contraction otherwise; epilogue sites
     # take the default and the ternary folds.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _pv_final(
         s_tmem: UInt32,
         v: MMASmemDescriptorPair,
@@ -568,7 +568,7 @@ def fa4_mma[
     # it last if anything is ever appended here.
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _body_1q():
         # Cross-stage P is 2Q-only (`CrossP_enabled` requires `num_q == 2`
         # and `not use_ws`), so its QK0-first schedule and `rel_slot` release
@@ -829,7 +829,7 @@ def fa4_mma[
             # `consumer_mbar(idx)` with the current index is identical to the
             # no-arg `consumer_mbar()` (which forwards `state.index()`).
             @__parameter
-            @always_inline
+            @inline(.always)
             def _advance_kv(release_idx: UInt32) -> UInt32:
                 _commit(kv_pipeline.consumer_mbar(release_idx))
                 kv_pipeline.state.step()
@@ -844,7 +844,7 @@ def fa4_mma[
             # which adds an internal +BK0 offset assuming one contiguous tile
             # (would read OOB). Empty (no-op) when num_qk_stages==1.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _qk_extra(q_base: MMASmemDescriptorPair, s_tmem: UInt32):
                 comptime for d in range(1, config.num_qk_stages):
                     var kd_idx = _advance_kv(kv_pipeline.state.index())
@@ -877,7 +877,7 @@ def fa4_mma[
             # sub-slots (produced consecutively right after the first). Leaves
             # the ring state at the last of them. Empty when v_subslots==1.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _v_wait_rest():
                 comptime if not v_sk_inline_lifecycle:
                     comptime for d in range(1, v_subslots):
@@ -887,7 +887,7 @@ def fa4_mma[
             # `_v_release_rest`: release the v_subslots-1 V sub-slots after
             # v_idx0 (ring-adjacent). Empty when v_subslots==1.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _v_release_rest(v_idx0: UInt32):
                 comptime if not v_sk_inline_lifecycle:
                     comptime for d in range(1, v_subslots):
@@ -908,7 +908,7 @@ def fa4_mma[
             # right slot with the right phase and returns WRONG DATA instead of
             # hanging.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _v_release_first(v_idx0: UInt32):
                 comptime if not v_sk_inline_lifecycle:
                     _commit(kv_pipeline.consumer_mbar(v_idx0))
@@ -942,7 +942,7 @@ def fa4_mma[
             # unread -- the caller's wait leaves the cursor on (0, 0) and every
             # later one is a bare step off it. See its own comment block below.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _pv_ws[
                 partial: Bool
             ](
@@ -1205,7 +1205,7 @@ def fa4_mma[
             # operand, so the dispatch lives here rather than at all five call
             # sites. Takes the ring INDEX -- the one form both arms express.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _pv_kv[
                 partial: Bool = False
             ](
@@ -1249,7 +1249,7 @@ def fa4_mma[
             # chunks -- which is exactly why this arm needs its own pair rather
             # than reusing the fa4_mma-scope wrappers.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _pv_kv_tile0(
                 s_tmem: UInt32,
                 v_idx: UInt32,
@@ -1284,7 +1284,7 @@ def fa4_mma[
                     )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _pv_kv_final(
                 s_tmem: UInt32,
                 v_idx: UInt32,
@@ -1774,7 +1774,7 @@ def fa4_mma[
             _commit(pipeline_o1.producer_mbar())
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _body_2q():
         comptime if config.use_shared_kv:
             # ---- Shared KV mode ----

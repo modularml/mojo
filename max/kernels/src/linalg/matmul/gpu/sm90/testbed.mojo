@@ -214,7 +214,7 @@ def test_matmul_sm90[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor)
     def epilogue_fn[
         _dtype: DType,

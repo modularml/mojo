@@ -41,7 +41,7 @@ comptime _SUPPORT_PDL_LAUNCH = _support_pdl_launch()
 
 
 @doc_hidden
-@always_inline("nodebug")
+@inline(.nodebug)
 def _support_pdl_launch() -> Bool:
     """Determines if programmatic dependency launch (PDL) is supported.
 
@@ -62,7 +62,7 @@ def _support_pdl_launch() -> Bool:
 
 
 @doc_hidden
-@always_inline("nodebug")
+@inline(.nodebug)
 def pdl_launch_attributes(
     pdl_level: PDLLevel = PDLLevel(),
 ) -> List[LaunchAttribute]:
@@ -92,7 +92,7 @@ def pdl_launch_attributes(
         return List[LaunchAttribute]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def launch_dependent_grids():
     """Launches dependent grids that were previously configured to depend on the
     current grid.
@@ -113,7 +113,7 @@ def launch_dependent_grids():
         __mlir_op.`nvvm.griddepcontrol`[kind=kind_attr, _type=None]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def wait_on_dependent_grids():
     """Waits for all dependent grids launched by this grid to complete execution.
 
@@ -154,12 +154,12 @@ struct PDLLevel(Defaultable, Equatable, TrivialRegisterPassable):
     comptime NO_WAIT_OVERLAP_AT_END = PDLLevel(3)
     """PDL no-wait overlap at end of kernel."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize the PDL level to OFF."""
         self = PDLLevel.OFF
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         """Check if the PDL level is equal to another PDL level.
 
@@ -171,7 +171,7 @@ struct PDLLevel(Defaultable, Equatable, TrivialRegisterPassable):
         """
         return self._level == other
 
-    @always_inline
+    @inline(.always)
     def __gt__(self, other: PDLLevel) -> Bool:
         """Check if the PDL level is greater than another PDL level.
 
@@ -183,7 +183,7 @@ struct PDLLevel(Defaultable, Equatable, TrivialRegisterPassable):
         """
         return self._level > other._level
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: PDLLevel) -> Bool:
         """Check if the PDL level is greater than or equal to another PDL level.
 
@@ -221,19 +221,19 @@ struct PDL[overlap_at_beginning: Bool = False](Defaultable):
         - Only supported on NVIDIA SM90+ (Hopper architecture and newer) GPUs.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize the PDL control structure."""
         pass
 
-    @always_inline
+    @inline(.always)
     def __enter__(self):
         """Wait for the predecessor grids to complete."""
         wait_on_dependent_grids()
         comptime if Self.overlap_at_beginning:
             launch_dependent_grids()
 
-    @always_inline
+    @inline(.always)
     def __exit__(self):
         """Release the grids that depend on this one."""
         comptime if not Self.overlap_at_beginning:

@@ -84,7 +84,7 @@ def calculate_coordinate[
     return indices * tile_dims
 
 
-@always_inline
+@inline(.always)
 def shared_to_global_2D[
     OOB_access: Bool
 ](
@@ -126,7 +126,7 @@ def shared_to_global_2D[
                     ](smem_tile[i, j])
 
 
-@always_inline
+@inline(.always)
 def shared_to_global_3D[
     OOB_access: Bool
 ](

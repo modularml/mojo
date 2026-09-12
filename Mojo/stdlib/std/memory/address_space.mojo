@@ -63,7 +63,7 @@ struct AddressSpace(
     comptime BUFFER_RESOURCE = AddressSpace(8)
     """Buffer resource GPU memory address space (AMD-specific)."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @staticmethod
     def __getattr_param__[name: StaticString]() -> AddressSpace:
         """Resolves a target-specific named address space.
@@ -129,7 +129,7 @@ struct AddressSpace(
         """
         return self._value == other._value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def write_to(self, mut writer: Some[Writer]):
         """Formats the address space to the provided Writer.
 

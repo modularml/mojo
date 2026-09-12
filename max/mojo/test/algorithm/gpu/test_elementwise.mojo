@@ -75,7 +75,7 @@ def run_elementwise[dtype: DType](ctx: DeviceContext) raises:
         unsafe_ptr=out_device.unsafe_ptr(), length=flattened_length
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_buffer, out_buffer, shape)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):
@@ -152,7 +152,7 @@ def run_elementwise_uneven_simd[dtype: DType](ctx: DeviceContext) raises:
         unsafe_ptr=out_device.unsafe_ptr(), length=flattened_length
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_buffer, out_buffer, shape)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):
@@ -210,7 +210,7 @@ def run_elementwise_exact_boundary_uses_simd[
     )
     var shape = IndexList[2](pack_size, pack_size + 1)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_buffer, shape)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):
@@ -267,7 +267,7 @@ def run_elementwise_transpose_copy[dtype: DType](ctx: DeviceContext) raises:
         unsafe_ptr=out_device.unsafe_ptr(), length=flattened_length
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(in_buffer, out_buffer, in_strides, out_shape)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):
@@ -359,7 +359,7 @@ def _test_elementwise_zero_dimension_3d(ctx: DeviceContext) raises:
     # Test with zero in first dimension
     var shape = IndexList[3](0, 4, 4)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(input_buffer, output_buffer, shape)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):

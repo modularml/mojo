@@ -317,7 +317,7 @@ trait TensorEngine:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def offset[
         offset_mut: Bool,
         offset_types: TypeList[Trait=CoordLike, ...],
@@ -444,7 +444,7 @@ trait TensorEngine:
         ...
 
 
-@always_inline
+@inline(.always)
 def _copy_from[
     SelfLayoutType: TensorLayout,
     self_origin: MutOrigin,
@@ -568,7 +568,7 @@ def _copy_from[
             )
 
 
-@always_inline
+@inline(.always)
 def _elementwise_binary_out_with_broadcast[
     DstLayoutType: TensorLayout,
     dst_origin: MutOrigin,
@@ -760,7 +760,7 @@ def _elementwise_binary_out_with_broadcast[
             )
 
 
-@always_inline
+@inline(.always)
 def _elementwise_binary_with_broadcast[
     SelfLayoutType: TensorLayout,
     self_origin: MutOrigin,
@@ -886,7 +886,7 @@ def _elementwise_binary_with_broadcast[
             )
 
 
-@always_inline
+@inline(.always)
 def _elementwise_unary_out[
     DstLayoutType: TensorLayout,
     dst_origin: MutOrigin,
@@ -2016,7 +2016,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
 
     @doc_hidden
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_ptr[
         mut: Bool,
         dtype: DType,
@@ -2048,7 +2048,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         return storage.bitcast[Scalar[dtype]]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_cast[
         to_mut: Bool,
         //,
@@ -2083,7 +2083,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         }
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -2117,7 +2117,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -2155,7 +2155,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         ](offset)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -2179,7 +2179,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         ](value)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -2219,7 +2219,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def offset[
         offset_mut: Bool,
         offset_types: TypeList[Trait=CoordLike, ...],
@@ -2295,7 +2295,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
         return (Int(storage) - Int(other)) // size_of[dtype]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_from[
         SelfLayoutType: TensorLayout,
         self_origin: MutOrigin,
@@ -2729,7 +2729,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
             ) -> type_of(lhs): max(lhs, rhs),
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _elementwise_unary[
         dtype: DType, //
@@ -3603,7 +3603,7 @@ struct DefaultEngine[*, element_width: Int = 1](TensorOps):
             )
 
 
-@always_inline
+@inline(.always)
 def _device_leaf_ptr[
     dtype: DType, //
 ](storage: DevicePointer[dtype, _]) -> MutPointer[
@@ -3717,7 +3717,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
 
     @doc_hidden
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_ptr[
         mut: Bool,
         dtype: DType,
@@ -3771,7 +3771,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_cast[
         to_mut: Bool,
         //,
@@ -3807,7 +3807,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
         result = Pointer(to=storage).bitcast[type_of(result)]()[]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -3844,7 +3844,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -3885,7 +3885,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
         ](offset)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -3912,7 +3912,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
         ](value)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -3955,7 +3955,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def offset[
         offset_mut: Bool,
         offset_types: TypeList[Trait=CoordLike, ...],
@@ -4044,7 +4044,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
             return storage.offset() - other.offset()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_from[
         SelfLayoutType: TensorLayout,
         self_origin: MutOrigin,
@@ -4479,7 +4479,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
             ) -> type_of(lhs): max(lhs, rhs),
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _elementwise_unary[
         self_origin: MutOrigin,
@@ -5254,7 +5254,7 @@ struct DevicePointerEngine[*, element_width: Int = 1](TensorOps):
             dtype.is_floating_point()
         ), "recip requires a floating-point dtype"
 
-        @always_inline
+        @inline(.always)
         def recip_fn(val: SIMD[dtype, Self.element_size]) -> type_of(val):
             return 1 / val
 
@@ -5417,7 +5417,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
 
     @doc_hidden
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_ptr[
         mut: Bool,
         dtype: DType,
@@ -5446,7 +5446,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         return storage.bitcast[Scalar[dtype]]() + Self.static_offset
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def unsafe_cast[
         to_mut: Bool,
         //,
@@ -5484,7 +5484,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         }
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -5518,7 +5518,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load[
         dtype: DType,
         //,
@@ -5557,7 +5557,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         ](offset)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -5581,7 +5581,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         ](value)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def store[
         dtype: DType,
         alignment: Int,
@@ -5623,7 +5623,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def offset[
         offset_mut: Bool,
         offset_types: TypeList[Trait=CoordLike, ...],
@@ -5694,7 +5694,7 @@ struct StaticOffsetEngine[*, static_offset: Int, element_width: Int = 1](
         return (Int(storage) - Int(other)) // size_of[dtype]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_from[
         SelfLayoutType: TensorLayout,
         self_origin: MutOrigin,

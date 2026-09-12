@@ -137,7 +137,7 @@ def matmul_dispatch_sm90[
         K_multiple_of_4B and (is_AB_bf16 or is_AB_fp32)
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(c, a, b)
     def _dispatch() raises -> Int:
@@ -638,7 +638,7 @@ def matmul_dispatch_sm90_fp8[
         return DISPATCH_HIT
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _dispatch[entry: TuningConfigSM90]() raises:
         comptime config = MatmulConfig[a_type, b_type, c_type, transpose_b](
             block_tile_shape=entry.block_tile_shape,
@@ -659,7 +659,7 @@ def matmul_dispatch_sm90_fp8[
         ](c, a, b, ctx)
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _search[
         T: Table[TuningConfigSM90], domain: List[Int] = List[Int]()
     ]() raises -> Int:
@@ -989,7 +989,7 @@ def matmul_dispatch_sm90_bf16_fp32[
     comptime tuning_table = Table(tuning_list, "tuning_table_bf16")
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _dispatch[entry: TuningConfigSM90]() raises:
         comptime config = MatmulConfig[a_type, b_type, c_type, transpose_b](
             block_tile_shape=entry.block_tile_shape,
@@ -1023,7 +1023,7 @@ def matmul_dispatch_sm90_bf16_fp32[
             ](c, a, b, ctx)
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _search[
         T: Table[TuningConfigSM90],
         domain: List[Int] = List[Int](),
@@ -1048,11 +1048,11 @@ def matmul_dispatch_sm90_bf16_fp32[
 
         return DISPATCH_MISS
 
-    @always_inline
+    @inline(.always)
     def rule_eq_nk(x: TuningConfigSM90) {} -> Bool:
         return x.K == static_K and x.N == static_N
 
-    @always_inline
+    @inline(.always)
     def rule_eq_nk_group[
         group: TuningGroup
     ](x: TuningConfigSM90,) {} -> Bool:

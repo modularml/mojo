@@ -112,7 +112,7 @@ def test_transposed_epilogue_row_straddle[
     var c_tensor_lt = c_tensor.to_layout_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def store_epilogue[
         _dtype: DType,

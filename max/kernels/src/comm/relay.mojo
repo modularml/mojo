@@ -29,7 +29,7 @@ from .device_query import CommTuningConfig
 from .sync import MAX_GPUS
 
 
-@always_inline
+@inline(.always)
 def _relay_pairs[ngpus: Int, group_size: Int](sm_version: StaticString) -> Bool:
     """Whether adjacent groups pair up to relay for each other at this shape.
 
@@ -60,7 +60,7 @@ def _relay_pairs[ngpus: Int, group_size: Int](sm_version: StaticString) -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _relay_slice_vectors[
     ngpus: Int
 ](num_simd_vectors: Int, relay_percent: Int) -> Int:

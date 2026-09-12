@@ -177,7 +177,7 @@ def allreduce_test[
         out_tensors_capture[i] = TileTensor(out_dev[i], row_major(length))
 
     # Custom epilogue that negates values to distinguish from default
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(out_tensors_capture)
     def outputs_lambda[
@@ -359,7 +359,7 @@ def allreduce_naive_test() raises -> None:
     for i in range(ngpus):
         out_tensors_capture[i] = TileTensor(out_dev[i], row_major(length))
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(out_tensors_capture)
     def outputs_lambda[

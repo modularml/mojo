@@ -36,7 +36,7 @@ from std._gpu import grid_dim, lane_id
 from std.math.uutils import umod
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a[
     m: Int, n: Int, k: Int
 ](
@@ -82,7 +82,7 @@ def load_matrix_a[
     )
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a[
     m: Int, n: Int, k: Int
 ](
@@ -130,7 +130,7 @@ def load_matrix_a[
     )
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a[
     m: Int, n: Int, k: Int
 ](
@@ -230,7 +230,7 @@ def load_matrix_a[
         return a
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a_amd[
     m: Int, n: Int, k: Int
 ](
@@ -268,7 +268,7 @@ def load_matrix_a_amd[
     ]
 
 
-@always_inline
+@inline(.always)
 def load_matrix_a_amd[
     dtype: DType, //, m: Int, n: Int, k: Int, n_blocks: Int = 1
 ](
@@ -335,7 +335,7 @@ def load_matrix_a_amd[
         return a
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b[
     m: Int, n: Int, k: Int
 ](
@@ -378,7 +378,7 @@ def load_matrix_b[
     )
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b[
     m: Int, n: Int, k: Int
 ](
@@ -421,7 +421,7 @@ def load_matrix_b[
     )
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b[
     m: Int, n: Int, k: Int
 ](
@@ -493,7 +493,7 @@ def load_matrix_b[
         )
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b_amd[
     m: Int, n: Int, k: Int
 ](
@@ -527,7 +527,7 @@ def load_matrix_b_amd[
     ]
 
 
-@always_inline
+@inline(.always)
 def load_matrix_b_amd[
     dtype: DType, //, m: Int, n: Int, k: Int, n_blocks: Int = 1
 ](
@@ -599,7 +599,7 @@ def load_matrix_b_amd[
         return b
 
 
-@always_inline
+@inline(.always)
 def _store_matrix_d_nvidia[
     dtype: DType, //, m: Int, n: Int, k: Int
 ](
@@ -650,7 +650,7 @@ def _store_matrix_d_nvidia[
     d_ptr[unsafe_offset=(tile_row + d23_row) * ldm + (tile_col + d3_col)] = d[3]
 
 
-@always_inline
+@inline(.always)
 def _store_matrix_d_amd[
     dtype: DType, //, m: Int, n: Int, k: Int, n_blocks: Int = 1
 ](
@@ -717,7 +717,7 @@ def _store_matrix_d_amd[
             d_ptr[unsafe_offset=d_idx] = d[i]
 
 
-@always_inline
+@inline(.always)
 def store_matrix_d[
     dtype: DType, //, m: Int, n: Int, k: Int, n_blocks: Int = 1
 ](

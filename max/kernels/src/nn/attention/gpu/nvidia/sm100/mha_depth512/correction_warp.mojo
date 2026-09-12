@@ -48,7 +48,7 @@ from .config import Depth512SM100Config
 from .smem import Depth512AttentionSMem
 
 
-@always_inline
+@inline(.always)
 def depth512_correction[
     MaskType: MHAMask,
     qkv_dtype: DType,
@@ -138,7 +138,7 @@ def depth512_correction[
     # ---- Rescale helper (inlined for O_lo and O_hi) --------------------------
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def rescale_o(o_tmem: TmemAddress, c_pair: SIMD[.float32, 2]):
         """Double-buffered TMEM load/scale/store over o_cols columns."""
         var o_b0: Array[Scalar[accum_type], batch_size]

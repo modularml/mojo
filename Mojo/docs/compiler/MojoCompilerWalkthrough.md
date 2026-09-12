@@ -1143,7 +1143,7 @@ The compiler supports different debug info levels controlled by `-debug-level`:
 | `line-tables-only` | Line numbers only (smaller output)           |
 | `full`             | Complete debug info with variables and types |
 
-Functions marked `@always_inline("nodebug")` suppress debug info, reducing
+Functions marked `@inline(.nodebug)` suppress debug info, reducing
 overhead for zero-cost abstractions.
 
 ### Key Interfaces

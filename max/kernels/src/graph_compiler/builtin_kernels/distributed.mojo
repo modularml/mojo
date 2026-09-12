@@ -175,7 +175,7 @@ struct DistributedAllReduceSum:
         # call it without triggering the MLIR 'kgen.param.declare.region must
         # have subprogram scope' error that arises when parameterized functions
         # are defined inside closures.
-        @always_inline
+        @inline(.always)
         @__parameter
         def output_lambda[
             output_index: Int,
@@ -220,7 +220,7 @@ struct DistributedAllReduceSum:
             ), "grouped allreduce is not supported on the vendor CCL path"
             logger.info("Executing: Vendor CCL")
 
-            @always_inline
+            @inline(.always)
             def launch_vendor_allreduce[
                 index: Int
             ]() raises {
@@ -255,7 +255,7 @@ struct DistributedAllReduceSum:
 
         # Custom allreduce path: hand the collective the whole world plus the
         # group width, and let it do its own group-local slicing internally.
-        @always_inline
+        @inline(.always)
         def launch_allreduce[
             index: Int
         ]() raises {
@@ -374,7 +374,7 @@ struct DistributedReduceScatterSum:
                 outputs[i].to_tile_tensor[.int64]().make_dynamic[.int64]()
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def output_lambda[
             output_index: Int,
@@ -391,7 +391,7 @@ struct DistributedReduceScatterSum:
                 rebind[SIMD[dtype, _width]](val),
             )
 
-        @always_inline
+        @inline(.always)
         def launch_reducescatter[
             index: Int
         ]() raises {
@@ -518,7 +518,7 @@ struct DistributedAllGather:
                 row_major(outputs[i].size()),
             )
 
-        @always_inline
+        @inline(.always)
         def launch_allgather[
             index: Int
         ]() raises {
@@ -614,7 +614,7 @@ struct DistributedBroadcast:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
-        @always_inline
+        @inline(.always)
         def launch_broadcast[
             index: Int
         ]() raises {
@@ -709,7 +709,7 @@ struct DistributedScatter:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
-        @always_inline
+        @inline(.always)
         def launch_scatter[
             index: Int
         ]() raises {
@@ -819,7 +819,7 @@ struct DistributedAllReduceAddRMSNormQuantFP8:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
-        @always_inline
+        @inline(.always)
         def launch_fused_allreduce[
             index: Int
         ]() raises {
@@ -1012,7 +1012,7 @@ struct DistributedReduceScatterRMSNorm:
                 residuals[i].to_tile_tensor[.int64]().as_immut().ptr
             )
 
-        @always_inline
+        @inline(.always)
         def launch_fused_rs_norm[
             index: Int
         ]() raises {
@@ -1044,7 +1044,7 @@ struct DistributedReduceScatterRMSNorm:
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 comptime if has_residual:
                     # Handed to `reducescatter` as a residual rather than as
@@ -1086,7 +1086,7 @@ struct DistributedReduceScatterRMSNorm:
                 # corrupts device memory.
                 @__copy_capture(sum_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_input_fn[
                     width: Int
                 ](coords: Coord) -> SIMD[dtype, width]:
@@ -1094,7 +1094,7 @@ struct DistributedReduceScatterRMSNorm:
 
                 @__copy_capture(normed_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_output_fn[
                     width: SIMDLength, alignment: Int
                 ](coords: Coord, val: SIMD[dtype, width]) -> None:
@@ -1295,7 +1295,7 @@ struct DistributedAllGatherRMSNorm:
                 )
                 row_off += len_i
 
-        @always_inline
+        @inline(.always)
         def launch_fused_ag_norm[
             index: Int
         ]() raises {
@@ -1326,7 +1326,7 @@ struct DistributedAllGatherRMSNorm:
             # then `rms_norm_gpu` into `normed_buf`. `sum_buf` is the residual on
             # both branches. mbc=True.
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 # Each shard gathers into its contiguous row-range of
                 # `sum_buf` (natural concat order), so the norm below runs
@@ -1346,7 +1346,7 @@ struct DistributedAllGatherRMSNorm:
                 # kernel as a garbage host-stack pointer and corrupts memory.
                 @__copy_capture(sum_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_input_fn[
                     width: Int
                 ](coords: Coord) -> SIMD[dtype, width]:
@@ -1354,7 +1354,7 @@ struct DistributedAllGatherRMSNorm:
 
                 @__copy_capture(normed_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_output_fn[
                     width: SIMDLength, alignment: Int
                 ](coords: Coord, val: SIMD[dtype, width]) -> None:
@@ -1534,7 +1534,7 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
                 )
                 row_off += len_i
 
-        @always_inline
+        @inline(.always)
         def launch_fused_ag_norm_quant[
             index: Int
         ]() raises {
@@ -1617,7 +1617,7 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
             # not list reaches the device as a host-stack pointer and faults.
             @__copy_capture(quant_buf, scale_buf, cols_rt)
             @__parameter
-            @always_inline
+            @inline(.always)
             def mx_epilogue[
                 width: Int
             ](row: Int, col: Int, val: SIMD[dtype, width]):
@@ -1645,7 +1645,7 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
             # Above the fuse threshold. Owes the same outputs as the fused
             # path -- skipping the quantize leaves `outputs_quant` stale.
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch_with_quant() raises:
                 allgather[
                     dtype=dtype, ngpus=num_devices, group_size=group_size
@@ -1659,7 +1659,7 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
 
                 @__copy_capture(sum_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_input_fn[
                     width: Int
                 ](coords: Coord) -> SIMD[dtype, width]:
@@ -1667,7 +1667,7 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
 
                 @__copy_capture(normed_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_output_fn[
                     width: SIMDLength, alignment: Int
                 ](coords: Coord, val: SIMD[dtype, width]) -> None:
@@ -1827,7 +1827,7 @@ struct DistributedAllGatherRMSNormQuantMXFP6:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
-        @always_inline
+        @inline(.always)
         def launch_fused_ag_norm_quant[
             index: Int
         ]() raises {
@@ -1901,7 +1901,7 @@ struct DistributedAllGatherRMSNormQuantMXFP6:
             # not list reaches the device as a host-stack pointer and faults.
             @__copy_capture(quant_buf, scale_buf, cols_rt)
             @__parameter
-            @always_inline
+            @inline(.always)
             def mx_epilogue[
                 width: Int
             ](row: Int, col: Int, val: SIMD[dtype, width]):
@@ -1940,7 +1940,7 @@ struct DistributedAllGatherRMSNormQuantMXFP6:
                         )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch_with_quant() raises:
                 var base = rebind[UnsafePointer[Scalar[dtype], MutAnyOrigin]](
                     sum_buf._storage
@@ -1978,7 +1978,7 @@ struct DistributedAllGatherRMSNormQuantMXFP6:
 
                 @__copy_capture(sum_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_input_fn[
                     width: Int
                 ](coords: Coord) -> SIMD[dtype, width]:
@@ -1986,7 +1986,7 @@ struct DistributedAllGatherRMSNormQuantMXFP6:
 
                 @__copy_capture(normed_buf)
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def norm_output_fn[
                     width: SIMDLength, alignment: Int
                 ](coords: Coord, val: SIMD[dtype, width]) -> None:
@@ -2113,7 +2113,7 @@ struct DistributedMatmulReduceScatterSum:
         # without it, so after RS-sum the output contains
         # `sum_j(A_j @ B_j) + residual` rather than `... + ngpus*residual`.
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(residual)
         def residual_add_fn[
             _dtype: DType, _width: SIMDLength, *, alignment: Int = 1

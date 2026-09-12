@@ -86,7 +86,7 @@ struct RMSNormFusedResidual:
             # GPU path: the device kernel bakes the callbacks in as `capturing`
             # comptime closures, so build them as comptime parameters.
             @__parameter
-            @always_inline
+            @inline(.always)
             def input_fn[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -95,7 +95,7 @@ struct RMSNormFusedResidual:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def residual_input_fn[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -104,7 +104,7 @@ struct RMSNormFusedResidual:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def output_fn[
                 width: SIMDLength, _rank: Int, alignment: Int
             ](coords: IndexList[_rank], val: SIMD[dtype, width]):
@@ -114,7 +114,7 @@ struct RMSNormFusedResidual:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def residual_output_fn[
                 width: SIMDLength, _rank: Int, alignment: Int
             ](coords: IndexList[_rank], val: SIMD[dtype, width]):
@@ -145,7 +145,7 @@ struct RMSNormFusedResidual:
             # CPU path: pass the callbacks as unified closures (runtime args).
             # They capture the tensors directly, which is what lets the migrated
             # CPU kernel take runtime closures end to end.
-            @always_inline
+            @inline(.always)
             def input_fn_cpu[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) {var input} -> SIMD[dtype, width]:
@@ -153,7 +153,7 @@ struct RMSNormFusedResidual:
                     rebind[IndexList[input.rank]](coords)
                 )
 
-            @always_inline
+            @inline(.always)
             def residual_input_fn_cpu[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) {var residual_input} -> SIMD[
@@ -163,7 +163,7 @@ struct RMSNormFusedResidual:
                     rebind[IndexList[residual_input.rank]](coords)
                 )
 
-            @always_inline
+            @inline(.always)
             def output_fn_cpu[
                 width: SIMDLength, alignment: Int
             ](coords: IndexList[rank], val: SIMD[dtype, width]) {
@@ -174,7 +174,7 @@ struct RMSNormFusedResidual:
                     rebind[SIMD[output.dtype, width]](val),
                 )
 
-            @always_inline
+            @inline(.always)
             def residual_output_fn_cpu[
                 width: SIMDLength, alignment: Int
             ](coords: IndexList[rank], val: SIMD[dtype, width]) {

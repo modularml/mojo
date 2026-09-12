@@ -340,7 +340,7 @@ def fp8_index_kernel[
             o_ptr[i * BN + tid] = k_s_reg * row_sum
 
 
-@always_inline
+@inline(.always)
 def fp8_index[
     dtype: DType,
     //,
@@ -661,7 +661,7 @@ def _reduce_logits[
     o_batch[seq_idx, key_idx] = sum * k_s_batch[key_idx][0]
 
 
-@always_inline
+@inline(.always)
 def fp8_index_naive[
     dtype: DType,
     //,

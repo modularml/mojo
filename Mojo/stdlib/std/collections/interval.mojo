@@ -274,7 +274,7 @@ struct Interval[T: IntervalElement](
         """
         return self.start < self.end
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes this interval to a writer in the format '(start, end)'.
 
@@ -397,7 +397,7 @@ struct _IntervalNode[
         self._parent = parent
         self._is_red = is_red
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes this interval node to a writer in the format
         '(start, end): data'.
@@ -759,7 +759,7 @@ struct IntervalTree[
         """
         self._draw(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the repr of this `IntervalTree` to a writer.
 
@@ -776,7 +776,7 @@ struct IntervalTree[
             fmt.TypeNames[Self.T, Self.U](),
         ).fields(write_fields)
 
-    @no_inline
+    @inline(.never)
     def _draw[w: Writer](self, mut writer: w):
         """Draws the interval tree in a simple ASCII tree format.
 
@@ -792,7 +792,7 @@ struct IntervalTree[
         """
         self._draw_helper(writer, self._root, "", True)
 
-    @no_inline
+    @inline(.never)
     def _draw_helper[
         w: Writer
     ](
@@ -833,7 +833,7 @@ struct IntervalTree[
         self._draw_helper(writer, node.value()[].left(), next_indent, False)
         self._draw_helper(writer, node.value()[].right(), next_indent, True)
 
-    @no_inline
+    @inline(.never)
     def _draw3[w: Writer](self, mut writer: w) raises:
         """Draws the interval tree in a simple ASCII tree format.
 
@@ -869,7 +869,7 @@ struct IntervalTree[
             work_list.append((node.value()[].left(), indent, False))
             work_list.append((node.value()[].right(), indent, True))
 
-    @no_inline
+    @inline(.never)
     def _draw2[w: Writer](self, mut writer: w) raises:
         """Draws the interval tree in a visual ASCII art format.
 

@@ -50,7 +50,7 @@ comptime _UNINIT_CHECK_ENABLED = (
 #   bit pattern produced by legitimate saturate-to-max in narrow fp8, so
 #   the check yields pervasive false positives. The C++ side skips these
 #   too.
-@always_inline
+@inline(.always)
 def _is_poison_checked_dtype[dtype: DType]() -> Bool:
     return (
         dtype == .float16
@@ -60,7 +60,7 @@ def _is_poison_checked_dtype[dtype: DType]() -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _poison_abort[
     uint_type: DType, //, dtype: DType
 ](
@@ -123,7 +123,7 @@ def _poison_abort[
     abort()
 
 
-@always_inline
+@inline(.always)
 def _check_not_poison[dtype: DType, width: Int](val: SIMD[dtype, width]):
     """Checks that a loaded SIMD value doesn't match debug allocator poison.
 
@@ -143,7 +143,7 @@ def _check_not_poison[dtype: DType, width: Int](val: SIMD[dtype, width]):
                 _poison_abort[dtype](poisoned_value=poison, lane=i)
 
 
-@always_inline
+@inline(.always)
 def _check_not_poison_masked[
     dtype: DType, width: Int
 ](val: SIMD[dtype, width], mask: SIMD[.bool, width]):

@@ -130,7 +130,7 @@ def test_matmul_sm100_epilogue[
     var c_tensor_lt = c_tensor.to_layout_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def test_lambda_add_coords_summ[
         _dtype: DType,
@@ -211,7 +211,7 @@ def test_matmul_sm100_epilogue[
     var c_tensor_host_lt = c_host_copy.to_layout_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_host_lt)
     def test_lambda_add_coords_summ_local[
         _dtype: DType,

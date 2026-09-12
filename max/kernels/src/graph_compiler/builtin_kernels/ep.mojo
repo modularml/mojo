@@ -85,7 +85,7 @@ comptime RT_LAYOUT_2D = type_of(row_major(Int64(1), Int64(1)))
 struct Struct_ep_init:
     """Registers the `ep.init` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dispatch_dtype: DType,
@@ -308,7 +308,7 @@ struct Struct_ep_init:
 struct Struct_ep_dispatch_async:
     """Registers the `ep.dispatch_async` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_dtype: DType,
@@ -429,7 +429,7 @@ struct Struct_ep_dispatch_async_block_scaled_nv:
     """Registers the `ep.dispatch_async.block.scaled.nv` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -495,7 +495,7 @@ struct Struct_ep_dispatch_async_block_scaled_nv:
         comptime assert input_scales_tensor.flat_rank == 1
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(input_scales_tensor)
         def input_scales_fn[dtype: DType](expert_id: Int) -> Scalar[dtype]:
             # Currently only use one global input scale for all experts
@@ -533,7 +533,7 @@ struct Struct_ep_dispatch_async_mxfp4:
     """Registers the `ep.dispatch_async.mxfp4` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_dtype: DType,
@@ -636,7 +636,7 @@ struct Struct_ep_dispatch_async_mxfp4:
 struct Struct_ep_dispatch_wait:
     """Registers the `ep.dispatch_wait` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         hidden_size: Int,
@@ -694,7 +694,7 @@ struct Struct_ep_dispatch_wait:
 struct Struct_ep_dispatch_wait_fp8:
     """Registers the `ep.dispatch_wait.fp8` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dispatch_dtype: DType,
@@ -760,7 +760,7 @@ struct Struct_ep_dispatch_wait_block_scaled_nv:
     """Registers the `ep.dispatch_wait.block.scaled.nv` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dispatch_dtype: DType,
@@ -828,7 +828,7 @@ struct Struct_ep_dispatch_wait_mxfp4:
     """Registers the `ep.dispatch_wait.mxfp4` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dispatch_dtype: DType,
@@ -914,7 +914,7 @@ struct Struct_ep_dispatch_wait_mxfp4:
 struct Struct_ep_dispatch:
     """Registers the `ep.dispatch` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dispatch_dtype: DType,
@@ -1032,7 +1032,7 @@ struct Struct_ep_dispatch:
 struct Struct_ep_dispatch_fp8:
     """Registers the `ep.dispatch.fp8` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_dtype: DType,
@@ -1103,7 +1103,7 @@ struct Struct_ep_dispatch_block_scaled_nv:
     """Registers the `ep.dispatch.block.scaled.nv` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -1201,7 +1201,7 @@ struct Struct_ep_dispatch_block_scaled_nv:
         comptime assert input_scales_tensor.flat_rank == 1
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(input_scales_tensor)
         def input_scales_fn[dtype: DType](expert_id: Int) -> Scalar[dtype]:
             # Currently only use one global input scale for all experts
@@ -1243,7 +1243,7 @@ struct Struct_ep_dispatch_block_scaled_nv:
 struct Struct_ep_dispatch_mxfp4:
     """Registers the `ep.dispatch.mxfp4` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -1430,7 +1430,7 @@ struct DistributedEPDispatchBlockScaledNV:
 
         var gpu_ctxs = dev_ctxs.filter_gpu_contexts[num_devices]()
 
-        @always_inline
+        @inline(.always)
         def launch_dispatch[
             index: Int
         ]() raises {
@@ -1456,7 +1456,7 @@ struct DistributedEPDispatchBlockScaledNV:
             comptime assert in_scales.flat_rank == 1
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(in_scales)
             def input_scales_fn[dtype: DType](expert_id: Int) -> Scalar[dtype]:
                 return rebind[Scalar[dtype]](in_scales[0].cast[dtype]())
@@ -1596,7 +1596,7 @@ struct DistributedEPDispatchMXFP4:
 
         var gpu_ctxs = dev_ctxs.filter_gpu_contexts[num_devices]()
 
-        @always_inline
+        @inline(.always)
         def launch_dispatch[
             index: Int
         ]() raises {
@@ -1733,7 +1733,7 @@ struct DistributedEPDispatch:
 
         var gpu_ctxs = dev_ctxs.filter_gpu_contexts[num_devices]()
 
-        @always_inline
+        @inline(.always)
         def launch_dispatch[
             index: Int
         ]() raises {
@@ -1873,7 +1873,7 @@ struct DistributedEPDispatchFP8:
 
         var gpu_ctxs = dev_ctxs.filter_gpu_contexts[num_devices]()
 
-        @always_inline
+        @inline(.always)
         def launch_dispatch[
             index: Int
         ]() raises {
@@ -1998,7 +1998,7 @@ struct DistributedEPCombine:
 
         var gpu_ctxs = dev_ctxs.filter_gpu_contexts[num_devices]()
 
-        @always_inline
+        @inline(.always)
         def launch_combine[
             index: Int
         ]() raises {
@@ -2015,7 +2015,7 @@ struct DistributedEPCombine:
             var rw_tensor = router_weights[index].to_tile_tensor[.int64]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(rw_tensor)
             def router_weights_fn[
                 width: Int
@@ -2025,7 +2025,7 @@ struct DistributedEPCombine:
                 ]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def output_fn[
                 dtype: DType, width: SIMDLength, *, alignment: Int = 1
             ](coords: IndexList[2], val: SIMD[dtype, width]):
@@ -2067,7 +2067,7 @@ struct DistributedEPCombine:
 struct Struct_ep_combine_async:
     """Registers the `ep.combine_async` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         combine_dtype: DType,
@@ -2149,7 +2149,7 @@ struct Struct_ep_combine_wait:
     """Registers the `ep.combine_wait` graph op with the graph compiler."""
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         combine_dtype: DType,
@@ -2214,7 +2214,7 @@ struct Struct_ep_combine_wait:
         comptime assert router_weights_tensor.flat_rank >= 2
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(router_weights_tensor)
         def router_weights_fn[
             width: Int
@@ -2224,7 +2224,7 @@ struct Struct_ep_combine_wait:
             ).cast[.float32]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[dtype, width]):
@@ -2266,7 +2266,7 @@ struct Struct_ep_combine_wait:
 struct Struct_ep_combine:
     """Registers the `ep.combine` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2354,7 +2354,7 @@ struct Struct_ep_combine:
         comptime assert router_weights_tensor.flat_rank >= 2
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(router_weights_tensor)
         def router_weights_fn[
             width: Int
@@ -2364,7 +2364,7 @@ struct Struct_ep_combine:
             ).cast[.float32]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[dtype, width]):
@@ -2405,7 +2405,7 @@ struct Struct_ep_combine:
 struct Struct_ep_combine_skip_a2a:
     """Registers the `ep.combine.skip_a2a` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2503,7 +2503,7 @@ struct Struct_ep_combine_skip_a2a:
         comptime assert router_weights_tensor.flat_rank >= 2
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(router_weights_tensor)
         def router_weights_fn[
             width: Int
@@ -2513,7 +2513,7 @@ struct Struct_ep_combine_skip_a2a:
             ).cast[.float32]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](coords: IndexList[2], val: SIMD[dtype, width]):
@@ -2556,7 +2556,7 @@ struct Struct_ep_combine_skip_a2a:
 struct Struct_ep_fused_silu:
     """Registers the `ep.fused_silu` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         output_dtype: DType,
@@ -2602,7 +2602,7 @@ struct Struct_ep_fused_silu:
             hw_info.sm_count,
         ]
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             # fmt: off
             return String(
@@ -2630,7 +2630,7 @@ struct Struct_ep_fused_silu:
 struct Struct_ep_fused_silu_fp8:
     """Registers the `ep.fused_silu.fp8` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         fp8_dtype: DType,
@@ -2684,7 +2684,7 @@ struct Struct_ep_fused_silu_fp8:
             group_size,
         ]
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             # fmt: off
             return String(
@@ -2715,7 +2715,7 @@ struct Struct_ep_fused_silu_fp8:
 struct Struct_ep_fused_silu_mxfp4:
     """Registers the `ep.fused_silu.mxfp4` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         quant_dtype: DType,
@@ -2790,7 +2790,7 @@ struct Struct_ep_fused_silu_mxfp4:
             clamp_activation=clamp_activation,
         ]
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             # fmt: off
             return String(
@@ -2825,7 +2825,7 @@ struct Struct_ep_fused_silu_mxfp4:
 struct Struct_ep_fused_silu_mxfp8:
     """Registers the `ep.fused_silu.mxfp8` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         fp8_dtype: DType,
@@ -2866,7 +2866,7 @@ struct Struct_ep_fused_silu_mxfp8:
 struct Struct_ep_fused_silu_mxfp6:
     """Registers the `ep.fused_silu.mxfp6` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         scales_dtype: DType,
@@ -2932,7 +2932,7 @@ struct Struct_ep_fused_silu_mxfp6:
             clamp_activation=clamp_activation,
         ]
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             # fmt: off
             return String(
@@ -2967,7 +2967,7 @@ struct Struct_ep_fused_silu_mxfp6:
 struct Struct_ep_fused_silu_nvfp4:
     """Registers the `ep.fused_silu.nvfp4` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         fp4_dtype: DType,
@@ -3028,7 +3028,7 @@ struct Struct_ep_fused_silu_nvfp4:
             hw_info.sm_count,
         ]
 
-        @always_inline
+        @inline(.always)
         def description_fn() {imm} -> String:
             # fmt: off
             return String(

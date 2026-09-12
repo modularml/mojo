@@ -99,7 +99,7 @@ struct InputRowMode(TrivialRegisterPassable):
     comptime TOKEN_SLOT = Self(1)  # A_row = t*topk + s (stage2 / down)
 
 
-@always_inline
+@inline(.always)
 def _xcd_wgm_swizzle(
     wgid_raw: Int, num_pid_m: Int, num_pid_n: Int
 ) -> Tuple[Int, Int]:

@@ -54,7 +54,7 @@ struct MHAAttentionConfigRDNA[token_gen: Bool, config: MHAConfig, group: Int](
     comptime double_buffer_k_only = False
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_head_idx() -> Int:
         comptime if Self.token_gen:
             var group_idx = umod(lane_id(), Self.group)
@@ -63,24 +63,24 @@ struct MHAAttentionConfigRDNA[token_gen: Bool, config: MHAConfig, group: Int](
             return block_idx.x
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def q_tile_idx() -> Int:
         return block_idx.y if not Self.token_gen else 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def kv_head_idx() -> Int:
         return block_idx.y if Self.token_gen else ufloordiv(
             Self.q_head_idx(), Self.group
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_mma_shape() -> IndexList[3]:
         return IndexList[3](RDNA_MMA_M, RDNA_MMA_N, RDNA_MMA_K)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_q_offset[q_depth: Int]() -> UInt32:
         return UInt32(
             q_depth
@@ -96,6 +96,6 @@ struct MHAAttentionConfigRDNA[token_gen: Bool, config: MHAConfig, group: Int](
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_output_offset[output_depth: Int]() -> UInt32:
         return Self.get_q_offset[output_depth]()

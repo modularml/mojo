@@ -54,7 +54,7 @@ def parameterized_on_cuda() -> Int:
         return -1
 
 
-@always_inline
+@inline(.always)
 def _verify_parameterized_on_cuda(asm: StringSlice) raises -> None:
     assert_true("test_cuda_target_parameterized" in asm)
 
@@ -96,7 +96,7 @@ def hello_mojo():
     _printf["Hello"]()
 
 
-@always_inline
+@inline(.always)
 def _verify_hello(asm: StringSlice) raises -> None:
     assert_true("test_cuda_target_hello_mojo" in asm)
     assert_true("vprintf" in asm)
@@ -124,7 +124,7 @@ def erf_elementwise(
     comptime granularity = 4 * simd_width_of[DType.float32]()
     var tid = granularity * global_idx.x
 
-    @always_inline
+    @inline(.always)
     def func[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         var offset = tid + Int(idx[0].value())
         if offset >= len:
@@ -171,7 +171,7 @@ def erf_kernel(buf: MutPointer[Float32, MutAnyOrigin], len: Int):
     buf[tid] = erf(buf[tid])
 
 
-@always_inline
+@inline(.always)
 def _verify_erf_kernel(asm: StringSlice) raises -> None:
     assert_true("erf_kernel" in asm)
     assert_true("tid.x" in asm)
@@ -200,7 +200,7 @@ def test_shared_stack_allocation() -> (
     return unsafe_stack_allocation[999, DType.int8, 8, address_space=.SHARED]()
 
 
-@always_inline
+@inline(.always)
 def _verify_shared_stack_allocation(asm: StringSlice) raises -> None:
     assert_true("test_cuda_target_test_shared_" in asm)
     assert_true(".shared .align 8 .b8" in asm)
@@ -229,7 +229,7 @@ def test_barrier():
     barrier()
 
 
-@always_inline
+@inline(.always)
 def _verify_barrier(asm: StringSlice) raises -> None:
     assert_true("barrier" in asm)
     assert_true("bar.sync 	0" in asm)
@@ -276,17 +276,17 @@ def gemm(
     comptime TILE_SZ_RATIO = TILE_SZ_A // TILE_SZ_B
 
     # Utilities for accessing flattened matrices.
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_a(row: Int, col: Int) -> Float32:
         return a.load(row + m * col)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def get_b(row: Int, col: Int) -> Float32:
         return b.load(row * n + col)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def set_c(row: Int, col: Int, val: Float32):
         c[row + col * m] = val
@@ -376,7 +376,7 @@ def test_warp_shuffle_up(val: Float32) -> Float32:
     return res
 
 
-@always_inline
+@inline(.always)
 def _verify_warp_shuffle_up(asm: StringSlice) raises -> None:
     assert_true("test_warp_shuf" in asm)
     assert_true("shfl.sync.up.b32" in asm)
@@ -406,7 +406,7 @@ def test_warp_shuffle_down(val: Int32) -> Int32:
     return res
 
 
-@always_inline
+@inline(.always)
 def _verify_warp_shuffle_down(asm: StringSlice) raises -> None:
     assert_true("test_warp_shuf" in asm)
     assert_true("shfl.sync.down.b32" in asm)
@@ -441,7 +441,7 @@ def warp_sum_reduce(val: Float32) -> Float32:
     return res
 
 
-@always_inline
+@inline(.always)
 def _verify_warp_sum_reduce(asm: StringSlice) raises -> None:
     assert_true("warp_sum_" in asm)
     assert_true("shfl.sync.bfly.b32" in asm)
@@ -484,7 +484,7 @@ def block_reduce(val: Float32) -> Float32:
     )
 
 
-@always_inline
+@inline(.always)
 def _verify_block_reduce(asm: StringSlice) raises -> None:
     assert_true("block_reduce" in asm)
     assert_true("mov.u32" in asm)

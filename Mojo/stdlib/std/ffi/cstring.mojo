@@ -18,7 +18,7 @@ from std.sys import size_of
 from std.utils._nicheable import UnsafeNicheable, NicheIndex
 
 
-@always_inline
+@inline(.always)
 def _validate_bytes(slice: Span[Byte, _]) raises:
     var length = Int(_unsafe_strlen(slice.unsafe_ptr(), Int(len(slice))))
     if length == len(slice) - 1:
@@ -50,7 +50,7 @@ struct CStringSpan[origin: ImmOrigin](
 
     var _data: Self._PointerType
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -90,7 +90,7 @@ struct CStringSpan[origin: ImmOrigin](
         """
         self._data = unsafe_from_ptr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, span: StringSpan[Self.origin]) raises:
         """Construct a `CStringSpan` from a `StringSpan`.
 
@@ -118,7 +118,7 @@ struct CStringSpan[origin: ImmOrigin](
         # Safety: _validate_bytes ensures span is a non-null terminated cstring.
         self._data = span.as_bytes().unsafe_ptr().unsafe_bitcast[Int8]()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, span: Span[Byte, Self.origin]) raises:
         """Construct a `CStringSpan` from a `Span[Byte]`.
 
@@ -133,7 +133,7 @@ struct CStringSpan[origin: ImmOrigin](
         # Safety: _validate_bytes ensures span is a non-null terminated cstring.
         self._data = span.unsafe_ptr().unsafe_bitcast[Int8]()
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs_same: Self) -> Bool:
         """Compare two `CStringSpan`s for equality.
 
@@ -145,7 +145,7 @@ struct CStringSpan[origin: ImmOrigin](
         """
         return Self.__eq__(self, rhs=rhs_same)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs: CStringSpan) -> Bool:
         """Compare two `CStringSpan`s for equality.
 
@@ -167,7 +167,7 @@ struct CStringSpan[origin: ImmOrigin](
             b = b.unsafe_offset(1)
         return False
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, rhs: CStringSpan) -> Bool:
         """Compare two `CStringSpan`s for inequality.
 
@@ -179,7 +179,7 @@ struct CStringSpan[origin: ImmOrigin](
         """
         return not (self == rhs)
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Get the length of the C string. Like C's strlen this does not include
         the nul terminator.
@@ -207,7 +207,7 @@ struct CStringSpan[origin: ImmOrigin](
         """
         t"CStringSpan({self.as_bytes_with_nul()})".write_to(writer)
 
-    @always_inline
+    @inline(.always)
     def ptr(self) -> Pointer[Int8, Self.origin]:
         """Get a pointer to the underlying `CStringSpan`.
 
@@ -217,7 +217,7 @@ struct CStringSpan[origin: ImmOrigin](
         return self._data
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     @deprecated(use=ptr)
     def unsafe_ptr(self) -> Pointer[Int8, Self.origin]:
         """Get a pointer to the underlying `CStringSpan`.
@@ -227,7 +227,7 @@ struct CStringSpan[origin: ImmOrigin](
         """
         return self.ptr()
 
-    @always_inline
+    @inline(.always)
     def as_bytes(self) -> Span[Byte, Self.origin]:
         """Get a span of the underlying `CStringSpan` as bytes.
 
@@ -243,7 +243,7 @@ struct CStringSpan[origin: ImmOrigin](
             length=len(self),
         )
 
-    @always_inline
+    @inline(.always)
     def as_bytes_with_nul(self) -> Span[Byte, Self.origin]:
         """Get a span of the underlying `CStringSpan` as bytes including the
         nul terminator.
@@ -265,13 +265,13 @@ struct CStringSpan[origin: ImmOrigin](
 
     @staticmethod
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def niche_count() -> Int:
         return Self._PointerType.niche_count()
 
     @staticmethod
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def write_niche[index: Int](memory: MutPointer[MaybeUninit[Self], _]):
         comptime assert size_of[Self]() == size_of[Self._PointerType]()
         Self._PointerType.write_niche[index](
@@ -280,7 +280,7 @@ struct CStringSpan[origin: ImmOrigin](
 
     @staticmethod
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def classify_niche(memory: ImmPointer[MaybeUninit[Self], _]) -> NicheIndex:
         comptime assert size_of[Self]() == size_of[Self._PointerType]()
         return Self._PointerType.classify_niche(

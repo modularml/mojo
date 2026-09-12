@@ -55,7 +55,7 @@ def bench_softmax_gpu[
     def input_fn[_simd_width: Int](coords: Coord) -> SIMD[dtype, _simd_width]:
         return data_buf.load[width=_simd_width, alignment=1](coords)
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(ctx: DeviceContext) raises {mut out_buf, mut data_d, imm}:
         softmax_inline[
             dtype,
@@ -70,7 +70,7 @@ def bench_softmax_gpu[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 
@@ -81,9 +81,9 @@ def bench_softmax_gpu[
 
     # The `algorithm.rowwise` overload — what `mo.reduce.softmax` launches.
     # Benched in the same process so both arms see identical clocks.
-    @always_inline
+    @inline(.always)
     def kernel_launch_rowwise(ctx: DeviceContext) raises {mut out_buf, imm}:
-        @always_inline
+        @inline(.always)
         def rowwise_input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
@@ -98,7 +98,7 @@ def bench_softmax_gpu[
             context=ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_fn_rowwise(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch_rowwise, ctx)
 
@@ -141,11 +141,11 @@ def bench_softmax_with_temperature_gpu[
 
     var temp = temperature
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(ctx: DeviceContext) raises {mut out_buf, imm}:
         softmax_with_temperature(ctx, data_buf, out_buf, temp)
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

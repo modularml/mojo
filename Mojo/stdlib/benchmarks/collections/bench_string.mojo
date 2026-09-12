@@ -64,7 +64,7 @@ def make_string[
 # Benchmark string init
 # ===-----------------------------------------------------------------------===#
 def bench_string_init(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         for _ in range(1000):
             var string = String()
@@ -83,7 +83,7 @@ def bench_string_count[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var amnt = black_box(items).count(black_box(sequence))
         keep(amnt)
@@ -101,7 +101,7 @@ def bench_string_split[
 ](mut b: Bencher) raises:
     var items = StringSlice(make_string[length](filename + ".txt")).as_imm()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res: List[type_of(items)]
 
@@ -134,7 +134,7 @@ def bench_string_join[short: Bool](mut b: Bencher) raises:
 
     var separator = String(",")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         for _ in range(1_000):
             var res = black_box(separator).join(black_box(word_list))
@@ -151,7 +151,7 @@ def bench_string_splitlines[
 ](mut b: Bencher) raises:
     var items = StringSlice(make_string[length](filename + ".txt"))
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         for _ in range(1_000_000 // length):
             var res = black_box(items).splitlines()
@@ -168,7 +168,7 @@ def bench_string_lower[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).lower()
         keep(res)
@@ -184,7 +184,7 @@ def bench_string_upper[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).upper()
         keep(res)
@@ -203,7 +203,7 @@ def bench_string_replace[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).replace(black_box(old), black_box(new))
         keep(res)
@@ -219,7 +219,7 @@ def bench_string_count_codepoints[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).count_codepoints()
         keep(res)
@@ -235,7 +235,7 @@ def bench_string_find_single[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         # this is to help with instability when measuring small strings
         for _ in range(10**6 // length):
@@ -256,7 +256,7 @@ def bench_string_find_multiple[
     var items = make_string[length](filename + ".txt")
     var sequence = "ZZZZ"  # something that probably won't be there
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         # this is to help with instability when measuring small strings
         for _ in range(10**6 // length):
@@ -274,7 +274,7 @@ def bench_string_is_valid_utf8[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".html")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = _is_valid_utf8(black_box(items).as_bytes())
         keep(res)
@@ -295,7 +295,7 @@ def bench_write_utf8[
     for c in codepoints_iter:
         codepoints.append(c)
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var data = Array[Byte, 4](uninitialized=True)
         # this is to help with instability when measuring small strings
@@ -321,7 +321,7 @@ def bench_string_write[short: Bool](mut b: Bencher) raises:
     var items_4 = items.copy()
     var items_5 = items.copy()
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         for _ in range(1_000_000):
             var res: String
@@ -363,7 +363,7 @@ def bench_string_repr[
 ](mut b: Bencher):
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         # this is to help with instability when measuring small strings
         for _ in range(10**6 // length):

@@ -221,7 +221,7 @@ def test_prefill[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(
         q_device,
         k_device,

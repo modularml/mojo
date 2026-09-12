@@ -167,7 +167,7 @@ def main() raises:
         ](ctx, Int(91), Idx[111], Idx[588])
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def test_lambda_fn_square[
             _dtype: DType,
             width: SIMDLength,
@@ -193,7 +193,7 @@ def main() raises:
         ](ctx, Int(277), Idx[2560], Idx[128])
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def test_lambda_add_coords[
             _dtype: DType,
             width: SIMDLength,

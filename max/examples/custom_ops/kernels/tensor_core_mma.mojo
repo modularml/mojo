@@ -1440,19 +1440,19 @@ def mma_tile_buffers[
     ).fill(0)
 
     # Helper functions for matrix operations
-    @always_inline
+    @inline(.always)
     @__parameter
     def load_tiles_from_dram():
         a_tiles.load_from_dram()
         b_tiles.load_from_dram()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def copy_tiles_to_shared():
         a_tiles.copy_to_shared()
         b_tiles.copy_to_shared()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def load_tiles_from_shared[k_tile_idx: Int]():
         a_tiles.load_tile_from_shared[k_tile_idx, is_a=True]()

@@ -509,7 +509,7 @@ def test_fused_concat_gpu(ctx: DeviceContext) raises:
 
     # Input lambda: generates data on-the-fly
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn[
         input_index: Int, width: Int, _rank: Int, alignment: Int = 1
     ](indices: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -522,7 +522,7 @@ def test_fused_concat_gpu(ctx: DeviceContext) raises:
 
     # Output epilogue: add 10 to every value
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_dyn)
     def output_fn[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
@@ -633,7 +633,7 @@ def test_concat_with_epilogue(ctx: DeviceContext) raises:
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_dyn)
     def epilogue_scale_by_2[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int

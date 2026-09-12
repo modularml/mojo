@@ -44,11 +44,11 @@ struct WorkInfo(TrivialRegisterPassable, Writable):
     # Whether work tile is completely OOB.
     var is_valid_tile: Bool
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         return self.is_valid_tile
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write(
             "(",
@@ -119,7 +119,7 @@ struct TileScheduler[
         SharedMemBarrier, MutAnyOrigin, address_space=.SHARED
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         cluster_dim: StaticTuple[Int32, 3],
@@ -149,7 +149,7 @@ struct TileScheduler[
         self.full_mbar = full_mbar_ptr.as_unsafe_any_origin()
         self.empty_mbar = empty_mbar_ptr.as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def work_info_from_clc_response(
         result: UnsafePointer[mut=True, UInt128, _, address_space=.SHARED],
@@ -178,7 +178,7 @@ struct TileScheduler[
             is_valid_tile=(ret_val[3] == 1),
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def work_info_from_cluster(
         work_info: WorkInfo,
@@ -256,7 +256,7 @@ struct TileScheduler[
             is_valid_tile=work_info.is_valid_tile,
         )
 
-    @always_inline
+    @inline(.always)
     def initial_work_info(self) -> WorkInfo:
         return self.work_info_from_cluster(
             WorkInfo(
@@ -270,7 +270,7 @@ struct TileScheduler[
             self.log_cluster_dim_n,
         )
 
-    @always_inline
+    @inline(.always)
     def fetch_next_work(
         self,
         work_info: WorkInfo,
@@ -294,7 +294,7 @@ struct TileScheduler[
             self.log_cluster_dim_n,
         )
 
-    @always_inline
+    @inline(.always)
     def advance_to_next_work(
         self,
         mut clc_state: PipelineState[Self.num_stages],

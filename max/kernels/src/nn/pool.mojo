@@ -34,16 +34,16 @@ struct PoolMethod(TrivialRegisterPassable):
     comptime MAX = PoolMethod(0)  # Max pooling.
     comptime AVG = PoolMethod(1)  # Average pooling not counting padded regions.
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, rhs: PoolMethod) -> Bool:
         return self.value == rhs.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, rhs: PoolMethod) -> Bool:
         return self.value != rhs.value
 
 
-@always_inline
+@inline(.always)
 def pool_shape_ceil[
     input_type: DType,
     filter_type: DType,
@@ -86,7 +86,7 @@ def pool_shape_ceil[
     ](input_buf, filter_buf, strides_buf, dilations_buf, paddings_buf)
 
 
-@always_inline
+@inline(.always)
 def pool_shape[
     input_type: DType,
     filter_type: DType,
@@ -129,7 +129,7 @@ def pool_shape[
     ](input_buf, filter_buf, strides_buf, dilations_buf, paddings_buf)
 
 
-@always_inline
+@inline(.always)
 def pool_shape_impl[
     input_type: DType,
     filter_type: DType,
@@ -215,7 +215,7 @@ def pool_shape_impl[
     return output_shape
 
 
-@always_inline
+@inline(.always)
 def max_pool_cpu[
     dtype: DType, int_type: DType
 ](
@@ -275,7 +275,7 @@ def max_pool_cpu[
     comptime stencil_rank = 2
     comptime stencil_axis = IndexList[stencil_rank](1, 2)
 
-    @always_inline
+    @inline(.always)
     def map_fn(
         point: IndexList[stencil_rank, ...],
     ) {
@@ -298,7 +298,7 @@ def max_pool_cpu[
         )
         return lower_bound, upper_bound
 
-    @always_inline
+    @inline(.always)
     def load_fn[
         simd_width: Int, dtype: DType
     ](point: IndexList[output.rank, ...]) {input,} -> SIMD[dtype, simd_width]:
@@ -306,11 +306,11 @@ def max_pool_cpu[
             input.load[width=simd_width](Coord(point))
         )
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return min_or_neg_inf[dtype]()
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute[
         simd_width: SIMDLength
     ](
@@ -320,7 +320,7 @@ def max_pool_cpu[
     ) -> SIMD[dtype, simd_width]:
         return max(val, result)
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_finalize[
         simd_width: SIMDLength
     ](
@@ -332,7 +332,7 @@ def max_pool_cpu[
         var i = output.layout(Coord(point))
         output.raw_store(i, val)
 
-    @always_inline
+    @inline(.always)
     def dilation_fn(dim: Int) {dilations, mut} -> Int:
         return Int(dilations[dim])
 
@@ -397,7 +397,7 @@ def max_pool_cpu[
         )
 
 
-@always_inline
+@inline(.always)
 def max_pool_gpu[
     dtype: DType, int_type: DType
 ](
@@ -462,7 +462,7 @@ def max_pool_gpu[
     comptime stencil_rank = 2
     comptime stencil_axis = IndexList[stencil_rank](1, 2)
 
-    @always_inline
+    @inline(.always)
     def map_fn(
         point: IndexList[stencil_rank, ...],
     ) {
@@ -485,7 +485,7 @@ def max_pool_gpu[
         )
         return lower_bound, upper_bound
 
-    @always_inline
+    @inline(.always)
     def load_fn[
         simd_width: Int, dtype: DType
     ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
@@ -496,11 +496,11 @@ def max_pool_gpu[
             input.raw_load[width=simd_width](i)
         )
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return min_or_neg_inf[dtype]()
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute[
         simd_width: SIMDLength
     ](
@@ -510,7 +510,7 @@ def max_pool_gpu[
     ) -> SIMD[dtype, simd_width]:
         return max(val, result)
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_finalize[
         simd_width: SIMDLength
     ](
@@ -522,7 +522,7 @@ def max_pool_gpu[
         var i = output.layout(Coord(point))
         output.raw_store(i, val)
 
-    @always_inline
+    @inline(.always)
     def dilation_fn(
         dim: Int,
     ) {var dilation_h, var dilation_w,} -> Int:
@@ -561,7 +561,7 @@ def max_pool_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def avg_pool_cpu[
     dtype: DType,
     int_type: DType,
@@ -651,7 +651,7 @@ def avg_pool_cpu[
     comptime stencil_rank = 2
     comptime stencil_axis = IndexList[stencil_rank](1, 2)
 
-    @always_inline
+    @inline(.always)
     def map_fn(
         point: IndexList[stencil_rank, ...],
     ) {
@@ -674,7 +674,7 @@ def avg_pool_cpu[
         )
         return lower_bound, upper_bound
 
-    @always_inline
+    @inline(.always)
     def load_fn[
         simd_width: Int, dtype: DType
     ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
@@ -685,11 +685,11 @@ def avg_pool_cpu[
             input.raw_load[width=simd_width](i)
         )
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return SIMD[dtype, simd_width](0)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute[
         simd_width: SIMDLength
     ](
@@ -699,7 +699,7 @@ def avg_pool_cpu[
     ) -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def pool_dim_size(
         dim: Int, size: Int, pad_low: Int, pad_high: Int, pool_window_size: Int
     ) -> Int:
@@ -710,7 +710,7 @@ def avg_pool_cpu[
         else:
             return pool_window_size
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_exclude_boundary[
         simd_width: SIMDLength
     ](
@@ -744,7 +744,7 @@ def avg_pool_cpu[
 
         output.raw_store(i, res)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize[
         simd_width: SIMDLength
     ](
@@ -852,7 +852,7 @@ def avg_pool_cpu[
             )
 
 
-@always_inline
+@inline(.always)
 def avg_pool_gpu[
     dtype: DType,
     int_type: DType,
@@ -944,7 +944,7 @@ def avg_pool_gpu[
     comptime stencil_rank = 2
     comptime stencil_axis = IndexList[stencil_rank](1, 2)
 
-    @always_inline
+    @inline(.always)
     def map_fn(
         point: IndexList[stencil_rank, ...],
     ) {
@@ -967,7 +967,7 @@ def avg_pool_gpu[
         )
         return lower_bound, upper_bound
 
-    @always_inline
+    @inline(.always)
     def load_fn[
         simd_width: Int, dtype: DType
     ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
@@ -978,11 +978,11 @@ def avg_pool_gpu[
             input.raw_load[width=simd_width](i)
         )
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_init[simd_width: Int]() -> SIMD[dtype, simd_width]:
         return SIMD[dtype, simd_width](0)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute[
         simd_width: SIMDLength
     ](
@@ -992,7 +992,7 @@ def avg_pool_gpu[
     ) -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def pool_dim_size(
         dim: Int, size: Int, pad_low: Int, pad_high: Int, pool_window_size: Int
     ) -> Int:
@@ -1003,7 +1003,7 @@ def avg_pool_gpu[
         else:
             return pool_window_size
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_exclude_boundary[
         simd_width: SIMDLength
     ](
@@ -1035,7 +1035,7 @@ def avg_pool_gpu[
         var i = output.layout(Coord(point))
         output.raw_store(i, res)
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize[
         simd_width: SIMDLength
     ](
@@ -1051,7 +1051,7 @@ def avg_pool_gpu[
         var i = output.layout(Coord(point))
         output.raw_store(i, res)
 
-    @always_inline
+    @inline(.always)
     def dilation_fn(
         dim: Int,
     ) {var dilation_h, var dilation_w,} -> Int:
@@ -1139,7 +1139,7 @@ def avg_pool_gpu[
             )
 
 
-@always_inline
+@inline(.always)
 def avg_pool[
     dtype: DType,
     int_type: DType,
@@ -1196,7 +1196,7 @@ def avg_pool[
         comptime assert False, "Unknown target " + target
 
 
-@always_inline
+@inline(.always)
 def max_pool[
     dtype: DType,
     int_type: DType,

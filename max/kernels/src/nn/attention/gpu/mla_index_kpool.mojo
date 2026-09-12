@@ -35,7 +35,7 @@ from layout import TensorLayout, TileTensor
 from max.gpu import block_dim, block_idx, thread_idx
 
 
-@always_inline
+@inline(.always)
 def pool_channel[
     kpool: Int
 ](logits: Array[Float32, kpool], vals: Array[Float32, kpool]) -> Float32:
@@ -56,7 +56,7 @@ def pool_channel[
     return acc / denom
 
 
-@always_inline
+@inline(.always)
 def _batch_of_pool_row(
     pool_row_offsets: TileTensor[mut=False, .uint32, ...],
     batch_size: Int,

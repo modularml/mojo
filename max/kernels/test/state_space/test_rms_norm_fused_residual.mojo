@@ -96,13 +96,13 @@ def run_rms_norm_fused_residual_cpu[
     var weight_offset = Scalar[dtype](0.0)
 
     # Define input functions
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, _rank: Int
     ](coords: IndexList[_rank]) {input_tensor} -> SIMD[dtype, width]:
         return input_tensor.load[width=width](rebind[IndexList[rank]](coords))
 
-    @always_inline
+    @inline(.always)
     def residual_input_fn[
         width: Int, _rank: Int
     ](coords: IndexList[_rank]) {residual_tensor} -> SIMD[dtype, width]:
@@ -111,13 +111,13 @@ def run_rms_norm_fused_residual_cpu[
         )
 
     # Define output functions
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: IndexList[rank], val: SIMD[dtype, width]) {output_tensor} -> None:
         output_tensor.store[width=width](coords, val)
 
-    @always_inline
+    @inline(.always)
     def residual_output_fn[
         width: SIMDLength, alignment: Int
     ](coords: IndexList[rank], val: SIMD[dtype, width]) {
@@ -133,7 +133,7 @@ def run_rms_norm_fused_residual_cpu[
         residual_output_tensor.as_imm().as_unsafe_any_origin()
     )
 
-    @always_inline
+    @inline(.always)
     def residual_read_fn[
         width: Int, _rank: Int
     ](coords: IndexList[_rank]) {residual_output_immut} -> SIMD[dtype, width]:

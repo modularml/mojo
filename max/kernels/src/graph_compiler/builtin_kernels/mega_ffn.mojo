@@ -121,7 +121,7 @@ struct Struct_mega_ffn_nvfp4:
     module docstring).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         c_type: DType,

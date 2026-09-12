@@ -20,7 +20,7 @@ from nn.gather_scatter import gather
 def test_gather(ctx: DeviceContext) raises:
     print("== test_gather")
 
-    @no_inline
+    @inline(.never)
     @__parameter
     def _test_gather[indices_type: DType]() raises:
         comptime num_rows = 16

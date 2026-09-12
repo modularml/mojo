@@ -464,7 +464,7 @@ def fused_rope_rmsnorm_quantization_kernel[
                     )
 
 
-@always_inline
+@inline(.always)
 def mla_fused_rope_rmsnorm_quantization[
     dtype: DType,
     freq_dtype: DType,
@@ -812,7 +812,7 @@ def mla_prefill_branch_fp8[
         ),
     )
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](row: Int, col: Int) {var k_latent} -> SIMD[k_latent.dtype, width]:
@@ -928,7 +928,7 @@ def mla_prefill_branch_fp8[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def quantize_and_bmm_fp8_helper[
     dtype: DType,
     c_dtype: DType,
@@ -1002,7 +1002,7 @@ def quantize_and_bmm_fp8_helper[
         ),
     )
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](batch: Int, row: Int, col: Int) {var a} -> SIMD[dtype, width]:
@@ -1361,7 +1361,7 @@ def mla_decode_branch_fp8[
     ](output_t, raw_output, w_uv, w_uv_scale, ctx)
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_branch_sparse_fp8[
     dtype: DType,
     fp8_dtype: DType,
@@ -1648,7 +1648,7 @@ def mla_prefill_branch_sparse_fp8[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_decode_graph_fp8[
     dtype: DType,
     fp8_dtype: DType,
@@ -1902,7 +1902,7 @@ def mla_prefill_decode_graph_fp8[
             )
 
 
-@always_inline
+@inline(.always)
 def convert_bf16_to_fp8_e4m3fn(
     input_buffer: TileTensor[mut=False, .bfloat16, ...],
     output_buffer: TileTensor[mut=True, .float8_e4m3fn, ...],
@@ -1920,7 +1920,7 @@ def convert_bf16_to_fp8_e4m3fn(
         input_buffer.rank == output_buffer.rank
     ), "Input and output must have the same rank"
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(input_buffer, output_buffer)
     def convert_kernel[
@@ -2534,7 +2534,7 @@ def mla_decode_branch_bf16[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_branch_sparse_bf16[
     collection_t: KVCollectionT,
     //,
@@ -2804,7 +2804,7 @@ def mla_prefill_branch_sparse_bf16[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_decode_graph_bf16[
     collection_t: KVCollectionT,
     //,

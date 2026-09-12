@@ -79,7 +79,7 @@ from .block_scaled_preshuffle_loaders import (
 )
 
 
-@always_inline
+@inline(.always)
 def _lds_load_width[BK_BYTES: Int, BM: Int, max_width: Int]() -> Int:
     """Widest packed DMA width whose warp-tiling divides `BM`.
 
@@ -122,7 +122,7 @@ def _lds_load_width[BK_BYTES: Int, BM: Int, max_width: Int]() -> Int:
     return 1
 
 
-@always_inline
+@inline(.always)
 def _largest_divisor_at_most[n: Int](cap: Int) -> Int:
     """Returns the largest divisor of `n` that is at most `cap`.
 
@@ -149,7 +149,7 @@ def _largest_divisor_at_most[n: Int](cap: Int) -> Int:
 # `log2(BK_BYTES//16)` row bits sitting at flat-bit `log2(BK_BYTES)` and XOR
 # them down into col's 16B-granule bits (base=4). yyy at base+shift => shift =
 # log2(BK_BYTES)-4 = log2(BK_BYTES//16) = bits. BK_BYTES is pow-2 (64/128/256).
-@always_inline
+@inline(.always)
 def a_lds_swizzle[BK_BYTES: Int]() -> Swizzle:
     """Builds the XOR-16 LDS swizzle for a row-major [BM, BK_BYTES] uint8 A tile.
 
@@ -385,7 +385,7 @@ struct BlockScaledMmaOp_PreB[
     var _a_scale_shift: UInt32
     var _b_scale_shift: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, warp_m_off: Int, warp_n_off: Int):
         comptime assert (
             Self.warp_tile[0] % Self.MMA_M == 0
@@ -430,11 +430,11 @@ struct BlockScaledMmaOp_PreB[
         self._a_scale_shift = UInt32(((warp_m_off >> 4) & 1) << 3)  # 0 or 8
         self._b_scale_shift = UInt32(((warp_n_off >> 4) & 1) << 3)
 
-    @always_inline
+    @inline(.always)
     def accum_tile(self) -> ref[self._c_reg] type_of(self._c_reg):
         return self._c_reg
 
-    @always_inline
+    @inline(.always)
     def load_a_frag_from_smem[
         mma_k_idx: Int
     ](self, a_smem_warp: TileTensor[.uint8, _, _, address_space=.SHARED, ...],):
@@ -501,7 +501,7 @@ struct BlockScaledMmaOp_PreB[
                         width=Self.FRAG_HALF_BYTES
                     ](off)
 
-    @always_inline
+    @inline(.always)
     def load_b_frag_preshuffled[
         B_N: Int,
         B_K_BYTES: Int,
@@ -609,7 +609,7 @@ struct BlockScaledMmaOp_PreB[
                         SIMD[.uint8, Self.FRAG_HALF_BYTES]
                     ](b_loader.load_fragment(n_log, k_byte_log))
 
-    @always_inline
+    @inline(.always)
     def load_a_scales_preshuffled[
         k_pair: Int, slot: Int = 0
     ](
@@ -650,7 +650,7 @@ struct BlockScaledMmaOp_PreB[
                 slot, m_pack_idx, k_pair
             ] = a_scale_loader.load_packed(mn_log, k_scale_idx)
 
-    @always_inline
+    @inline(.always)
     def load_b_scales_preshuffled[
         k_pair: Int, slot: Int = 0
     ](
@@ -687,7 +687,7 @@ struct BlockScaledMmaOp_PreB[
                 slot, n_pack_idx, k_pair
             ] = b_scale_loader.load_packed(mn_log, k_scale_idx)
 
-    @always_inline
+    @inline(.always)
     def stage_scale_group(
         mut self,
         a_scale_loader: PreshuffledScaleLoader[_, _],
@@ -724,7 +724,7 @@ struct BlockScaledMmaOp_PreB[
                 b_scale_loader.load_group[G](warp_n_off + q * 32, k_pair_base)
             )
 
-    @always_inline
+    @inline(.always)
     def publish_scale_group(
         self,
         scale_smem: TileTensor[
@@ -756,7 +756,7 @@ struct BlockScaledMmaOp_PreB[
                 rebind[SIMD[.uint8, G * 4]](group_v[p, 0]),
             )
 
-    @always_inline
+    @inline(.always)
     def read_scale_group[
         phase: Int, slot: Int = 0
     ](
@@ -800,7 +800,7 @@ struct BlockScaledMmaOp_PreB[
                 )
             )[0]
 
-    @always_inline
+    @inline(.always)
     def mma[mma_k_idx: Int, slot: Int = 0, scale_slot: Int = 0](self):
         """Block-scaled MFMA at MFMA-K position `mma_k_idx` using B from `slot`.
 
@@ -1199,7 +1199,7 @@ struct BlockScaledMatmulAMD_PreB[
 
         var k_counter = 0
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_a_tile_from_dram[reg_slot: Int = 0]():
             # Register-bounce load into landing-ring slot `reg_slot` (no-op in dram_to_lds mode).
@@ -1217,14 +1217,14 @@ struct BlockScaledMatmulAMD_PreB[
                     )
                 k_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def a_smem_slot(
             slot: Int,
         ) -> type_of(a_smem.tile[Self.BM, Self.A_SMEM_ROW_BYTES](0, 0)):
             return a_smem.tile[Self.BM, Self.A_SMEM_ROW_BYTES](slot, 0)
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_a_tile_to_smem[reg_slot: Int = 0](slot: Int):
             comptime if Self.dram_to_lds:
@@ -1285,7 +1285,7 @@ struct BlockScaledMatmulAMD_PreB[
                             ),
                         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_scales_for_iter[slot: Int = 0](k_pair_base: Int):
             """Issues all A+B preshuffled scale-dword loads for one outer-K iter.
@@ -1306,21 +1306,21 @@ struct BlockScaledMatmulAMD_PreB[
                     k_pair_base + k_pair,
                 )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def s_setprio[priority: Int16]():
             # Raise wave priority during MFMA clusters so the matrix unit
             # isn't preempted by memory-issuing waves; lower it for loads.
             llvm_intrinsic["llvm.amdgcn.s.setprio", NoneType](priority)
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _sched_barrier_zero():
             # Hard reorder fence: pins surrounding instrs to source order so the
             # scheduler can't hoist the interleaved B loads back into one block.
             llvm_intrinsic["llvm.amdgcn.sched.barrier", NoneType](Int32(0))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _s_barrier_raw():
             # Bare s_barrier (no vmcnt/lgkmcnt release) so in-flight B DMAs
@@ -1331,7 +1331,7 @@ struct BlockScaledMatmulAMD_PreB[
         # the epilogue can bracket each with s_setprio[1]/[0].
         comptime n_clusters = ceildiv(Self.num_k_mmas, Self.mfma_cluster)
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_chain_plain[
             b_slot: Int, a_slot: Int = b_slot, scale_slot: Int = 0
@@ -1347,7 +1347,7 @@ struct BlockScaledMatmulAMD_PreB[
                 mma_op.mma[k, slot=b_slot, scale_slot=scale_slot]()
             s_setprio[0]()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_chain_epilogue[slot: Int]():
             # Last resident tile, no B prefetch left to overlap.

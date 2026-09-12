@@ -69,7 +69,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -187,7 +187,7 @@ struct Order(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.COL:
             writer.write_string("COL")
@@ -412,7 +412,7 @@ struct ClusterShape(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SHAPE_AUTO:
             writer.write_string("SHAPE_AUTO")
@@ -667,7 +667,7 @@ struct MatmulAlgorithmCapability(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SPLITK_SUPPORT:
             writer.write_string("SPLITK_SUPPORT")
@@ -759,7 +759,7 @@ struct PointerMode(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.HOST:
             writer.write_string("HOST")
@@ -917,7 +917,7 @@ struct Search(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.BEST_FIT:
             writer.write_string("BEST_FIT")
@@ -978,7 +978,7 @@ struct ReductionScheme(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.NONE:
             writer.write_string("NONE")
@@ -1409,7 +1409,7 @@ struct cublasLtMatmulDescAttributes_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.CUBLASLT_MATMUL_DESC_COMPUTE_TYPE:
             writer.write_string("CUBLASLT_MATMUL_DESC_COMPUTE_TYPE")
@@ -1834,7 +1834,7 @@ struct Preference(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SEARCH_MODE:
             writer.write_string("SEARCH_MODE")
@@ -1948,7 +1948,7 @@ struct AlgorithmConfig(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.ID:
             writer.write_string("ID")
@@ -2076,7 +2076,7 @@ struct InnerShape(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.UNDEFINED:
             writer.write_string("UNDEFINED")
@@ -2141,7 +2141,7 @@ struct cublasLtMatmulMatrixScale_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.MATRIX_SCALE_SCALAR_32F:
             writer.write_string("MATRIX_SCALE_SCALAR_32F")
@@ -2188,7 +2188,7 @@ struct cublasLtBatchMode_t(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.STRIDED:
             writer.write_string("BATCH_MODE_STRIDED")
@@ -2284,7 +2284,7 @@ struct LayoutAttribute(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.TYPE:
             writer.write_string("TYPE")
@@ -2475,7 +2475,7 @@ struct Stages(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.STAGES_UNDEFINED:
             writer.write_string("STAGES_UNDEFINED")
@@ -2777,7 +2777,7 @@ struct Epilogue(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.DEFAULT:
             writer.write_string("DEFAULT")
@@ -3574,7 +3574,7 @@ struct Tile(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.TILE_UNDEFINED:
             writer.write_string("TILE_UNDEFINED")
@@ -3933,7 +3933,7 @@ struct TransformDescriptor(TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SCALE_TYPE:
             writer.write_string("SCALE_TYPE")

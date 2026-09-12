@@ -24,7 +24,7 @@ from std.benchmark import Bench, BenchConfig, Bencher, BenchId
 # Benchmarks
 # ===-----------------------------------------------------------------------===#
 def bench_writer_int[n: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var s1 = String()
         s1.write(n)
@@ -34,7 +34,7 @@ def bench_writer_int[n: Int](mut b: Bencher) raises:
 
 
 def bench_writer_simd[n: Int](mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var s1 = String()
         s1.write(SIMD[.int32, simd_width_of[DType.int32]()](n))

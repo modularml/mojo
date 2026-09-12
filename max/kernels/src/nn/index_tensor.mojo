@@ -26,7 +26,7 @@ from max.runtime.asyncrt import parallelism_level
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def index_tensor_shape[
     output_rank: Int,
     input_type: DType,
@@ -382,7 +382,7 @@ def _index_tensor_impl[
 # ===-----------------------------------------------------------------------===#
 # Advanced Indexing
 # ===-----------------------------------------------------------------------===#
-@always_inline
+@inline(.always)
 def _advanced_indexing_use_simd[
     start_axis: Int, num_index_tensors: Int, input_rank: Int
 ](read_strides: IndexList, write_strides: IndexList) -> Bool:
@@ -412,7 +412,7 @@ def _advanced_indexing_use_simd[
     return inner_dim_not_indexed and read_contiguous and write_contiguous
 
 
-@always_inline
+@inline(.always)
 def advanced_indexing_getitem[
     input_rank: Int,
     index_rank: Int,
@@ -493,7 +493,7 @@ def advanced_indexing_getitem[
         out_tensor.rank == input_rank + index_rank - num_index_tensors
     )
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int,
         alignment: Int = 1,
@@ -554,7 +554,7 @@ def advanced_indexing_getitem[
         ](elementwise_fn_wrapper, out_tensor.layout.shape_coord(), ctx)
 
 
-@always_inline
+@inline(.always)
 def advanced_indexing_getitem_shape[
     input_rank: Int,
     index_rank: Int,
@@ -593,7 +593,7 @@ def advanced_indexing_getitem_shape[
     return answer
 
 
-@always_inline
+@inline(.always)
 def advanced_indexing_setitem_inplace[
     index_rank: Int,
     updates_rank: Int,
@@ -711,7 +711,7 @@ def advanced_indexing_setitem_inplace[
         else:
             iteration_shape[i] = index_tensor_shape[i - start_axis]
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int, alignment: Int = 1
     ](iteration_indices: Coord) {var}:

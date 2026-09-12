@@ -85,7 +85,7 @@ from nn.attention.mha_operand import MHAOperand
 comptime NEG_INF = Float32(-3.0e38)
 
 
-@always_inline
+@inline(.always)
 def _threadgroup_barrier_mem_none():
     """Threadgroup execution barrier with no memory fence.
 
@@ -100,7 +100,7 @@ def _threadgroup_barrier_mem_none():
     llvm_intrinsic["llvm.air.wg.barrier", NoneType](Int32(0), Int32(1))
 
 
-@always_inline
+@inline(.always)
 def _prevent_inst_reorder[warp_scope: Bool = False](opaque_len: Int):
     """Never-executing scheduler fence -- no runtime cost, no kernel arg.
 
@@ -150,7 +150,7 @@ comptime MMA_DIM = 16
 comptime _SOFTMAX_FRAG_ROWS = 2  # M5 lane owns rows {rb, rb+8} of each 16x16 subtile
 
 
-@always_inline
+@inline(.always)
 def _softmax_seed_sink(
     mut sm_m: Array[Float32, _SOFTMAX_FRAG_ROWS],
     mut sm_l: Array[Float32, _SOFTMAX_FRAG_ROWS],
@@ -170,7 +170,7 @@ def _softmax_seed_sink(
     sm_l[1] = Float32(1)
 
 
-@always_inline
+@inline(.always)
 def _softmax_row_max[
     num_n_mmas: Int
 ](
@@ -197,7 +197,7 @@ def _softmax_row_max[
     return r^
 
 
-@always_inline
+@inline(.always)
 def _softmax_update[
     num_n_mmas: Int, out_num_n_mmas: Int
 ](
@@ -265,7 +265,7 @@ def _softmax_update[
         output[ni] = o_lo.join(o_hi)
 
 
-@always_inline
+@inline(.always)
 def _softmax_normalize[
     out_num_n_mmas: Int
 ](

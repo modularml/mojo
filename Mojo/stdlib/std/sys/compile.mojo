@@ -20,7 +20,7 @@ from std.collections.string.string_span import _get_kgen_string
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def codegen_unreachable[cond: Bool, msg: StaticString, *extra: StaticString]():
     """Compilation fails if cond is True and the caller of the function
     is being generated as runtime code.
@@ -64,7 +64,7 @@ struct _OptimizationLevel(ImplicitlyCopyable, Intable, Writable):
         """
         return Self.level
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the optimization level to a writer."""
         writer.write(Self.level)
@@ -91,7 +91,7 @@ struct _DebugLevel(ImplicitlyCopyable, Writable):
 
     comptime level = get_defined_string["__DEBUG_LEVEL", "none"]()
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the optimization level to a writer."""
         writer.write(Self.level)

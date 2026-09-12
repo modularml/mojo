@@ -72,7 +72,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
     comptime quantization_enabled: Bool = False
     comptime quantization_granularity: Int
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -87,7 +87,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         ...
 
     # TODO: change this to return a LayoutTensor once MOCO-1471 is fixed
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int,
     ](
@@ -99,7 +99,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
     ) -> UnsafePointer[Scalar[Self.dtype], ImmutAnyOrigin]:
         ...
 
-    @always_inline
+    @inline(.always)
     def block_paged_tile[
         layout_t: TensorLayout,
         //,
@@ -137,7 +137,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
             layout_val,
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -147,7 +147,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
     ) -> UnsafePointer[Scalar[Self.scale_dtype], ImmutAnyOrigin]:
         ...
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -159,17 +159,17 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
     ) -> SIMD[Self.scale_dtype, width]:
         ...
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         """Returns the length of the cache for a given batch index."""
         ...
 
-    @always_inline
+    @inline(.always)
     def max_context_length(self) -> UInt32:
         """Returns the maximum cache length in a given batch index."""
         ...
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in the KV memory view.
 
@@ -178,12 +178,12 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         ...
 
-    @always_inline
+    @inline(.always)
     def populate[
         BN: Int,
         base_alignment: Int,
@@ -219,7 +219,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
             batch_idx, base_kv_row, _row
         )
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -230,7 +230,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -260,7 +260,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         P@V MMA consumer descriptor."""
         ...
 
-    @always_inline
+    @inline(.always)
     def create_scale_tma_tile[
         BMN: Int
     ](self, ctx: DeviceContext) raises -> TMATensorTile[
@@ -274,7 +274,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         need to mask any extra rows."""
         ...
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](self, ctx: DeviceContext) raises -> TMATensorTile[
@@ -297,7 +297,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
             " that ADDRESSES scales"
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -313,7 +313,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         tile_width: Int,
         tile_stride: Int = tile_width,
@@ -367,7 +367,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         tile_width: Int,
         padded_depth: Int,
@@ -410,7 +410,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Float32, MutAnyOrigin]:
@@ -456,7 +456,7 @@ struct KVCacheMHAOperand[
     def __init__(out self, cache: Self.cache_t):
         self.cache = cache
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -470,7 +470,7 @@ struct KVCacheMHAOperand[
             Int(batch_idx), Int(start_tok_idx), Int(head_idx), Int(head_dim_idx)
         )
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -495,7 +495,7 @@ struct KVCacheMHAOperand[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -507,7 +507,7 @@ struct KVCacheMHAOperand[
             batch_idx, start_tok_idx, head_idx, head_dim_idx
         )
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -521,20 +521,20 @@ struct KVCacheMHAOperand[
             batch_idx, head_idx, start_tok_idx, head_dim_idx
         )
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         return self.cache.cache_length(batch_idx)
 
-    @always_inline
+    @inline(.always)
     def max_context_length(self) -> UInt32:
         return self.cache.max_context_length()
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in the KV memory view."""
         return self.cache.num_kv_rows()
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix.
 
@@ -544,7 +544,7 @@ struct KVCacheMHAOperand[
         """
         return self.cache.row_idx(batch_idx, start_tok_idx)
 
-    @always_inline
+    @inline(.always)
     def populate[
         BN: Int,
         base_alignment: Int,
@@ -577,7 +577,7 @@ struct KVCacheMHAOperand[
             batch_idx, base_kv_row
         )
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -587,7 +587,7 @@ struct KVCacheMHAOperand[
         """
         return self.cache.get_tma_row(encoded_index)
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -638,7 +638,7 @@ struct KVCacheMHAOperand[
             ](ctx)
         )
 
-    @always_inline
+    @inline(.always)
     def create_scale_tma_tile[
         BMN: Int
     ](
@@ -663,7 +663,7 @@ struct KVCacheMHAOperand[
         """
         comptime assert False, "create_scale_tma_tile is not implemented"
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -695,7 +695,7 @@ struct KVCacheMHAOperand[
             swizzle_mode, BN=BN, BK=BK, padded_depth=padded_depth
         ](ctx)
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         tile_width: Int,
         tile_stride: Int = tile_width,
@@ -750,7 +750,7 @@ struct KVCacheMHAOperand[
             ](ctx)
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         tile_width: Int,
         padded_depth: Int,
@@ -803,7 +803,7 @@ struct KVCacheMHAOperand[
             ](ctx)
         )
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Float32, MutAnyOrigin]:
@@ -849,7 +849,7 @@ struct KVCacheScalesMHAOperand[
     def __init__(out self, cache: Self.cache_t):
         self.cache = cache
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -864,7 +864,7 @@ struct KVCacheScalesMHAOperand[
             Int(batch_idx), Int(start_tok_idx), Int(head_idx), Int(head_dim_idx)
         )
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -889,7 +889,7 @@ struct KVCacheScalesMHAOperand[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -903,7 +903,7 @@ struct KVCacheScalesMHAOperand[
             Scalar[Self.scale_dtype], ImmutAnyOrigin
         ].unsafe_dangling()
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -915,20 +915,20 @@ struct KVCacheScalesMHAOperand[
     ) -> SIMD[Self.scale_dtype, width]:
         return SIMD[Self.scale_dtype, width](0)
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         return self.cache.cache_length(batch_idx)
 
-    @always_inline
+    @inline(.always)
     def max_context_length(self) -> UInt32:
         return self.cache.max_context_length()
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in the KV memory view."""
         return self.cache.num_kv_rows()
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx in the SCALE pool -- what this operand addresses.
 
@@ -939,12 +939,12 @@ struct KVCacheScalesMHAOperand[
         """
         return self.cache.scale_row_idx(batch_idx, start_tok_idx)
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row."""
         return self.cache.get_tma_row(encoded_index)
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -965,7 +965,7 @@ struct KVCacheScalesMHAOperand[
         """TMA not supported for KVCacheScalesMHAOperand."""
         comptime assert False, "TMA not supported for KVCacheScalesMHAOperand"
 
-    @always_inline
+    @inline(.always)
     def create_scale_tma_tile[
         BMN: Int
     ](
@@ -980,7 +980,7 @@ struct KVCacheScalesMHAOperand[
     ) raises:
         comptime assert False, "create_scale_tma_tile is not implemented"
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](
@@ -1001,7 +1001,7 @@ struct KVCacheScalesMHAOperand[
         """
         return self.cache.create_index_scale_tma_tile[TILE](ctx)
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1022,7 +1022,7 @@ struct KVCacheScalesMHAOperand[
             False
         ), "create_rope_tma_tile is not supported for KVCacheScalesMHAOperand"
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         tile_width: Int,
         tile_stride: Int = tile_width,
@@ -1070,7 +1070,7 @@ struct KVCacheScalesMHAOperand[
             " KVCacheScalesMHAOperand"
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         tile_width: Int,
         padded_depth: Int,
@@ -1099,7 +1099,7 @@ struct KVCacheScalesMHAOperand[
             " KVCacheScalesMHAOperand"
         )
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Float32, MutAnyOrigin]:
@@ -1110,7 +1110,7 @@ struct KVCacheScalesMHAOperand[
         return UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling()
 
 
-@always_inline
+@inline(.always)
 def _null_scale_tile_tensor[
     scale_dtype: DType,
     scale_layout: TensorLayout,
@@ -1229,7 +1229,7 @@ struct LayoutTensorMHAOperand[
         self.buffer = buffer
         self.scale_buffer = scale_buffer
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -1251,7 +1251,7 @@ struct LayoutTensorMHAOperand[
         )
         return ret_ptr.as_imm().as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -1286,7 +1286,7 @@ struct LayoutTensorMHAOperand[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -1306,7 +1306,7 @@ struct LayoutTensorMHAOperand[
         )
         return ret_ptr.as_imm().as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -1325,27 +1325,27 @@ struct LayoutTensorMHAOperand[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         # Contiguous tensor path assumes BSHD layout and all cache entries have
         # the same length.
         return Int(self.buffer.dim[1]())
 
-    @always_inline
+    @inline(.always)
     def max_context_length(self) -> UInt32:
         return UInt32(Int(self.buffer.dim[1]()))
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows (batch * seq_len)."""
         return Int(self.buffer.dim[0]()) * Int(self.buffer.dim[1]())
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         return batch_idx * UInt32(Int(self.buffer.dim[1]())) + start_tok_idx
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -1353,7 +1353,7 @@ struct LayoutTensorMHAOperand[
         """
         return encoded_index
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1393,7 +1393,7 @@ struct LayoutTensorMHAOperand[
             Int(self.buffer.dim[2]()),
         )
 
-    @always_inline
+    @inline(.always)
     def create_scale_tma_tile[
         BMN: Int
     ](
@@ -1424,7 +1424,7 @@ struct LayoutTensorMHAOperand[
             __desc_shape=Index(1, BMN),
         ](ctx, scale_tensor)
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1458,7 +1458,7 @@ struct LayoutTensorMHAOperand[
             False
         ), "create_rope_tma_tile is not supported for LayoutTensorMHAOperand"
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         tile_width: Int,
         tile_stride: Int = tile_width,
@@ -1514,7 +1514,7 @@ struct LayoutTensorMHAOperand[
             l2_promotion=l2_promotion,
         ](ctx, self.buffer.ptr.bitcast[Scalar[tma_dtype]](), rows)
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         tile_width: Int,
         padded_depth: Int,
@@ -1560,7 +1560,7 @@ struct LayoutTensorMHAOperand[
             " LayoutTensorMHAOperand"
         )
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Float32, MutAnyOrigin]:
@@ -1659,7 +1659,7 @@ struct RaggedMHAOperand[
         self.cache_row_offsets = cache_row_offsets
         self.scale_buffer = scale_buffer
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -1683,7 +1683,7 @@ struct RaggedMHAOperand[
         )
         return ret_ptr.as_imm().as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -1720,7 +1720,7 @@ struct RaggedMHAOperand[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -1734,7 +1734,7 @@ struct RaggedMHAOperand[
             Scalar[Self.scale_dtype], ImmutAnyOrigin
         ].unsafe_dangling()
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -1746,30 +1746,30 @@ struct RaggedMHAOperand[
     ) -> SIMD[Self.scale_dtype, width]:
         return SIMD[Self.scale_dtype, width](0)
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         return Int(
             self.cache_row_offsets[batch_idx + 1]
             - self.cache_row_offsets[batch_idx]
         )
 
-    @always_inline
+    @inline(.always)
     def max_context_length(self) -> UInt32:
         comptime assert (
             False
         ), "For RaggedMHAOperand, max_context_length is not implemented."
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of tokens in the ragged buffer."""
         return Int(self.buffer.dim[0]())
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         return self.cache_row_offsets[Int(batch_idx)][0] + start_tok_idx
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -1777,7 +1777,7 @@ struct RaggedMHAOperand[
         """
         return encoded_index
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1817,7 +1817,7 @@ struct RaggedMHAOperand[
             Int(self.buffer.dim[1]()),
         )
 
-    @always_inline
+    @inline(.always)
     def create_scale_tma_tile[
         BMN: Int
     ](
@@ -1872,7 +1872,7 @@ struct RaggedMHAOperand[
                 " tensor."
             )
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](
@@ -1908,7 +1908,7 @@ struct RaggedMHAOperand[
             Self.dtype, flat_scale_window[Self.dtype, TILE]()
         ](ctx, self.buffer.ptr, total_elements)
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1929,7 +1929,7 @@ struct RaggedMHAOperand[
             False
         ), "create_rope_tma_tile is not supported for RaggedMHAOperand"
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         tile_width: Int,
         tile_stride: Int = tile_width,
@@ -1965,7 +1965,7 @@ struct RaggedMHAOperand[
             l2_promotion=l2_promotion,
         ](ctx, self.buffer.ptr.bitcast[Scalar[tma_dtype]](), rows)
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         tile_width: Int,
         padded_depth: Int,
@@ -1993,7 +1993,7 @@ struct RaggedMHAOperand[
             False
         ), "create_rope_gather4_tma_tile is not supported for RaggedMHAOperand"
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Float32, MutAnyOrigin]:

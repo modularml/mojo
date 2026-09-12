@@ -38,12 +38,12 @@ def test_sync_parallelize() raises:
 
     var chunk_size = ceildiv(len(vector), num_work_items)
 
-    @always_inline
+    @inline(.always)
     def parallel_fn(thread_id: Int) {var vector, var chunk_size}:
         var start = thread_id * chunk_size
         var end = min(start + chunk_size, len(vector))
 
-        @always_inline
+        @inline(.always)
         def add_two(idx: Int) {var}:
             vector[start + idx] = vector[start + idx] + 2
 
@@ -66,12 +66,12 @@ def test_parallelize() raises:
 
     var chunk_size = ceildiv(len(vector), num_work_items)
 
-    @always_inline
+    @inline(.always)
     def parallel_fn(thread_id: Int) {var vector, var chunk_size}:
         var start = thread_id * chunk_size
         var end = min(start + chunk_size, len(vector))
 
-        @always_inline
+        @inline(.always)
         def add_two(idx: Int) {var}:
             vector[start + idx] = vector[start + idx] + 2
 
@@ -118,7 +118,7 @@ def test_parallelize_unified() raises:
 
     var chunk_size = ceildiv(len(vector), num_work_items)
 
-    @always_inline
+    @inline(.always)
     def parallel_fn(
         thread_id: Int,
     ) {imm vector, imm chunk_size,}:
@@ -145,7 +145,7 @@ def test_sync_parallelize_unified() raises:
 
     var chunk_size = ceildiv(len(vector), num_work_items)
 
-    @always_inline
+    @inline(.always)
     def add_two_parallel(
         thread_id: Int,
     ) {imm vector, imm chunk_size,}:
@@ -164,7 +164,7 @@ def test_sync_parallelize_unified() raises:
 def test_sync_parallelize_unified_single_item() raises:
     var result = 0
 
-    @always_inline
+    @inline(.always)
     def set_result(
         i: Int,
     ) {mut result,}:
@@ -178,7 +178,7 @@ def test_sync_parallelize_unified_single_item() raises:
 def test_sync_parallelize_unified_zero_items() raises:
     var called = False
 
-    @always_inline
+    @inline(.always)
     def should_not_run(
         i: Int,
     ) {mut called,}:

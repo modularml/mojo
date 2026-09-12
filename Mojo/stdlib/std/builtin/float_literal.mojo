@@ -151,7 +151,7 @@ struct FloatLiteral[value: __mlir_type.`!pop.float_literal`](
         """
         return self.__int_literal__().__int__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __float__(self) -> Float64:
         """Converts the FloatLiteral to a concrete Float64.
 
@@ -160,7 +160,7 @@ struct FloatLiteral[value: __mlir_type.`!pop.float_literal`](
         """
         return Float64(self)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the FloatLiteral in string form.
 
@@ -169,7 +169,7 @@ struct FloatLiteral[value: __mlir_type.`!pop.float_literal`](
         """
         Float64(self).write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the FloatLiteral in repr form.
 

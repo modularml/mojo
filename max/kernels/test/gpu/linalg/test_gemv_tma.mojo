@@ -367,7 +367,7 @@ def test_gemv_tma[
         comptime num_runs = 50
         comptime num_warmup = 10
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {imm}:
             gemv_tma(
                 c_device,

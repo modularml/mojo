@@ -148,7 +148,7 @@ def len(value: StringSlice) -> Int:
     ...
 
 
-@always_inline
+@inline(.always)
 def len[T: Sized](value: T) -> Int:
     """Get the length of a value.
 
@@ -164,7 +164,7 @@ def len[T: Sized](value: T) -> Int:
     return value.__len__()
 
 
-@always_inline
+@inline(.always)
 def len[T: SizedRaising](value: T) raises -> Int:
     """Get the length of a value.
 

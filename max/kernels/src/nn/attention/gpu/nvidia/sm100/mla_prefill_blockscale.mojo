@@ -104,7 +104,7 @@ struct WarpRole(Equatable, TrivialRegisterPassable):
     comptime CVTToBF16 = Self(5)
     comptime Empty = Self(6)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self == Self(Int32(other))
 
@@ -504,7 +504,7 @@ __extension SM100MLA:
             warpgroup_reg_dealloc[num_reg_empty]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         mut tma_to_cvt_pipeline: TMAtoCvtPipeline,
         score_row: UInt32,
@@ -654,7 +654,7 @@ __extension SM100MLA:
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _k_num_valid_pages(current_kv_row: UInt32) -> UInt32:
             """Valid K_nope/V sub-tile pages at `current_kv_row`."""
             if current_kv_row >= num_keys:
@@ -665,7 +665,7 @@ __extension SM100MLA:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _rope_num_valid_pages(current_kv_row: UInt32) -> UInt32:
             """Valid K_rope sub-tile pages at `current_kv_row`."""
             if current_kv_row >= num_keys:
@@ -700,7 +700,7 @@ __extension SM100MLA:
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _produce_k_rope[
             partial: Bool,
         ](
@@ -771,7 +771,7 @@ __extension SM100MLA:
                 )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _produce_v[
             partial: Bool,
         ](
@@ -826,7 +826,7 @@ __extension SM100MLA:
             kv_pipeline.state._phase = 1  # producer starts at phase 1
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _fused_rope_smem_ptr() -> (
                 SharedMemPointer[Scalar[Self.KRopeType.dtype]]
             ):
@@ -845,7 +845,7 @@ __extension SM100MLA:
                 ).bitcast[Scalar[Self.KRopeType.dtype]]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _produce_k_fused[
                 partial: Bool,
                 with_q: Bool = False,
@@ -899,7 +899,7 @@ __extension SM100MLA:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _fused_v_smem_ptr() -> (
                 SharedMemPointer[Scalar[Self.KVLUTType.dtype]]
             ):
@@ -1067,7 +1067,7 @@ __extension SM100MLA:
             var k0_mbar = k_pipeline.producer_mbar[qk_stage=0]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _produce_k_split[
                 partial: Bool,
                 with_q: Bool = False,
@@ -1139,7 +1139,7 @@ __extension SM100MLA:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _split_v_smem_ptr(
                 pair: type_of(pipeline_v.get_tile[qk_stage=0]()),
             ) -> SharedMemPointer[Scalar[Self.KVLUTType.dtype]]:
@@ -1282,7 +1282,7 @@ __extension SM100MLA:
                         pipeline_v.commit_step()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def convert_fp8_to_bf16(
         mut iter_count: UInt32,
         mut tma_to_cvt_pipeline: TMAtoCvtPipeline,
@@ -1380,7 +1380,7 @@ __extension SM100MLA:
             kv_start_tok += UInt32(Self.BN)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma(
         tmem_addr: UInt32,
         mut cvt_to_mma_pipeline: CvtToMMAPipeline,
@@ -1699,7 +1699,7 @@ __extension SM100MLA:
             pipeline_o1.commit_mma(e)
 
 
-@always_inline
+@inline(.always)
 def mla_sm100_prefill_blockscale[
     output_dtype: DType,
     q_type: DType,
@@ -1899,7 +1899,7 @@ def mla_sm100_prefill_blockscale[
     )
 
 
-@always_inline
+@inline(.always)
 def _mla_prefill_sm100_valid_length_dispatch[
     KVType: MHAOperand,
     output_dtype: DType,

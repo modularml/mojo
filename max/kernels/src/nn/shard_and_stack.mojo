@@ -136,7 +136,7 @@ def _shard_and_stack_multi_device[
     # Total elements per input in output
     var output_elements_per_input = outer_dims * segment_elements
 
-    @no_inline
+    @inline(.never)
     def transfer(tp_index: Int) raises {imm}:
         # Device context for this output (index 0 is CPU, so +1)
         var gpu_ctx = dev_ctxs_input[tp_index + 1]
@@ -216,7 +216,7 @@ def _shard_and_stack_single_device[
     # Total elements per input in output
     var output_elements_per_input = outer_dims * segment_elements
 
-    @no_inline
+    @inline(.never)
     def process_task(input_idx: Int) {imm}:
         var input_tensor = dyn_inputs[input_idx]
 

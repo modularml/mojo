@@ -26,7 +26,7 @@ from layout import (
 )
 
 
-@always_inline
+@inline(.always)
 def shrink_qkv_permute_3mn_sm100(
     c_lora: TileTensor[mut=True, address_space=.GENERIC, ...],
     a: TileTensor[mut=False, address_space=.GENERIC, ...],
@@ -95,7 +95,7 @@ def shrink_qkv_permute_3mn_sm100(
         row_major(Coord(M, N_Total)),
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lora, M)
     @__parameter
     def permute_dim_lora_bmn[
@@ -174,7 +174,7 @@ def shrink_qkv_permute_3mn_sm100(
 # specialize loading and storing only, no new kernel.
 
 
-@always_inline
+@inline(.always)
 def expand_qkv_sm100(
     q_out: TileTensor[mut=True, address_space=.GENERIC, ...],
     kv_out: TileTensor[mut=True, address_space=.GENERIC, ...],
@@ -309,7 +309,7 @@ def expand_qkv_sm100(
     # count (M).
     comptime a_plane_splits = Index(q_dim, q_dim + kv_dim)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(q_tensor, kv_tensor, M)
     @__parameter
     def route_qkv[

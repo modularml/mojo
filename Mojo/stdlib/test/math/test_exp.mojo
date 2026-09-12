@@ -50,7 +50,7 @@ def test_exp_float64() raises:
     assert_equal(String(exp(Float64(108.5230))), String(1.3518859659123633e47))
 
 
-@always_inline
+@inline(.always)
 def exp_libm[
     dtype: DType, simd_width: SIMDLength
 ](arg: SIMD[dtype, simd_width]) raises -> SIMD[dtype, simd_width]:

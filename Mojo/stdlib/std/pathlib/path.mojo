@@ -74,7 +74,7 @@ def cwd() raises -> Path:
     return String(unsafe_from_utf8_ptr=ptr)
 
 
-@always_inline
+@inline(.always)
 def _dir_of_current_file() raises -> Path:
     """Gets the directory the file is at.
 
@@ -84,7 +84,7 @@ def _dir_of_current_file() raises -> Path:
     return _dir_of_current_file_impl(call_location().file_name())
 
 
-@no_inline
+@inline(.never)
 def _dir_of_current_file_impl(file_name: StaticString) raises -> Path:
     var i = String(file_name).rfind(DIR_SEPARATOR)
     return Path(file_name[byte=0:i])
@@ -175,7 +175,7 @@ struct Path(
             self.path += DIR_SEPARATOR
             self.path += suffix
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         """Checks if the path is not empty.
 
@@ -194,7 +194,7 @@ struct Path(
 
         writer.write(self.path)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the repr of this `Path` to a writer.
 
@@ -205,7 +205,7 @@ struct Path(
         """
         fmt.FormatStruct(writer, "Path").fields(fmt.Repr(self.path))
 
-    @always_inline
+    @inline(.always)
     def __fspath__(self) -> String:
         """Returns a string representation of the path.
 
@@ -236,7 +236,7 @@ struct Path(
         """
         return StringSlice(self.path) == other
 
-    @always_inline
+    @inline(.always)
     def __lt__(self, other: Self) -> Bool:
         """Returns True if this path is less than the other path.
 
@@ -282,7 +282,7 @@ struct Path(
         """
         return std.os.lstat(self)
 
-    @always_inline
+    @inline(.always)
     def exists(self) -> Bool:
         """Returns True if the path exists and False otherwise.
 

@@ -394,7 +394,7 @@ struct TileLoaderLDSIm2col[
             " — tile_rows must be >= 1."
         )
 
-    @always_inline
+    @inline(.always)
     def __init__[
         InLayout: TensorLayout,
         InEngine: TensorEngine,
@@ -591,7 +591,7 @@ struct TileLoaderLDSIm2col[
         self.rt_d_out = 0
         self.rt_spatial_dhw = 0
 
-    @always_inline
+    @inline(.always)
     def __init__[
         InLayout: TensorLayout,
         InEngine: TensorEngine,
@@ -711,7 +711,7 @@ struct TileLoaderLDSIm2col[
         self.rt_d_out = 0
         self.rt_spatial_dhw = 0
 
-    @always_inline
+    @inline(.always)
     def __init__[
         InLayout: TensorLayout,
         InEngine: TensorEngine,
@@ -834,7 +834,7 @@ struct TileLoaderLDSIm2col[
         self.rt_d_out = runtime_d_out
         self.rt_spatial_dhw = runtime_d_out * runtime_h_out * runtime_w_out
 
-    @always_inline
+    @inline(.always)
     def load_tile(
         self,
         dst: SMemTile[Self.dtype, _, _, ...],

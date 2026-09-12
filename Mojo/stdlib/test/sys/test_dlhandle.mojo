@@ -343,7 +343,7 @@ def test_owned_dlhandle_automatic_cleanup() raises:
     # This test primarily verifies that the code compiles and runs
     # without crashes. The actual cleanup happens automatically.
 
-    @always_inline
+    @inline(.always)
     def create_and_destroy_handle():
         try:
             var lib = OwnedDLHandle("libc.so.6")

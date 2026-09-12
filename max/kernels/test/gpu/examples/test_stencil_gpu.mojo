@@ -101,7 +101,7 @@ def test_stencil_avg_pool(ctx: DeviceContext) raises:
     def dilation_fn_gpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_gpu[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var d_input,} -> SIMD[dtype, simd_width]:
@@ -123,7 +123,7 @@ def test_stencil_avg_pool(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_gpu[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -173,7 +173,7 @@ def test_stencil_avg_pool(ctx: DeviceContext) raises:
     def dilation_fn_cpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_ref[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var h_input,} -> SIMD[dtype, simd_width]:
@@ -195,7 +195,7 @@ def test_stencil_avg_pool(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_ref[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -297,7 +297,7 @@ def test_stencil_avg_pool_padded(ctx: DeviceContext) raises:
     def dilation_fn_gpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_gpu[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var d_input,} -> SIMD[dtype, simd_width]:
@@ -319,7 +319,7 @@ def test_stencil_avg_pool_padded(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_gpu[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -371,7 +371,7 @@ def test_stencil_avg_pool_padded(ctx: DeviceContext) raises:
     def dilation_fn_cpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_ref[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var h_input,} -> SIMD[dtype, simd_width]:
@@ -393,7 +393,7 @@ def test_stencil_avg_pool_padded(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_ref[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -495,7 +495,7 @@ def test_stencil_avg_pool_stride_2(ctx: DeviceContext) raises:
     def dilation_fn_gpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_gpu[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var d_input,} -> SIMD[dtype, simd_width]:
@@ -517,7 +517,7 @@ def test_stencil_avg_pool_stride_2(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_gpu[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -570,7 +570,7 @@ def test_stencil_avg_pool_stride_2(ctx: DeviceContext) raises:
     def dilation_fn_cpu(dim: Int) {} -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def load_fn_ref[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var h_input,} -> SIMD[dtype, simd_width]:
@@ -592,7 +592,7 @@ def test_stencil_avg_pool_stride_2(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return val + result
 
-    @always_inline
+    @inline(.always)
     def avg_pool_compute_finalize_ref[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -701,7 +701,7 @@ def test_stencil_gpu_max_pool(ctx: DeviceContext) raises:
     def dilation_fn_gpu(dim: Int) {} -> Int:
         return dilation
 
-    @always_inline
+    @inline(.always)
     def load_fn_gpu[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var d_input,} -> SIMD[dtype, simd_width]:
@@ -723,7 +723,7 @@ def test_stencil_gpu_max_pool(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return max(val, result)
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_finalize_gpu[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {
@@ -775,7 +775,7 @@ def test_stencil_gpu_max_pool(ctx: DeviceContext) raises:
     def dilation_fn_cpu(dim: Int) {} -> Int:
         return dilation
 
-    @always_inline
+    @inline(.always)
     def load_fn_ref[
         simd_width: Int, dtype: DType
     ](point: IndexList[rank, ...]) {var h_input,} -> SIMD[dtype, simd_width]:
@@ -797,7 +797,7 @@ def test_stencil_gpu_max_pool(ctx: DeviceContext) raises:
     ) {} -> SIMD[dtype, simd_width]:
         return max(val, result)
 
-    @always_inline
+    @inline(.always)
     def max_pool_compute_finalize_ref[
         simd_width: SIMDLength
     ](point: IndexList[rank, ...], val: SIMD[dtype, simd_width]) {

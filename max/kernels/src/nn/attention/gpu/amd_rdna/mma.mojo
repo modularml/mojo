@@ -24,7 +24,7 @@ from layout import TileTensor
 from .buffers import RDNA_AB_FRAG_SIZE, RDNA_CD_FRAG_SIZE
 
 
-@always_inline
+@inline(.always)
 def rdna_mma(
     a_reg: TileTensor[_, _, address_space=.LOCAL, ...],
     b_reg: TileTensor[_, _, address_space=.LOCAL, ...],

@@ -66,7 +66,7 @@ from std.math import ceildiv
 from max.gpu import thread_idx
 
 
-@always_inline
+@inline(.always)
 def swizzle_granularity[dtype: DType, swizzle_mode: TensorMapSwizzle]() -> Int:
     """Returns the TMA swizzle granularity measured in elements of `dtype`.
 
@@ -84,7 +84,7 @@ def swizzle_granularity[dtype: DType, swizzle_mode: TensorMapSwizzle]() -> Int:
     return sg
 
 
-@always_inline
+@inline(.always)
 def scale_align_elems[dtype: DType]() -> Int:
     """Scales per 16-byte unit, and so the granularity a flat scale TMA may
     START a copy at.
@@ -103,7 +103,7 @@ def scale_align_elems[dtype: DType]() -> Int:
     return 16 // size_of[Scalar[dtype]]()
 
 
-@always_inline
+@inline(.always)
 def flat_scale_window[dtype: DType, TILE: Int]() -> Int:
     """Scales a flat scale TMA box STAGES for a `TILE`-key tile.
 
@@ -121,7 +121,7 @@ def flat_scale_window[dtype: DType, TILE: Int]() -> Int:
     return TILE + scale_align_elems[dtype]()
 
 
-@always_inline
+@inline(.always)
 def create_flat_scale_tma_tile[
     dtype: DType, BOX: Int
 ](
@@ -165,7 +165,7 @@ def create_flat_scale_tma_tile[
     ](ctx, scale_tensor)
 
 
-@always_inline
+@inline(.always)
 def padded_depth[
     dtype: DType, swizzle_mode: TensorMapSwizzle, depth: Int
 ]() -> Int:
@@ -188,7 +188,7 @@ def padded_depth[
     return padded_depth
 
 
-@always_inline
+@inline(.always)
 def _kv_cache_out_slot[
     drop_list: Tuple, kv_cache_rank: Int, flat_rank: Int, i: Int
 ]() -> Int:
@@ -215,7 +215,7 @@ def _kv_cache_out_slot[
     return kv_cache_rank - 1 - kept_outside
 
 
-@always_inline
+@inline(.always)
 def _compute_kv_cache_dynamic_shape_strides[
     dtype: DType, //, kv_cache_rank: Int, drop_list: Tuple
 ](blocks: TileTensor[dtype, ...], page_stride: Int = -1) -> Tuple[
@@ -289,7 +289,7 @@ def _compute_kv_cache_dynamic_shape_strides[
     return (kv_cache_shape, kv_cache_strides)
 
 
-@always_inline
+@inline(.always)
 def _make_cache_tt[
     dtype: DType,
     ResultLayout: TensorLayout,
@@ -412,7 +412,7 @@ def kv_num_sub_tiles(tile_BN: Int, page_size: Int) -> Int:
 comptime _SWIZZLE_ATOM_ROWS = 8
 
 
-@always_inline
+@inline(.always)
 def _kv_fold_base_ok(bk: Int, gran: Int, head_size: Int) -> Bool:
     """Shared SM100 depth-chunk-fold geometry gate.
 
@@ -429,7 +429,7 @@ def _kv_fold_base_ok(bk: Int, gran: Int, head_size: Int) -> Bool:
     return bk % gran == 0 and bk // gran >= 2 and head_size % bk == 0
 
 
-@always_inline
+@inline(.always)
 def kv_tma_fold_chunks[
     dtype: DType,
     swizzle_mode: TensorMapSwizzle,
@@ -558,11 +558,11 @@ struct PagedRowIndices[
 
     var rows: Array[UInt32, Self.num_pages]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.rows = Array[UInt32, Self.num_pages](uninitialized=True)
 
-    @always_inline
+    @inline(.always)
     def get_row(self, offset: UInt32) -> UInt32:
         """Physical row for an arbitrary offset within the BN range.
 
@@ -593,7 +593,7 @@ struct PagedRowIndices[
                 row = self.rows[i] if page == UInt32(i) else row
             return row + (offset % UInt32(Self.eff_page))
 
-    @always_inline
+    @inline(.always)
     def sub_rows[
         SubBN: Int
     ](self, offset: UInt32) -> PagedRowIndices[
@@ -638,7 +638,7 @@ struct PagedRowIndices[
             out.rows[p] = self.get_row(offset + UInt32(p * Sub.eff_page))
         return out^
 
-    @always_inline
+    @inline(.always)
     def _tma_copy_kv_impl[
         dtype: DType,
         tile_shape: IndexList[3],
@@ -988,7 +988,7 @@ struct PagedRowIndices[
                         elect,
                     )
 
-    @always_inline
+    @inline(.always)
     def tma_copy_v[
         dtype: DType,
         tile_shape: IndexList[3],
@@ -1150,7 +1150,7 @@ struct PagedRowIndices[
             depth_offset=depth_offset,
         )
 
-    @always_inline
+    @inline(.always)
     def tma_copy_k[
         dtype: DType,
         tile_shape: IndexList[3],
@@ -1282,7 +1282,7 @@ struct PagedRowIndices[
         )
 
 
-@always_inline
+@inline(.always)
 def _populate_via_row_idx[
     BN: Int,
     page_size: Int,
@@ -1322,7 +1322,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
     comptime quantization_enabled: Bool = False
     comptime quantization_granularity: Int = 1
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -1422,7 +1422,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         current request."""
         ...
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -1439,7 +1439,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -1450,7 +1450,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """Returns a pointer to the scales block at the requested indices."""
         ...
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Scalar[Self.scale_dtype], MutAnyOrigin]:
@@ -1467,7 +1467,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """Returns the maximum tile size for the KVCache."""
         ...
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in this KV cache view.
 
@@ -1476,12 +1476,12 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         ...
 
-    @always_inline
+    @inline(.always)
     def scale_row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx of a token's scale in the SCALE pool.
 
@@ -1493,7 +1493,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def populate[
         BN: Int,
         base_alignment: Int,
@@ -1523,7 +1523,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
             batch_idx, base_kv_row, _row
         )
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -1534,7 +1534,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1559,7 +1559,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         multi-atom-row page); `False` builds the rank-4 chunk-outer box."""
         ...
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](self, ctx: DeviceContext) raises -> TMATensorTile[
@@ -1577,7 +1577,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -1599,7 +1599,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -1660,7 +1660,7 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -1801,7 +1801,7 @@ struct ContinuousBatchingKVCache[
     def get_type_name() -> String:
         return "ContinuousBatchingKVCache"
 
-    @always_inline
+    @inline(.always)
     def _get_idx_tuple(
         self, block_idx: Int, head_idx: Int, tok_idx: Int, head_dim_idx: Int
     ) -> DynamicCoord[.int64, 4]:
@@ -1852,22 +1852,22 @@ struct ContinuousBatchingKVCache[
         self.max_seq_length = max_seq_length
         self.max_cache_length = max_cache_length
 
-    @always_inline
+    @inline(.always)
     def _batch_size(self) -> Int:
         return Int(self.cache_lengths.dim[0]())
 
-    @always_inline
+    @inline(.always)
     def cache_lengths_nd(self) -> Self.cache_lengths_tt_type:
         return self.cache_lengths
 
-    @always_inline
+    @inline(.always)
     def cache_length(self, batch_idx: Int) -> Int:
         assert (
             batch_idx < self._batch_size()
         ), "KVCache batch_idx is out of bounds"
         return Int(self.cache_lengths[batch_idx])
 
-    @always_inline
+    @inline(.always)
     def load[
         width: Int,
         output_dtype: DType = Self.dtype,
@@ -1883,7 +1883,7 @@ struct ContinuousBatchingKVCache[
         # Bypass TileTensor.load's `where` constraint by using ptr directly.
         return self.blocks.load[width=width](idx).cast[output_dtype]()
 
-    @always_inline
+    @inline(.always)
     def store(
         self,
         bs: Int,
@@ -1900,7 +1900,7 @@ struct ContinuousBatchingKVCache[
         # Bypass TileTensor.store's `where` constraint by using ptr directly.
         self.blocks.store(idx, val)
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -1927,7 +1927,7 @@ struct ContinuousBatchingKVCache[
         """
         return SIMD[Self.scale_dtype, width](0)
 
-    @always_inline
+    @inline(.always)
     def store_scale[
         scales_dtype: DType = Self.scale_dtype, width: Int = 1
     ](
@@ -1944,7 +1944,7 @@ struct ContinuousBatchingKVCache[
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def load_quantized[
         width: Int
     ](
@@ -1986,13 +1986,13 @@ struct ContinuousBatchingKVCache[
         current request."""
         return self.max_cache_length
 
-    @always_inline
+    @inline(.always)
     def _stride(self) -> UInt32:
         return UInt32(self.blocks.layout.stride[0]().value()) // UInt32(
             self.kv_params.num_heads * self.kv_params.head_size
         )
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -2004,7 +2004,7 @@ struct ContinuousBatchingKVCache[
         """
         return encoded_index
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in this KV cache view."""
         var total_blocks = self.blocks.dim[0]()
@@ -2013,13 +2013,13 @@ struct ContinuousBatchingKVCache[
             + UInt32(self.blocks.dim[1]())
         )
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         var block_idx = self.lookup_table[Int(batch_idx)]
         return block_idx * self._stride() + tok_idx
 
-    @always_inline
+    @inline(.always)
     def scale_row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Not supported: this cache carries no quantization scales."""
         comptime assert False, (
@@ -2027,7 +2027,7 @@ struct ContinuousBatchingKVCache[
             " ContinuousBatchingKVCache has no scale pool"
         )
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](self, ctx: DeviceContext) raises -> TMATensorTile[
@@ -2042,7 +2042,7 @@ struct ContinuousBatchingKVCache[
             " ContinuousBatchingKVCache has no scale pool"
         )
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -2105,7 +2105,7 @@ struct ContinuousBatchingKVCache[
             row_major=row_major,
         ](ctx, self.blocks.ptr, Int(rows))
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -2171,7 +2171,7 @@ struct ContinuousBatchingKVCache[
             self.num_kv_rows(),
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -2202,7 +2202,7 @@ struct ContinuousBatchingKVCache[
             False
         ), "create_rope_tma_tile is not supported for ContinuousBatchingKVCache"
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -2228,7 +2228,7 @@ struct ContinuousBatchingKVCache[
             " ContinuousBatchingKVCache"
         )
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -2247,7 +2247,7 @@ struct ContinuousBatchingKVCache[
         )
         return offset_ptr.as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int,
     ](
@@ -2289,7 +2289,7 @@ struct ContinuousBatchingKVCache[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -2308,7 +2308,7 @@ struct ContinuousBatchingKVCache[
             Scalar[Self.scale_dtype], MutAnyOrigin
         ].unsafe_dangling()
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Scalar[Self.scale_dtype], MutAnyOrigin]:
@@ -2527,7 +2527,7 @@ struct PagedKVCache[
         """Returns the maximum tile size for the KVCache."""
         return Self.page_size
 
-    @always_inline
+    @inline(.always)
     def cache_lengths_nd(self) -> Self.cache_lengths_tt_type:
         return self.cache_lengths
 
@@ -2535,13 +2535,13 @@ struct PagedKVCache[
         """Returns the length of the cache for a given batch index."""
         return Int(self.cache_lengths[batch_idx])
 
-    @always_inline
+    @inline(.always)
     def _stride(self) -> UInt32:
         return UInt32(self.blocks.layout.stride[0]().value()) // UInt32(
             self.kv_params.num_heads * self.kv_params.head_size
         )
 
-    @always_inline
+    @inline(.always)
     def get_tma_row(self, encoded_index: Int32) -> Int32:
         """Convert an encoded sparse index to a physical TMA row.
 
@@ -2556,7 +2556,7 @@ struct PagedKVCache[
         var stride = Int32(self._stride())
         return phys_block * stride + offset
 
-    @always_inline
+    @inline(.always)
     def num_kv_rows(self) -> Int:
         """Returns the total number of virtual rows in this KV cache view."""
         var total_blocks = self.blocks.dim[0]()
@@ -2564,7 +2564,7 @@ struct PagedKVCache[
             UInt32(total_blocks - 1) * self._stride() + UInt32(Self.page_size)
         )
 
-    @always_inline
+    @inline(.always)
     def _scale_stride(self) -> UInt32:
         """Rows between consecutive physical blocks in the SCALE pool.
 
@@ -2577,7 +2577,7 @@ struct PagedKVCache[
             Self.kv_params.num_heads * Self.head_dim_granularity
         )
 
-    @always_inline
+    @inline(.always)
     def num_scale_rows(self) -> Int:
         """Total virtual rows in the scale pool, as `num_kv_rows` is for values.
         """
@@ -2587,7 +2587,7 @@ struct PagedKVCache[
             + UInt32(Self.page_size)
         )
 
-    @always_inline
+    @inline(.always)
     def scale_row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
         """Returns the row idx of a token's scale in the scale pool.
 
@@ -2616,7 +2616,7 @@ struct PagedKVCache[
         ]
         return block_idx * self._scale_stride() + UInt32(tok_in_block_idx)
 
-    @always_inline
+    @inline(.always)
     def row_idx(self, batch_idx: UInt32, tok_idx: UInt32) -> UInt32:
         """Returns the row idx when viewing the memory as a matrix."""
         var lut_block_index, tok_in_block_idx = divmod(
@@ -2640,7 +2640,7 @@ struct PagedKVCache[
         # alias row_stride = Int(num_heads * head_size * Self.collection_size)
         return block_idx * self._stride() + UInt32(tok_in_block_idx)
 
-    @always_inline
+    @inline(.always)
     def populate[
         BN: Int,
         base_alignment: Int,
@@ -2821,7 +2821,7 @@ struct PagedKVCache[
                     result.rows[c * chunk + i] = rows_simd[i]
         return result^
 
-    @always_inline
+    @inline(.always)
     def create_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -2870,7 +2870,7 @@ struct PagedKVCache[
             row_major=row_major,
         ](ctx, self.blocks.ptr, Int(rows))
 
-    @always_inline
+    @inline(.always)
     def create_index_scale_tma_tile[
         TILE: Int
     ](self, ctx: DeviceContext) raises -> TMATensorTile[
@@ -2920,7 +2920,7 @@ struct PagedKVCache[
             Self.scale_dtype, flat_scale_window[Self.scale_dtype, TILE]()
         ](ctx, self.scales_raw_ptr(), self.num_scale_rows())
 
-    @always_inline
+    @inline(.always)
     def create_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -2986,7 +2986,7 @@ struct PagedKVCache[
             self.num_kv_rows(),
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_tma_tile[
         swizzle_mode: TensorMapSwizzle,
         *,
@@ -3039,7 +3039,7 @@ struct PagedKVCache[
             ctx, rope_ptr, Int(rows)
         )
 
-    @always_inline
+    @inline(.always)
     def create_rope_gather4_tma_tile[
         *,
         tile_height: Int = 4,
@@ -3080,7 +3080,7 @@ struct PagedKVCache[
             l2_promotion=l2_promotion,
         ](ctx, rope_ptr, self.num_kv_rows())
 
-    @always_inline
+    @inline(.always)
     def _get_idx(
         self, bs: Int, head_idx: Int, tok_idx: Int, head_dim_idx: Int
     ) -> DynamicCoord[.int64, 4]:
@@ -3118,7 +3118,7 @@ struct PagedKVCache[
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def _get_scale_idx(
         self,
         bs: Int,
@@ -3163,7 +3163,7 @@ struct PagedKVCache[
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def load[
         width: Int,
         output_dtype: DType = Self.dtype,
@@ -3191,7 +3191,7 @@ struct PagedKVCache[
         else:
             return self.blocks.load[width=width](idx).cast[output_dtype]()
 
-    @always_inline
+    @inline(.always)
     def store(
         self,
         bs: Int,
@@ -3238,7 +3238,7 @@ struct PagedKVCache[
         # Bypass TileTensor.store's `where` constraint by using ptr directly.
         self.blocks.store(idx, val)
 
-    @always_inline
+    @inline(.always)
     def load_scale[
         width: Int
     ](
@@ -3276,7 +3276,7 @@ struct PagedKVCache[
         # Bypass TileTensor.load's `where` constraint by using ptr directly.
         return self.scales.value().load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     def store_scale[
         scales_dtype: DType = Self.scale_dtype, width: Int = 1
     ](
@@ -3322,7 +3322,7 @@ struct PagedKVCache[
             scale_idx, rebind[SIMD[Self.scale_dtype, width]](scales)
         )
 
-    @always_inline
+    @inline(.always)
     def load_quantized[
         width: Int
     ](
@@ -3358,7 +3358,7 @@ struct PagedKVCache[
         current request."""
         return self.max_cache_length
 
-    @always_inline
+    @inline(.always)
     def block_paged_ptr[
         tile_size: Int
     ](
@@ -3382,7 +3382,7 @@ struct PagedKVCache[
         var ptr = self.blocks.ptr + Int(self.blocks.layout(full_block_idx))
         return ptr.as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def block_paged_storage[
         tile_size: Int
     ](
@@ -3433,7 +3433,7 @@ struct PagedKVCache[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def scales_block_paged_ptr(
         self,
         batch_idx: Int,
@@ -3456,7 +3456,7 @@ struct PagedKVCache[
         )
         return scales_ptr.as_unsafe_any_origin()
 
-    @always_inline
+    @inline(.always)
     def scales_raw_ptr(
         self,
     ) -> UnsafePointer[Scalar[Self.scale_dtype], MutAnyOrigin]:
@@ -3612,15 +3612,15 @@ struct ContinuousBatchingKVCacheCollection[
             _compute_kv_cache_dynamic_shape_strides[4, (1, 2)](self.blocks)
         )
 
-    @always_inline
+    @inline(.always)
     def get_key_cache(self, layer_idx: Int) -> Self.CacheType:
         return self._get_cache[0](layer_idx)
 
-    @always_inline
+    @inline(.always)
     def get_value_cache(self, layer_idx: Int) -> Self.CacheType:
         return self._get_cache[1](layer_idx)
 
-    @always_inline
+    @inline(.always)
     def _get_cache[kv_idx: Int](self, layer_idx: Int) -> Self.CacheType:
         assert (
             kv_idx == 0 or self.blocks.dim[1]() > 1
@@ -3948,18 +3948,18 @@ struct PagedKVCacheCollection[
                 DType.int64, 4
             ]()
 
-    @always_inline
+    @inline(.always)
     def get_key_cache(self, layer_idx: Int) -> Self.CacheType:
         return self._get_cache[0](layer_idx)
 
-    @always_inline
+    @inline(.always)
     def get_value_cache(self, layer_idx: Int) -> Self.CacheType:
         comptime assert (
             not Self.kv_params.is_mla
         ), "Cannot call get_value_cache for MLA cache"
         return self._get_cache[1](layer_idx)
 
-    @always_inline
+    @inline(.always)
     def _get_cache[kv_idx: Int](self, layer_idx: Int) -> Self.CacheType:
         comptime assert (
             kv_idx >= 0 and kv_idx < 2

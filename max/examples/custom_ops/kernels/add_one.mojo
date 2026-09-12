@@ -36,7 +36,7 @@ struct AddOne:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def elementwise_add_one[width: Int](idx: Coord) -> SIMD[x.dtype, width]:
             return x.load[width](idx) + 1
 

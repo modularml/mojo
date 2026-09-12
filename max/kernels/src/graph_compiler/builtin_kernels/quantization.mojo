@@ -147,7 +147,7 @@ struct RMSNormFusedQuantizeDynamicScaledFP8:
             row_major(Coord(rows)),
         )
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input_dtype, width]:
@@ -155,13 +155,13 @@ struct RMSNormFusedQuantizeDynamicScaledFP8:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[output_dtype, width]) {var out_t}:
             out_t.store[width=width, alignment=alignment](coords, val)
 
-        @always_inline
+        @inline(.always)
         def scale_fn(
             coords: Coord, val: Scalar[scale_dtype]
         ) {var scale_t, var in_shape}:
@@ -350,7 +350,7 @@ struct GGMLQ40Dequantize:
     """Registers the `ggml_q4_0_dequantize` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -384,7 +384,7 @@ struct VroomQ40Matmul:
     """Registers the `vroom_q4_0_matmul` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
         target: StaticString,
@@ -422,7 +422,7 @@ struct VroomQ40RepackWeights:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -453,7 +453,7 @@ struct GGMLQ4KDequantize:
     """Registers the `ggml_q4_k_dequantize` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -489,7 +489,7 @@ struct VroomQ4KMatmul:
     """Registers the `vroom_q4_k_matmul` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
         target: StaticString,
@@ -527,7 +527,7 @@ struct VroomQ4KRepackWeights:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -558,7 +558,7 @@ struct GGMLQ6KDequantize:
     """Registers the `ggml_q6_k_dequantize` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -597,7 +597,7 @@ struct VroomQ6KMatmul:
     """Registers the `vroom_q6_k_matmul` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
         target: StaticString,
@@ -635,7 +635,7 @@ struct VroomQ6KRepackWeights:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         _trace_name: StaticString,
     ](
@@ -666,7 +666,7 @@ struct QMatmulGPU_b4_g32:
     """Registers the `qmatmul_b4_g32` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         target: StaticString,
         _trace_name: StaticString,
@@ -702,7 +702,7 @@ struct QMatmulGPU_b4_g128:
     """Registers the `qmatmul_b4_g128` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         target: StaticString,
         _trace_name: StaticString,
@@ -738,7 +738,7 @@ struct QMatmulGPURepackGGUF:
     """Registers the `GGUF_gpu_repack_q4_0` graph op with the graph compiler."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         target: StaticString,
         _trace_name: StaticString,
@@ -772,7 +772,7 @@ struct QMatmulGPURepackGPTQ_b4_g128:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         target: StaticString,
         _trace_name: StaticString,
@@ -804,7 +804,7 @@ struct QMatmulGPURepackGPTQ_b4_g128_desc_act:
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def execute[
         target: StaticString,
         _trace_name: StaticString,
@@ -850,7 +850,7 @@ struct Struct_quantize_dynamic_block_scaled:
     """Registers the `mo.quantize.dynamic.block.scaled` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -889,7 +889,7 @@ struct Struct_grouped_quantize_dynamic_block_scaled:
     """Registers the `mo.grouped.quantize.dynamic.block.scaled` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -929,7 +929,7 @@ struct Struct_quantize_dynamic_block_scaled_mxfp4:
     """Registers the `mo.quantize.dynamic.block.scaled.mxfp4` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         in_dtype: DType,
@@ -958,7 +958,7 @@ struct Struct_quantize_dynamic_block_scaled_mxfp4:
 struct Struct_dequant_mxfp4:
     """Registers the `mo.dequant.mxfp4` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_type: DType,
@@ -1006,7 +1006,7 @@ struct Struct_dequant_mxfp4:
 struct Struct_quantize_dynamic_block_scaled_mxfp6:
     """Registers the `mo.quantize.dynamic.block.scaled.mxfp6` graph op."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         in_dtype: DType,
@@ -1041,7 +1041,7 @@ struct Struct_quantize_dynamic_block_scaled_mxfp6:
 struct Struct_dequant_mxfp6:
     """Registers the `mo.dequant.mxfp6` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_type: DType,
@@ -1094,7 +1094,7 @@ struct Struct_interleave_block_scales:
     """Registers the `mo.interleave.block.scales` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         scales_type: DType,
@@ -1127,7 +1127,7 @@ struct Struct_block_scaled_preshuffle_b_5d:
     paying the >1 h CPU-side numpy shuffle on every model load.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -1163,7 +1163,7 @@ struct Struct_block_scaled_preshuffle_scale_4d_per_expert:
     out-of-range reads.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -1212,7 +1212,7 @@ struct Struct_unfused_qkv_matmul_ragged_paged_gguf_quantized:
     """Registers the `mo.unfused_qkv_matmul.ragged.paged.gguf_quantized` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         quantization_encoding_q: StaticString,
@@ -1264,7 +1264,7 @@ struct QuantizeStaticScaledFloat8[*, scale_is_inverted: Bool]:
     """Registers the `mo.quantize_static_scaled_float8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_type: DType,
@@ -1292,7 +1292,7 @@ struct QuantizeStaticScaledFloat8[*, scale_is_inverted: Bool]:
         # `scale_is_inverted` param and always used `1.0/scale`; preserved here.
         var inversed_scale = 1.0 / scale.cast[.float32]()
 
-        @always_inline
+        @inline(.always)
         def quant_fn[
             width: Int, element_alignment: Int
         ](idx: IndexList[2]) {var input, var inversed_scale} -> SIMD[
@@ -1314,7 +1314,7 @@ struct QuantizeTensorDynamicScaledFloat8:
     """Registers the `mo.quantize_tensor_dynamic_scaled_float8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_type: DType,
@@ -1332,7 +1332,7 @@ struct QuantizeTensorDynamicScaledFloat8:
     ) raises:
         comptime assert is_gpu[target](), "only valid on GPUs"
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](row: Int, col: Int) {var input} -> SIMD[input_type, width]:
@@ -1360,7 +1360,7 @@ struct QuantizeDynamicScaledFloat8:
     """
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         input_type: DType,
@@ -1378,7 +1378,7 @@ struct QuantizeDynamicScaledFloat8:
     ) raises:
         comptime assert is_gpu[target](), "only valid on GPUs"
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](row: Int, col: Int) {var input} -> SIMD[input_type, width]:

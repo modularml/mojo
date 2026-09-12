@@ -124,7 +124,7 @@ struct Depth512MBars[
 
     # ---- construction ---------------------------------------------------------
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, mbar_base: MBarType):
         """Wrap a base mbarrier pointer from Depth512AttentionSMem.mbar_base().
 
@@ -138,7 +138,7 @@ struct Depth512MBars[
     # ---- initialization -------------------------------------------------------
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _init_count(lane_idx: Int32) -> Int32:
         """Return mbarrier thread count for the given barrier index.
 
@@ -156,7 +156,7 @@ struct Depth512MBars[
             return 128
         return 1
 
-    @always_inline
+    @inline(.always)
     def init(self, *, lane_idx: Int32):
         """Initialize all barriers. One call per warp lane (lane_idx = tid % 32).
 
@@ -177,7 +177,7 @@ struct Depth512MBars[
     comptime SPipelineProducer = RolePipeline[1, True, 1, 1, 2]
     comptime SPipelineConsumer = ConsumerPipeline[1]
 
-    @always_inline
+    @inline(.always)
     def producer_s_even(self) -> Self.SPipelineProducer:
         """MMA warp: acquire waits on S_even consumer (buffer free),
         commit arrives at S_even producer (S written to TMEM)."""
@@ -186,7 +186,7 @@ struct Depth512MBars[
             self.mbar_base + Self.S_even_consumer_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def producer_s_odd(self) -> Self.SPipelineProducer:
         """MMA warp: acquire waits on S_odd consumer (buffer free),
         commit arrives at S_odd producer (S written to TMEM)."""
@@ -195,7 +195,7 @@ struct Depth512MBars[
             self.mbar_base + Self.S_odd_consumer_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def consumer_s_even(self) -> Self.SPipelineConsumer:
         """Softmax warp: wait on S_even producer (S ready in TMEM),
         release arrives at S_even consumer (S loaded, buffer free)."""
@@ -204,7 +204,7 @@ struct Depth512MBars[
             self.mbar_base + Self.S_even_consumer_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def consumer_s_odd(self) -> Self.SPipelineConsumer:
         """Softmax warp: wait on S_odd producer (S ready in TMEM),
         release arrives at S_odd consumer (S loaded, buffer free)."""
@@ -215,7 +215,7 @@ struct Depth512MBars[
 
     # ---- C pipeline accessors (correction factor handoff) ---------------------
 
-    @always_inline
+    @inline(.always)
     def producer_c(self) -> ProducerPipeline[1]:
         """Softmax warp: acquire waits on C consumer (buffer free),
         commit arrives at C producer (correction written to SMEM)."""
@@ -224,7 +224,7 @@ struct Depth512MBars[
             self.mbar_base + Self.C_consumer_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def consumer_c(self) -> ConsumerPipeline[1]:
         """Correction warp: wait on C producer (correction ready),
         release arrives at C consumer (correction consumed)."""
@@ -238,7 +238,7 @@ struct Depth512MBars[
     # PO_lo (count-256): softmax (128, P ready) + correction (128, O_lo rescaled).
     # PO_hi (count-128): correction (128, O_hi rescaled) only.
 
-    @always_inline
+    @inline(.always)
     def producer_o_lo(self) -> RolePipeline[1, True, 1, 1, 2]:
         """MMA warp P@V_lo pipeline.
         Acquire: wait on PO_lo (P ready + previous O_lo rescaled).
@@ -248,7 +248,7 @@ struct Depth512MBars[
             self.mbar_base + Self.PO_lo_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def producer_o_hi(self) -> RolePipeline[1, True, 1, 1, 2]:
         """MMA warp P@V_hi pipeline.
         Acquire: wait on PO_hi (previous O_hi rescaled).
@@ -258,7 +258,7 @@ struct Depth512MBars[
             self.mbar_base + Self.PO_hi_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def consumer_o_lo(self) -> ConsumerPipeline[1]:
         """Correction warp O_lo pipeline.
         Wait: on O_mma_lo (V_lo accumulation done, O_lo safe to read).
@@ -268,7 +268,7 @@ struct Depth512MBars[
             self.mbar_base + Self.PO_lo_offset,
         }
 
-    @always_inline
+    @inline(.always)
     def consumer_o_hi(self) -> ConsumerPipeline[1]:
         """Correction warp O_hi pipeline.
         Wait: on O_mma_hi (V_hi accumulation done, O_hi safe to read).
@@ -280,7 +280,7 @@ struct Depth512MBars[
 
     # ---- PO raw accessors (prologue arrives) ----------------------------------
 
-    @always_inline
+    @inline(.always)
     def po_lo_mbar(self) -> MBarType:
         """Raw pointer to PO_lo barrier.
 
@@ -290,7 +290,7 @@ struct Depth512MBars[
         """
         return self.mbar_base + Self.PO_lo_offset
 
-    @always_inline
+    @inline(.always)
     def po_hi_mbar(self) -> MBarType:
         """Raw pointer to PO_hi barrier.
 
@@ -301,7 +301,7 @@ struct Depth512MBars[
 
     # ---- KV pipeline barriers ------------------------------------------------
 
-    @always_inline
+    @inline(.always)
     def get_kv_mbars(self) -> MBarType:
         """Base pointer for KV pipeline barriers.
 
@@ -313,7 +313,7 @@ struct Depth512MBars[
     # ---- utility -------------------------------------------------------------
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def num_mbars() -> UInt32:
         """Total number of mbarriers managed by this struct."""
         return UInt32(Self.size)

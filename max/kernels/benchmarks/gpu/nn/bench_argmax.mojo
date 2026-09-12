@@ -65,9 +65,9 @@ def bench_argmax[
     var num_bytes = batch * num_elements * size_of[Scalar[dtype]]()
     var suffix = String("/N=", num_elements, "/batch=", batch, "/", dtype)
 
-    @always_inline
+    @inline(.always)
     def bench_streaming(mut b: Bencher) raises {imm}:
-        @always_inline
+        @inline(.always)
         def launch(ctx: DeviceContext) raises {imm}:
             argmax_gpu(ctx, in_tensor, out_tensor)
 
@@ -79,9 +79,9 @@ def bench_argmax[
         [ThroughputMeasure(BenchMetric.bytes, num_bytes)],
     )
 
-    @always_inline
+    @inline(.always)
     def bench_topk_k1(mut b: Bencher) raises {imm}:
-        @always_inline
+        @inline(.always)
         def launch(ctx: DeviceContext) raises {imm}:
             topk_gpu[sampling=False, largest=True](
                 ctx, 1, in_tensor, vals_tensor, out_tensor
@@ -97,17 +97,17 @@ def bench_argmax[
 
     var in_shape = Coord(IndexList[2](batch, num_elements))
 
-    @always_inline
+    @inline(.always)
     def launch_rowwise(
         ctx: DeviceContext,
     ) raises {mut out_tensor, imm}:
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var in_tensor} -> SIMD[dtype, width]:
             return in_tensor.load[width=width](coords)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[.int64, width]) {var out_tensor}:
@@ -117,7 +117,7 @@ def bench_argmax[
             input_fn, output_fn, in_shape, ctx
         )
 
-    @always_inline
+    @inline(.always)
     def bench_rowwise(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, launch_rowwise, ctx)
 

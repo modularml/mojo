@@ -530,7 +530,7 @@ struct IntLiteral[value: __mlir_type.`!pop.int_literal`](
         """
         return self
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the IntLiteral in string form.
 
@@ -539,7 +539,7 @@ struct IntLiteral[value: __mlir_type.`!pop.int_literal`](
         """
         Int(self).write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the IntLiteral in repr form.
 

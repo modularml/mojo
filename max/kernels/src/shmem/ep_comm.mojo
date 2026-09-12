@@ -136,7 +136,7 @@ comptime EP_DATA_READY_FLAG = 1 << 10
 comptime MAX_GPUS_PER_NODE = 8
 
 
-@always_inline
+@inline(.always)
 def _BLOCK_SCOPE() -> StaticString:
     comptime if is_nvidia_gpu():
         return "block"
@@ -148,7 +148,7 @@ def _BLOCK_SCOPE() -> StaticString:
         ]()
 
 
-@always_inline
+@inline(.always)
 def _DEVICE_SCOPE() -> StaticString:
     comptime if is_nvidia_gpu():
         return "device"
@@ -167,7 +167,7 @@ comptime _counter_atomic = Atomic[Int32, scope=DEVICE_SCOPE]
 comptime _signal_atomic = Atomic[UInt64]
 
 
-@always_inline
+@inline(.always)
 def block_memcpy[
     dst_addr_space: AddressSpace,
     src_addr_space: AddressSpace,
@@ -196,7 +196,7 @@ def block_memcpy[
         )
 
 
-@always_inline
+@inline(.always)
 def _scoped_barrier[n_threads: Int, barrier_id: Int]() -> None:
     """Block barrier scoped to a thread-class. A negative `barrier_id` selects
     the full-block `barrier()` (the standalone default, byte-identical); a
@@ -209,7 +209,7 @@ def _scoped_barrier[n_threads: Int, barrier_id: Int]() -> None:
         named_barrier[Int32(n_threads)](Int32(barrier_id))
 
 
-@always_inline
+@inline(.always)
 def block_prefix_sum[
     dtype: DType,
     //,
@@ -337,19 +337,19 @@ struct EPRoleSplit[block_size: Int, n_items: Int, flag: Bool = False]:
         and Self.n_items == Self.n_trips * Self.n_copy_threads
     )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_role_index() -> Int:
         """Returns this thread's linear index within the copy role."""
         return Int(thread_idx.x)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def is_ep_copy_role() -> Bool:
         """Returns True if this thread carries copy/quantize work."""
         return Self.copy_role_index() < Self.n_copy_threads
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def publisher_role_index() -> Int:
         """Returns this warp's index within the publisher role.
@@ -359,14 +359,14 @@ struct EPRoleSplit[block_size: Int, n_items: Int, flag: Bool = False]:
         """
         return Int(warp_id()) - Self.n_copy_warps
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def is_ep_publisher_role() -> Bool:
         """Returns True if this thread's warp carries publication work."""
         return Self.publisher_role_index() >= 0
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def ep_signal_completion[
     p2p_world_size: Int,
@@ -534,7 +534,7 @@ def ep_signal_completion[
             )
 
 
-@always_inline
+@inline(.always)
 def get_device_alignment() -> Int:
     """Returns the natural SIMD alignment in bytes for the current GPU target.
 
@@ -580,43 +580,43 @@ trait TokenFormat(Deinitable, DevicePassable):
     # kernel.
     comptime dispatch_smem_size: Int
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def token_size() -> Int:
         "Returns the size of the (quantized) token in bytes."
         ...
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def src_info_size() -> Int:
         "Returns the size of the source info in bytes. Currently, source info is a single int32 that stores a token's index in the original rank."
         return align_up(size_of[Int32](), Self.alignment)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def topk_info_size() -> Int:
         "Returns the size of the top-k info in bytes. Currently, top-k info is an array of uint16 that stores a token's top-k expert IDs."
         return align_up(size_of[UInt16]() * Self.top_k, Self.alignment)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def msg_size() -> Int:
         "Returns the size of the message in bytes."
         return Self.token_size() + Self.src_info_size() + Self.topk_info_size()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def src_info_offset() -> Int:
         "Returns the offset of the source info in the message."
         return Self.token_size()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def topk_info_offset() -> Int:
         "Returns the offset of the top-k info in the message."
         return Self.token_size() + Self.src_info_size()
 
-    @always_inline
+    @inline(.always)
     def pad_expert_offsets[
         n_groups: Int
     ](self, row_offsets: UnsafePointer[mut=True, UInt32, ...]) -> None:
@@ -625,7 +625,7 @@ trait TokenFormat(Deinitable, DevicePassable):
         """
         pass
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_token_to_send_buf[
         src_type: DType,
@@ -646,7 +646,7 @@ trait TokenFormat(Deinitable, DevicePassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def copy_msg_to_output_tensor[
         buf_addr_space: AddressSpace = .GENERIC,
     ](
@@ -665,7 +665,7 @@ trait TokenFormat(Deinitable, DevicePassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def init_smem_resources[
         smem_base_offset: Int = 0, warp_base: Int = 0
     ](self) -> None:
@@ -677,7 +677,7 @@ trait TokenFormat(Deinitable, DevicePassable):
         """
         pass
 
-    @always_inline
+    @inline(.always)
     def copy_msg_tile_to_output_tensor[
         extract_topk_info_func: def(
             UnsafePointer[UInt8, MutUntrackedOrigin], Int
@@ -781,7 +781,7 @@ struct BF16TokenFormat[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         output_tokens: TileTensor[
@@ -795,14 +795,14 @@ struct BF16TokenFormat[
             output_tokens.layout,
         }
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def token_size() -> Int:
         return align_up(
             Self.hid_dim * size_of[DType.bfloat16](), Self.alignment
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_token_to_send_buf[
         src_type: DType,
@@ -820,7 +820,7 @@ struct BF16TokenFormat[
             thread_idx.x - thread_base,
         )
 
-    @always_inline
+    @inline(.always)
     def copy_msg_to_output_tensor[
         buf_addr_space: AddressSpace = .GENERIC,
     ](
@@ -927,7 +927,7 @@ struct BlockwiseFP8TokenFormat[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         output_tokens: TileTensor[
@@ -950,14 +950,14 @@ struct BlockwiseFP8TokenFormat[
             output_scales.layout,
         }
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def fp8_quant_size() -> Int:
         return align_up(
             Self.hid_dim * size_of[Self.fp8_dtype](), Self.alignment
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_size() -> Int:
         comptime assert (
@@ -968,17 +968,17 @@ struct BlockwiseFP8TokenFormat[
             Self.alignment,
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def token_size() -> Int:
         return Self.fp8_quant_size() + Self.scales_size()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_offset() -> Int:
         return Self.fp8_quant_size()
 
-    @always_inline
+    @inline(.always)
     def pad_expert_offsets[
         n_groups: Int
     ](self, row_offsets: UnsafePointer[mut=True, UInt32, ...]) -> None:
@@ -1004,7 +1004,7 @@ struct BlockwiseFP8TokenFormat[
         if tid < n_groups:
             row_offsets[tid + 1] = aligned_exp_end
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_token_to_send_buf[
         src_type: DType,
@@ -1057,7 +1057,7 @@ struct BlockwiseFP8TokenFormat[
                     bitcast[.uint8, scale_bytes](scale_factor),
                 )
 
-    @always_inline
+    @inline(.always)
     def copy_msg_to_output_tensor[
         buf_addr_space: AddressSpace = .GENERIC,
     ](
@@ -1254,7 +1254,7 @@ struct NVBlockScaledTokenFormat[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         output_tokens: TileTensor[
@@ -1303,7 +1303,7 @@ struct NVBlockScaledTokenFormat[
         except e:
             abort(String(e))
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def quant_size() -> Int:
         comptime payload_size = (
@@ -1313,7 +1313,7 @@ struct NVBlockScaledTokenFormat[
         )
         return align_up(payload_size, Self.alignment)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_size() -> Int:
         comptime assert (
@@ -1324,17 +1324,17 @@ struct NVBlockScaledTokenFormat[
             Self.alignment,
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def token_size() -> Int:
         return Self.quant_size() + Self.scales_size()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_offset() -> Int:
         return Self.quant_size()
 
-    @always_inline
+    @inline(.always)
     def pad_expert_offsets[
         n_groups: Int
     ](self, row_offsets: UnsafePointer[mut=True, UInt32, ...]) -> None:
@@ -1391,7 +1391,7 @@ struct NVBlockScaledTokenFormat[
                     group_scales_end, UInt32(WARP_SIZE - 1)
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_token_to_send_buf[
         src_type: DType,
@@ -1439,7 +1439,7 @@ struct NVBlockScaledTokenFormat[
                     buf_p, src_p, input_scale, Int(i)
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _copy_one_item[
         src_type: DType,
@@ -1526,7 +1526,7 @@ struct NVBlockScaledTokenFormat[
                 bitcast[DType.uint8, byte_width](output_vector),
             )
 
-    @always_inline
+    @inline(.always)
     def copy_msg_to_output_tensor[
         buf_addr_space: AddressSpace = .GENERIC,
     ](
@@ -1539,7 +1539,7 @@ struct NVBlockScaledTokenFormat[
         "NVFP4 format directly uses tile based copy."
         pass
 
-    @always_inline
+    @inline(.always)
     def init_smem_resources[
         smem_base_offset: Int = 0, warp_base: Int = 0
     ](self) -> None:
@@ -1567,7 +1567,7 @@ struct NVBlockScaledTokenFormat[
         if elect_one_sync():
             mbar_base[warp_id() - warp_base].init()
 
-    @always_inline
+    @inline(.always)
     def copy_msg_tile_to_output_tensor[
         extract_topk_info_func: def(
             UnsafePointer[UInt8, MutUntrackedOrigin], Int
@@ -1837,7 +1837,7 @@ struct MXTokenFormat[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         output_tokens: TileTensor[
@@ -1862,14 +1862,14 @@ struct MXTokenFormat[
         }
         self.max_padded_M = Int64(max_padded_M)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def quant_size() -> Int:
         return align_up(
             (Self.hid_dim * Self.bits_per_element) // 8, Self.alignment
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_size() -> Int:
         comptime assert (
@@ -1880,12 +1880,12 @@ struct MXTokenFormat[
             Self.alignment,
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def token_size() -> Int:
         return Self.quant_size() + Self.scales_size()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def scales_offset() -> Int:
         return Self.quant_size()
@@ -1894,7 +1894,7 @@ struct MXTokenFormat[
         Self.mx_format.fp6_format() if Self.mx_format.is_fp6() else FP6Format.E2M3
     )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _copy_token_to_send_buf_fp6[
         src_type: DType,
@@ -1958,7 +1958,7 @@ struct MXTokenFormat[
                 ),
             )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def copy_token_to_send_buf[
         src_type: DType,
@@ -2043,7 +2043,7 @@ struct MXTokenFormat[
                         bitcast[.uint8, byte_width](output_vector),
                     )
 
-    @always_inline
+    @inline(.always)
     def copy_msg_to_output_tensor[
         buf_addr_space: AddressSpace = .GENERIC,
     ](
@@ -2184,13 +2184,13 @@ struct EPLocalSyncCounters[n_experts: Int](
 
     comptime device_type: AnyType = Self
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr: UnsafePointer[mut=True, Int32, ...]):
         self.ptr = ptr.unsafe_origin_cast[
             MutUntrackedOrigin
         ]().address_space_cast[.GENERIC]()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, mut buffer: DeviceBuffer[.int32]):
         self.ptr = buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
 
@@ -2210,14 +2210,14 @@ struct EPLocalSyncCounters[n_experts: Int](
     def get_type_name() -> String:
         return String(t"EPLocalSyncCounters[n_experts={Self.n_experts}]")
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def dispatch_async_size() -> Int:
         """Returns the size in Int32 elements needed by dispatch_async kernel.
         """
         return 2 * Self.n_experts + MAX_GPUS_PER_NODE
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def dispatch_wait_size() -> Int:
         """Returns the size in Int32 elements needed by dispatch_wait kernel.
@@ -2246,7 +2246,7 @@ struct EPLocalSyncCounters[n_experts: Int](
         """
         return 6 * Self.n_experts + 7
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def combine_async_size() -> Int:
         """Returns the size in Int32 elements needed by combine_async kernel.
@@ -2256,13 +2256,13 @@ struct EPLocalSyncCounters[n_experts: Int](
         """
         return 6 * Self.n_experts + 7
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def combine_wait_size() -> Int:
         """Returns the size in Int32 elements needed by combine_wait kernel."""
         return 2 * Self.n_experts
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def total_size() -> Int:
         """Returns the total size in Int32 elements needed for all counters."""
@@ -2279,7 +2279,7 @@ struct EPLocalSyncCounters[n_experts: Int](
             + Self.combine_wait_size()
         )
 
-    @always_inline
+    @inline(.always)
     def get_dispatch_async_ptr(
         self,
     ) -> UnsafePointer[Int32, MutUntrackedOrigin]:
@@ -2291,12 +2291,12 @@ struct EPLocalSyncCounters[n_experts: Int](
         """
         return self.ptr
 
-    @always_inline
+    @inline(.always)
     def get_dispatch_wait_ptr(self) -> UnsafePointer[Int32, MutUntrackedOrigin]:
         """Returns pointer to dispatch_wait kernel atomic counters."""
         return self.ptr + Self.dispatch_async_size()
 
-    @always_inline
+    @inline(.always)
     def get_combine_async_ptr(self) -> UnsafePointer[Int32, MutUntrackedOrigin]:
         """Returns pointer to combine_async kernel atomic counters.
 
@@ -2305,7 +2305,7 @@ struct EPLocalSyncCounters[n_experts: Int](
         """
         return self.ptr + Self.dispatch_async_size()
 
-    @always_inline
+    @inline(.always)
     def get_combine_wait_ptr(self) -> UnsafePointer[Int32, MutUntrackedOrigin]:
         """Returns pointer to combine_wait kernel atomic counters."""
         return self.ptr + Self.dispatch_async_size() + Self.dispatch_wait_size()
@@ -2470,7 +2470,7 @@ struct EPDispatchKernel[
     # double-buffering and its generation reset.
     comptime rc_cursor_base = Self.rank_flag_base + Self.n_ranks
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def assert_l1_vslot_ticket_layout():
         """Static layout guarantees for the ticket and pool-cursor words."""
@@ -2515,7 +2515,7 @@ struct EPDispatchKernel[
         ), "the reservation cursors must fit the receive-count buffer"
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def rank_flag_offset(src_rank: Int) -> Int32:
         """Offset of `src_rank`'s dedicated rank-completion flag.
 
@@ -2532,7 +2532,7 @@ struct EPDispatchKernel[
         return Int32(Self.rank_flag_base + src_rank)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def recv_count_size() -> Int:
         """Receive-count buffer element count, including both tails.
 
@@ -2560,7 +2560,7 @@ struct EPDispatchKernel[
     ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def recv_buf_layout[
         out_dtype: DType = _get_index_type[type_of(Self._recv_layout)](
             AddressSpace.GENERIC
@@ -2573,7 +2573,7 @@ struct EPDispatchKernel[
             offset = Self._recv_layout[linear_idx_type=out_dtype](coord)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def recv_count_layout(coord: Coord, out offset: Int32):
         comptime if Self.skip_a2a:
             var _coord = Coord((coord[0], Idx[0]))
@@ -2582,7 +2582,7 @@ struct EPDispatchKernel[
             offset = Self._recv_count_layout[linear_idx_type=.int32](coord)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def send_buf_layout(coord: Coord, out offset: Int32):
         offset = Self._send_layout[linear_idx_type=.int32](coord)
 
@@ -2591,7 +2591,7 @@ struct EPDispatchKernel[
     # ===-------------------------------------------------------------------===#
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _comm_barrier[n_comm_threads: Int, comm_barrier_id: Int]() -> None:
         """Synchronizes the comm thread-class.
 
@@ -2608,7 +2608,7 @@ struct EPDispatchKernel[
             named_barrier[Int32(n_comm_threads)](Int32(comm_barrier_id))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def monitor_and_signal_completion[
         comm_warp_base: Int = 0,
     ](
@@ -2722,7 +2722,7 @@ struct EPDispatchKernel[
                 expert_finished_counter[counter_offset] = 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_and_send_tokens[
         input_type: DType,
         //,
@@ -3015,7 +3015,7 @@ struct EPDispatchKernel[
     # ===-------------------------------------------------------------------===#
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_for_arrivals_and_compute_offsets[
         comm_thread_base: Int = 0,
         n_comm_threads: Int = Self.num_threads,
@@ -3200,7 +3200,7 @@ struct EPDispatchKernel[
             recv_count_p.store(tid, UInt64.MAX_FINITE)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_received_tokens_to_output[
         comm_thread_base: Int = 0,
         n_comm_threads: Int = Self.num_threads,
@@ -3328,7 +3328,7 @@ struct EPDispatchKernel[
             2, Int32, address_space=.SHARED
         ]()
 
-        @always_inline
+        @inline(.always)
         def fetch_tile_id() {imm} -> Int32:
             """Fetch the start of the next tile for the current expert. Should
             be called by a single thread.
@@ -3337,7 +3337,7 @@ struct EPDispatchKernel[
                 ordering=Ordering.ACQUIRE
             ](atomic_counter + Self.work_counter_offset + local_expert_id, 1)
 
-        @always_inline
+        @inline(.always)
         def fill_tok_rank_map(tile_id: Int, _total: Int) {mut} -> None:
             """Fill tok_rank_map for a tile. Must be called by warp 0 only,
             after rank_prefix is loaded."""
@@ -3404,7 +3404,7 @@ struct EPDispatchKernel[
                 and umod(tile_id, sms_per_tile) == sms_per_tile - 1
             )
 
-            @always_inline
+            @inline(.always)
             def _recv_buf_ptr_for(
                 tok_local: Int,
             ) {imm} -> UnsafePointer[UInt8, MutUntrackedOrigin]:
@@ -3423,7 +3423,7 @@ struct EPDispatchKernel[
                     )
                 )
 
-            @always_inline
+            @inline(.always)
             def extract_topk_info(
                 token_ptr: UnsafePointer[UInt8, MutUntrackedOrigin],
                 output_pos: Int,
@@ -3547,7 +3547,7 @@ struct EPDispatchKernel[
                 atomic_counter.store(Self.ready_flag_offset, Int32(0))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def pack_shared_expert_inputs(
         format_handler: Self.token_fmt_type,
         send_buf_p: UnsafePointer[UInt8, MutUntrackedOrigin],
@@ -3611,7 +3611,7 @@ struct EPDispatchKernel[
                 tile_start + tile_size, shared_expert_token_count
             )
 
-            @always_inline
+            @inline(.always)
             def _send_buf_ptr_for(
                 tok_local: Int,
             ) {imm} -> UnsafePointer[UInt8, MutUntrackedOrigin]:
@@ -3619,7 +3619,7 @@ struct EPDispatchKernel[
                     (tile_start + tok_local, Idx[0])
                 )
 
-            @always_inline
+            @inline(.always)
             def extract_topk_info(
                 token_ptr: UnsafePointer[UInt8, MutUntrackedOrigin],
                 output_pos: Int,
@@ -3941,7 +3941,7 @@ struct EPCombineKernel[
     ]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def send_buf_layout[
         out_dtype: DType = _get_index_type[type_of(Self._send_layout)](
             AddressSpace.GENERIC
@@ -3950,12 +3950,12 @@ struct EPCombineKernel[
         return Self._send_layout[linear_idx_type=out_dtype](coord)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def recv_buf_layout(coord: Coord) -> Int32:
         return Self._recv_layout[linear_idx_type=.int32](coord)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _recv_offset_in_bounds(src_idx: Int32, src_topk_idx: Int32) -> Bool:
         """Whether a src_info row is a valid receive-buffer write offset.
 
@@ -3976,7 +3976,7 @@ struct EPCombineKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def recv_count_layout(coord: Coord) -> Int32:
         comptime if Self.skip_a2a:
             var _coord = Coord((coord[0], Idx[0]))
@@ -3989,7 +3989,7 @@ struct EPCombineKernel[
     # ===-------------------------------------------------------------------===#
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_shared_expert_outputs[
         input_type: DType,
         //,
@@ -4031,7 +4031,7 @@ struct EPCombineKernel[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def send_tokens_back[
         input_type: DType,
         //,
@@ -4344,7 +4344,7 @@ struct EPCombineKernel[
     # ===-------------------------------------------------------------------===#
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def wait_for_all_arrivals(
         recv_count_p: UnsafePointer[UInt64, MutUntrackedOrigin],
         atomic_counter: UnsafePointer[Int32, MutUntrackedOrigin],
@@ -4384,7 +4384,7 @@ struct EPCombineKernel[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def reduce_and_copy_to_output[
         output_type: DType,
         router_weights_wrapper: Optional[router_weights_wrapper_type] = None,
@@ -5159,7 +5159,7 @@ def combine_kernel[
                 ), "output_tokens expects rank >= 2"
                 comptime hid_dim = input_tokens.static_shape[1]
 
-                @always_inline
+                @inline(.always)
                 @__parameter
                 def add_shared_expert_output[
                     dtype: DType, width: SIMDLength, *, alignment: Int = 1
@@ -5844,7 +5844,7 @@ def fused_silu_nvfp4_interleaved_kernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def sigmoid[
     dtype: DType,
     width: SIMDLength,

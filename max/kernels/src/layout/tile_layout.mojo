@@ -66,7 +66,7 @@ from .int_tuple import IntTuple, coord_to_int_tuple
 from .layout import Layout as LegacyLayout
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _divide_by_stride[StrideType: CoordLike](idx: Int, stride_val: Int) -> Int:
     """Divide idx by stride, specializing for compile-time known values."""
     comptime if StrideType.is_static_value and StrideType.static_value == 1:
@@ -79,7 +79,7 @@ def _divide_by_stride[StrideType: CoordLike](idx: Int, stride_val: Int) -> Int:
         return q
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _mod_by_shape[ShapeType: CoordLike](val: Int, shape_val: Int) -> Int:
     """Compute val % shape, specializing for compile-time known values.
 
@@ -359,7 +359,7 @@ struct Layout[
     ]
     """The compile-time size of the memory region spanned by the layout."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         """Default-initialize a layout from its compile-time type parameters.
 
@@ -371,7 +371,7 @@ struct Layout[
         self._shape = Coord[*Self.shape_types]()
         self._stride = Coord[*Self.stride_types]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(
         out self,
         shape: Coord[*Self.shape_types],
@@ -452,7 +452,7 @@ struct Layout[
                 index, self._shape, self._stride
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def idx2crd[
         *,
         out_dtype: DType = .int64,
@@ -528,7 +528,7 @@ struct Layout[
                 )
         return result
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def product(self) -> Int:
         """Returns the total number of elements in the layout's domain.
 
@@ -540,7 +540,7 @@ struct Layout[
         """
         return Int(self._shape.product())
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def size(self) -> Int:
         """Returns the total number of elements in the layout's domain.
 
@@ -551,7 +551,7 @@ struct Layout[
         """
         return self.product()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def cosize[
         linear_idx_type: DType = .int64
     ](self) -> Scalar[linear_idx_type]:
@@ -568,7 +568,7 @@ struct Layout[
         """
         return self[linear_idx_type=linear_idx_type](self.product() - 1) + 1
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def to_layout(self) -> LegacyLayout:
         """Converts this mixed layout to a legacy `Layout` using `IntTuple`.
 
@@ -598,7 +598,7 @@ struct Layout[
             _types_to_int_tuple[Self._stride_types](),
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reverse(
         self,
     ) -> Layout[Self.shape_types.reverse(), Self.stride_types.reverse(),]:
@@ -612,7 +612,7 @@ struct Layout[
         """
         return Layout(self._shape.reverse(), self._stride.reverse())
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def transpose(
         self,
     ) -> Layout[Self.shape_types.reverse(), Self.stride_types.reverse()]:
@@ -636,7 +636,7 @@ struct Layout[
         """
         return self.reverse()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def make_dynamic[
         dtype: DType
     ](self) -> Layout[
@@ -665,7 +665,7 @@ struct Layout[
             self._stride.make_dynamic[dtype](),
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shape[i: Int](self) -> Self._shape_types[i]:
         """Returns the i-th shape dimension.
 
@@ -677,7 +677,7 @@ struct Layout[
         """
         return self._shape[i]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def stride[i: Int](self) -> Self._stride_types[i]:
         """Returns the i-th stride dimension.
 
@@ -689,7 +689,7 @@ struct Layout[
         """
         return self._stride[i]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shape_coord(self) -> Coord[*Self._shape_types]:
         """Returns the full shape as a `Coord`.
 
@@ -698,7 +698,7 @@ struct Layout[
         """
         return self._shape
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def stride_coord(self) -> Coord[*Self._stride_types]:
         """Returns the full stride as a `Coord`.
 
@@ -707,7 +707,7 @@ struct Layout[
         """
         return self._stride
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the Layout representation to a Writer.
 
@@ -970,7 +970,7 @@ comptime _RowMajorNested[*element_types: CoordLike] = TypeList.tabulate[
 row-major over the flattened shape, then re-nested."""
 
 
-@always_inline
+@inline(.always)
 def row_major(var shape: Coord) -> RowMajorLayout[*shape.element_types]:
     """Creates a row-major layout from a shape `Coord`.
 
@@ -1022,7 +1022,7 @@ def row_major(var shape: Coord) -> RowMajorLayout[*shape.element_types]:
     return {shape, Coord(strides^)}
 
 
-@always_inline
+@inline(.always)
 def row_major[
     *element_types: CoordLike
 ](var *elements: *element_types) -> RowMajorLayout[*element_types]:
@@ -1080,7 +1080,7 @@ def row_major[
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def row_major[*idxs: Int]() -> RowMajorLayout[*_IntToComptimeInt[*idxs]]:
     """Creates a row-major layout from compile-time shape dimensions.
 
@@ -1099,7 +1099,7 @@ def row_major[*idxs: Int]() -> RowMajorLayout[*_IntToComptimeInt[*idxs]]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def row_major_nested(
     var shape: Coord,
 ) -> RowMajorNestedLayout[*shape.element_types]:
@@ -1217,7 +1217,7 @@ comptime _ColMajorMapperIdx[
 ]().values
 
 
-@always_inline
+@inline(.always)
 def col_major[
     *element_types: CoordLike
 ](var *elements: *element_types) -> ColMajorLayout[element_types]:
@@ -1238,7 +1238,7 @@ def col_major[
     return col_major(Coord[*element_types](*elements^))
 
 
-@always_inline
+@inline(.always)
 def col_major(var shape: Coord) -> ColMajorLayout[shape.element_types]:
     """Create a column-major layout from a shape.
 
@@ -1291,7 +1291,7 @@ def col_major(var shape: Coord) -> ColMajorLayout[shape.element_types]:
     return Layout(shape, Coord[*ColMajorTypes](strides^))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def col_major[*idxs: Int]() -> ColMajorLayout[_IntToComptimeInt[*idxs]]:
     """Create a column-major layout from compile-time shape dimensions.
 
@@ -1314,7 +1314,7 @@ def col_major[*idxs: Int]() -> ColMajorLayout[_IntToComptimeInt[*idxs]]:
     return col_major(shape)
 
 
-@always_inline
+@inline(.always)
 def col_major_nested(
     var shape: Coord,
 ) -> ColMajorNestedLayout[shape.element_types]:
@@ -1346,7 +1346,7 @@ def col_major_nested(
     return Layout(shape, Coord[*ColMajorTypes](strides^))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def col_major(
     idx: ComptimeInt[...],
 ) -> Layout[
@@ -1364,7 +1364,7 @@ def col_major(
     return Layout(Coord(idx), Coord(Idx[1]))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def col_major(
     idx: Scalar[...],
 ) -> Layout[
@@ -1904,7 +1904,7 @@ Parameters:
 """
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _runtime_shape_div(a: Int, b: Int) -> Int:
     """Runtime shape_div: ``a // b`` if divisible, else ``signum(a * b)``.
 
@@ -2167,7 +2167,7 @@ Parameters:
 """
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def coalesce[
     LayoutType: TensorLayout,
     //,
@@ -2299,7 +2299,7 @@ Parameters:
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def _print_layout(layout: Layout):
     """Prints a 2D layout to the standard output.
 
@@ -2315,7 +2315,7 @@ def _print_layout(layout: Layout):
     _format_layout(layout, stdout)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dim_size[T: CoordLike](dim: T) -> Int:
     """Returns the element count for a single layout dimension.
 
@@ -2333,7 +2333,7 @@ def _dim_size[T: CoordLike](dim: T) -> Int:
         return Int(dim.value())
 
 
-@no_inline
+@inline(.never)
 def _format_layout[W: Writer](layout: Layout, mut writer: W):
     """Formats a 2D layout as a table and writes it to the specified writer.
 

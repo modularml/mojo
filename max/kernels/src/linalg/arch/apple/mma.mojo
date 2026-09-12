@@ -137,14 +137,14 @@ struct MmaOpApple[
     var rb: Int
     var cb: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         var lid = Int(lane_id())
         self.rb = ((lid & 7) >> 1) + ((lid & 16) >> 2)
         self.cb = ((lid & 1) << 2) + (lid & 8)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def zero_accum() -> Self.AccumType:
         return Self.AccumType(fill=SIMD[Self.out_type, Self.FRAG_SIZE](0))
 
@@ -165,7 +165,7 @@ struct MmaOpApple[
                 False
             ), "Tile must have a contiguous dimension (static_stride == 1)"
 
-    @always_inline
+    @inline(.always)
     def _load_fragment[
         dtype: DType
     ](
@@ -184,7 +184,7 @@ struct MmaOpApple[
         var hi = tile.raw_load[width=4, alignment=alignment](hi_off)
         return lo.join(hi)
 
-    @always_inline
+    @inline(.always)
     def _store_fragment[
         dtype: DType
     ](self, tile: TileTensor[mut=True, dtype, ...], frag: SIMD[dtype, 8],):
@@ -194,7 +194,7 @@ struct MmaOpApple[
         tile.raw_store[width=4](off_lo, frag.slice[4, offset=0]())
         tile.raw_store[width=4](off_hi, frag.slice[4, offset=4]())
 
-    @always_inline
+    @inline(.always)
     def load_fragment[
         dtype: DType, bounded: Bool = False
     ](
@@ -241,7 +241,7 @@ struct MmaOpApple[
         else:
             return self._load_fragment[dtype](tile, lo_off, hi_off)
 
-    @always_inline
+    @inline(.always)
     def _do_load[
         dtype: DType, bounded: Bool
     ](
@@ -266,7 +266,7 @@ struct MmaOpApple[
         else:
             return self._load_fragment[dtype](tile, lo_off, hi_off)
 
-    @always_inline
+    @inline(.always)
     def _bounded_load[
         dtype: DType
     ](
@@ -289,7 +289,7 @@ struct MmaOpApple[
         var hi = gmem_edge_masked_load[4](tile.ptr + hi_off, hi_mask)
         return lo.join(hi)
 
-    @always_inline
+    @inline(.always)
     def _bounded_store[
         dtype: DType
     ](
@@ -325,7 +325,7 @@ struct MmaOpApple[
                     if col + i < valid_cols:
                         tile.raw_store[width=1](off + i, frag[4 + i])
 
-    @always_inline
+    @inline(.always)
     def mma[
         bounded: Bool = False
     ](
@@ -469,7 +469,7 @@ struct MmaOpApple[
                         hw_transpose_b,
                     )
 
-    @always_inline
+    @inline(.always)
     def _load_frag_x2[
         dtype: DType, bounded: Bool
     ](
@@ -516,7 +516,7 @@ struct MmaOpApple[
 
         return (lo_a.join(hi_a), lo_b.join(hi_b))
 
-    @always_inline
+    @inline(.always)
     def mma_dense_x2[
         bounded: Bool = False
     ](
@@ -612,7 +612,7 @@ struct MmaOpApple[
                     hw_transpose_b,
                 )
 
-    @always_inline
+    @inline(.always)
     def _load_a_im2col_fragment_x2[
         input_origin: ImmOrigin, bounded: Bool, c_aligned: Bool, mi: Int
     ](
@@ -716,7 +716,7 @@ struct MmaOpApple[
                             frag1[out_off + (i - 4)] = val
         return (frag0, frag1)
 
-    @always_inline
+    @inline(.always)
     def _load_b_fragment_x2[
         dtype: DType, bounded: Bool
     ](
@@ -770,7 +770,7 @@ struct MmaOpApple[
         var f1 = lo8.slice[4, offset=4]().join(hi8.slice[4, offset=4]())
         return (f0, f1)
 
-    @always_inline
+    @inline(.always)
     def mma_im2col[
         input_origin: ImmOrigin, bounded: Bool = True, c_aligned: Bool = False
     ](
@@ -910,7 +910,7 @@ struct MmaOpApple[
                 False
             ), "Apple fused conv requires BK=32 (num_k_steps == 2)"
 
-    @always_inline
+    @inline(.always)
     def store(
         self,
         accum: Self.AccumType,
@@ -931,7 +931,7 @@ struct MmaOpApple[
                 var sub = d_tile.tile[16, 16](mi, ni)
                 self._store_fragment(sub, accum[mi * Self.num_n_mmas + ni])
 
-    @always_inline
+    @inline(.always)
     def store_bounded(
         self,
         accum: Self.AccumType,
@@ -963,7 +963,7 @@ struct MmaOpApple[
                     valid_cols=valid_cols - ni * 16,
                 )
 
-    @always_inline
+    @inline(.always)
     def load_accum(
         self,
         d_tile: TileTensor[Self.out_type, ...],

@@ -183,7 +183,7 @@ struct GroupedTensormapSmem(TrivialRegisterPassable):
     ]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def from_smem(
         ptr_a: UnsafePointer[
             TMADescriptor, MutAnyOrigin, address_space=.SHARED
@@ -243,7 +243,7 @@ struct GroupedTensormapManager(TrivialRegisterPassable):
     # SMEM descriptors for in-place tensormap updates
     var smem: GroupedTensormapSmem
 
-    @always_inline
+    @inline(.always)
     def init_ab_tensormaps[
         a_dtype: DType,
         a_rank: Int,
@@ -317,7 +317,7 @@ struct GroupedTensormapManager(TrivialRegisterPassable):
             template_sfa.smem_tensormap_init(self.smem.desc_sfa)
             template_sfb.smem_tensormap_init(self.smem.desc_sfb)
 
-    @always_inline
+    @inline(.always)
     def init_c_tensormap[
         c_dtype: DType,
         c_rank: Int,
@@ -345,7 +345,7 @@ struct GroupedTensormapManager(TrivialRegisterPassable):
         if lane_id() == 0:
             template_c.smem_tensormap_init(self.smem.desc_c)
 
-    @always_inline
+    @inline(.always)
     def update_ab_for_group[
         a_dtype: DType,
         a_rank: Int,
@@ -486,7 +486,7 @@ struct GroupedTensormapManager(TrivialRegisterPassable):
         # Step 4: Sync within warp
         syncwarp()
 
-    @always_inline
+    @inline(.always)
     def update_c_for_group[
         c_dtype: DType,
         c_rank: Int,
@@ -1178,7 +1178,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== TMA Update Helper ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _update_tensormap_address[
         dtype: DType,
         tma_rank: Int,
@@ -1218,7 +1218,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         ctx: Self.Context,
         a_tma_template: Self.ATmaOp,
@@ -1274,7 +1274,7 @@ struct GroupedBlockScaledMatmulKernel[
         cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers_2sm(
         ctx: Self.Context,
         a_tma_template: Self.ATmaOp,
@@ -1358,7 +1358,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== 1SM Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_template, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_template, `nvvm.grid_constant`)
@@ -1707,7 +1707,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== Load Input Tiles ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -1848,7 +1848,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== MMA Operation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -1923,7 +1923,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== Epilogue ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def epilogue(
         c_tiles: Self.SmemType.Core.CTileArray,
         c_tma_op: Self.CTmaOp,
@@ -1958,7 +1958,7 @@ struct GroupedBlockScaledMatmulKernel[
     # ========== 2SM Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=StaticTuple[Int32, 3](2, 1, 1))
     @__llvm_arg_metadata(a_tma_template, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_template, `nvvm.grid_constant`)
@@ -2390,7 +2390,7 @@ struct GroupedBlockScaledMatmulKernel[
                         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_initial_work(
         problem_sizes: Self.ProblemSizesTile,
         _num_groups: Int,

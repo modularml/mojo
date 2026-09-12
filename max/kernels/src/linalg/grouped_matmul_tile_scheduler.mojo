@@ -31,11 +31,11 @@ struct RasterOrder(TrivialRegisterPassable):
     comptime AlongN = Self(0)
     comptime AlongM = Self(1)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
@@ -52,7 +52,7 @@ struct WorkInfo(TrivialRegisterPassable, Writable):
     var is_valid_tile: Bool
     var terminate: Bool
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
     ):
@@ -61,15 +61,15 @@ struct WorkInfo(TrivialRegisterPassable, Writable):
         self.is_valid_tile = False
         self.terminate = False
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         return self.is_valid_tile
 
-    @always_inline
+    @inline(.always)
     def is_done(self) -> Bool:
         return self.terminate
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write(
             "(",
@@ -146,7 +146,7 @@ struct TileScheduler[
 
     comptime kNum1DBlocksPerGroup: UInt32 = 16
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         num_active_experts: Int,
@@ -187,7 +187,7 @@ struct TileScheduler[
         self.current_dynamic_dim_cumsum = 0
         self.block_idx_start = 0
 
-    @always_inline
+    @inline(.always)
     def fetch_next_work(mut self) -> WorkInfo:
         self.current_iter += 1
         var next_block_idx = UInt32(self.current_iter) * UInt32(
@@ -259,7 +259,7 @@ struct TileScheduler[
             False,
         )
 
-    @always_inline
+    @inline(.always)
     def _get_swizzled_block_idx(
         self,
         num_n_blocks: UInt32,

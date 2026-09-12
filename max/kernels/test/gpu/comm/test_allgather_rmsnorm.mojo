@@ -69,7 +69,7 @@ from comm.sync import (
 )
 
 
-@always_inline
+@inline(.always)
 def _gathered_value[in_dtype: DType](row: Int, col: Int) -> Scalar[in_dtype]:
     """The bf16 value at global (row, col) of the gathered stream.
 
@@ -120,13 +120,13 @@ def _rms_norm_full[
         row_major(Coord(Index(num_cols))),
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(src_view)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[in_dtype, width]:
         return src_view.raw_load[width=width](src_view.layout(coords))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(dst_view)
     @__parameter
     def output_fn[
@@ -286,7 +286,7 @@ def _run_case[
             # `normed`. `sum_out` must be the gathered stream on both branches
             # (op contract).
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 _allgather_full[in_dtype, ngpus, num_cols](
                     in_shards, sum_full, config, rank_sigs, list_of_ctx[i], i
@@ -719,7 +719,7 @@ def _run_prod_oracle_case[
             # Two-launch fallback writes the residual into `sum_full` (the op
             # contract), then norms it into `normed`.
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 _allgather_full[
                     in_dtype, ngpus, num_cols, group_size=group_size
@@ -1200,7 +1200,7 @@ def _run_asymmetric_fuse_gate_case[
         group_size < ngpus
     ), "a straddling verdict needs at least two groups"
 
-    @always_inline
+    @inline(.always)
     def rows_of(dev: Int) {imm} -> Int:
         return rows_first if dev // group_size == 0 else rows_second
 
@@ -1347,7 +1347,7 @@ def _run_asymmetric_fuse_gate_case[
         # The op's own fallback. Windowed by each device's OWN group height,
         # which is what the symmetric `_allgather_full` cannot express.
         @__parameter
-        @always_inline
+        @inline(.always)
         def two_launch() raises:
             var world_out_views = Array[FullType, ngpus * group_size](
                 uninitialized=True
@@ -1387,7 +1387,7 @@ def _run_asymmetric_fuse_gate_case[
         # host-stack pointers and the stores land out of bounds.
         @__copy_capture(quant_view, scale_view)
         @__parameter
-        @always_inline
+        @inline(.always)
         def mx_epilogue[
             width: Int
         ](row: Int, col: Int, val: SIMD[in_dtype, width]):

@@ -68,7 +68,7 @@ def _init_rocshmem_dylib() -> OwnedDLHandle:
         abort(t"failed to load ROCSHMEM library: {e}")
 
 
-@always_inline
+@inline(.always)
 def _get_rocshmem_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() -> result_type:

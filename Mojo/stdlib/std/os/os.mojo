@@ -237,7 +237,7 @@ def listdir[PathLike: stdPathLike](path: PathLike) raises -> List[String]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _abort_base() -> Never:
     __mlir_op.`llvm.intr.trap`()
 
@@ -246,7 +246,7 @@ def _abort_base() -> Never:
         pass
 
 
-@always_inline
+@inline(.always)
 def abort() -> Never:
     """Terminates execution, using a target dependent trap instruction if
     available.
@@ -261,7 +261,7 @@ def abort() -> Never:
     _abort_base()
 
 
-@no_inline
+@inline(.never)
 def _abort_report[
     *, prefix: StaticString
 ](loc: SourceLocation, message: Some[Writable]):
@@ -318,7 +318,7 @@ def _abort_report[
         )
 
 
-@always_inline
+@inline(.always)
 def _abort_impl[
     *, prefix: StaticString
 ](
@@ -335,7 +335,7 @@ def _abort_impl[
     abort()
 
 
-@always_inline
+@inline(.always)
 def abort[
     *, prefix: StaticString = "ABORT:"
 ](message: String, *, location: Optional[SourceLocation] = {}) -> Never:
@@ -351,7 +351,7 @@ def abort[
     _abort_impl[prefix=prefix](message, location=location)
 
 
-@always_inline
+@inline(.always)
 def abort[
     *, prefix: StaticString = "ABORT:"
 ](message: TString, *, location: Optional[SourceLocation] = {}) -> Never:

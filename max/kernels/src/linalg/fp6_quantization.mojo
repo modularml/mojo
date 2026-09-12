@@ -134,7 +134,7 @@ def _quantize_mxfp6_amd_kernel[
             )
 
 
-@always_inline
+@inline(.always)
 def quantize_mxfp6_amd[
     fmt: FP6Format, *, SF_VECTOR_SIZE: Int = 32, num_max_threads: Int = 512
 ](

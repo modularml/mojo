@@ -20,7 +20,7 @@ def test_memset_async(ctx: DeviceContext) raises:
     print("== test_memset_async")
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def test_memset[dtype: DType](val: Scalar[dtype]) raises:
         comptime length = 4
         var data = alloc[Scalar[dtype]](length)

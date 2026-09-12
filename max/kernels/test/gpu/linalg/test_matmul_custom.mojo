@@ -85,7 +85,7 @@ def run_matmul_naive(ctx: DeviceContext, M: Int, N: Int, K: Int) raises:
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_func_bf16() raises:
         comptime kernel = matmul_kernel_naive[
@@ -134,7 +134,7 @@ def run_matmul_naive(ctx: DeviceContext, M: Int, N: Int, K: Int) raises:
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_func_fp32() raises:
         comptime kernel = matmul_kernel_naive[
@@ -267,7 +267,7 @@ def run_matmul[
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_func_naive() raises:
         comptime kernel = matmul_kernel_naive[
@@ -548,7 +548,7 @@ def run_matmul_transpose[
         row_major(Coord(N, K)),
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_func_naive() raises:
         comptime kernel = matmul_kernel_naive[
@@ -667,7 +667,7 @@ def run_batched_matmul(
     ctx.enqueue_copy(a_device, a_host)
     ctx.enqueue_copy(b_device, b_host)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor)
     @__parameter
     def elementwise_epilogue_fn1[
@@ -689,7 +689,7 @@ def run_batched_matmul(
     ctx.enqueue_copy(a_device_n, a_host_n)
     ctx.enqueue_copy(b_device_n, b_host_n)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_n)
     @__parameter
     def elementwise_epilogue_fn2[

@@ -206,7 +206,7 @@ def test_split_k_epilogue[
 
     @__parameter
     @__copy_capture(epi_ptr, fire_ptr, wide_ptr)
-    @always_inline
+    @inline(.always)
     def record[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_dtype, width]):
@@ -384,7 +384,7 @@ def test_dispatch_workspace_cap[
 
     @__parameter
     @__copy_capture(seen_ptr, wide_ptr)
-    @always_inline
+    @inline(.always)
     def probe[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_dtype, width]):

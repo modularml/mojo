@@ -99,7 +99,7 @@ def bench_matmul[
     # Choose a size larger than the two times the L2 cache
     # 128 MiB is larger that twice the L2 cache on the A100, A10, and L4.
     # update: using 512 to be 2x the infinity cache on MI300x
-    @always_inline
+    @inline(.always)
     def get_size(shape: Coord) -> Int:
         return Int(shape[0].value()) * Int(shape[1].value())
 
@@ -115,7 +115,7 @@ def bench_matmul[
     cb_a.init_on_device(init_type, ctx)
     cb_b.init_on_device(init_type, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {
@@ -127,7 +127,7 @@ def bench_matmul[
         var shape_b,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var tensor_a = TileTensor(
                 cb_a.offset_ptr(iteration), row_major(shape_a)
@@ -140,7 +140,7 @@ def bench_matmul[
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(tensor_c)
             def test_lambda_add_coords_prod[
                 _dtype: DType,

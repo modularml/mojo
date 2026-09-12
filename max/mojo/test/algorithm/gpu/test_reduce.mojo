@@ -180,7 +180,7 @@ def reduce_inner_test[
         unsafe_ptr=res_device.unsafe_ptr(), length=out_shape.flattened_length()
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_wrapper[
         dtype: DType, width: SIMDLength, reduction_idx: Int

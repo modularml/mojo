@@ -50,7 +50,7 @@ from std.sys.info import simd_width_of
 comptime _PDL_LEVEL = PDLLevel.ON
 
 
-@always_inline
+@inline(.always)
 def block_reduce[
     BLOCK_SIZE: Int,
     reduce_fn: def[dtype: DType, width: SIMDLength](
@@ -77,7 +77,7 @@ def block_reduce[
     """
     comptime num_reductions = 1
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_wrapper[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -99,7 +99,7 @@ def block_reduce[
     ](val_tup, init_tup)[0]
 
 
-@always_inline
+@inline(.always)
 def block_reduce[
     BLOCK_SIZE: Int,
     num_reductions: Int,
@@ -134,7 +134,7 @@ def block_reduce[
         BLOCK_SIZE % WARP_SIZE == 0
     ), "block size must be a multiple of the warp size"
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def do_warp_reduce(
         val: StaticTuple[SIMD[dtype, simd_width], num_reductions]
@@ -143,7 +143,7 @@ def block_reduce[
 
         comptime for i in range(num_reductions):
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def reduce_wrapper[
                 dtype: DType, width: SIMDLength
@@ -198,7 +198,7 @@ def block_reduce[
     return result
 
 
-@always_inline
+@inline(.always)
 def row_reduce[
     BLOCK_SIZE: Int,
     input_fn: def[dtype: DType, width: Int, rank: Int](
@@ -242,7 +242,7 @@ def row_reduce[
     """
     comptime num_reductions = 1
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_wrapper[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -267,7 +267,7 @@ def row_reduce[
     ](row_coords, init_tup, row_size)[0]
 
 
-@always_inline
+@inline(.always)
 def row_reduce[
     BLOCK_SIZE: Int,
     num_reductions: Int,
@@ -520,7 +520,7 @@ def small_reduce_kernel[
 
                 comptime for i in range(num_reductions):
 
-                    @always_inline
+                    @inline(.always)
                     @__parameter
                     def reduce_wrapper[
                         dtype: DType, width: SIMDLength
@@ -997,7 +997,7 @@ def reduce_launch[
             )
 
 
-@always_inline
+@inline(.always)
 def _reduce_generator_gpu[
     num_reductions: Int,
     init_type: DType,

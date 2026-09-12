@@ -70,7 +70,7 @@ comptime _ReduceFn = def[dtype: DType, width: SIMDLength](
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _dpp_update_i32[
     dpp_ctrl: Int,
     row_mask: Int = 0xF,
@@ -110,7 +110,7 @@ def _dpp_update_i32[
     )
 
 
-@always_inline
+@inline(.always)
 def _dpp_move[
     dtype: DType, simd_width: SIMDLength, //, dpp_ctrl: Int
 ](val: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -152,7 +152,7 @@ def _dpp_move[
         comptime assert False, "unsupported type for DPP move"
 
 
-@always_inline
+@inline(.always)
 def _dpp_reduce_and_broadcast[
     dtype: DType,
     simd_width: SIMDLength,
@@ -227,7 +227,7 @@ def _dpp_reduce_and_broadcast[
     # On CDNA4+ use permlane_shuffle (register-level) instead of
     # shuffle_xor (ds_bpermute through LDS). permlane_shuffle only
     # supports 32-bit operands, so fall back to shuffle_xor for wider types.
-    @always_inline
+    @inline(.always)
     def _cross_row_step[
         shuffle_width: Int
     ](v: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -246,7 +246,7 @@ def _dpp_reduce_and_broadcast[
     return out
 
 
-@always_inline
+@inline(.always)
 def _dpp_prefix_sum[
     dtype: DType, //, exclusive: Bool
 ](val: Scalar[dtype]) -> Scalar[dtype]:
@@ -302,7 +302,7 @@ def _dpp_prefix_sum[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _shuffle[
     mnemonic: StringSlice,
     dtype: DType,
@@ -360,7 +360,7 @@ def _shuffle[
         comptime assert False, "unhandled shuffle dtype"
 
 
-@always_inline
+@inline(.always)
 def _shuffle_amd_helper[
     dtype: DType, simd_width: SIMDLength
 ](dst_lane: UInt32, val: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -391,7 +391,7 @@ def _shuffle_amd_helper[
             comptime assert False, "unhandled shuffle dtype"
 
 
-@always_inline
+@inline(.always)
 def _shuffle_apple_helper[
     op: StringSlice, dtype: DType, simd_width: SIMDLength
 ](
@@ -462,7 +462,7 @@ def _shuffle_apple_helper[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def shuffle_idx[
     dtype: DType, simd_width: SIMDLength, //
 ](val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[dtype, simd_width]:
@@ -500,7 +500,7 @@ def shuffle_idx[
     return shuffle_idx(_FULL_MASK, val, offset)
 
 
-@always_inline
+@inline(.always)
 def _shuffle_idx_amd[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -517,7 +517,7 @@ def _shuffle_idx_amd[
     return _shuffle_amd_helper(UInt32(dst_lane), val)
 
 
-@always_inline
+@inline(.always)
 def shuffle_idx[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -576,7 +576,7 @@ def shuffle_idx[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def shuffle_up[
     dtype: DType, simd_width: SIMDLength, //
 ](val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[dtype, simd_width]:
@@ -605,7 +605,7 @@ def shuffle_up[
     return shuffle_up(_FULL_MASK, val, offset)
 
 
-@always_inline
+@inline(.always)
 def _shuffle_up_amd[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -619,7 +619,7 @@ def _shuffle_up_amd[
     return _shuffle_amd_helper(UInt32(dst_lane), val)
 
 
-@always_inline
+@inline(.always)
 def shuffle_up[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -671,7 +671,7 @@ def shuffle_up[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def shuffle_down[
     dtype: DType, simd_width: SIMDLength, //
 ](val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[dtype, simd_width]:
@@ -701,7 +701,7 @@ def shuffle_down[
     return shuffle_down(_FULL_MASK, val, offset)
 
 
-@always_inline
+@inline(.always)
 def _shuffle_down_amd[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -716,7 +716,7 @@ def _shuffle_down_amd[
     return _shuffle_amd_helper(dst_lane, val)
 
 
-@always_inline
+@inline(.always)
 def shuffle_down[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -771,7 +771,7 @@ def shuffle_down[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def shuffle_xor[
     dtype: DType, simd_width: SIMDLength, //
 ](val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[dtype, simd_width]:
@@ -796,7 +796,7 @@ def shuffle_xor[
     return shuffle_xor(_FULL_MASK, val, offset)
 
 
-@always_inline
+@inline(.always)
 def _shuffle_xor_amd[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -812,7 +812,7 @@ def _shuffle_xor_amd[
     return _shuffle_amd_helper(dst_lane, val)
 
 
-@always_inline
+@inline(.always)
 def shuffle_xor[
     dtype: DType, simd_width: SIMDLength, //
 ](mask: UInt, val: SIMD[dtype, simd_width], offset: UInt32) -> SIMD[
@@ -872,7 +872,7 @@ def shuffle_xor[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def lane_group_reduce[
     val_type: DType,
     simd_width: SIMDLength,
@@ -930,7 +930,7 @@ def lane_group_reduce[
     return res
 
 
-@always_inline
+@inline(.always)
 def reduce[
     val_type: DType,
     simd_width: SIMDLength,
@@ -981,7 +981,7 @@ def reduce[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _lane_group_broadcast_reduce[
     val_type: DType,
     simd_width: SIMDLength,
@@ -1021,7 +1021,7 @@ def _lane_group_broadcast_reduce[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def lane_group_sum[
     val_type: DType,
     simd_width: SIMDLength,
@@ -1058,7 +1058,7 @@ def lane_group_sum[
     ](val)
 
 
-@always_inline
+@inline(.always)
 def sum(val: SIMD) -> Scalar[val.dtype]:
     """Computes the sum of values across all lanes in a warp.
 
@@ -1080,7 +1080,7 @@ def sum(val: SIMD) -> Scalar[val.dtype]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def prefix_sum[
     dtype: DType,
     //,
@@ -1148,7 +1148,7 @@ def prefix_sum[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _has_redux_f32_support[dtype: DType, simd_width: Int]() -> Bool:
     return (
         (is_nvidia_gpu["sm_100a"]() or is_nvidia_gpu["sm_101a"]())
@@ -1157,7 +1157,7 @@ def _has_redux_f32_support[dtype: DType, simd_width: Int]() -> Bool:
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _redux_f32_max_min[direction: StaticString](val: SIMD) -> type_of(val):
     comptime instruction = StaticString("redux.sync.") + direction + ".NaN.f32"
     return inlined_assembly[
@@ -1168,7 +1168,7 @@ def _redux_f32_max_min[direction: StaticString](val: SIMD) -> type_of(val):
     ](val, Int32(_FULL_MASK))
 
 
-@always_inline
+@inline(.always)
 def lane_group_max[
     val_type: DType,
     simd_width: SIMDLength,
@@ -1211,7 +1211,7 @@ def lane_group_max[
     ](val)
 
 
-@always_inline
+@inline(.always)
 def max(val: SIMD) -> Scalar[val.dtype]:
     """Computes the maximum value across all lanes in a warp.
 
@@ -1233,7 +1233,7 @@ def max(val: SIMD) -> Scalar[val.dtype]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def lane_group_min[
     val_type: DType,
     simd_width: SIMDLength,
@@ -1276,7 +1276,7 @@ def lane_group_min[
     ](val)
 
 
-@always_inline
+@inline(.always)
 def min(val: SIMD) -> Scalar[val.dtype]:
     """Computes the minimum value across all lanes in a warp.
 
@@ -1298,7 +1298,7 @@ def min(val: SIMD) -> Scalar[val.dtype]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def broadcast[
     val_type: DType, simd_width: SIMDLength, //
 ](val: SIMD[val_type, simd_width]) -> SIMD[val_type, simd_width]:
@@ -1326,7 +1326,7 @@ def broadcast[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _vote_nvidia_helper(vote: Bool) -> UInt32:
     return llvm_intrinsic[
         "llvm.nvvm.vote.ballot.sync",
@@ -1337,7 +1337,7 @@ def _vote_nvidia_helper(vote: Bool) -> UInt32:
     ](0xFFFFFFFF, vote).cast[.uint32]()
 
 
-@always_inline
+@inline(.always)
 def _vote_amd_helper[ret_type: DType](vote: Bool) -> Scalar[ret_type]:
     comptime assert ret_type in (
         DType.uint32,
@@ -1354,7 +1354,7 @@ def _vote_amd_helper[ret_type: DType](vote: Bool) -> Scalar[ret_type]:
     ](vote)
 
 
-@always_inline
+@inline(.always)
 def _vote_apple_helper[ret_type: DType](vote: Bool) -> Scalar[ret_type]:
     comptime assert ret_type in (
         DType.uint32,
@@ -1368,7 +1368,7 @@ def _vote_apple_helper[ret_type: DType](vote: Bool) -> Scalar[ret_type]:
     return mask32.cast[ret_type]()
 
 
-@always_inline
+@inline(.always)
 def vote[ret_type: DType](val: Bool) -> Scalar[ret_type]:
     """Creates a 32 or 64 bit mask among all threads in the warp, where each bit is set to 1 if the
     corresponding thread voted True, and 0 otherwise.
@@ -1407,7 +1407,7 @@ def vote[ret_type: DType](val: Bool) -> Scalar[ret_type]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def match_any[
     dtype: DType,
     //,
@@ -1526,7 +1526,7 @@ def match_any[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def match_all[
     dtype: DType,
     //,

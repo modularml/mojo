@@ -463,7 +463,7 @@ def test_advanced_indexing_getitem(ctx: DeviceContext) raises:
     var output_data_buffer = TileTensor(output_data_stack, output_static_layout)
     var output_dyn = output_data_buffer.make_dynamic[.int64]()
 
-    @always_inline
+    @inline(.always)
     def input_tensor_fn[
         dtype: DType, width: Int
     ](idx: IndexList[input_rank]) {var input_dyn} -> SIMD[dtype, width]:
@@ -471,7 +471,7 @@ def test_advanced_indexing_getitem(ctx: DeviceContext) raises:
             input_dyn.load[width=width, alignment=1](Coord(idx))
         )
 
-    @always_inline
+    @inline(.always)
     def indices_fn[
         indices_index: Int,
     ](coordinates: IndexList[index_rank]) {
@@ -608,7 +608,7 @@ def test_advanced_indexing_setitem_inplace(ctx: DeviceContext) raises:
     var updates = TileTensor(updates_stack, updates_static_layout)
     var updates_dyn = updates.make_dynamic[.int64]()
 
-    @always_inline
+    @inline(.always)
     def updates_tensor_fn[
         dtype: DType, width: Int
     ](idx: IndexList[updates_rank]) {var updates_dyn} -> SIMD[dtype, width]:
@@ -616,7 +616,7 @@ def test_advanced_indexing_setitem_inplace(ctx: DeviceContext) raises:
             updates_dyn.load[width=width, alignment=1](Coord(idx))
         )
 
-    @always_inline
+    @inline(.always)
     def indices_fn[
         indices_index: Int,
     ](coordinates: IndexList[index_rank]) {

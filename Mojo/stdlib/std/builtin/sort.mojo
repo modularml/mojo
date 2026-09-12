@@ -30,7 +30,7 @@ comptime insertion_sort_threshold = 32
 """Threshold below which insertion sort is used instead of quicksort."""
 
 
-@always_inline
+@inline(.always)
 def _insertion_sort[
     T: Copyable,
     origin: MutOrigin,
@@ -57,7 +57,7 @@ def _insertion_sort[
 
 
 # put everything that's "<" to the left of pivot
-@always_inline
+@inline(.always)
 def _quicksort_partition_right[
     T: Copyable,
     origin: MutOrigin,
@@ -85,7 +85,7 @@ def _quicksort_partition_right[
 
 
 # put everything that's "<=" to the left of pivot
-@always_inline
+@inline(.always)
 def _quicksort_partition_left[
     T: Copyable,
     origin: MutOrigin,
@@ -132,7 +132,7 @@ def _heap_sort_fix_down[
         j = i * 2 + 1
 
 
-@always_inline
+@inline(.always)
 def _heap_sort[
     T: Copyable,
     origin: MutOrigin,
@@ -149,7 +149,7 @@ def _heap_sort[
         _heap_sort_fix_down(span, 0, cmp_fn)
 
 
-@always_inline
+@inline(.always)
 def _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
     var log2: Int = (bit_width_of[DType.int]() - 1) ^ count_leading_zeros(
@@ -160,7 +160,7 @@ def _estimate_initial_height(size: Int) -> Int:
     return max(2, Int(ceil(1.3 * Float64(log2))))
 
 
-@always_inline
+@inline(.always)
 def _delegate_small_sort[
     T: Copyable,
     origin: MutOrigin,
@@ -190,7 +190,7 @@ def _delegate_small_sort[
 #     var len: Int
 
 
-@always_inline
+@inline(.always)
 def _quicksort[
     T: Copyable,
     origin: MutOrigin,
@@ -382,7 +382,7 @@ def _stable_sort[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _partition[
     T: Copyable,
     origin: MutOrigin,
@@ -534,7 +534,7 @@ def sort[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _sort2[
     T: Copyable,
     origin: MutOrigin,
@@ -549,7 +549,7 @@ def _sort2[
         span.unsafe_swap_elements(offset0, offset1)
 
 
-@always_inline
+@inline(.always)
 def _sort3[
     T: Copyable,
     origin: MutOrigin,
@@ -566,7 +566,7 @@ def _sort3[
     _sort2(span, offset0, offset1, cmp_fn)
 
 
-@always_inline
+@inline(.always)
 def _sort_partial_3[
     T: Copyable,
     origin: MutOrigin,
@@ -587,7 +587,7 @@ def _sort_partial_3[
         span.unsafe_swap_elements(offset1, offset2)
 
 
-@always_inline
+@inline(.always)
 def _small_sort[
     T: Copyable,
     origin: MutOrigin,

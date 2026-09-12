@@ -477,7 +477,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
     var ctx = DeviceContext()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def test_grouped_1d1d_block_fp4[
         num_experts: Int,
         N: Int,
@@ -630,7 +630,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
     print("\n=== Grouped 1D1D NVFP4 Mixed-Expert Dynamic Switching Tests ===")
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def mixed4[
         num_experts: Int,
         N: Int,

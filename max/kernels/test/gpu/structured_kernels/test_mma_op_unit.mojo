@@ -111,43 +111,43 @@ comptime DEPTH = 64
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _pattern_K_bf16(gr: Int, gc: Int) -> BFloat16:
     return BFloat16(Float32(gr) + Float32(gc) * 0.01)
 
 
-@always_inline
+@inline(.always)
 def _pattern_Q_bf16(gr: Int, gc: Int) -> BFloat16:
     return BFloat16(Float32(gr) - Float32(gc) * 0.01)
 
 
-@always_inline
+@inline(.always)
 def _pattern_V_bf16(k: Int, m: Int) -> BFloat16:
     return BFloat16((Float32(k) * 0.1 + Float32(m)) / 32.0)
 
 
-@always_inline
+@inline(.always)
 def _pattern_P_bf16(k: Int, n: Int) -> BFloat16:
     return BFloat16((Float32(k) + Float32(n) * 0.1) / 64.0)
 
 
-@always_inline
+@inline(.always)
 def _pattern_K_fp8(gr: Int, gc: Int) -> Float8_e4m3fn:
     # FP8 e4m3: peak representable ~448. Keep inputs in [0, ~4).
     return Float8_e4m3fn((Float32(gr) + Float32(gc) * 0.01) / 32.0)
 
 
-@always_inline
+@inline(.always)
 def _pattern_Q_fp8(gr: Int, gc: Int) -> Float8_e4m3fn:
     return Float8_e4m3fn((Float32(gr) - Float32(gc) * 0.01) / 32.0)
 
 
-@always_inline
+@inline(.always)
 def _pattern_V_fp8(k: Int, m: Int) -> Float8_e4m3fn:
     return Float8_e4m3fn((Float32(k) * 0.1 + Float32(m)) / 256.0)
 
 
-@always_inline
+@inline(.always)
 def _pattern_P_fp8(k: Int, n: Int) -> Float8_e4m3fn:
     return Float8_e4m3fn((Float32(k) + Float32(n) * 0.1) / 512.0)
 

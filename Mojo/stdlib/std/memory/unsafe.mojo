@@ -29,7 +29,7 @@ from std.builtin.dtype import _uint_type_of_width
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def bitcast[
     src_dtype: DType,
     src_width: SIMDLength,
@@ -130,7 +130,7 @@ def _llvm_bitwidth(dtype: DType) -> Int:
     # fmt: on
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def pack_bits[
     src_width: SIMDLength,
     //,

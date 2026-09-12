@@ -30,11 +30,11 @@ def main():
     print("is never reached")
 
 
-@always_inline
+@inline(.always)
 def outer():
     inner(call_location())
 
 
-@always_inline
+@inline(.always)
 def inner(location: SourceLocation):
     debug_assert(False, "forcing failure", location=location)

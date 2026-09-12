@@ -24,7 +24,7 @@ from std.math import abs
 from std.random import rand
 
 
-@always_inline
+@inline(.always)
 def idx_x(
     n: Int, c: Int, h: Int, w: Int, N: Int, C: Int, H: Int, W: Int
 ) -> Int:
@@ -32,13 +32,13 @@ def idx_x(
     return n * (C * H * W) + c * (H * W) + h * W + w
 
 
-@always_inline
+@inline(.always)
 def idx_f(m: Int, c: Int, p: Int, q: Int, M: Int, C: Int, K: Int) -> Int:
     """Index into F (filter) tensor: (M, C, K, K) layout."""
     return m * (C * K * K) + c * (K * K) + p * K + q
 
 
-@always_inline
+@inline(.always)
 def idx_y(
     n: Int, m: Int, h: Int, w: Int, N: Int, M: Int, H_out: Int, W_out: Int
 ) -> Int:

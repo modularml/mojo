@@ -56,7 +56,7 @@ from std.utils.index import IndexList
 # exclusivity check is a stopgap workaround; the proper fix is to give the k/v
 # views provably-disjoint origins instead of sharing the collection's.
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def _rope_split_store_ragged_impl[
     dtype: DType,
     freq_dtype: DType,
@@ -377,7 +377,7 @@ def _rope_split_store_ragged_impl[
 # impl, so it inherits the same false-positive aliasing rejection. See
 # `_rope_split_store_ragged_impl` for the full rationale. Stopgap workaround.
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def _rope_split_store_ragged[
     dtype: DType,
     freq_dtype: DType,
@@ -428,7 +428,7 @@ def _rope_split_store_ragged[
     )
 
 
-@always_inline
+@inline(.always)
 def rope_split_store_paged_ragged[
     dtype: DType,
     freq_dtype: DType,
@@ -494,7 +494,7 @@ def rope_split_store_paged_ragged[
 # impl, so it inherits the same false-positive aliasing rejection. See
 # `_rope_split_store_ragged_impl` for the full rationale. Stopgap workaround.
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def _rope_split_store_ragged_with_position_ids[
     dtype: DType,
     freq_dtype: DType,
@@ -590,7 +590,7 @@ def _rope_split_store_ragged_with_position_ids[
     )
 
 
-@always_inline
+@inline(.always)
 def rope_split_store_paged_ragged_with_position_ids[
     dtype: DType,
     freq_dtype: DType,

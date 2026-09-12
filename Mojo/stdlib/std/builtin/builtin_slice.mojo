@@ -49,7 +49,7 @@ struct Slice(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, start: Int, end: Int):
         """Construct slice given the start and end values.
 
@@ -61,7 +61,7 @@ struct Slice(
         self.end = end
         self.step = None
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         start: Optional[Int],
@@ -85,7 +85,7 @@ struct Slice(
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Write Slice string representation to a `Writer`.
 
@@ -94,7 +94,7 @@ struct Slice(
         """
         FormatStruct(writer, "Slice").fields(self.start, self.end, self.step)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write Slice string representation to a `Writer`.
 
@@ -107,7 +107,7 @@ struct Slice(
             Named("step", self.step),
         )
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -224,7 +224,7 @@ struct StridedSlice(ImplicitlyCopyable, Writable):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Write StridedSlice string representation to a `Writer`.
 
@@ -233,7 +233,7 @@ struct StridedSlice(ImplicitlyCopyable, Writable):
         """
         self._inner.write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write StridedSlice debug representation to a `Writer`.
 
@@ -267,7 +267,7 @@ struct ContiguousSlice(ImplicitlyCopyable, Writable):
     var end: Optional[Int]
     """The end index of the slice."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         start: Optional[Int],
@@ -290,7 +290,7 @@ struct ContiguousSlice(ImplicitlyCopyable, Writable):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Write ContiguousSlice string representation to a `Writer`.
 
@@ -299,7 +299,7 @@ struct ContiguousSlice(ImplicitlyCopyable, Writable):
         """
         Slice(self.start, self.end, None).write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write ContiguousSlice debug representation to a `Writer`.
 
@@ -338,7 +338,7 @@ struct ContiguousSlice(ImplicitlyCopyable, Writable):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def slice(end: Int) -> Slice:
     """Construct slice given the end value.
 
@@ -351,7 +351,7 @@ def slice(end: Int) -> Slice:
     return Slice(None, end, None)
 
 
-@always_inline
+@inline(.always)
 def slice(start: Int, end: Int) -> Slice:
     """Construct slice given the start and end values.
 
@@ -365,7 +365,7 @@ def slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-@always_inline
+@inline(.always)
 def slice(
     start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:

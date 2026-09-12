@@ -33,7 +33,7 @@ from nn._ragged_utils import get_batch_from_row_offsets
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def _rope[
     dtype: DType,
     freq_dtype: DType,
@@ -48,12 +48,12 @@ def _rope[
 # In GGUF, weights are organized as real, imag, real, imag, real, imag, …,
 # while in safetensors, the data is stored as real, …, real, imag, …, imag.
 # This function return the indices for the real and imaginary part.
-@always_inline
+@inline(.always)
 def get_safetensors_idx(head_dim_idx: Int, head_size: Int) -> Tuple[Int, Int]:
     return (head_dim_idx // 2, head_dim_idx // 2 + head_size // 2)
 
 
-@always_inline
+@inline(.always)
 def get_identity_rope_coeff[width: Int, dtype: DType]() -> SIMD[dtype, width]:
     # Creates a SIMD vector with real parts set to 1 and imaginary parts to
     # 0, effectively making the RoPE transformation an identity operation.
@@ -62,7 +62,7 @@ def get_identity_rope_coeff[width: Int, dtype: DType]() -> SIMD[dtype, width]:
     )
 
 
-@always_inline
+@inline(.always)
 def apply_rope[
     dtype: DType,
     freq_dtype: DType,
@@ -115,7 +115,7 @@ def apply_rope[
         output_fn[alignment=alignment](pos_im, output_im)
 
 
-@always_inline
+@inline(.always)
 def rope_ragged[
     dtype: DType,
     freq_dtype: DType,
@@ -197,7 +197,7 @@ def rope_ragged[
         pos_ids_ptr = rebind[PtrType](start_pos.ptr.as_imm())
         pos_ids_stride = 0
 
-    @always_inline
+    @inline(.always)
     def rope_fn[width: Int, alignment: Int = 1](idx_arg: Coord) {var}:
         comptime assert idx_arg.rank == 3, "Invalid rank passed to rope kernel"
         comptime assert freqs_cis.flat_rank >= 2

@@ -37,7 +37,7 @@ from nn.attention.mha_mask import MHAMask
 from .smem import SM100AttentionSMem
 
 
-@always_inline
+@inline(.always)
 def fa4_correction[
     qkv_dtype: DType,
     rope_dtype_: Optional[DType],
@@ -93,7 +93,7 @@ def fa4_correction[
     # accumulated O tile by `c`). Depends only on `o_tmem`, `c_pair` and
     # comptime `config.correction_o_cols()` — no pipeline / warp-group state —
     # so it is shared verbatim by BOTH the single-O loop below and the two-WG
-    # `_correction_step` closure further down. `@always_inline` => inlining
+    # `_correction_step` closure further down. `@inline(.always)` => inlining
     # it back into either caller reproduces the identical instruction stream
     # (2-O / DeepSeek / MHA codegen is unchanged).
     #
@@ -101,7 +101,7 @@ def fa4_correction[
     # not the logical depth. See its docstring: under shared-key the logical
     # depth runs 4x past the accumulator and silently corrupts.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _rescale_o(o_tmem: TmemAddress, c_pair: SIMD[.float32, 2]):
         comptime o_cols = config.correction_o_cols()
         comptime batch_size = 16 if o_cols % 16 == 0 else 8
@@ -296,7 +296,7 @@ def fa4_correction[
     # once more after the main loop for any extra c0-only iter (1Q
     # odd-T case where WG0 has one more main-loop commit than WG1).
     @__parameter
-    @always_inline
+    @inline(.always)
     def _correction_step[i: Int]():
         # correct
         var c_scalar: Scalar[accum_type]

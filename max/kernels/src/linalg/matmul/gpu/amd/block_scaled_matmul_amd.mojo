@@ -132,7 +132,7 @@ comptime SCHED_MASK_MFMA = 3
 #     swizzle here entirely (see `use_smem_swizzle` below). Validated on
 #     MI355 via rocprofv3: it eliminates the measured LDS bank conflicts
 #     on the A/B fragment reads.
-@always_inline
+@inline(.always)
 def _full_row_lds_swizzle[BK_BYTES: Int]() -> Swizzle:
     """Builds the LDS swizzle for a row-major `[rows, BK_BYTES]` uint8 tile.
 
@@ -154,7 +154,7 @@ def _full_row_lds_swizzle[BK_BYTES: Int]() -> Swizzle:
     return Swizzle(bits, 4, bits)
 
 
-@always_inline
+@inline(.always)
 def _smem_row_bytes[payload_bytes: Int]() -> Int:
     """SMEM row stride for a `[rows, payload_bytes]` uint8 A/B tile.
 
@@ -184,7 +184,7 @@ def _smem_row_bytes[payload_bytes: Int]() -> Int:
     return w
 
 
-@always_inline
+@inline(.always)
 def _swizzled_smem_off[
     BK_BYTES: Int, swizzle: Optional[Swizzle]
 ](row: Int, col_byte: Int) -> Int:
@@ -386,7 +386,7 @@ struct BlockScaledMmaOp[
         address_space=.LOCAL,
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert (
             Self.num_m_mmas <= 4
@@ -413,11 +413,11 @@ struct BlockScaledMmaOp[
         _ = self._a_scale_packed.fill(Int32(0))
         _ = self._b_scale_packed.fill(Int32(0))
 
-    @always_inline
+    @inline(.always)
     def accum_tile(self) -> ref[self._c_reg] type_of(self._c_reg):
         return self._c_reg
 
-    @always_inline
+    @inline(.always)
     def load_frag_from_smem[
         k_tile_idx: Int, slot: Int = 0
     ](
@@ -484,7 +484,7 @@ struct BlockScaledMmaOp[
         else:
             self._load_a_frag_vectorized[k_tile_idx](a_smem_warp)
 
-    @always_inline
+    @inline(.always)
     def _load_b_frag_vectorized[
         k_tile_idx: Int, slot: Int = 0
     ](
@@ -535,7 +535,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 b_reg_v[b_idx, h] = b_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
+    @inline(.always)
     def _load_a_frag_vectorized[
         k_tile_idx: Int
     ](
@@ -571,7 +571,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 a_reg_v[a_idx, h] = a_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
+    @inline(.always)
     def load_a_frag_from_smem[
         k_tile_idx: Int
     ](self, a_smem_warp: TileTensor[.uint8, _, _, address_space=.SHARED, ...],):
@@ -605,7 +605,7 @@ struct BlockScaledMmaOp[
                 ](row, col_byte)
                 a_reg_v[a_idx, h] = a_smem_warp.raw_load[width=half_w](off)
 
-    @always_inline
+    @inline(.always)
     def load_b_frag_preshuffled[
         k_tile_idx: Int, N: Int, K_BYTES: Int, slot: Int = 0
     ](
@@ -660,7 +660,7 @@ struct BlockScaledMmaOp[
                 b_idx, 0
             ] = b_loader.load_fragment(n_log, k_byte_log)
 
-    @always_inline
+    @inline(.always)
     def load_scales_from_smem[
         k_tile_idx: Int
     ](
@@ -725,7 +725,7 @@ struct BlockScaledMmaOp[
             b_packed = b_packed | bitcast[.int32](byte_val << UInt32(n_mma * 8))
         self._b_scale_packed.raw_store(k_tile_idx, b_packed)
 
-    @always_inline
+    @inline(.always)
     def mma[k_tile_idx: Int, slot: Int = 0](self):
         """Execute block-scaled MFMA for k-tile k_tile_idx using B from `slot`.
 
@@ -1149,7 +1149,7 @@ struct BlockScaledMatmulAMD[
         var k_counter = split_id * tiles_per_split
         var k_scale_counter = split_id * tiles_per_split
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_tiles_from_dram():
             """Load one BK-wide tile from DRAM to register buffers."""
@@ -1159,7 +1159,7 @@ struct BlockScaledMatmulAMD[
             b_loader.load(b_load_reg, b_block.vectorize[1, simd_width]())
             k_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_tiles_to_smem[stage: Int = 0]():
             """Copy register buffers to SMEM in row-major order.
@@ -1191,7 +1191,7 @@ struct BlockScaledMatmulAMD[
             comptime b_stage_base = stage * Self.BN * B_SMEM_ROW_BYTES
             var tid = Int(thread_idx.x)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def store_a():
                 var a_row = tid // a_load_cols
@@ -1205,7 +1205,7 @@ struct BlockScaledMatmulAMD[
                         a_load_reg.raw_load[width=simd_width](v * simd_width),
                     )
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def store_b():
                 var b_row = tid // b_load_cols
@@ -1231,7 +1231,7 @@ struct BlockScaledMatmulAMD[
                 if tid < b_active_threads:
                     store_b()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_scales_from_dram():
             """Cooperatively read one BK iteration's scale tiles to registers.
@@ -1275,7 +1275,7 @@ struct BlockScaledMatmulAMD[
 
             k_scale_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_scales_to_smem[stage: Int = 0]():
             """Copy staged scale dwords to SMEM at the fragment-read offsets.
@@ -1304,7 +1304,7 @@ struct BlockScaledMatmulAMD[
         comptime a_loads_per_thread = Self.BM // a_load_rows
         comptime b_loads_per_thread = Self.BN // b_load_rows
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def simple_k_loop():
             """Fallback for small K where schedule prologue doesn't fit."""
@@ -1334,7 +1334,7 @@ struct BlockScaledMatmulAMD[
                     mma_op.mma[k]()
                 barrier()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def scheduled_k_loop():
             """Pipelined K-loop via build_default_matmul_schedule."""
@@ -1350,7 +1350,7 @@ struct BlockScaledMatmulAMD[
             ]()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _bind[entry: ScheduleEntry]():
                 comptime if entry.op.tag == LOAD_DRAM:
                     load_tiles_from_dram()
@@ -1416,7 +1416,7 @@ struct BlockScaledMatmulAMD[
             comptime for i in range(len(schedule.epilogue)):
                 _bind[schedule.epilogue[i]]()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def double_buffered_k_loop():
             """Depth-2 LDS ping-pong: read stage `k%2` while writing tile k+1
@@ -1428,7 +1428,7 @@ struct BlockScaledMatmulAMD[
             )
             comptime n_pairs = (tiles_per_split - 2) // 2
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def load_frags[stage: Int, slot: Int]():
                 var a_warp = a_smem.tile[Self.WM, A_BK_BYTES](
@@ -1447,7 +1447,7 @@ struct BlockScaledMatmulAMD[
                     )
                     mma_op.load_scales_from_smem[k](sfa_k, sfb_k)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def step[cur: Int, prefetch_dram: Bool]():
                 """One steady-state K-tile: stage/slot `cur` in, `1 - cur` out.
@@ -2267,7 +2267,7 @@ def block_scaled_matmul_amd[
             ](c, a, b, a_scales, b_scales, M, ctx)
 
 
-@always_inline
+@inline(.always)
 def _largest_divisor_at_most[n: Int](cap: Int) -> Int:
     """Returns the largest divisor of `n` that is at most `cap`.
 

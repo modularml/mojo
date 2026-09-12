@@ -94,7 +94,7 @@ def _transpose_fcrs_to_krsc[
 # =========================================================================
 
 
-@always_inline
+@inline(.always)
 def test_alignment_sm100_conv2d[
     input_type: DType, output_type: DType
 ](in_channels: Int, out_channels: Int) -> Bool:
@@ -260,7 +260,7 @@ def dispatch_sm100_conv2d[
         var in_c_bytes = in_c * size_of[input_type]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _launch[
             swizzle: TensorMapSwizzle,
             num_pipeline_stages_override: Int = 0,

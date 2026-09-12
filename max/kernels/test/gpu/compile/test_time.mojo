@@ -28,13 +28,13 @@ def clock_functions():
     _ = perf_counter_ns()
 
 
-@always_inline
+@inline(.always)
 def _verify_clock_functions_nvidia(asm: StringSlice) raises -> None:
     # NVIDIA uses globaltimer for perf_counter_ns (nanosecond resolution).
     assert_true("globaltimer" in asm)
 
 
-@always_inline
+@inline(.always)
 def _verify_clock_functions_amd(asm: StringSlice) raises -> None:
     # AMD uses s_memrealtime for perf_counter_ns (constant-speed clock).
     assert_true("s_memrealtime" in asm)
@@ -72,13 +72,13 @@ def global_clock_functions():
     _ = global_perf_counter_ns()
 
 
-@always_inline
+@inline(.always)
 def _verify_global_clock_functions_nvidia(asm: StringSlice) raises -> None:
     # NVIDIA uses globaltimer for global_perf_counter_ns.
     assert_true("globaltimer" in asm)
 
 
-@always_inline
+@inline(.always)
 def _verify_global_clock_functions_amd(asm: StringSlice) raises -> None:
     # AMD uses s_memrealtime for global_perf_counter_ns (constant-speed clock).
     assert_true("s_memrealtime" in asm)
@@ -115,7 +115,7 @@ def test_global_clock_functions_gfx950() raises:
 def time_functions(some_value: Int) -> Int:
     var tmp = some_value
 
-    @always_inline
+    @inline(.always)
     def something() {mut tmp}:
         tmp += 1
 
@@ -124,7 +124,7 @@ def time_functions(some_value: Int) -> Int:
     return tmp
 
 
-@always_inline
+@inline(.always)
 def _verify_time_functions(asm: StringSlice) raises -> None:
     # time_function uses perf_counter_ns which reads globaltimer on NVIDIA.
     assert_true("globaltimer" in asm)
@@ -157,7 +157,7 @@ def sleep_function():
     sleep(1.0)
 
 
-@always_inline
+@inline(.always)
 def _verify_sleep_function_nvidia(asm: StringSlice) raises -> None:
     # Verify the nanosleep instruction is present.
     assert_true("nanosleep" in asm, "Expected nanosleep instruction in PTX")
@@ -167,7 +167,7 @@ def _verify_sleep_function_nvidia(asm: StringSlice) raises -> None:
     assert_true("bra" in asm, "Expected branch instruction for sleep loop")
 
 
-@always_inline
+@inline(.always)
 def _verify_sleep_function_amd(asm: StringSlice) raises -> None:
     # Verify s_memrealtime is used for timing (constant-speed clock).
     assert_true("s_memrealtime" in asm, "Expected s_memrealtime for timing")

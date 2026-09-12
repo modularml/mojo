@@ -166,22 +166,22 @@ struct Conv2dSmem[
     var source_tiles: Self.SourceTiles
 
     # ========== Tile Accessors ==========
-    @always_inline
+    @inline(.always)
     def act_tiles(ref[AddressSpace.SHARED] self) -> Self.ActTileArray:
         """Get activation tiles (im2col'd)."""
         return self.input_tiles.a_tiles()
 
-    @always_inline
+    @inline(.always)
     def filter_tiles(ref[AddressSpace.SHARED] self) -> Self.FilterTileArray:
         """Get filter tiles."""
         return self.input_tiles.b_tiles()
 
-    @always_inline
+    @inline(.always)
     def out_tiles(ref[AddressSpace.SHARED] self) -> Self.OutTileArray:
         """Get output tiles."""
         return self.output_tiles.c_tiles()
 
-    @always_inline
+    @inline(.always)
     def src_tiles(ref[AddressSpace.SHARED] self) -> Self.SrcTileArray:
         """Get source C tiles (for residual operations)."""
         return self.source_tiles.src_tiles()
@@ -218,7 +218,7 @@ struct Conv2dSmem[
     comptime LoadOrderBarriers = Self.LoadOrderBarrier.BarrierArray
 
     # ========== Conv2D-specific Barrier Accessors ==========
-    @always_inline
+    @inline(.always)
     def epi_load_barriers(
         ref[AddressSpace.SHARED] self,
     ) -> Self.EpiLoadBarriers:
@@ -229,7 +229,7 @@ struct Conv2dSmem[
         """
         return self.epi_load_pipeline.barriers.barriers()
 
-    @always_inline
+    @inline(.always)
     def get_load_order_barrier(
         ref[AddressSpace.SHARED] self,
     ) -> Self.LoadOrderBarriers:

@@ -45,7 +45,7 @@ def test_capture_neg_1_5() raises:
     run_captured_func(ctx, -1.5)
 
 
-@no_inline
+@inline(.never)
 def run_captured_func(ctx: DeviceContext, captured: Float32) raises:
     print("-")
     print("run_captured_func(", captured, "):")

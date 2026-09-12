@@ -110,7 +110,7 @@ from linalg.matmul.gpu.sm100.block_scaled_matmul import (
 comptime logger = Logger()
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_scaled_fp4fp8[
     out_dtype: DType,
     scales_dtype: DType,
@@ -410,7 +410,7 @@ def quantize_dynamic_scaled_fp4fp8_kernel[
                         )
 
 
-@always_inline
+@inline(.always)
 def block_scales_interleave_fp4[
     scales_dtype: DType,
     //,
@@ -2031,7 +2031,7 @@ def block_scaled_matmul_with_epilogue[
     if m == 0 or n == 0:
         return
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -2103,7 +2103,7 @@ def block_scaled_matmul_with_epilogue[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def block_scaled_matmul[
     c_type: DType,
     a_type: DType,
@@ -2260,7 +2260,7 @@ def block_scaled_matmul[
 
     # vendor block scaled matmul kernels don't support compute lambda, so we wrap it around an epilogue lambda instead.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c)
     def compute_lambda_wrapper[
         _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
@@ -2346,7 +2346,7 @@ def block_scaled_matmul[
         else:
             raise Error("Heuristic and outliers dispatch failed")
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -2431,7 +2431,7 @@ def block_scaled_matmul[
         )
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_block_scaled[
     out_dtype: DType,
     scales_dtype: DType,
@@ -2596,7 +2596,7 @@ def quantize_dynamic_block_scaled[
         )
 
 
-@always_inline
+@inline(.always)
 def block_scales_interleave[
     scales_dtype: DType,
     //,
@@ -2659,7 +2659,7 @@ def block_scales_interleave[
 ########################################################
 
 
-@always_inline
+@inline(.always)
 def quantize_mxfp8_lane_group[
     in_dtype: DType,
     width: Int,
@@ -2807,7 +2807,7 @@ def _quantize_mx_amd_kernel[
                 scales.store(Coord(global_row_idx, scale_col), e8m0_scale)
 
 
-@always_inline
+@inline(.always)
 def quantize_mx_amd[
     out_dtype: DType = .uint8,
     scales_dtype: DType = .float8_e8m0fnu,
@@ -2940,7 +2940,7 @@ def quantize_dynamic_block_scaled_mxfp4_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def quantize_dynamic_block_scaled_mxfp4[
     in_dtype: DType
 ](
@@ -2994,7 +2994,7 @@ def quantize_dynamic_block_scaled_mxfp4[
         )
 
 
-@always_inline
+@inline(.always)
 def _mxfp4_dotprod[
     out_dtype: DType,
     //,
@@ -3007,7 +3007,7 @@ def _mxfp4_dotprod[
     b_scales_ptr: UnsafePointer[Float8_e8m0fnu, ImmutAnyOrigin],
     K: Int,
 ):
-    @always_inline
+    @inline(.always)
     def cast_fp2em1x2_to_bf16x2[
         byte_select: Int
     ](packed: Int32, scale: Float32) -> SIMD[.bfloat16, 2]:
@@ -3015,7 +3015,7 @@ def _mxfp4_dotprod[
             "llvm.amdgcn.cvt.scalef32.pk.bf16.fp4", SIMD[.bfloat16, 2]
         ](packed, scale, Int32(byte_select))
 
-    @always_inline
+    @inline(.always)
     def dotprod_bf16x2(
         a: SIMD[.bfloat16, 2], b: SIMD[.bfloat16, 2], c: Float32
     ) -> Float32:
@@ -3068,7 +3068,7 @@ def _mxfp4_dotprod[
     c_ptr.store(accum.cast[out_dtype]())
 
 
-@always_inline
+@inline(.always)
 def _mxfp4_dotprod_block_size(static_N: Int) -> Int:
     comptime target_block_size = 16
     return target_block_size if (static_N % target_block_size) == 0 else 1
@@ -3108,7 +3108,7 @@ def matmul_dynamic_block_scaled_amd_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def matmul_dynamic_block_scaled_amd[
     out_dtype: DType
 ](
@@ -3219,7 +3219,7 @@ def grouped_matmul_block_scaled_amd_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def grouped_matmul_block_scaled_amd[
     out_dtype: DType,
 ](

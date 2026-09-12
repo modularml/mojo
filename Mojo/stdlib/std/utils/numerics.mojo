@@ -58,7 +58,7 @@ struct FPUtils[
     """The equivalent uint dtype of the float type."""
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def mantissa_width() -> Int:
         """Returns the mantissa width of a floating point type.
 
@@ -68,7 +68,7 @@ struct FPUtils[
         return DType.mantissa_width[Self.dtype]()
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def max_exponent() -> Int:
         """Returns the max exponent of a floating point dtype without accounting
         for inf representations. This is not
@@ -81,7 +81,7 @@ struct FPUtils[
         return DType.max_exponent[Self.dtype]()
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def exponent_width() -> Int:
         """Returns the exponent width of a floating point type.
 
@@ -91,7 +91,7 @@ struct FPUtils[
         return DType.exponent_width[Self.dtype]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def exponent_bias() -> Int:
         """Returns the exponent bias of a floating point type.
 
@@ -101,7 +101,7 @@ struct FPUtils[
         return DType.exponent_bias[Self.dtype]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mantissa_mask() -> Int:
         """Returns the mantissa mask of a floating point type.
 
@@ -111,7 +111,7 @@ struct FPUtils[
         return (1 << Self.mantissa_width()) - 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def sign_mask() -> Int:
         """Returns the sign mask of a floating point type.
 
@@ -123,7 +123,7 @@ struct FPUtils[
         return 1 << (Self.exponent_width() + Self.mantissa_width())
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def exponent_mask() -> Int:
         """Returns the exponent mask of a floating point type.
 
@@ -135,7 +135,7 @@ struct FPUtils[
         return ~(Self.sign_mask() | Self.mantissa_mask())
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def exponent_mantissa_mask() -> Int:
         """Returns the exponent and mantissa mask of a floating point type.
 
@@ -147,7 +147,7 @@ struct FPUtils[
         return Self.exponent_mask() | Self.mantissa_mask()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def quiet_nan_mask() -> Int:
         """Returns the quiet NaN mask for a floating point type.
 
@@ -166,7 +166,7 @@ struct FPUtils[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def bitcast_to_integer(value: Scalar[Self.dtype]) -> Int:
         """Bitcasts the floating-point value to an integer.
 
@@ -179,7 +179,7 @@ struct FPUtils[
         return Int(bitcast[Self.integral_type, 1](value))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def bitcast_to_uint(value: Scalar[Self.dtype]) -> Scalar[Self.uint_type]:
         """Bitcasts the floating-point value to an integer.
 
@@ -192,7 +192,7 @@ struct FPUtils[
         return bitcast[Self.uint_type, 1](value)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def bitcast_from_integer(value: Int) -> Scalar[Self.dtype]:
         """Bitcasts the floating-point value from an integer.
 
@@ -205,7 +205,7 @@ struct FPUtils[
         return bitcast[Self.dtype, 1](Scalar[Self.integral_type](value))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_sign(value: Scalar[Self.dtype]) -> Bool:
         """Returns the sign of the floating point value.
 
@@ -218,7 +218,7 @@ struct FPUtils[
         return (Self.bitcast_to_integer(value) & Self.sign_mask()) != 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def set_sign(value: Scalar[Self.dtype], sign: Bool) -> Scalar[Self.dtype]:
         """Sets the sign of the floating point value.
 
@@ -237,7 +237,7 @@ struct FPUtils[
         return Self.bitcast_from_integer(bits)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_exponent(value: Scalar[Self.dtype]) -> Int:
         """Returns the exponent bits of the floating-point value.
 
@@ -252,7 +252,7 @@ struct FPUtils[
         ) >> Self.mantissa_width()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_exponent_biased(value: Scalar[Self.dtype]) -> Int:
         """Returns the biased exponent of the floating-point value as an Int,
         this is how the value is stored before subtracting the exponent bias.
@@ -270,7 +270,7 @@ struct FPUtils[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def set_exponent(
         value: Scalar[Self.dtype], exponent: Int
     ) -> Scalar[Self.dtype]:
@@ -289,7 +289,7 @@ struct FPUtils[
         return Self.bitcast_from_integer(bits)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_mantissa(value: Scalar[Self.dtype]) -> Int:
         """Gets the mantissa bits of the floating-point value.
 
@@ -302,7 +302,7 @@ struct FPUtils[
         return Self.bitcast_to_integer(value) & Self.mantissa_mask()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_mantissa_uint(value: Scalar[Self.dtype]) -> Scalar[Self.uint_type]:
         """Gets the mantissa bits of the floating-point value.
 
@@ -317,7 +317,7 @@ struct FPUtils[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def set_mantissa(
         value: Scalar[Self.dtype], mantissa: Int
     ) -> Scalar[Self.dtype]:
@@ -336,7 +336,7 @@ struct FPUtils[
         return Self.bitcast_from_integer(bits)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def pack(sign: Bool, exponent: Int, mantissa: Int) -> Scalar[Self.dtype]:
         """Construct a floating-point value from its constituent sign, exponent,
         and mantissa.
@@ -368,22 +368,22 @@ struct FlushDenormals(Defaultable):
     var state: Int32
     """The current state."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initializes the FlushDenormals."""
         self.state = Self._current_state()
 
-    @always_inline
+    @inline(.always)
     def __enter__(self):
         """Enters the context. This will set denormals to zero."""
         self._set_flush(True)
 
-    @always_inline
+    @inline(.always)
     def __exit__(self):
         """Exits the context. This will restore the prior FPState."""
         self._set_flush(False, True)
 
-    @always_inline
+    @inline(.always)
     def _set_flush(self, enable: Bool, force: Bool = False):
         comptime if (
             not CompilationTarget.has_sse4()
@@ -423,7 +423,7 @@ struct FlushDenormals(Defaultable):
             has_side_effect=True,
         ](fpcr)
 
-    @always_inline
+    @inline(.always)
     def _is_set(self, state: Int32) -> Bool:
         comptime if CompilationTarget.has_sse4():
             return (state & 0x8000) != 0 and (state & 0x40) != 0
@@ -431,7 +431,7 @@ struct FlushDenormals(Defaultable):
         comptime ARM_FPCR_FZ = Int32(1) << 24
         return (state & ARM_FPCR_FZ) != 0
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _current_state() -> Int32:
         """Gets the current denormal state."""
@@ -464,7 +464,7 @@ struct FlushDenormals(Defaultable):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def nan[dtype: DType]() -> Scalar[dtype]:
     """Gets a NaN value for the given dtype.
 
@@ -526,7 +526,7 @@ def nan[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def isnan[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[.bool, width]:
@@ -581,7 +581,7 @@ def isnan[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def inf[dtype: DType]() -> Scalar[dtype]:
     """Gets a +inf value for the given dtype.
 
@@ -635,7 +635,7 @@ def inf[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def neg_inf[dtype: DType]() -> Scalar[dtype]:
     """Gets a -inf value for the given dtype.
 
@@ -693,7 +693,7 @@ def neg_inf[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def max_finite[dtype: DType]() -> Scalar[dtype]:
     """Returns the maximum finite value of type.
 
@@ -738,7 +738,7 @@ def max_finite[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def min_finite[dtype: DType]() -> Scalar[dtype]:
     """Returns the minimum (lowest) finite value of type.
 
@@ -767,7 +767,7 @@ def min_finite[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def max_or_inf[dtype: DType]() -> Scalar[dtype]:
     """Returns the maximum (potentially infinite) value of type.
 
@@ -791,7 +791,7 @@ def max_or_inf[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def min_or_neg_inf[dtype: DType]() -> Scalar[dtype]:
     """Returns the minimum (potentially negative infinite) value of type.
 
@@ -815,7 +815,7 @@ def min_or_neg_inf[dtype: DType]() -> Scalar[dtype]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def isinf[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[.bool, width]:
@@ -863,7 +863,7 @@ def isinf[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def isfinite[
     dtype: DType, width: SIMDLength, //
 ](val: SIMD[dtype, width]) -> SIMD[.bool, width]:
@@ -901,7 +901,7 @@ def isfinite[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def get_accum_type[
     dtype: DType, *, preferred_accum_type: DType = .float32
 ]() -> DType:
@@ -976,7 +976,7 @@ def nextafter[
         DType.float64,
     ), "nextafter only supports float32 and float64 types"
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _float32_dispatch[
         lhs_type: DType, rhs_type: DType, result_type: DType
     ](arg0: Scalar[lhs_type], arg1: Scalar[rhs_type]) -> Scalar[result_type]:
@@ -984,7 +984,7 @@ def nextafter[
             arg0, arg1
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _float64_dispatch[
         lhs_type: DType, rhs_type: DType, result_type: DType
     ](arg0: Scalar[lhs_type], arg1: Scalar[rhs_type]) -> Scalar[result_type]:

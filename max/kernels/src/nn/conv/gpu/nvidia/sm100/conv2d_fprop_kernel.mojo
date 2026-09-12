@@ -449,7 +449,7 @@ struct Conv2dFpropKernel[
     # ========== Static Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -503,7 +503,7 @@ struct Conv2dFpropKernel[
     # ========== Im2col TMA-based convolution ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         ctx: Self.Context,
         act_tma_op: Self.ActTmaOp,
@@ -595,7 +595,7 @@ struct Conv2dFpropKernel[
         cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         act_tma_origin: ImmOrigin,
         filter_tma_origin: ImmOrigin,
@@ -710,7 +710,7 @@ struct Conv2dFpropKernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(act_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(filter_tma_op, `nvvm.grid_constant`)
@@ -750,7 +750,7 @@ struct Conv2dFpropKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(act_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(filter_tma_op, `nvvm.grid_constant`)
@@ -797,7 +797,7 @@ struct Conv2dFpropKernel[
     # ========== Unified Kernel Implementation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _run_impl[
         has_residual: Bool,
         _src_rank: Int = Self.SrcTmaOp.rank,

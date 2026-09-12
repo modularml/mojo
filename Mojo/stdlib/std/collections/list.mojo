@@ -76,7 +76,7 @@ struct _ListIter[
     var _data: Pointer[Self.T, Self.origin]
     var _length: Int
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
@@ -94,7 +94,7 @@ struct _ListIter[
             self._index -= 1
             return self._data[unsafe_offset=self._index]
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
@@ -122,7 +122,7 @@ struct _ListIterOwned[T: Movable & Deinitable](
     var _list: List[Self.T]
     var _index: Int
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         # Destroy the remaining elements that have not yet been
         # iterated over.
@@ -132,7 +132,7 @@ struct _ListIterOwned[T: Movable & Deinitable](
         )
         self._list._len = 0
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -146,7 +146,7 @@ struct _ListIterOwned[T: Movable & Deinitable](
             .unsafe_take_pointee()
         )
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len = len(self._list) - self._index
         return (iter_len, {iter_len})
@@ -465,7 +465,7 @@ struct List[T: AnyType, /](
         self = Self()
         self._unchecked_grow(length, fill)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, length: Int, fill_with: Some[def(Int) -> Self.T]):
         """Constructs a list by calling `fill_with(i)` for each index `i`.
 
@@ -490,7 +490,7 @@ struct List[T: AnyType, /](
                 init_with=lambda () {imm} -> Self.T: fill_with(i)
             )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, var *values: Self.T, __list_literal__: NoneType
     ) where conforms_to(Self.T, Movable):
@@ -534,7 +534,7 @@ struct List[T: AnyType, /](
         for var value in iterable:
             self.append(rebind_var[type_of(self).T](value^))
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, unsafe_uninit_length: Int):
         """Construct a list with the specified length, with uninitialized
         memory. This is unsafe, as it relies on the caller initializing the
@@ -601,7 +601,7 @@ struct List[T: AnyType, /](
     # ===-------------------------------------------------------------------===#
 
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __eq__(
         self, other: Self, /
     ) -> Bool where conforms_to(Self.T, Equatable):
@@ -790,7 +790,7 @@ struct List[T: AnyType, /](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__(self) -> Int:
         """Gets the number of elements in the list.
 
@@ -819,7 +819,7 @@ struct List[T: AnyType, /](
         fmt.write_sequence_to(writer, iterate)
         _ = iterator^
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Writable):
@@ -830,7 +830,7 @@ struct List[T: AnyType, /](
         """
         self._write_self_to[f=fmt.write_to[Self.T]](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Writable):
@@ -861,7 +861,7 @@ struct List[T: AnyType, /](
         """
         return len(self) * size_of[Self.T]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def capacity(self) -> Int:
         """Gets the number of elements that can fit in the list without resizing.
 
@@ -877,7 +877,7 @@ struct List[T: AnyType, /](
         """
         return self._capacity
 
-    @no_inline
+    @inline(.never)
     def _realloc(
         mut self, new_capacity: Int
     ) where conforms_to(Self.T, Movable):
@@ -898,7 +898,7 @@ struct List[T: AnyType, /](
         self._capacity = new_capacity
         self._annotate_new()
 
-    @always_inline
+    @inline(.always)
     def _grow_amortized(
         mut self, min_capacity: Int
     ) where conforms_to(Self.T, Movable):
@@ -948,12 +948,12 @@ struct List[T: AnyType, /](
             self._realloc(self._capacity * 2 | Int(self._capacity == 0))
         self._annotate_increase()
         # Not `_unsafe_next_uninit_ptr`: its capacity assert survives into the
-        # hot path, because the `@no_inline` `_realloc` hides the invariant
+        # hot path, because the `@inline(.never)` `_realloc` hides the invariant
         # just established above from the optimizer.
         self._data.unsafe_offset(self._len).unsafe_write(value^)
         self._len += 1
 
-    @always_inline
+    @inline(.always)
     def insert(
         mut self, i: Int, var value: Self.T, /
     ) where conforms_to(Self.T, Movable):
@@ -1144,7 +1144,7 @@ struct List[T: AnyType, /](
         """
         return self.pop(len(self) - 1)
 
-    @always_inline
+    @inline(.always)
     def pop(mut self, i: Int) -> Self.T where conforms_to(Self.T, Movable):
         """Pops a value from the list at the given index.
 
@@ -1494,7 +1494,7 @@ struct List[T: AnyType, /](
 
     @__unsafe_nested_origins_read_only
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, slice: ContiguousSlice
     ) -> Span[Self.T, Self._InteriorOrigin[origin_of(self)]]:
@@ -1517,7 +1517,7 @@ struct List[T: AnyType, /](
         }
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, idx: IntLiteral, /
     ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
@@ -1537,7 +1537,7 @@ struct List[T: AnyType, /](
 
     @stable(since="1.0")
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, idx: Int, /
     ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
@@ -1557,7 +1557,7 @@ struct List[T: AnyType, /](
         return self.unsafe_get(index(idx))
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, idx: Some[Indexer]
     ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
@@ -1577,7 +1577,7 @@ struct List[T: AnyType, /](
         return self.unsafe_get(index(idx))
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def unsafe_get(
         ref self, idx: Int
     ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
@@ -1602,7 +1602,7 @@ struct List[T: AnyType, /](
         check_bounds[cpu_default=False](idx, len(self))
         return self._unsafe_interior_ptr().unsafe_offset(idx)[]
 
-    @always_inline
+    @inline(.always)
     def unsafe_set(
         mut self, idx: Int, var value: Self.T
     ) where conforms_to(Self.T, Deinitable & Movable):
@@ -1677,7 +1677,7 @@ struct List[T: AnyType, /](
         var ptr = self._data
         ptr.unsafe_offset(elt_idx_1).swap_pointees(ptr.unsafe_offset(elt_idx_2))
 
-    @always_inline
+    @inline(.always)
     def _unsafe_interior_ptr[
         origin: Origin, address_space: AddressSpace, //
     ](ref[origin, address_space] self) -> Pointer[
@@ -1713,7 +1713,7 @@ struct List[T: AnyType, /](
             .unsafe_address_space_cast[address_space]()
         )
 
-    @always_inline
+    @inline(.always)
     def _unsafe_next_uninit_ptr(
         ref self,
     ) -> Pointer[Self.T, origin_of(self)]:

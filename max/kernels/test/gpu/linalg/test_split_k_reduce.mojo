@@ -87,7 +87,7 @@ def test_split_k_reduce_rank3[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c, epilogue_buffer)
     def epilogue_fn[
         _dtype: DType, _width: SIMDLength, *, alignment: Int = 1

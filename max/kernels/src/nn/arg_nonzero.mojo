@@ -24,7 +24,7 @@ from std.utils.index import IndexList
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def arg_nonzero[
     dtype: DType,
     output_type: DType,
@@ -78,7 +78,7 @@ def arg_nonzero[
 
 
 # Where has the shape 2D shape [NumNonZeros, InputRank]
-@always_inline
+@inline(.always)
 def arg_nonzero_shape[
     dtype: DType
 ](input_buffer: TileTensor[dtype, ...]) -> IndexList[2]:

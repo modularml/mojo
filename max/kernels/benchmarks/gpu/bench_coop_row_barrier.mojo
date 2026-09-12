@@ -30,7 +30,7 @@ from nn.sampling.coop_row import COOP_SLOT_FLOATS, CoopRow, coop_row_words
 comptime BLOCK_SIZE = 1024
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _sum(x: SIMD, y: type_of(x)) -> type_of(x):
     return x + y
@@ -74,7 +74,7 @@ def main() raises:
         ctx.enqueue_memset(workspace, 0)
         ctx.synchronize()
 
-        @always_inline
+        @inline(.always)
         def launch(ctx: DeviceContext) raises {mut workspace, mut sink, imm}:
             @__parameter
             def go[g: Int]() raises:
@@ -90,7 +90,7 @@ def main() raises:
                 if group_size == g:
                     return go[g]()
 
-        @always_inline
+        @inline(.always)
         def bench_fn(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, launch, ctx)
 

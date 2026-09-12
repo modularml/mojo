@@ -56,9 +56,9 @@ def time_kernel(
     kernel_name: String,
     func: Some[def(DeviceContext) raises -> None],
 ) raises:
-    @always_inline
+    @inline(.always)
     def bench_func(mut m: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             func(ctx)
 
@@ -196,7 +196,7 @@ def test_case_batched[
 
     comptime if DEBUG_BENCH:
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {var}:
             _topk_gpu[sampling=sampling, largest=largest](
                 ctx,
@@ -275,7 +275,7 @@ def test_case_batched[
 
         comptime if DEBUG_BENCH:
 
-            @always_inline
+            @inline(.always)
             def run_func_cpu(ctx: DeviceContext) raises {var}:
                 _top_k_cpu[
                     dtype=dtype,

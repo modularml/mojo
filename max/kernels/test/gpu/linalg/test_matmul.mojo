@@ -43,7 +43,7 @@ comptime epilogue_func_type = def[
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def epilogue_test_fn[
     dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](
@@ -183,7 +183,7 @@ def test[
     ctx.enqueue_copy(c_device_ref_buffer, c_host_ref_ptr)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_device, m, n)
     def epilogue_fn[
         _dtype: DType,
@@ -258,7 +258,7 @@ def test[
 
     comptime pack_size = simd_width_of[dtype, target=get_gpu_target()]()
 
-    @always_inline
+    @inline(.always)
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
         var val = c_device_ref.load[width=simd_width](idx0)
 

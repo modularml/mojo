@@ -198,14 +198,14 @@ def bench_dispatch[
     dealloc(host_topk_ids^)
     dealloc(host_input_tokens^)
 
-    @always_inline
+    @inline(.always)
     def clean_up(
         ctx: DeviceContext,
         atomic_counter: DeviceBuffer[.int32],
     ) raises {}:
         ctx.enqueue_memset(atomic_counter, Int32(0))
 
-    @always_inline
+    @inline(.always)
     def setup_and_run_benchmark[
         TokenFmtType: TokenFormat,
         FormatHandlerType: TokenFormat,
@@ -282,7 +282,7 @@ def bench_dispatch[
         ]
         var func_combine_async_wait = ctx.compile_function[combine_wait]()
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async(
             ctx: DeviceContext,
         ) raises {imm}:
@@ -307,7 +307,7 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async_wait(
             ctx: DeviceContext,
         ) raises {imm}:
@@ -325,14 +325,14 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async_e2e(
             ctx: DeviceContext,
         ) raises {imm}:
             run_dispatch_async(ctx)
             run_dispatch_async_wait(ctx)
 
-        @always_inline
+        @inline(.always)
         def run_combine_async(
             ctx: DeviceContext,
         ) raises {imm}:
@@ -357,7 +357,7 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_combine_async_wait(
             ctx: DeviceContext,
         ) raises {imm}:
@@ -372,7 +372,7 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_combine_async_e2e(
             ctx: DeviceContext,
         ) raises {imm}:
@@ -381,45 +381,45 @@ def bench_dispatch[
 
         shmem_barrier_all_on_stream(ctx.stream())
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async_func() raises {imm}:
             run_dispatch_async_e2e(ctx)
 
-        @always_inline
+        @inline(.always)
         def run_combine_async_func() raises {imm}:
             run_combine_async_e2e(ctx)
 
-        @always_inline
+        @inline(.always)
         def run_clean_up_func() raises {imm}:
             clean_up(ctx, atomic_counter)
 
-        @always_inline
+        @inline(.always)
         def dispatch_launch(
             ctx: DeviceContext,
         ) raises {imm}:
             run_dispatch_async_func()
 
-        @always_inline
+        @inline(.always)
         def bench_dispatch_func(mut b: Bencher) {imm}:
             bencher_iter_custom(b, dispatch_launch, ctx)
 
-        @always_inline
+        @inline(.always)
         def combine_launch(
             ctx: DeviceContext,
         ) raises {imm}:
             run_combine_async_func()
 
-        @always_inline
+        @inline(.always)
         def bench_combine_func(mut b: Bencher) {imm}:
             bencher_iter_custom(b, combine_launch, ctx)
 
-        @always_inline
+        @inline(.always)
         def clean_up_launch(
             ctx: DeviceContext,
         ) raises {imm}:
             run_clean_up_func()
 
-        @always_inline
+        @inline(.always)
         def bench_clean_up_func(mut b: Bencher) {imm}:
             bencher_iter_custom(b, clean_up_launch, ctx)
 

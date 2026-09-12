@@ -231,7 +231,7 @@ def bench_matmul_1d_tma_epilogue[
     cb_bias.init_on_device(init_type, ctx)
 
     @__copy_capture(cb_a, cb_b, cb_c, cb_bias)
-    @always_inline
+    @inline(.always)
     def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
         var tensor_a = TileTensor(
             cb_a.offset_ptr(iteration), row_major(shape_a)
@@ -253,7 +253,7 @@ def bench_matmul_1d_tma_epilogue[
         elif variant == "compute_lambda_bias":
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(tensor_c, bias_tile)
             def epilogue_lambda[
                 _dtype: DType,
@@ -295,7 +295,7 @@ def bench_matmul_1d_tma_epilogue[
                 ctx,
             )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 
@@ -365,7 +365,7 @@ def bench_matmul_1d_tma_epilogue[
         elif variant == "compute_lambda_bias":
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(bias_ver_nd)
             def ver_epilogue_lambda[
                 _dtype: DType,

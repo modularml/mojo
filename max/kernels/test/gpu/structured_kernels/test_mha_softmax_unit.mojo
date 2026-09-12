@@ -94,7 +94,7 @@ comptime DIAG_PER_LANE = 5  # o_avg, max_vec, norm_vec, scale_vec, nan_count
 # ----------------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def _fill_att_block(
     mut att_block: RegTile[.float32, _, MutUntrackedOrigin],
     value: Float32,
@@ -108,7 +108,7 @@ def _fill_att_block(
             att_v[h, w, 0] = v_simd
 
 
-@always_inline
+@inline(.always)
 def _fill_att_block_one_hot(
     mut att_block: RegTile[.float32, _, MutUntrackedOrigin],
     base_value: Float32,
@@ -130,7 +130,7 @@ def _fill_att_block_one_hot(
         att_v[0, 0, 0] = v0
 
 
-@always_inline
+@inline(.always)
 def _exp2_inplace(
     mut att_block: RegTile[.float32, _, MutUntrackedOrigin],
 ):
@@ -144,7 +144,7 @@ def _exp2_inplace(
             att_v[h, w, 0] = math_exp2(att_v[h, w, 0])
 
 
-@always_inline
+@inline(.always)
 def _accumulate_o_from_att(
     mut o_reg: RegTile[.float32, _, MutUntrackedOrigin],
     att_block: RegTile[.float32, _, MutUntrackedOrigin],
@@ -179,7 +179,7 @@ def _accumulate_o_from_att(
             o_v[h, w, 0] = elt
 
 
-@always_inline
+@inline(.always)
 def _emit_diag(
     out_ptr: MutPointer[Float32, MutAnyOrigin],
     o_reg: RegTile[.float32, _, MutUntrackedOrigin],
@@ -372,7 +372,7 @@ def kernel_case4_subnormal(
 # ----------------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def _logit_for_tile(t: Int) -> Float32:
     """Logit pattern for case 5; selected at runtime since the index is
     iteration-driven. Using a flat function instead of an Array

@@ -25,7 +25,7 @@ Author contract — one body, two targets:
 def reduce_sum[...](shape, target="cpu", ctx=None) raises:
     var axis_size: DType = ...
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx: rowwise.Context[params]) {var axis_size}:
@@ -33,7 +33,7 @@ def reduce_sum[...](shape, target="cpu", ctx=None) raises:
         comptime rank = row_coords.rank
         var state = ReduceSum[accum_type, W]()
 
-        @always_inline
+        @inline(.always)
         def tile_fn[
             ws: Int
         ](mut state: ReduceSum[accum_type, W], coords: RowCoord[rank]):
@@ -43,7 +43,7 @@ def reduce_sum[...](shape, target="cpu", ctx=None) raises:
         rowwise.reduce(row_coords, axis_size, ctx, state, tile_fn)
         rowwise.pjoin(state, ctx)
 
-        @always_inline
+        @inline(.always)
         def emit() {...}:
             ...
 
@@ -128,7 +128,7 @@ from std.utils.static_tuple import StaticTuple
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def reduce[
     params: ContextParams,
     rank: Int,
@@ -161,7 +161,7 @@ def reduce[
         _gpu_reduce(row_coords, axis_size, ctx, tile_fn)
 
 
-@always_inline
+@inline(.always)
 def reduce[
     State: ReduceOp,
     params: ContextParams,
@@ -205,7 +205,7 @@ def reduce[
         _gpu_reduce(row_coords, axis_size, ctx, state, tile_fn)
 
 
-@always_inline
+@inline(.always)
 def pjoin[
     State: ReduceOp,
     params: ContextParams,
@@ -236,7 +236,7 @@ def pjoin[
         _gpu_pjoin(state, ctx)
 
 
-@always_inline
+@inline(.always)
 def once[
     Emit: ImplicitlyCopyable & RegisterPassable & (def() -> None),
     params: ContextParams,
@@ -267,13 +267,13 @@ def once[
         _gpu_once(emit, ctx)
 
 
-@always_inline
+@inline(.always)
 # ===-----------------------------------------------------------------------===#
 # `pick_simd_width` — body-side SIMD width selection.
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def pick_simd_width[
     M: ReduceOp,
     target: StaticString = "cpu",
@@ -351,7 +351,7 @@ def pick_simd_width[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def strided_load[
     dtype: DType,
     //,
@@ -825,7 +825,7 @@ struct RowCache[
     var row_coord: RowCoord[Self.rank]
     """The row's coords (reduced axis pinned to its base)."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, copy: Self):
         """Explicit copy constructor: `Array` lost `ImplicitlyCopyable`
         conformance, so `_owned` can't be auto-derived and needs `.copy()`.
@@ -837,7 +837,7 @@ struct RowCache[
         self._shmem_addr = copy._shmem_addr
         self.row_coord = copy.row_coord
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, row_coord: RowCoord[Self.rank]):
         """Builds an empty handle; `cache` fills the backing.
 
@@ -856,7 +856,7 @@ struct RowCache[
         # with the real base when `shared`.
         self._shmem_addr = Int(row_coord.coord[0].value())
 
-    @always_inline
+    @inline(.always)
     def recompute[
         w: Int,
         InputFn: ImplicitlyCopyable
@@ -901,7 +901,7 @@ struct RowCache[
         comptime al = tile_alignment[Self.dtype, w, Self.params.target]()
         return compute[w](input_fn[w, al](coord), coord)
 
-    @always_inline
+    @inline(.always)
     def load[
         w: Int,
         InputFn: ImplicitlyCopyable
@@ -1076,7 +1076,7 @@ struct Row[
     # no-op against `ctx._phase`); unused and DCE'd on every other tier.
     var _reduce_index: Int
 
-    @always_inline
+    @inline(.always)
     def __init__[
         InputFn: ImplicitlyCopyable
         & RegisterPassable
@@ -1128,7 +1128,7 @@ struct Row[
                     self._row_regs[chunk] = input_fn[Self._W, al](idx)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _participant() -> Int:
         # Row-local participant index (comptime-resolved): lane within the
         # warp (warp tier) or thread within the block (block tier).
@@ -1138,7 +1138,7 @@ struct Row[
             return Int(thread_idx.x)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _index_vector[w: Int](pos: Int) -> SIMD[.int64, w]:
         # Per-lane axis positions for a tile starting at `pos`. Lane stride
         # is the tier discriminator (comptime): `1` when lanes are
@@ -1149,7 +1149,7 @@ struct Row[
         comptime lane_stride = 0 if Self.params.emit_tile_width > 1 else 1
         return SIMD[.int64, w](pos) + iota[.int64, w]() * Int64(lane_stride)
 
-    @always_inline
+    @inline(.always)
     def reduce[
         M: ReduceOp,
         Contribute: ImplicitlyCopyable
@@ -1213,7 +1213,7 @@ struct Row[
             var partial = M()
             var ctx = self.ctx
 
-            @always_inline
+            @inline(.always)
             def splitk_reduce_tile[
                 ws: Int
             ](mut state: M, coords: RowCoord[Self.rank]) {
@@ -1253,7 +1253,7 @@ struct Row[
         else:
             var ctx = self.ctx
 
-            @always_inline
+            @inline(.always)
             def reduce_tile[
                 ws: Int
             ](mut state: M, coords: RowCoord[Self.rank]) {
@@ -1289,7 +1289,7 @@ struct Row[
         pjoin(state, self.ctx)
         return state
 
-    @always_inline
+    @inline(.always)
     def elementwise[
         G: ImplicitlyCopyable
         & RegisterPassable
@@ -1331,7 +1331,7 @@ struct Row[
             if Int(self.ctx._phase) == Self.params._num_phases - 1:
                 var ctx = self.ctx
 
-                @always_inline
+                @inline(.always)
                 def splitk_emit_tile[
                     ws: Int
                 ](coords: RowCoord[Self.rank]) {var input_fn, var g, var ctx}:
@@ -1361,7 +1361,7 @@ struct Row[
         else:
             var ctx = self.ctx
 
-            @always_inline
+            @inline(.always)
             def emit_tile[
                 ws: Int
             ](coords: RowCoord[Self.rank]) {var input_fn, var g, var ctx}:
@@ -1386,7 +1386,7 @@ struct Row[
                     emit_tile,
                 )
 
-    @always_inline
+    @inline(.always)
     def emit[
         Write: ImplicitlyCopyable
         & RegisterPassable
@@ -1415,7 +1415,7 @@ struct Row[
         """
         var row_coord = self.row_coord
 
-        @always_inline
+        @inline(.always)
         def emit_once() {var write, var row_coord}:
             var oc = row_coord.at_axis[Self.axis](0)
             write(oc)
@@ -1423,7 +1423,7 @@ struct Row[
         once(emit_once, self.ctx)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _row_sync():
         # Row-local barrier for shmem staging: warp-level on the warp tier
         # (one warp per row — a block `barrier()` would deadlock when the
@@ -1434,7 +1434,7 @@ struct Row[
         else:
             barrier()
 
-    @always_inline
+    @inline(.always)
     def cache[
         T: DType,
         Compute: ImplicitlyCopyable
@@ -1538,7 +1538,7 @@ struct Row[
                         )
         return out
 
-    @always_inline
+    @inline(.always)
     def reduce[
         T: DType,
         shared: Bool,
@@ -1631,7 +1631,7 @@ struct Row[
             var over_ = over
             var axis_size = Int(self.axis_size.value())
 
-            @always_inline
+            @inline(.always)
             def reduce_tile[
                 ws: Int
             ](mut state: M, coords: RowCoord[Self.rank]) {
@@ -1672,7 +1672,7 @@ struct Row[
         pjoin(state, self.ctx)
         return state
 
-    @always_inline
+    @inline(.always)
     def elementwise[
         T: DType,
         shared: Bool,
@@ -1765,7 +1765,7 @@ struct Row[
             var over_ = over
             var axis_size = Int(self.axis_size.value())
 
-            @always_inline
+            @inline(.always)
             def emit_tile[
                 ws: Int
             ](coords: RowCoord[Self.rank]) {

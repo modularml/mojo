@@ -108,15 +108,15 @@ struct _SpanIter[
     var index: Int
     var src: Span[Self.T, Self.origin]
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> ref[Self.origin] Self.Element:
@@ -133,7 +133,7 @@ struct _SpanIter[
             self.index -= 1
             return self.src._data[unsafe_offset=self.index]
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the number of elements remaining in this iterator.
 
@@ -145,7 +145,7 @@ struct _SpanIter[
         else:
             return self.index
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         """Returns bounds `[lower, upper]` for the remaining iterator length.
 
@@ -251,7 +251,7 @@ struct Span[
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     def __init__(out self):
         """Create an empty / zero-length span."""
@@ -260,7 +260,7 @@ struct Span[
 
     @doc_hidden
     @implicit
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @stable(since="1.0")
     def __init__(
         other: Span,
@@ -293,7 +293,7 @@ struct Span[
         self._data = unsafe_ptr
         self._len = length
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(
         out self,
@@ -307,7 +307,7 @@ struct Span[
         self._data = rebind[type_of(self._data)](list.unsafe_ptr())
         self._len = len(list)
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(
         out self,
@@ -321,14 +321,14 @@ struct Span[
         self._data = array.unsafe_ptr()
         self._len = array.length
 
-    @always_inline
+    @inline(.always)
     def _unchecked_get(
         self,
         index: Int,
     ) -> ref[Self.origin, Self.address_space] Self.T:
         return self._data[unsafe_offset=index]
 
-    @always_inline
+    @inline(.always)
     def _unchecked_subspan(
         self,
         *,
@@ -345,7 +345,7 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, idx: Int, /
     ) -> ref[Self.origin, Self.address_space] Self.T:
@@ -360,7 +360,7 @@ struct Span[
         check_bounds(idx, len(self))
         return self._data[unsafe_offset=idx]
 
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, idx: Some[Indexer]
     ) -> ref[Self.origin, Self.address_space] Self.T:
@@ -375,7 +375,7 @@ struct Span[
         check_bounds(idx, len(self))
         return self._data[unsafe_offset=idx]
 
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self, idx: IntLiteral
     ) -> ref[Self.origin, Self.address_space] Self.T:
@@ -394,7 +394,7 @@ struct Span[
         check_bounds(idx, len(self))
         return self._data[unsafe_offset=idx]
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, slc: ContiguousSlice) -> Self:
         """Get a new span from a slice of the current span.
 
@@ -411,7 +411,7 @@ struct Span[
         var start, end = check_slice_bounds(slc, len(self))
         return self._unchecked_subspan(start=start, end=end)
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType where Self._is_generic_as:
         """Consume the span and return an iterator over its elements.
 
@@ -425,7 +425,7 @@ struct Span[
             0, rebind[Span[downcast[Self.T, Copyable], Self.origin]](self)
         )
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where Self._is_generic_as:
@@ -441,7 +441,7 @@ struct Span[
             0, rebind[Span[downcast[Self.T, Copyable], Self.origin]](self)
         )
 
-    @always_inline
+    @inline(.always)
     def __reversed__(
         self,
     ) -> _SpanIter[
@@ -548,7 +548,7 @@ struct Span[
         fmt.write_sequence_to(writer, iterate)
         _ = iterator^
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Writable) and Self._is_generic_as:
@@ -559,7 +559,7 @@ struct Span[
         """
         self._write_self_to[f=fmt.write_to[Self.T]](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.T, Writable) and Self._is_generic_as:
@@ -603,7 +603,7 @@ struct Span[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def as_imm(self) -> Self.Immutable:
         """Return an immutable version of this `Span`.
 
@@ -612,7 +612,7 @@ struct Span[
         """
         return rebind[Self.Immutable](self)
 
-    @always_inline
+    @inline(.always)
     def unsafe_get(
         self, idx: Some[Indexer]
     ) -> ref[Self.origin, Self.address_space] Self.T:
@@ -648,7 +648,7 @@ struct Span[
         """
         return self._data
 
-    @always_inline
+    @inline(.always)
     def as_ref(
         self,
     ) -> Pointer[Self.T, Self.origin, address_space=Self.address_space]:
@@ -661,7 +661,7 @@ struct Span[
 
         return Self._PointerType(to=self._data[unsafe_offset=0])
 
-    @always_inline
+    @inline(.always)
     @__allow_legacy_custom_self_type
     def copy_from(
         self: MutSpan[Self.T, _], other: Span[Self.T, _]
@@ -731,7 +731,7 @@ struct Span[
                 return False
         return True
 
-    @always_inline
+    @inline(.always)
     @__allow_legacy_custom_self_type
     def __ne__(
         self: Span[Self.T, _], rhs: Span[Self.T, _]
@@ -778,7 +778,7 @@ struct Span[
                 var p = Pointer(to=element).unsafe_mut_cast[True]()
                 p[] = value.copy()
 
-    @always_inline
+    @inline(.always)
     @__allow_legacy_custom_self_type
     def unsafe_swap_elements(
         self: MutSpan[Self.T, _], a: Int, b: Int
@@ -839,7 +839,7 @@ struct Span[
 
         self.unsafe_swap_elements(a, b)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __merge_with__[
         other_type: type_of(Span[Self.T, _, address_space=Self.address_space]),
     ](
@@ -1010,7 +1010,7 @@ struct Span[
         vectorize[simdwidth](length, do_count)
         return count
 
-    @always_inline
+    @inline(.always)
     def unsafe_subspan(self, *, offset: Int, length: Int) -> Self:
         """Returns a subspan of the current span.
 

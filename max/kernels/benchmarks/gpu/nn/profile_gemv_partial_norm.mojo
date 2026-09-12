@@ -209,7 +209,7 @@ def main() raises:
             transpose_b=True,
         )
 
-        @always_inline
+        @inline(.always)
         def kernel_launch(
             ctx: DeviceContext, iteration: Int
         ) raises {
@@ -262,7 +262,7 @@ def main() raises:
                     ctx,
                 )
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, kernel_launch, ctx)
 

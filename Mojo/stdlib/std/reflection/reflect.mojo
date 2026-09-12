@@ -415,7 +415,7 @@ struct Reflected[T: AnyType]:
     # `nodebug` (not `builtin`) because the body emits a `lit.ref.struct.ger`
     # MLIR op, which is not legal inside a `@always_inline("builtin")` function.
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def field_ref[
         idx: Int
     ](ref s: Self.T) -> ref[s] _field_types_of[Self.T]()[idx]:

@@ -114,7 +114,7 @@ struct KVCacheIterator[
     var batch_idx: Int
     var kv_head_idx: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         cache: Self.cache_t,
@@ -128,7 +128,7 @@ struct KVCacheIterator[
         self.batch_idx = batch_idx
         self.kv_head_idx = kv_head_idx
 
-    @always_inline
+    @inline(.always)
     def next_tile(mut self) -> Self.GmemTileType:
         """Returns a TileTensor for the next DRAM tile."""
         var valid_rows = max(
@@ -154,12 +154,12 @@ struct KVCacheIterator[
         self.tile_start_row += Self.tile_size
         return tile
 
-    @always_inline
+    @inline(.always)
     def increment(mut self):
         self.tile_start_row += Self.tile_size
 
 
-@always_inline
+@inline(.always)
 def _get_k_swizzle[mma_m: Int, bk: Int]() -> Optional[Swizzle]:
     """K swizzle for decode.
 
@@ -404,12 +404,12 @@ struct KVBuffer[
 
     var warp_id: UInt32
 
-    @always_inline
+    @inline(.always)
     def _smem_view(self) -> Self.SmemParentType:
         """Full 2-stage SMEM view with strides (BK, BN)."""
         return self.smem_tile
 
-    @always_inline
+    @inline(.always)
     def smem_block_tile[
         tile_rows: Int,
     ](self, tile_row: Int, block_col: Int) -> TileTensor[
@@ -438,7 +438,7 @@ struct KVBuffer[
             stride_layout=Self._SmemTileStrides,
         ](Coord(tile_row, block_col))
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         k_cache: Self.kv_t,
@@ -457,7 +457,7 @@ struct KVBuffer[
 
         self.warp_id = warp_id
 
-    @always_inline
+    @inline(.always)
     def load_from_dram[buffer_idx: Int](mut self):
         var gmem_tile = self.kv_cache_iter.next_tile()
         var loader = SubTileLoaderLDS[Self.kv_t.dtype, Self.swizzle](gmem_tile)
@@ -554,7 +554,7 @@ struct KVBuffer[
     comptime _rows_per_k_tile = Self.num_mmas * Self.num_k_mmas2
     comptime _rows_per_k_mma = Self.num_mmas
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile[
         k_mma_tile_idx: Int,
         bk_tile_idx: Int,
@@ -567,7 +567,7 @@ struct KVBuffer[
         comptime reg_slot = bk_tile_idx % Self._reg_num_k_tiles
         return self.kv_mma_op.mma_tile_at[reg_slot, k_mma_tile_idx]()
 
-    @always_inline
+    @inline(.always)
     def mma_subtile[
         k_mma_tile_idx: Int,
         bk_tile_idx: Int,
@@ -587,7 +587,7 @@ struct KVBuffer[
         """
         return self.get_mma_tile[k_mma_tile_idx, bk_tile_idx]()
 
-    @always_inline
+    @inline(.always)
     def zero_partial_tile_pad(self):
         """Register-side zero for the OOB tail of the partial K-tile.
 
@@ -645,7 +645,7 @@ struct KVBuffer[
                     .fill(0)
                 )
 
-    @always_inline
+    @inline(.always)
     def load_from_shared(self, buffer: Int):
         # The no-index form loads every strip into the reg tile. When the
         # reg tile is chunked (_reg_num_k_tiles < num_k_tiles) slots alias,
@@ -748,7 +748,7 @@ struct KVBuffer[
             comptime for bk_tile in range(Self.num_k_tiles):
                 self.load_from_shared[bk_tile](buffer)
 
-    @always_inline
+    @inline(.always)
     def load_from_shared[bk_tile: Int](self, buffer: Int):
         var smem_base = self.smem_tile.tile[Self.BN, Self.BK](
             0, buffer * Self._blocks_per_stage
@@ -945,7 +945,7 @@ struct DecodeStreamingKVBuffer[
     ]
     var warp_id: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         cache: Self.kv_t,
@@ -961,7 +961,7 @@ struct DecodeStreamingKVBuffer[
         self.smem_ptr = smem_ptr
         self.warp_id = warp_id
 
-    @always_inline
+    @inline(.always)
     def _k_smem_view(
         self,
     ) -> TileTensor[
@@ -978,7 +978,7 @@ struct DecodeStreamingKVBuffer[
             address_space=.SHARED,
         ](self.smem_ptr, Self._KSmemParentLayout())
 
-    @always_inline
+    @inline(.always)
     def k_smem_block_tile[
         tile_rows: Int,
     ](self, tile_row: Int) -> TileTensor[
@@ -1005,7 +1005,7 @@ struct DecodeStreamingKVBuffer[
             stride_layout=Self._KSmemTileStrides,
         ](Coord(tile_row, Idx[0]))
 
-    @always_inline
+    @inline(.always)
     def load_from_dram[
         strip_idx: Int
     ](self, gmem_tile: TileTensor[Self.kv_t.dtype, ...],):
@@ -1146,7 +1146,7 @@ struct DecodeStreamingKVBuffer[
                 load_buf.vectorize[1, _v_sw](),
             )
 
-    @always_inline
+    @inline(.always)
     def load_from_shared(self):
         """Load from SMEM to MMA registers."""
         comptime if Self.transpose:
@@ -1228,7 +1228,7 @@ struct DecodeStreamingKVBuffer[
                         frag[r] = mma_view[tr * Self.input_frag_size + r, tc][0]
                     reg_vec[kg * _v_num_mmas_v + i, 0] = frag
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile[
         k_mma_idx: Int,
     ](self) -> TileTensor[
@@ -1269,7 +1269,7 @@ trait KVBufferConfig:
     comptime iterator_axis: Int
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_wtile_coord() -> IndexList[2]:
         ...
 
@@ -1298,7 +1298,7 @@ struct KBufferConfig[BN: Int, BK: Int, WN: Int](KVBufferConfig):
     comptime iterator_axis = 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_wtile_coord() -> IndexList[2]:
         var warp_col = get_warp_coords[Self.BN, Self.WN]()[1]
         return IndexList[2](warp_col, 0)
@@ -1329,7 +1329,7 @@ struct VBufferConfig[BN: Int, BK: Int, WN: Int, depth: Int](KVBufferConfig):
     comptime iterator_axis = 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_wtile_coord() -> IndexList[2]:
         var warp_col = get_warp_coords[Self.BN, Self.WN]()[1]
         return IndexList[2](0, warp_col)
@@ -1476,7 +1476,7 @@ struct DecodeKVBuffer[
     var tile_idx: Int
     var load_tile_id: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: Self.GmemTileType,
@@ -1494,7 +1494,7 @@ struct DecodeKVBuffer[
         self.tile_idx = 0
         self.load_tile_id = 0
 
-    @always_inline
+    @inline(.always)
     def load_from_dram(
         mut self,
     ):
@@ -1514,7 +1514,7 @@ struct DecodeKVBuffer[
         self.tile_idx += 1
         self.load_tile_id = (self.load_tile_id + 1) % Self.num_stages
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile(
         self,
     ) -> TileTensor[
@@ -1532,7 +1532,7 @@ struct DecodeKVBuffer[
             ]
         ](self.mma_tile)
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared[
         tile_id: Int = 0
     ](self,):
@@ -1547,7 +1547,7 @@ struct DecodeKVBuffer[
             ).vectorize[1, Self.simd_width](),
         )
 
-    @always_inline
+    @inline(.always)
     def load_from_shared[
         k_mma: Int,
     ](self):

@@ -21,7 +21,7 @@ from nn.gather_scatter import gather_reduce
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def add(x: SIMD, y: type_of(x)) -> type_of(x):
     return x + y
 

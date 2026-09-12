@@ -221,7 +221,7 @@ def _bench(
     var out_tma = create_tma_tile[CHUNK, V](ctx, out_tt.to_layout_tensor())
     var outb_tma = create_tma_tile[CHUNK, V](ctx, outb_tt.to_layout_tensor())
 
-    @always_inline
+    @inline(.always)
     def launch_l1(
         lctx: DeviceContext,
     ) raises {
@@ -313,7 +313,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_l2(
         lctx: DeviceContext,
     ) raises {
@@ -381,7 +381,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_seg_reduce(
         lctx: DeviceContext,
     ) raises {
@@ -420,7 +420,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_seg_scan(
         lctx: DeviceContext,
     ) raises {
@@ -464,7 +464,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_seg_apply(
         lctx: DeviceContext,
     ) raises {
@@ -503,7 +503,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_l3(
         lctx: DeviceContext,
     ) raises {
@@ -542,7 +542,7 @@ def _bench(
             block_dim=(V,),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_fused(
         lctx: DeviceContext,
     ) raises {

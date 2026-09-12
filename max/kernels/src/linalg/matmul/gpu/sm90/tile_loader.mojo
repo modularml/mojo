@@ -60,7 +60,7 @@ trait TileLoader(TrivialRegisterPassable):
 
     comptime _dtype: DType
 
-    @always_inline
+    @inline(.always)
     def load_tile(
         self,
         dst: TileTensor[
@@ -93,7 +93,7 @@ trait BarrierHandler(TrivialRegisterPassable):
     cp.async: prepare is noop, complete commits copies and signals arrival.
     """
 
-    @always_inline
+    @inline(.always)
     def prepare_stage(self, mem_barrier: SMemBarrier):
         """Prepare barrier for incoming transfers.
 
@@ -105,7 +105,7 @@ trait BarrierHandler(TrivialRegisterPassable):
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def complete_stage(self, mem_barrier: SMemBarrier):
         """Signal that all transfers for this stage are done.
 
@@ -142,11 +142,11 @@ struct TMABarrierHandler[expected_bytes: Int](BarrierHandler):
                 consumer_arrive_count=Int32(num_consumers * cluster_size),
             )
 
-    @always_inline
+    @inline(.always)
     def prepare_stage(self, mem_barrier: SMemBarrier):
         mem_barrier[].expect_bytes(Int32(Self.expected_bytes))
 
-    @always_inline
+    @inline(.always)
     def complete_stage(self, mem_barrier: SMemBarrier):
         pass
 
@@ -172,11 +172,11 @@ struct CPAsyncBarrierHandler(BarrierHandler):
                 consumer_arrive_count=Int32(num_consumers * cluster_size),
             )
 
-    @always_inline
+    @inline(.always)
     def prepare_stage(self, mem_barrier: SMemBarrier):
         pass
 
-    @always_inline
+    @inline(.always)
     def complete_stage(self, mem_barrier: SMemBarrier):
         async_copy_arrive(mem_barrier)
         _ = mem_barrier[].arrive()
@@ -223,7 +223,7 @@ struct TileLoaderTMA[
     var rank: Int
     var multicast_mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tma_op: Self.TMATensorTilePtr,
@@ -241,7 +241,7 @@ struct TileLoaderTMA[
         self.rank = rank
         self.multicast_mask = multicast_mask
 
-    @always_inline
+    @inline(.always)
     def load_tile(
         self,
         dst: TileTensor[
@@ -364,7 +364,7 @@ struct TileLoaderCPAsync[
         Engine=Self.src_engine,
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         src: TileTensor[
@@ -444,7 +444,7 @@ struct TileLoaderCPAsync[
         ](a_gmem_tile, dst_vec)
 
 
-@always_inline
+@inline(.always)
 def async_copy_with_bound_check[
     dtype: DType,
     src_layout: TensorLayout,

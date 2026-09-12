@@ -48,7 +48,7 @@ def _compute_reg_tile_layout(layout: Layout, frag_size: Int) -> Layout:
     return Layout.row_major(local_size // frag_size, frag_size)
 
 
-@always_inline
+@inline(.always)
 def _load_a_reg_tile[
     dtype: DType,
     layout: Layout,

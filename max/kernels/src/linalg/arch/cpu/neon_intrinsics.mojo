@@ -33,7 +33,7 @@ def _neon_dotprod[
     comptime assert width == 4
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def call_intrinsic[intrin: StaticString]() -> SIMD[c_type, width]:
         return llvm_intrinsic[intrin, SIMD[c_type, width]](c, a, b)
 
@@ -83,7 +83,7 @@ def _neon_matmul[
     comptime assert width == 4
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def call_intrinsic[intrin: StaticString]() -> SIMD[c_type, width]:
         return llvm_intrinsic[intrin, SIMD[c_type, width]](c, a, b)
 

@@ -266,13 +266,13 @@ def test_rmsnorm_then_matmul[
     var weight_offset = Scalar[a_type](0.0)
     var norm_shape = Index(M, K)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(a_raw_tensor)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[a_type, width]:
         return a_raw_tensor.raw_load[width=width](a_raw_tensor.layout(coords))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(a_normed_vendor_tensor)
     @__parameter
     def output_fn_vendor[
@@ -295,7 +295,7 @@ def test_rmsnorm_then_matmul[
         transpose_b=transpose_b,
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(a_normed_ours_tensor)
     @__parameter
     def output_fn_ours[
@@ -322,7 +322,7 @@ def test_rmsnorm_then_matmul[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_ours_tensor)
     def epilogue_fn[
         _dtype: DType,

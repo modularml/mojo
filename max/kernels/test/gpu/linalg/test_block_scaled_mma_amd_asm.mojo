@@ -16,11 +16,11 @@
 travels in a 32-byte fragment despite carrying only 24 payload bytes. One FP6
 MFMA (`cbsz:2 blgp:2`, accumulator width 16) on gfx950 measures:
 
-    operand     wrapper         A/B span  VGPRs  bytes
-    <6 x i32>   @always_inline   6         17     48
-    <8 x i32>   @always_inline   6         17     48
-    <6 x i32>   @no_inline       6         31     48
-    <8 x i32>   @no_inline       6         33     64
+    operand     wrapper           A/B span  VGPRs  bytes
+    <6 x i32>   @inline(.always)  6         17     48
+    <8 x i32>   @inline(.always)  6         17     48
+    <6 x i32>   @inline(.never)   6         31     48
+    <8 x i32>   @inline(.never)   6         33     64
 
 The padding is free only while InstCombine narrows the operand and the wrapper
 stays inlined. The span reads 6 in every row, so the tests also pin whole-kernel

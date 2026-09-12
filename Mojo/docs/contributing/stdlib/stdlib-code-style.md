@@ -211,23 +211,23 @@ This first table is just a definition of the various "case styles."
 
 The following table shows our preferred use of different case styles.
 
-| Code kind                          | Example                                           | Case style                            |
-|------------------------------------|---------------------------------------------------|---------------------------------------|
-| `def`                              | `def engage_hyperdrive()`                         | `snake_case`                          |
-| `struct`                           | `struct Point`                                    | `PascalCase`                          |
-| `trait`                            | `trait Copyable`                                  | `PascalCase`                          |
-| `enum`                             | `enum StatusCode`                                 | `PascalCase`                          |
-| `var`                              | `var the_value = 5`                               | `snake_case`                          |
-| `module` / `package`               | `io.mojo` / `os/__init__.mojo`                    | `flatcase` / `snake_case`             |
-| dunder                             | `__init__`                                        | `flatcase`                            |
-| decorator                          | `@no_inline`                                      | `snake_case`                          |
-| **Parameters — type or value**     | &nbsp;                                            | &nbsp;                                |
-| `alias` type                       | `alias Int8 = Scalar[DType.int8]`                 | `PascalCase`                          |
-| `alias` value global / local scope | `alias CHUNK_SIZE = 32` / `alias chunk_size = 32` | `SCREAMING_SNAKE_CASE` / `snake_case` |
-| `struct` type parameter            | `struct List[ElementType: Movable]`               | `PascalCase`                          |
-| `struct` value parameter           | `struct Array[ElementType: Movable, length: Int]` | `snake_case`                          |
-| `def` type parameter               | `def do_it[Action: Actionable](action: Action)`   | `PascalCase`                          |
-| `def` value parameter              | `def repeat[count: Int]()`                        | `snake_case`                          |
+| Code kind                            | Example                                             | Case style                              |
+|--------------------------------------|-----------------------------------------------------|-----------------------------------------|
+| `def`                                | `def engage_hyperdrive()`                           | `snake_case`                            |
+| `struct`                             | `struct Point`                                      | `PascalCase`                            |
+| `trait`                              | `trait Copyable`                                    | `PascalCase`                            |
+| `enum`                               | `enum StatusCode`                                   | `PascalCase`                            |
+| `var`                                | `var the_value = 5`                                 | `snake_case`                            |
+| `module` / `package`                 | `io.mojo` / `os/__init__.mojo`                      | `flatcase` / `snake_case`               |
+| dunder                               | `__init__`                                          | `flatcase`                              |
+| decorator                            | `@inline(.never)`                                   | `snake_case`                            |
+| **Parameters — type or value**       | &nbsp;                                              | &nbsp;                                  |
+| `alias` type                         | `alias Int8 = Scalar[DType.int8]`                   | `PascalCase`                            |
+| `alias` value global / local scope   | `alias CHUNK_SIZE = 32` / `alias chunk_size = 32`   | `SCREAMING_SNAKE_CASE` / `snake_case`   |
+| `struct` type parameter              | `struct List[ElementType: Movable]`                 | `PascalCase`                            |
+| `struct` value parameter             | `struct Array[ElementType: Movable, length: Int]`   | `snake_case`                            |
+| `def` type parameter                 | `def do_it[Action: Actionable](action: Action)`     | `PascalCase`                            |
+| `def` value parameter                | `def repeat[count: Int]()`                          | `snake_case`                            |
 
 Although these are our style conventions, not all code currently adheres to it.
 When preparing a new change, it is important to adhere to the style and naming
@@ -433,7 +433,7 @@ In cases where a generic, cross-platform compatible fallback implementation
 is available, it is okay to use an unguarded `else` condition:
 
 ```mojo
-@always_inline("nodebug")
+@inline(.nodebug)
 def prefetch[...](...):
     comptime if is_nvidia_gpu():
         inlined_assembly["prefetch.global.L2 [$0];", ...](...)

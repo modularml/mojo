@@ -119,7 +119,7 @@ struct ArgMax:
         # the new impl handles CPU + GPU and any axis.
         comptime reduce_dim = axis if axis >= 0 else axis + rank
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -127,7 +127,7 @@ struct ArgMax:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[.int64, width]) {var output}:
@@ -178,7 +178,7 @@ struct ArgMin:
         # the new impl handles CPU + GPU and any axis.
         comptime reduce_dim = axis if axis >= 0 else axis + rank
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -186,7 +186,7 @@ struct ArgMin:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[.int64, width]) {var output}:
@@ -264,7 +264,7 @@ struct Mean:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -272,7 +272,7 @@ struct Mean:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -341,13 +341,13 @@ struct RowMeanOfSquares:
         if output.shape()[0] != input.shape()[0] or output.shape()[1] != 1:
             raise Error("output must have shape [input_rows, 1]")
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
             return input._lambda_load[width=width](coords)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -576,7 +576,7 @@ struct ReduceAdd:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -584,7 +584,7 @@ struct ReduceAdd:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -648,7 +648,7 @@ struct ReduceMul:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -656,7 +656,7 @@ struct ReduceMul:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -721,7 +721,7 @@ struct ReduceMax:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -729,7 +729,7 @@ struct ReduceMax:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -793,7 +793,7 @@ struct ReduceMin:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input.dtype, width]:
@@ -801,7 +801,7 @@ struct ReduceMin:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[output.dtype, width]) {var output}:
@@ -877,7 +877,7 @@ struct LayerNorm:
         if Int(beta.shape()[0]) != Int(input.shape()[rank - 1]):
             raise Error("Beta size does not match dimension of reduction.")
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[dtype, width]:
@@ -885,7 +885,7 @@ struct LayerNorm:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) {var output}:
@@ -1000,7 +1000,7 @@ struct ReduceRMSNorm:
 
         # Shape passed via `input.shape_coord()` to preserve statically-known
         # dims in the `Coord` type.
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[dtype, width]:
@@ -1008,7 +1008,7 @@ struct ReduceRMSNorm:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) {var output}:
@@ -1119,7 +1119,7 @@ struct ReduceRMSNormRoPE:
         if output.shape() != input.shape():
             raise Error("Input and output buffers are not same shape")
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[dtype, width]:
@@ -1127,7 +1127,7 @@ struct ReduceRMSNormRoPE:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def cos_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var cos_vals} -> SIMD[cos_sin_dtype, width]:
@@ -1135,7 +1135,7 @@ struct ReduceRMSNormRoPE:
                 width=width, element_alignment=alignment
             ](coords)
 
-        @always_inline
+        @inline(.always)
         def sin_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var sin_vals} -> SIMD[cos_sin_dtype, width]:
@@ -1143,7 +1143,7 @@ struct ReduceRMSNormRoPE:
                 width=width, element_alignment=alignment
             ](coords)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[output_dtype, width]) {var output}:
@@ -1283,7 +1283,7 @@ struct LayerNormRopeRagged:
         if Int(beta.shape()[0]) != Int(input.shape()[rank - 1]):
             raise Error("Beta size does not match dimension of reduction.")
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[input_dtype, width]:
@@ -1291,7 +1291,7 @@ struct LayerNormRopeRagged:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[output_dtype, width]) {var output}:
@@ -1436,17 +1436,17 @@ struct ReduceGroupNorm:
         """
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
             return input._lambda_load[width=width](coords)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def gamma_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
             return gamma._lambda_load[width=width](coords)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def beta_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
             return beta._lambda_load[width=width](coords)
 
@@ -1521,7 +1521,7 @@ struct ReduceMinAndMax:
             0 <= norm_axis < rank
         ), "axis must be between [0, <input rank>)"
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[dtype, width]:
@@ -1533,7 +1533,7 @@ struct ReduceMinAndMax:
         # min at slot 0, max at slot 1 of the reduced axis. A `Coord`'s
         # elements are immutable and typed per position, so the retarget goes
         # through `RowCoord`, whose axis element is dynamic and writable.
-        @always_inline
+        @inline(.always)
         def output_min_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var output}:
@@ -1541,7 +1541,7 @@ struct ReduceMinAndMax:
                 RowCoord[output.rank](coords).at_axis[norm_axis](0).coord, val
             )
 
-        @always_inline
+        @inline(.always)
         def output_max_fn[
             width: SIMDLength
         ](coords: Coord, val: SIMD[dtype, width]) {var output}:
@@ -1633,7 +1633,7 @@ struct ReduceRMSNormFusedResidualAdd:
         if input.shape() != residual_input.shape():
             raise Error("Input and residual input buffers are not same shape")
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int
         ](coords: Coord) {var input} -> SIMD[dtype, width]:
@@ -1641,13 +1641,13 @@ struct ReduceRMSNormFusedResidualAdd:
                 coords
             )
 
-        @always_inline
+        @inline(.always)
         def residual_input_fn[
             width: Int
         ](coords: Coord) {var residual_input} -> SIMD[dtype, width]:
             return residual_input._lambda_load[width=width](coords)
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) {var output}:
@@ -1656,7 +1656,7 @@ struct ReduceRMSNormFusedResidualAdd:
                 rebind[SIMD[output.dtype, width]](val),
             )
 
-        @always_inline
+        @inline(.always)
         def residual_output_fn[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) {var residual_output}:
@@ -1813,7 +1813,7 @@ struct RMSNormResidualAdd:
             # comptime closures, so build them as comptime parameters. Reads go
             # through `_lambda_load` so a fused producer op folds into the load.
             @__parameter
-            @always_inline
+            @inline(.always)
             def input_fn[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -1822,7 +1822,7 @@ struct RMSNormResidualAdd:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def residual_input_fn[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -1831,7 +1831,7 @@ struct RMSNormResidualAdd:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def output_fn[
                 width: SIMDLength, _rank: Int, alignment: Int
             ](coords: IndexList[_rank], val: SIMD[dtype, width]):
@@ -1841,7 +1841,7 @@ struct RMSNormResidualAdd:
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def residual_output_fn[
                 width: SIMDLength, _rank: Int, alignment: Int
             ](coords: IndexList[_rank], val: SIMD[dtype, width]):
@@ -1872,7 +1872,7 @@ struct RMSNormResidualAdd:
             # end at runtime (see `RMSNormFusedResidual`). `_fused_load` works
             # whether or not a producer fused in, unlike the GPU-only comptime
             # `_lambda_load`.
-            @always_inline
+            @inline(.always)
             def input_fn_cpu[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) {var input} -> SIMD[dtype, width]:
@@ -1880,7 +1880,7 @@ struct RMSNormResidualAdd:
                     rebind[IndexList[input.rank]](coords)
                 )
 
-            @always_inline
+            @inline(.always)
             def residual_input_fn_cpu[
                 width: Int, _rank: Int
             ](coords: IndexList[_rank]) {var residual_input} -> SIMD[
@@ -1890,7 +1890,7 @@ struct RMSNormResidualAdd:
                     rebind[IndexList[residual_input.rank]](coords)
                 )
 
-            @always_inline
+            @inline(.always)
             def output_fn_cpu[
                 width: SIMDLength, alignment: Int
             ](coords: IndexList[rank], val: SIMD[dtype, width]) {
@@ -1901,7 +1901,7 @@ struct RMSNormResidualAdd:
                     rebind[SIMD[output.dtype, width]](val),
                 )
 
-            @always_inline
+            @inline(.always)
             def residual_output_fn_cpu[
                 width: SIMDLength, alignment: Int
             ](coords: IndexList[rank], val: SIMD[dtype, width]) {
@@ -2138,7 +2138,7 @@ struct Softmax:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[output.dtype, width]:
@@ -2202,7 +2202,7 @@ struct LogSoftmax:
             Error: If the operation parameters are invalid.
         """
 
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](coords: Coord) {var input} -> SIMD[output.dtype, width]:

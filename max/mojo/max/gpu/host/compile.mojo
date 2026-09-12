@@ -27,12 +27,12 @@ from .info import GPUInfo
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _cross_compilation() -> Bool:
     return __mlir_attr.`#kgen.param.expr<cross_compilation> : i1`
 
 
-@always_inline
+@inline(.always)
 def _compile_code[
     func_type: TrivialRegisterPassable,
     //,
@@ -58,7 +58,7 @@ def _compile_code[
 # ===-----------------------------------------------------------------------===#
 
 
-@no_inline
+@inline(.never)
 def _to_sass[
     target: CompilationTarget = CompilationTarget.current_accelerator()
 ](asm: String, *, nvdisasm_opts: String = "") raises -> String:
@@ -84,7 +84,7 @@ def _to_sass[
 # ===-----------------------------------------------------------------------===#
 
 
-@no_inline
+@inline(.never)
 def _ptxas_compile[
     target: CompilationTarget = CompilationTarget.current_accelerator()
 ](

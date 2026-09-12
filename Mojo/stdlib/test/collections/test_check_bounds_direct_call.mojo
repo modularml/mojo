@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 #
 # Regression test: `check_bounds` called directly from an ordinary (non
-# `@always_inline`) function used to fail to lower under `-g` because its
+# `@inline(.always)`) function used to fail to lower under `-g` because its
 # `call_location[inline_count=2]` could not be inlined the requested number of
 # times. It must now compile and degrade the assert to the best-available
 # location.

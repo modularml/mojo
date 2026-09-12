@@ -435,35 +435,35 @@ struct NullSwiGLUOutput[
 
     comptime device_type: AnyType = Self
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         pass
 
-    @always_inline
+    @inline(.always)
     def store_packed_byte(self, m: Int, byte_pos: Int, val: UInt8):
         pass
 
-    @always_inline
+    @inline(.always)
     def store_packed_word(self, m: Int, byte_pos: Int, val: UInt32):
         pass
 
-    @always_inline
+    @inline(.always)
     def set_sf(self, m: Int, post_col: Int, sf: Scalar[Self.SfDtype]):
         pass
 
-    @always_inline
+    @inline(.always)
     def input_scale(self, active_expert_idx: Int) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def clamp_alpha(self) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def clamp_limit(self) -> Float32:
         return Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def pad_sf_zero_block(
         self,
         sf_block_base: Int,
@@ -540,7 +540,7 @@ struct RealSwiGLUOutput[
     var _clamp_alpha: Float32
     var _clamp_limit: Float32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         c_packed_ptr: UnsafePointer[UInt8, MutAnyOrigin],
@@ -557,12 +557,12 @@ struct RealSwiGLUOutput[
         self._clamp_alpha = clamp_alpha
         self._clamp_limit = clamp_limit
 
-    @always_inline
+    @inline(.always)
     def store_packed_byte(self, m: Int, byte_pos: Int, val: UInt8):
         # c_packed shape (M_total, c_packed_row_stride), row-major.
         self.c_packed_ptr.store(m * Self.c_packed_row_stride + byte_pos, val)
 
-    @always_inline
+    @inline(.always)
     def store_packed_word(self, m: Int, byte_pos: Int, val: UInt32):
         # Caller guarantees `byte_pos` and `c_packed_row_stride` are
         # multiples of 4 so PTX lowers to one ST.GLOBAL.B32.
@@ -570,7 +570,7 @@ struct RealSwiGLUOutput[
             (m * Self.c_packed_row_stride + byte_pos) // 4, val
         )
 
-    @always_inline
+    @inline(.always)
     def set_sf(
         self,
         m: Int,
@@ -593,19 +593,19 @@ struct RealSwiGLUOutput[
         ) * dim4 + i4
         self.c_swiglu_scales_ptr.store(linear_idx, sf)
 
-    @always_inline
+    @inline(.always)
     def input_scale(self, active_expert_idx: Int) -> Float32:
         return self.c_input_scales_ptr[active_expert_idx]
 
-    @always_inline
+    @inline(.always)
     def clamp_alpha(self) -> Float32:
         return self._clamp_alpha
 
-    @always_inline
+    @inline(.always)
     def clamp_limit(self) -> Float32:
         return self._clamp_limit
 
-    @always_inline
+    @inline(.always)
     def pad_sf_zero_block(
         self,
         sf_block_base: Int,
@@ -1223,7 +1223,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers(
         elect_one_warp: Bool,
         elect_one_thread: Bool,
@@ -1294,7 +1294,7 @@ struct Grouped1D1DMatmulKernel[
         cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_sched_ctx(
         ref[AddressSpace.SHARED] smem: Self.SmemType, slot_idx: Int
     ) -> GroupedWorkContext1D1D:
@@ -1327,7 +1327,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _consume_sched_ctx(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         mut sched_ci: Int,
@@ -1344,7 +1344,7 @@ struct Grouped1D1DMatmulKernel[
         return ctx
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_iter0_ctx(
         num_active_experts: Int,
         a_offsets: Self.OffsetsTile,
@@ -1392,7 +1392,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sched_terminal_slot() -> SchedulerSlot:
         return SchedulerSlot(
             UInt32(0),
@@ -1406,7 +1406,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _ctx_to_sched_slot(ctx: GroupedWorkContext1D1D) -> SchedulerSlot:
         """Convert a work context into a scheduler slot."""
         if ctx.is_done():
@@ -1423,7 +1423,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_sched_slot(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         num_active_experts: Int,
@@ -1513,7 +1513,7 @@ struct Grouped1D1DMatmulKernel[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _publish_sched_slot(
         ref[AddressSpace.SHARED] smem: Self.SmemType,
         slot_idx: Int,
@@ -1525,7 +1525,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Kernel Entry Point ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)
@@ -2704,7 +2704,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== SFB Load to TMEM (MMA_N < 64) ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sfb_load_to_tmem(
         sfb_tiles: Self.SmemType.Core.SFBTileArray,
         tmem_region: Self.TmemRegion,
@@ -2806,7 +2806,7 @@ struct Grouped1D1DMatmulKernel[
             _ = _sfb_st_vals
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _get_sf_coords(
         m_coord: UInt32,
         n_coord: UInt32,
@@ -2839,7 +2839,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Load Input Tiles ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -3152,7 +3152,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== MMA Operation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _compute_sfb_tmem_adj(
         m_coord: UInt32, n_coord: UInt32, m_start: UInt32
     ) -> UInt32:
@@ -3186,7 +3186,7 @@ struct Grouped1D1DMatmulKernel[
             return UInt32(0)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -3264,7 +3264,7 @@ struct Grouped1D1DMatmulKernel[
     # ========== Epilogue ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _swiglu_quant_epilogue_body(
         c_tiles: Self.SmemType.Core.CTileArray,
         output_stage: Self.TileWriterType.Stage,
@@ -3815,7 +3815,7 @@ struct Grouped1D1DMatmulKernel[
         # `cvt.rn.bf16x2.f32` cast width used by `tile_writer` so the
         # bf16 SMEM scratchpad is byte-identical to the standalone
         # matmul's BF16 GMEM output (chain reference).
-        @always_inline
+        @inline(.always)
         @__parameter
         def store_scaled_pair(
             smem_idx_a: UInt32,
@@ -4133,7 +4133,7 @@ struct Grouped1D1DMatmulKernel[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def epilogue(
         c_tiles: Self.SmemType.Core.CTileArray,
         c_tma_op: Self.CTmaOp,

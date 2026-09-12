@@ -49,7 +49,7 @@ comptime _TraceType_KERNEL = 3
 comptime _TraceType_MAX = 4
 
 
-@always_inline
+@inline(.always)
 def _setup_category(
     name_category: def(UInt32, CStringSpan[_]) thin abi("C") -> NoneType,
     value: Int,
@@ -108,7 +108,7 @@ def _init_dylib() -> OwnedDLHandle:
         return OwnedDLHandle(unsafe_uninitialized=True)
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -212,7 +212,7 @@ def c_event_attrs_ffi(
     return rebind[_C_EventAttributes[ImmUntrackedOrigin]](attrs)
 
 
-@always_inline
+@inline(.always)
 def color_from_category(category: Int) -> Color:
     if category == _TraceType_MAX:
         return Color.MODULAR_PURPLE
@@ -228,7 +228,7 @@ def color_from_category(category: Int) -> Color:
 struct EventAttributes[message_origin: ImmOrigin](TrivialRegisterPassable):
     var _value: _C_EventAttributes[Self.message_origin]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -446,7 +446,7 @@ def _is_disabled() -> Bool:
     return not _is_enabled()
 
 
-@always_inline
+@inline(.always)
 def _start_range(
     *,
     var message: String = "",
@@ -466,14 +466,14 @@ def _start_range(
         return _RangeStart()(message.as_c_string_span())
 
 
-@always_inline
+@inline(.always)
 def _end_range(id: RangeID) raises:
     comptime if _is_disabled():
         return
     _RangeEnd()(id)
 
 
-@always_inline
+@inline(.always)
 def _mark(
     *,
     var message: String = "",

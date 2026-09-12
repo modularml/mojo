@@ -161,11 +161,11 @@ def bench_p2p[
         human_readable_size(num_bytes),
     )
 
-    @always_inline
+    @inline(.always)
     def bench_iter(
         mut bencher: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut buf0_write, mut buf1_write, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut buf0_write, mut buf1_write, imm}:

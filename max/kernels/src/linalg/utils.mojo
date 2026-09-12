@@ -26,7 +26,7 @@ from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.reflection import reflect
 
 
-@always_inline
+@inline(.always)
 def partial_simd_load[
     dtype: DType, //, width: Int
 ](
@@ -67,7 +67,7 @@ def partial_simd_load[
     return masked_load[width](storage, mask, pad_value)
 
 
-@always_inline
+@inline(.always)
 def partial_simd_store[
     dtype: DType, //, width: SIMDLength
 ](
@@ -294,7 +294,7 @@ struct NullTileOperation(TileOperation):
         return tile
 
 
-@always_inline
+@inline(.always)
 def is_valid_epilogue[T: AnyType]() -> Bool:
     """Whether `T` is a real epilogue rather than a null sentinel.
 
@@ -311,7 +311,7 @@ def is_valid_epilogue[T: AnyType]() -> Bool:
     return not (T == NullTileOperation or T == NullTileConsumer)
 
 
-@always_inline
+@inline(.always)
 def lora_qkv_plane_row_offset[
     splits: IndexList[2]
 ](out_col: Int, plane_stride: Int) -> Int:
@@ -435,7 +435,7 @@ struct GemmShape(TrivialRegisterPassable):
         return GemmShape(Int(c.dim[0]()), Int(c.dim[1]()), Int(a.dim[1]()))
 
     # TODO: re-enable using IndexList.
-    @always_inline
+    @inline(.always)
     def __getitem__(self, idx: Int) -> Int:
         if idx == 0:
             return self.M
@@ -492,7 +492,7 @@ struct GemmShape(TrivialRegisterPassable):
 
 # Helper heuristic function to decide on tile size
 #  Returns (TileN, TileK)
-@always_inline
+@inline(.always)
 def calculate_tile_n_k[
     a_type: DType,
     b_type: DType,
@@ -555,7 +555,7 @@ def calculate_tile_n_k[
     )
 
 
-@always_inline
+@inline(.always)
 def _get_tile_n_k[
     a_type: DType,
     b_type: DType,
@@ -695,7 +695,7 @@ def get_packB_unroll_factor() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def get_matmul_num_tasks[
     a_type: DType,
     b_type: DType,
@@ -749,14 +749,14 @@ struct SubMatmulConfig(ImplicitlyCopyable):
     # Dimension of sub-matrices.
     var shape: IndexList[3]
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         return self.shape > Index(0, 0, 0)
 
 
 # The work is first grouped into blocks for alignment and load/store efficiency.
 # This will partition the work blocks between tasks as even as possible.
-@always_inline
+@inline(.always)
 def partition_work(
     task_id: Int, num_tasks: Int, work: Int, work_block_size: Int
 ) -> IndexList[2]:
@@ -988,7 +988,7 @@ def get_pack_data_size[dtype: DType]() -> Int:
     return 256 * KB // size_of[dtype]()
 
 
-@always_inline
+@inline(.always)
 def get_kernel_config[
     a_type: DType,
     b_type: DType,
@@ -1018,7 +1018,7 @@ def get_kernel_config[
     }
 
 
-@always_inline
+@inline(.always)
 def use_vnni_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
     """Returns whether the VNNI instruction should be used for the given dtypes.
 
@@ -1041,7 +1041,7 @@ def use_vnni_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
         return False
 
 
-@always_inline
+@inline(.always)
 def use_i8mm_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
     """Returns whether the i8mm instruction should be used for the given dtypes.
 
@@ -1066,7 +1066,7 @@ def use_i8mm_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
 
 # Determines which kernel shape to use based on the matmul shape MxNxK.
 # Currently only allows two shapes.
-@always_inline
+@inline(.always)
 def get_kernel_type(m: Int, n: Int, k: Int) -> Bool:
     """Returns the kernel shape variant to use based on the matmul dimensions.
 
@@ -1133,7 +1133,7 @@ def dispatch_get_kernel_type[
         func[False]()
 
 
-@always_inline
+@inline(.always)
 def packA_i8mm[
     a_type: DType
 ](
@@ -1156,7 +1156,7 @@ def packA_i8mm[
         a_packed_ptr: Pointer to the destination packed A buffer.
     """
 
-    @always_inline
+    @inline(.always)
     def packA_helper[
         nrow: Int
     ](offset: Int) {var k, var t0, imm a_ptr, imm a_packed_ptr}:
@@ -1193,12 +1193,12 @@ struct InnerKernelID(TrivialRegisterPassable):
 
     var value: Int
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs: InnerKernelID) -> Bool:
         return self.value == rhs.value
 
 
-@always_inline
+@inline(.always)
 def select_inner_kernel[
     a_type: DType, b_type: DType, c_type: DType
 ]() -> InnerKernelID:

@@ -80,7 +80,7 @@ from linalg.matmul.gpu.amd.amd_4wave_matmul import (
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _xcd_wgm_swizzle(
     wgid_raw: Int, num_pid_m: Int, num_pid_n: Int
 ) -> Tuple[Int, Int]:
@@ -133,7 +133,7 @@ def _xcd_wgm_swizzle(
     return (pid_m, pid_n)
 
 
-@always_inline
+@inline(.always)
 def amd_4wave_conv[
     a_type: DType,
     b_type: DType,
@@ -356,7 +356,7 @@ def amd_4wave_conv[
         pad_d=pad_d,
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def run_kernel[config: MatmulKernelConfig]() raises:
         # Dispatch via `AMD4WaveMatmul.run_conv2d` — the unified entry

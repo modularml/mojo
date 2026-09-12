@@ -35,7 +35,7 @@ def vec_func[
 
 
 # Force the capture to be captured instead of inlined away.
-@no_inline
+@inline(.never)
 def run_binary_add(ctx: DeviceContext, capture: Float32) raises:
     print("== run_binary_add")
 

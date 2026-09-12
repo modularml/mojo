@@ -134,7 +134,7 @@ struct Softmax[
     var score_frag_rowsum: Self.ScoreFragTensorType
     var correction: Self.ScoreFragTensorType
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.rowmax_tensor = stack_allocation[
             dtype=Self.dtype, address_space=.LOCAL
@@ -152,7 +152,7 @@ struct Softmax[
             dtype=Self.dtype, address_space=.LOCAL
         ](Self.score_frag_layout).fill(1)
 
-    @always_inline
+    @inline(.always)
     def _score_row_idx[col_tile: Int, row: Int](self, lane_row: Int) -> UInt32:
         """Map (col_tile, lane_row, row) to a linear score matrix row index."""
         return (
@@ -163,7 +163,7 @@ struct Softmax[
             + UInt32(row)
         )
 
-    @always_inline
+    @inline(.always)
     def _reduce_rows[
         is_max: Bool
     ](
@@ -310,7 +310,7 @@ struct Softmax[
                             self.score_frag_rowsum[col_tile, row]
                         )
 
-    @always_inline
+    @inline(.always)
     def calculate_qk_max(
         self,
         score: TileTensor[Self.dtype, ...],
@@ -318,7 +318,7 @@ struct Softmax[
     ):
         self._reduce_rows[is_max=True](score, warp_scratch)
 
-    @always_inline
+    @inline(.always)
     def calculate_qk_sum(
         self,
         score: TileTensor[Self.dtype, ...],
@@ -326,7 +326,7 @@ struct Softmax[
     ):
         self._reduce_rows[is_max=False](score, warp_scratch)
 
-    @always_inline
+    @inline(.always)
     def exp[
         start: Int = 0, stride: Int = 1
     ](self, score: TileTensor[mut=True, Self.dtype, ...]):
@@ -350,7 +350,7 @@ struct Softmax[
                     )
                 )
 
-    @always_inline
+    @inline(.always)
     def scale_rowmax(self, scale: Scalar[Self.dtype]):
         """Scale score_frag_rowmax by scale factor (e.g. scale * log2e).
 
@@ -365,7 +365,7 @@ struct Softmax[
             comptime for row in range(Self.frag_num_rows):
                 self.score_frag_rowmax[col_tile, row] *= scale
 
-    @always_inline
+    @inline(.always)
     def exp_scaled[
         start: Int = 0, stride: Int = 1
     ](
@@ -412,7 +412,7 @@ struct Softmax[
                     (score_reg_tile[tile_id, 0] + neg_max) * scale_vec
                 )
 
-    @always_inline
+    @inline(.always)
     def exp_pkfma[
         start: Int = 0, stride: Int = 1
     ](
@@ -465,7 +465,7 @@ struct Softmax[
                     fma(score_reg_tile[tile_id, 0], scale_vec, neg_scaled_max)
                 )
 
-    @always_inline
+    @inline(.always)
     def calculate_correction(self):
         comptime for col_tile in range(Self.num_colwise_tiles):
             # Correction since previous max may be updated.
@@ -475,7 +475,7 @@ struct Softmax[
                     - self.score_frag_rowmax[col_tile, row]
                 )
 
-    @always_inline
+    @inline(.always)
     def update_output(self, output: TileTensor[mut=True, Self.dtype, ...]):
         # gfx950 MFMA fragments are always row-vectors (shape[0]=1).
         comptime assert output.flat_rank == 2
@@ -496,7 +496,7 @@ struct Softmax[
                 Self.dtype, Self.frag_size
             ](self.correction[col_tile, 0][0])
 
-    @always_inline
+    @inline(.always)
     def update_sum(self):
         # Save current rowmax and rowsum
         comptime for col_tile in range(Self.num_colwise_tiles):
@@ -507,7 +507,7 @@ struct Softmax[
                     + self.score_frag_rowsum[col_tile, row]
                 )
 
-    @always_inline
+    @inline(.always)
     def apply_sum_correction(self):
         """Apply rowsum *= correction (deferred sum rescale pattern)."""
         comptime for col_tile in range(Self.num_colwise_tiles):
@@ -517,7 +517,7 @@ struct Softmax[
                     * self.correction[col_tile, row]
                 )
 
-    @always_inline
+    @inline(.always)
     def update_sum_additive(self):
         """Additive rowsum update: rowsum += new_sum (no correction)."""
         comptime for col_tile in range(Self.num_colwise_tiles):
@@ -527,14 +527,14 @@ struct Softmax[
                     + self.score_frag_rowsum[col_tile, row]
                 )
 
-    @always_inline
+    @inline(.always)
     def update_max(self):
         # Save current rowmax and rowsum
         comptime for i in range(Self.num_colwise_tiles):
             comptime for j in range(Self.frag_num_rows):
                 self.rowmax_tensor[i, j] = self.score_frag_rowmax[i, j]
 
-    @always_inline
+    @inline(.always)
     def full(
         self,
         output: TileTensor[mut=True, Self.dtype, ...],

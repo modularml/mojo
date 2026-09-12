@@ -127,7 +127,7 @@ def _probe_layer_norm[
     var beta = TileTensor(beta_d, row_major(Coord(Index(cols))))
     var epsilon = Scalar[dtype](1e-5)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -136,7 +136,7 @@ def _probe_layer_norm[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var out_buf}:
@@ -204,7 +204,7 @@ def _probe_rms_norm[
     var gamma = TileTensor(gamma_d, row_major(Coord(Index(cols))))
     var epsilon = Scalar[dtype](1e-5)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -213,7 +213,7 @@ def _probe_rms_norm[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var out_buf}:
@@ -269,7 +269,7 @@ def _probe_softmax[
     var in_buf = TileTensor(in_d, row_major(Coord(shape)))
     var out_buf = TileTensor(out_d, row_major(Coord(shape)))
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:

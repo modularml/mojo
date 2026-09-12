@@ -31,7 +31,7 @@ from comm.lamport import (
 from std.testing import assert_equal, assert_false, assert_true
 
 
-@always_inline
+@inline(.always)
 def _bits[
     dtype: DType, width: Int
 ](v: SIMD[dtype, width]) -> SIMD[_unsigned_integral_type_of[dtype](), width]:
@@ -39,7 +39,7 @@ def _bits[
     return bitcast[_unsigned_integral_type_of[dtype](), width](v)
 
 
-@always_inline
+@inline(.always)
 def _neg_zero[dtype: DType]() -> Scalar[dtype]:
     """A single `-0.0` scalar of `dtype`, built from raw bits."""
     comptime uint = _unsigned_integral_type_of[dtype]()

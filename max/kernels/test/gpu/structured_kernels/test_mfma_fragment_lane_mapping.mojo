@@ -571,7 +571,7 @@ def test_bf16_32x32x16_row(ctx: DeviceContext) raises:
     print("  PASSED")
 
 
-@always_inline
+@inline(.always)
 def _fp8_quantize(x: Float32) -> Float32:
     """Round-trip a value through FP8 e4m3fn to get the nearest representable value.
 

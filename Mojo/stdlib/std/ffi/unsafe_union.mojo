@@ -53,7 +53,7 @@ def _all_types_unique[*Ts: AnyType]() -> Bool:
     return True
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _check_union_types[*Ts: AnyType]():
     """Compile-time check that union types are valid.
 
@@ -223,7 +223,7 @@ struct UnsafeUnion[*Ts: AnyType](ImplicitlyCopyable, Movable, Writable):
     # Internal methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _get_ptr[
         origin: Origin, address_space: AddressSpace, //, T: AnyType
     ](ref[origin, address_space] self) -> Pointer[
@@ -243,7 +243,7 @@ struct UnsafeUnion[*Ts: AnyType](ImplicitlyCopyable, Movable, Writable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_get[
         origin: Origin, address_space: AddressSpace, //, T: AnyType
     ](ref[origin, address_space] self) -> ref[origin, address_space] T:
@@ -309,7 +309,7 @@ struct UnsafeUnion[*Ts: AnyType](ImplicitlyCopyable, Movable, Writable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_take[T: Movable](mut self) -> T:
         """Move the stored value out of the union.
 
@@ -343,7 +343,7 @@ struct UnsafeUnion[*Ts: AnyType](ImplicitlyCopyable, Movable, Writable):
         ](), "type is not a union element type"
         return self._get_ptr[T]().unsafe_take_pointee()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_set[T: Movable](mut self, var value: T):
         """Set the union to hold the given value.
 
@@ -371,7 +371,7 @@ struct UnsafeUnion[*Ts: AnyType](ImplicitlyCopyable, Movable, Writable):
         ](), "type is not a union element type"
         self._get_ptr[T]().unsafe_write(value^)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //, T: AnyType
     ](ref[origin, address_space] self) -> Pointer[

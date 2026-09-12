@@ -110,7 +110,7 @@ def _stencil_impl_gpu[
     ), "Only stencil spatial axes [1, 2] are supported"
 
     # GPU kernel implementation
-    @always_inline
+    @inline(.always)
     def stencil_kernel() {
         var shape,
         var input_shape,

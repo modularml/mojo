@@ -20,7 +20,7 @@ from std.memory import UnsafePointer, bitcast, unsafe_memcpy
 from std.utils import IndexList, StaticTuple, product
 
 
-@always_inline
+@inline(.always)
 def _to_StaticTuple[
     dtype: DType, size: SIMDLength
 ](data: SIMD[dtype, size]) -> StaticTuple[Scalar[dtype], size]:
@@ -33,7 +33,7 @@ def _to_StaticTuple[
     return res
 
 
-@always_inline
+@inline(.always)
 def _to_SIMD[
     dtype: DType, size: Int
 ](data: StaticTuple[Scalar[dtype], size]) -> SIMD[dtype, size]:
@@ -45,7 +45,7 @@ def _to_SIMD[
     return res
 
 
-@always_inline
+@inline(.always)
 def calculate_symmetric_vector[
     input_dtype: DType, simd_width: SIMDLength, output_bits: Int
 ](data: SIMD[input_dtype, simd_width]) -> Tuple[
@@ -136,7 +136,7 @@ struct Q4sym[
     """The bits of the encoded uint4 numbers."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _check_constraints():
         # TODO
         comptime assert (
@@ -151,14 +151,14 @@ struct Q4sym[
             Self.float_dtype.is_floating_point()
         ), "Must be floating point type"
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Construct a default initialized Q4sym."""
         self.scale = StaticTuple[UInt8, 2]()
         self.bits = StaticTuple[UInt8, SIMDLength(Self.group_size) // 2]()
         self._check_constraints()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, data: SIMD[Self.float_dtype, Self.group_size]):
         """
         Construct an encoded Q4sym from data.
@@ -179,14 +179,14 @@ struct Q4sym[
         self._check_constraints()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _encode_bits(
         qdata: SIMD[.uint8, Self.group_size]
     ) -> SIMD[.uint8, SIMDLength(Self.group_size) // 2]:
         var lo_hi = qdata.split()
         return lo_hi[0] | (lo_hi[1] << 4)
 
-    @always_inline
+    @inline(.always)
     def _decode_bits(mut self) -> SIMD[.uint8, Self.group_size]:
         # Extract the lower 4 bits of all bits in the `l_bits` format
         var bits_simd = _to_SIMD[.uint8, SIMDLength(Self.group_size) // 2](
@@ -198,7 +198,7 @@ struct Q4sym[
             bits_lower.join(bits_upper)
         )
 
-    @always_inline
+    @inline(.always)
     def decode_scale(mut self) -> Float16:
         """
         Obtain the scale factor.
@@ -217,7 +217,7 @@ struct Q4sym[
         var scale_decoded = bitcast[.float16, 1](final_result)
         return scale_decoded
 
-    @always_inline
+    @inline(.always)
     def decode_unsigned(mut self) -> SIMD[.uint8, Self.group_size]:
         """
         Decode the stored uint4 numbers to uint8.
@@ -229,7 +229,7 @@ struct Q4sym[
         # Obtain the unsigned quantized values, these have a zp of 8
         return self._decode_bits()
 
-    @always_inline
+    @inline(.always)
     def decode_signed(mut self) -> SIMD[.int8, Self.group_size]:
         """
         Decode the stored uint4 numbers to requantized int4 numbers.
@@ -244,7 +244,7 @@ struct Q4sym[
         var decoded_result = self.decode_unsigned()
         return decoded_result.cast[.int8]() - 8
 
-    @always_inline
+    @inline(.always)
     def decode_fully(mut self) -> SIMD[Self.float_dtype, Self.group_size]:
         """
         Decode the stored numbers into floating point representation.

@@ -100,7 +100,7 @@ from std.utils.numerics import get_accum_type, min_or_neg_inf
 from std.utils.static_tuple import StaticTuple
 
 
-@always_inline
+@inline(.always)
 def mha_sm90_dispatch[
     q_type: DType,
     KVType: MHAOperand,
@@ -408,7 +408,7 @@ def mha_sm90_dispatch[
 
 
 # materializes max prompt len, call partition
-@always_inline
+@inline(.always)
 def _mha_sm90_sink_dispatch[
     SchedulerType: MHATileScheduler,
     KVLUTType: MHAOperand,
@@ -541,7 +541,7 @@ def _mha_sm90_sink_dispatch[
 # materializes kv_input_row_offsets, calls kernel
 
 
-@always_inline
+@inline(.always)
 def _mha_sm90_kv_input_row_offset_dispatch[
     KVLUTType: MHAOperand,
     output_type: DType,
@@ -667,7 +667,7 @@ def _mha_sm90_kv_input_row_offset_dispatch[
         )
 
 
-@always_inline
+@inline(.always)
 def _mha_sm90_valid_length_dispatch[
     KVLUTType: MHAOperand,
     output_type: DType,
@@ -789,7 +789,7 @@ def _mha_sm90_valid_length_dispatch[
         )
 
 
-@always_inline
+@inline(.always)
 def _mha_sm90_enqueue[
     KVLUTType: MHAOperand,
     output_type: DType,
@@ -1217,7 +1217,7 @@ def _mha_sm90[
 
     # returns `true` if we are done
     @__parameter
-    @always_inline
+    @inline(.always)
     def advance[
         producer: Bool,
         sync: MHASchedulerSynchronization = MHASchedulerSynchronization.DEFAULT,
@@ -1263,7 +1263,7 @@ def _mha_sm90[
     ]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def k_tile(
         idx: UInt32,
         out k_smem: LayoutTensor[
@@ -1280,7 +1280,7 @@ def _mha_sm90[
         k_smem = {(kv_smem + UInt32(sz) * idx).as_unsafe_any_origin()}
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def v_tile(
         idx: UInt32,
         out v_smem: LayoutTensor[
@@ -1297,7 +1297,7 @@ def _mha_sm90[
         v_smem = {(kv_smem + UInt32(sz) * idx).as_unsafe_any_origin()}
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def get_position(seq_info: SeqInfo) -> PositionType:
         return _get_position[
             BM,
@@ -1370,7 +1370,7 @@ def _mha_sm90[
         var local_warp_group_idx: UInt32 = warp_group_idx - 1
 
         @__parameter
-        @always_inline("nodebug")
+        @inline(.nodebug)
         def q_consumer(
             q_idx: UInt32,
         ) -> LayoutTensor[
@@ -1418,7 +1418,7 @@ def _mha_sm90[
         ].stack_allocation()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def vectorize_p_reg_tile(
             out result: LayoutTensor[
                 accum_type,
@@ -1431,7 +1431,7 @@ def _mha_sm90[
             result = {p_reg_tile.ptr}
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def vectorize_o_reg_tile(
             out result: LayoutTensor[
                 accum_type,
@@ -1466,7 +1466,7 @@ def _mha_sm90[
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def q_mul_k(read_idx: UInt32, read_phase: UInt32, q_idx: UInt32):
             var k_smem_sub = k_tile(read_idx)
             var q_smem_sub = q_consumer(q_idx)
@@ -1490,7 +1490,7 @@ def _mha_sm90[
             warpgroup_fence(p_reg_tile)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def p_mul_v(read_idx: UInt32, read_phase: UInt32):
             var v_smem_sub = v_tile(read_idx)
             produced_mbar_kv[read_idx].wait(read_phase)
@@ -1505,19 +1505,19 @@ def _mha_sm90[
             warpgroup_fence(output_reg_tile)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def wait_for_q_mul_k[wgmma_left_in_flight: Int](read_idx: UInt32):
             wgmma_0.wait_group[wgmma_left_in_flight]()  # P is available
             _ = consumed_mbar_kv[read_idx].arrive()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def wait_for_p_mul_v(read_idx: UInt32):
             wgmma_1.wait_group[0]()  # output is available
             _ = consumed_mbar_kv[read_idx].arrive()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def apply_mask(
             position: PositionType,
             mask_status: TileMaskStatus,
@@ -1539,7 +1539,7 @@ def _mha_sm90[
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def scale_output(correction: type_of(rowmax)):
             # we are now able to read/modify `output_reg_tile` and modify `p_frag`
             var vout = vectorize_o_reg_tile()
@@ -1557,7 +1557,7 @@ def _mha_sm90[
                     vout[row, col] = vout[row, col] * c
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def elementwise_reciprocal(
             old_rowsum: type_of(rowsum), new_rowsum: type_of(rowsum)
         ):
@@ -1569,7 +1569,7 @@ def _mha_sm90[
                 old_rowsum[row] = new
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def write_output(
             position: PositionType,
             q_idx: UInt32,

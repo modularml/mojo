@@ -105,7 +105,7 @@ def _argn[
         imm,
     }:
         @__parameter
-        @always_inline
+        @inline(.always)
         def cmpeq[
             dtype: DType, simd_width: SIMDLength
         ](a: SIMD[dtype, simd_width], b: SIMD[dtype, simd_width]) -> SIMD[
@@ -117,7 +117,7 @@ def _argn[
                 return a.ge(b)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def cmp[
             dtype: DType, simd_width: SIMDLength
         ](a: SIMD[dtype, simd_width], b: SIMD[dtype, simd_width]) -> SIMD[

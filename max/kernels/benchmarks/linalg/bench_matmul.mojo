@@ -125,7 +125,7 @@ def bench_matmul[
     if b_packed:
         pack_b_ndbuffer[a_type, c_type](b, bp)
 
-    @always_inline
+    @inline(.always)
     def bench_fn() raises {var a, var b, var c, var bp}:
         comptime bench_matmul = matmul[
             transpose_b=False, b_packed=b_packed, saturated_vnni=False

@@ -21,7 +21,7 @@ from nn.conv.conv import Naive2dConvolution
 from std.utils.index import Index
 
 
-@always_inline
+@inline(.always)
 def matmul[
     dtype: DType, //, N: Int, K: Int, M: Int, transpose_b: Bool
 ](

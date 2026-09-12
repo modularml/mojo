@@ -17,7 +17,7 @@ from std.reflection import reflect
 from std.reflection.type_info import _unqualified_type_name
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _constrained_conforms_to[
     cond: Bool,
     *,
@@ -50,7 +50,7 @@ def _constrained_conforms_to[
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _field_conforms_to_error[
     *,
     Parent: AnyType,

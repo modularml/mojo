@@ -121,7 +121,7 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
     comptime B_SIZE = 32
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_dyn)
     def epilogue_plus_one[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
@@ -148,7 +148,7 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
         ) if test_epilogue else None,
     ]
 
-    @always_inline
+    @inline(.always)
     def run_concat_inner_most_single_dim(
         ctx: DeviceContext,
     ) raises {
@@ -223,7 +223,7 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
 
     validate_results()
 
-    @always_inline
+    @inline(.always)
     def run_concat_gpu(
         ctx: DeviceContext,
     ) raises {

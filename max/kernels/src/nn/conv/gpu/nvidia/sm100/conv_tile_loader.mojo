@@ -58,12 +58,12 @@ struct TileLoaderTMAIm2col[
     var tma_op: Self.TmaOpPtr
     var multicast_mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, tma_op: Self.TmaOpPtr, multicast_mask: UInt16):
         self.tma_op = tma_op
         self.multicast_mask = multicast_mask
 
-    @always_inline
+    @inline(.always)
     def load[
         LayoutType: TensorLayout
     ](

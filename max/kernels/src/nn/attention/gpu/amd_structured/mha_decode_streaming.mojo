@@ -37,7 +37,7 @@ from .mma import TiledMmaOp
 
 
 __extension Attention:
-    @always_inline
+    @inline(.always)
     def mha_decode_streaming(
         mut self,
         exp_sum_ptr: UnsafePointer[

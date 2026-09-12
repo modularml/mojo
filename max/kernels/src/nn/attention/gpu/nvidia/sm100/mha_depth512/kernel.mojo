@@ -524,7 +524,7 @@ struct SM100MHADepth512[
             warpgroup_reg_dealloc[24]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mask_status(
         mask: Self.MaskType,
         seq_id: UInt32,

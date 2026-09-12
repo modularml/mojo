@@ -88,13 +88,13 @@ def _stage_smem_bytes(d: Int, vec_size: Int, cluster_size: Int) -> Int:
     )
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _max(x: SIMD, y: type_of(x)) -> type_of(x):
     return max(x, y)
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _sum(x: SIMD, y: type_of(x)) -> type_of(x):
     return x + y
@@ -108,7 +108,7 @@ comptime _CUTOFF_SEARCH_MAX_ITERS = 64
 comptime _CLUSTER_SLOT_FLOATS = 16
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_cutoff_stats[
     block_size: Int, n: Int, broadcast: Bool = True
 ](vals: StaticTuple[Float32, n]) -> StaticTuple[Float32, n]:
@@ -118,7 +118,7 @@ def _block_reduce_cutoff_stats[
     sums. Counts are carried as floats, which is exact below 2^24.
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -139,7 +139,7 @@ def _block_reduce_cutoff_stats[
     ](vals, initial_vals=initial)
 
 
-@always_inline
+@inline(.always)
 def _cluster_cutoff_search[
     vec_size: Int,
     block_size: Int,
@@ -200,7 +200,7 @@ def _cluster_cutoff_search[
     ]()
     var phase = 0
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _cutoff_stats_combine(x: SIMD, y: type_of(x)) -> type_of(x):
         # Same lane layout as `_block_reduce_cutoff_stats`, padded to a
@@ -418,7 +418,7 @@ def TopKTopPMaskedProbsClusterKernel[
     )[0]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_e(offset: Int) -> SIMD[.float32, vec_size]:
         var v = logits_row.load[width=vec_size]((Idx[0], offset)).cast[
             DType.float32
@@ -694,7 +694,7 @@ def topk_topp_masked_probs_cluster[
                 return launch_single[param_vec_size]()
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_sums[
     block_size: Int, n: Int, broadcast: Bool = True
 ](vals: StaticTuple[Float32, n]) -> StaticTuple[Float32, n]:
@@ -704,7 +704,7 @@ def _block_reduce_sums[
     block reduction, while this keeps each lane a separate sum.
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -716,7 +716,7 @@ def _block_reduce_sums[
     ](vals, initial_vals=StaticTuple[Float32, n](0))
 
 
-@always_inline
+@inline(.always)
 def _sampling_rejection_loop_cluster[
     vec_size: Int,
     block_size: Int,

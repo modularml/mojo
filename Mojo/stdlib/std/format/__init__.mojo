@@ -217,7 +217,7 @@ trait Writable:
         """
         comptime WriterType = type_of(writer)
 
-        @always_inline
+        @inline(.always)
         def call_write_to[
             FieldType: Writable
         ](field: FieldType, mut writer: WriterType):
@@ -259,7 +259,7 @@ trait Writable:
 
         comptime WriterType = type_of(writer)
 
-        @always_inline
+        @inline(.always)
         def call_write_repr_to[
             FieldType: Writable
         ](field: FieldType, mut writer: WriterType):
@@ -268,7 +268,7 @@ trait Writable:
         _reflection_write_to[f=call_write_repr_to](self, writer)
 
 
-@always_inline
+@inline(.always)
 def _reflection_write_to[
     T: Writable,
     W: Writer,

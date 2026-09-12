@@ -52,7 +52,7 @@ struct _AMD_F8F6F4_MATRIX_FORMAT(TrivialRegisterPassable):
         self._value = Int32(value)
 
 
-@always_inline
+@inline(.always)
 def _mma_amd[block_size: Int = 1](mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     comptime if _is_amd_rdna():
         # Use WMMA instructions for RDNA3+ consumer GPUs.

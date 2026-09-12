@@ -69,7 +69,7 @@ def test_concat() raises:
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def epilogue_plus_one[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
     ](indices: IndexList[_rank], val: SIMD[c_type, width]):
@@ -140,7 +140,7 @@ def test_concat_parallel() raises:
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def epilogue_plus_one[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
     ](indices: IndexList[_rank], val: SIMD[c_type, width]):
@@ -212,7 +212,7 @@ def test_concat_inner() raises:
     var input_vec = _tuple_to_list(input_tuple)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def epilogue_plus_one[
         c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
     ](indices: IndexList[_rank], val: SIMD[c_type, width]):

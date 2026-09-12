@@ -60,7 +60,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -126,7 +126,7 @@ struct cudnnSoftmaxMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SOFTMAX_MODE_INSTANCE:
             return writer.write_string("CUDNN_SOFTMAX_MODE_INSTANCE")
@@ -134,7 +134,7 @@ struct cudnnSoftmaxMode_t(
             return writer.write_string("CUDNN_SOFTMAX_MODE_CHANNEL")
         abort("invalid cudnnSoftmaxMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSoftmaxMode_t({self})".write_to(writer)
 
@@ -180,7 +180,7 @@ struct cudnnReduceTensorIndices_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_REDUCE_TENSOR_NO_INDICES:
             return writer.write_string("CUDNN_REDUCE_TENSOR_NO_INDICES")
@@ -188,7 +188,7 @@ struct cudnnReduceTensorIndices_t(
             return writer.write_string("CUDNN_REDUCE_TENSOR_FLATTENED_INDICES")
         abort("invalid cudnnReduceTensorIndices_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnReduceTensorIndices_t({self})".write_to(writer)
 
@@ -361,7 +361,7 @@ struct cudnnReduceTensorOp_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_REDUCE_TENSOR_ADD:
             return writer.write_string("CUDNN_REDUCE_TENSOR_ADD")
@@ -383,7 +383,7 @@ struct cudnnReduceTensorOp_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_REDUCE_TENSOR_MUL_NO_ZEROS")
         abort("invalid cudnnReduceTensorOp_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnReduceTensorOp_t({self})".write_to(writer)
 
@@ -458,7 +458,7 @@ struct cudnnDeterminism_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NON_DETERMINISTIC:
             return writer.write_string("CUDNN_NON_DETERMINISTIC")
@@ -466,7 +466,7 @@ struct cudnnDeterminism_t(
             return writer.write_string("CUDNN_DETERMINISTIC")
         abort("invalid cudnnDeterminism_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnDeterminism_t({self})".write_to(writer)
 
@@ -549,7 +549,7 @@ struct cudnnStatus_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_STATUS_SUCCESS:
             return writer.write_string("CUDNN_STATUS_SUCCESS")
@@ -697,7 +697,7 @@ struct cudnnStatus_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_STATUS_VERSION_MISMATCH")
         t"cudnnStatus_t(unknown={self._value})".write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnStatus_t({self})".write_to(writer)
 
@@ -722,7 +722,7 @@ struct cudnnCTCLossAlgo_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_CTC_LOSS_ALGO_DETERMINISTIC:
             return writer.write_string("CUDNN_CTC_LOSS_ALGO_DETERMINISTIC")
@@ -730,7 +730,7 @@ struct cudnnCTCLossAlgo_t(
             return writer.write_string("CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC")
         abort("invalid cudnnCTCLossAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnCTCLossAlgo_t({self})".write_to(writer)
 
@@ -779,7 +779,7 @@ struct cudnnTensorFormat_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_TENSOR_NCHW:
             return writer.write_string("CUDNN_TENSOR_NCHW")
@@ -789,7 +789,7 @@ struct cudnnTensorFormat_t(
             return writer.write_string("CUDNN_TENSOR_NCHW_VECT_C")
         abort("invalid cudnnTensorFormat_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnTensorFormat_t({self})".write_to(writer)
 
@@ -935,7 +935,7 @@ struct cudnnNormAlgo_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NORM_ALGO_STANDARD:
             return writer.write_string("CUDNN_NORM_ALGO_STANDARD")
@@ -943,7 +943,7 @@ struct cudnnNormAlgo_t(
             return writer.write_string("CUDNN_NORM_ALGO_PERSIST")
         abort("invalid cudnnNormAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnNormAlgo_t({self})".write_to(writer)
 
@@ -972,7 +972,7 @@ struct cudnnOpTensorOp_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_OP_TENSOR_ADD:
             return writer.write_string("CUDNN_OP_TENSOR_ADD")
@@ -988,7 +988,7 @@ struct cudnnOpTensorOp_t(
             return writer.write_string("CUDNN_OP_TENSOR_NOT")
         abort("invalid cudnnOpTensorOp_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnOpTensorOp_t({self})".write_to(writer)
 
@@ -1265,7 +1265,7 @@ struct cudnnActivationMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_ACTIVATION_SIGMOID:
             return writer.write_string("CUDNN_ACTIVATION_SIGMOID")
@@ -1283,7 +1283,7 @@ struct cudnnActivationMode_t(
             return writer.write_string("CUDNN_ACTIVATION_SWISH")
         abort("invalid cudnnActivationMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnActivationMode_t({self})".write_to(writer)
 
@@ -1340,7 +1340,7 @@ struct cudnnConvolutionBwdDataAlgo_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_CONVOLUTION_BWD_DATA_ALGO_0:
             return writer.write_string("CUDNN_CONVOLUTION_BWD_DATA_ALGO_0")
@@ -1364,7 +1364,7 @@ struct cudnnConvolutionBwdDataAlgo_t(
             return writer.write_string("CUDNN_CONVOLUTION_BWD_DATA_ALGO_COUNT")
         abort("invalid cudnnConvolutionBwdDataAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnConvolutionBwdDataAlgo_t({self})".write_to(writer)
 
@@ -1435,13 +1435,13 @@ struct cudnnSamplerType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SAMPLER_BILINEAR:
             return writer.write_string("CUDNN_SAMPLER_BILINEAR")
         abort("invalid cudnnSamplerType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSamplerType_t({self})".write_to(writer)
 
@@ -1493,7 +1493,7 @@ struct cudnnNormMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NORM_PER_ACTIVATION:
             return writer.write_string("CUDNN_NORM_PER_ACTIVATION")
@@ -1501,7 +1501,7 @@ struct cudnnNormMode_t(
             return writer.write_string("CUDNN_NORM_PER_CHANNEL")
         abort("invalid cudnnNormMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnNormMode_t({self})".write_to(writer)
 
@@ -1601,7 +1601,7 @@ struct cudnnNormOps_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NORM_OPS_NORM:
             return writer.write_string("CUDNN_NORM_OPS_NORM")
@@ -1611,7 +1611,7 @@ struct cudnnNormOps_t(
             return writer.write_string("CUDNN_NORM_OPS_NORM_ADD_ACTIVATION")
         abort("invalid cudnnNormOps_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnNormOps_t({self})".write_to(writer)
 
@@ -1669,7 +1669,7 @@ struct cudnnSoftmaxAlgorithm_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SOFTMAX_FAST:
             return writer.write_string("CUDNN_SOFTMAX_FAST")
@@ -1679,7 +1679,7 @@ struct cudnnSoftmaxAlgorithm_t(
             return writer.write_string("CUDNN_SOFTMAX_LOG")
         abort("invalid cudnnSoftmaxAlgorithm_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSoftmaxAlgorithm_t({self})".write_to(writer)
 
@@ -1752,7 +1752,7 @@ struct cudnnBatchNormOps_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_BATCHNORM_OPS_BN:
             return writer.write_string("CUDNN_BATCHNORM_OPS_BN")
@@ -1762,7 +1762,7 @@ struct cudnnBatchNormOps_t(
             return writer.write_string("CUDNN_BATCHNORM_OPS_BN_ADD_ACTIVATION")
         abort("invalid cudnnBatchNormOps_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBatchNormOps_t({self})".write_to(writer)
 
@@ -1792,7 +1792,7 @@ struct cudnnConvolutionFwdAlgo_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM:
             return writer.write_string(
@@ -1820,7 +1820,7 @@ struct cudnnConvolutionFwdAlgo_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_CONVOLUTION_FWD_ALGO_COUNT")
         abort("invalid cudnnConvolutionFwdAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnConvolutionFwdAlgo_t({self})".write_to(writer)
 
@@ -2028,13 +2028,13 @@ struct cudnnLRNMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_LRN_CROSS_CHANNEL_DIM1:
             return writer.write_string("CUDNN_LRN_CROSS_CHANNEL_DIM1")
         abort("invalid cudnnLRNMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnLRNMode_t({self})".write_to(writer)
 
@@ -2144,7 +2144,7 @@ struct cudnnFoldingDirection_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_TRANSFORM_FOLD:
             return writer.write_string("CUDNN_TRANSFORM_FOLD")
@@ -2152,7 +2152,7 @@ struct cudnnFoldingDirection_t(
             return writer.write_string("CUDNN_TRANSFORM_UNFOLD")
         abort("invalid cudnnFoldingDirection_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnFoldingDirection_t({self})".write_to(writer)
 
@@ -2199,7 +2199,7 @@ struct cudnnErrQueryMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_ERRQUERY_RAWCODE:
             return writer.write_string("CUDNN_ERRQUERY_RAWCODE")
@@ -2209,7 +2209,7 @@ struct cudnnErrQueryMode_t(
             return writer.write_string("CUDNN_ERRQUERY_BLOCKING")
         abort("invalid cudnnErrQueryMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnErrQueryMode_t({self})".write_to(writer)
 
@@ -2350,7 +2350,7 @@ struct cudnnBatchNormMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_BATCHNORM_PER_ACTIVATION:
             return writer.write_string("CUDNN_BATCHNORM_PER_ACTIVATION")
@@ -2360,7 +2360,7 @@ struct cudnnBatchNormMode_t(
             return writer.write_string("CUDNN_BATCHNORM_SPATIAL_PERSISTENT")
         abort("invalid cudnnBatchNormMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBatchNormMode_t({self})".write_to(writer)
 
@@ -2431,7 +2431,7 @@ struct cudnnSeverity_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SEV_FATAL:
             return writer.write_string("CUDNN_SEV_FATAL")
@@ -2443,7 +2443,7 @@ struct cudnnSeverity_t(
             return writer.write_string("CUDNN_SEV_INFO")
         abort("invalid cudnnSeverity_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSeverity_t({self})".write_to(writer)
 
@@ -2473,7 +2473,7 @@ struct cudnnMathType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_DEFAULT_MATH:
             return writer.write_string("CUDNN_DEFAULT_MATH")
@@ -2485,7 +2485,7 @@ struct cudnnMathType_t(
             return writer.write_string("CUDNN_FMA_MATH")
         abort("invalid cudnnMathType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnMathType_t({self})".write_to(writer)
 
@@ -2510,7 +2510,7 @@ struct cudnnNanPropagation_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NOT_PROPAGATE_NAN:
             return writer.write_string("CUDNN_NOT_PROPAGATE_NAN")
@@ -2518,7 +2518,7 @@ struct cudnnNanPropagation_t(
             return writer.write_string("CUDNN_PROPAGATE_NAN")
         abort("invalid cudnnNanPropagation_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnNanPropagation_t({self})".write_to(writer)
 
@@ -2549,7 +2549,7 @@ struct cudnnRNNAlgo_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_RNN_ALGO_STANDARD:
             return writer.write_string("CUDNN_RNN_ALGO_STANDARD")
@@ -2563,7 +2563,7 @@ struct cudnnRNNAlgo_t(
             return writer.write_string("CUDNN_RNN_ALGO_COUNT")
         abort("invalid cudnnRNNAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnRNNAlgo_t({self})".write_to(writer)
 
@@ -2676,7 +2676,7 @@ struct cudnnDataType_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_DATA_FLOAT:
             return writer.write_string("CUDNN_DATA_FLOAT")
@@ -2710,7 +2710,7 @@ struct cudnnDataType_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_DATA_FAST_FLOAT_FOR_FP8")
         abort("invalid cudnnDataType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnDataType_t({self})".write_to(writer)
 
@@ -2862,7 +2862,7 @@ struct cudnnIndicesType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_32BIT_INDICES:
             return writer.write_string("CUDNN_32BIT_INDICES")
@@ -2874,7 +2874,7 @@ struct cudnnIndicesType_t(
             return writer.write_string("CUDNN_8BIT_INDICES")
         abort("invalid cudnnIndicesType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnIndicesType_t({self})".write_to(writer)
 
@@ -3140,7 +3140,7 @@ struct cudnnConvolutionBwdFilterAlgo_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_CONVOLUTION_BWD_FILTER_ALGO_0:
             return writer.write_string("CUDNN_CONVOLUTION_BWD_FILTER_ALGO_0")
@@ -3168,7 +3168,7 @@ struct cudnnConvolutionBwdFilterAlgo_t(
             )
         abort("invalid cudnnConvolutionBwdFilterAlgo_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnConvolutionBwdFilterAlgo_t({self})".write_to(writer)
 
@@ -3291,7 +3291,7 @@ struct cudnnPoolingMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_POOLING_MAX:
             return writer.write_string("CUDNN_POOLING_MAX")
@@ -3307,7 +3307,7 @@ struct cudnnPoolingMode_t(
             return writer.write_string("CUDNN_POOLING_MAX_DETERMINISTIC")
         abort("invalid cudnnPoolingMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnPoolingMode_t({self})".write_to(writer)
 
@@ -3386,13 +3386,13 @@ struct cudnnDivNormMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_DIVNORM_PRECOMPUTED_MEANS:
             return writer.write_string("CUDNN_DIVNORM_PRECOMPUTED_MEANS")
         abort("invalid cudnnDivNormMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnDivNormMode_t({self})".write_to(writer)
 

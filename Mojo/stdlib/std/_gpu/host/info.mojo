@@ -32,7 +32,7 @@ from std.sys.info import (
 from std._plugin._overlay import ADDITIONAL_TARGETS
 
 
-@always_inline
+@inline(.always)
 def get_gpu_target[
     # TODO: Ideally this is an Optional[StaticString] but blocked by MOCO-1039
     target_arch: StaticString = _accelerator_arch(),
@@ -48,7 +48,7 @@ def get_gpu_target[
     return {}
 
 
-@always_inline
+@inline(.always)
 def _get_gpu_target[
     # TODO: Ideally this is an Optional[StaticString] but blocked by MOCO-1039
     target_arch: StaticString = _accelerator_arch(),
@@ -2071,7 +2071,7 @@ struct GPUInfo(Copyable, Equatable, Movable, RegisterPassable, Writable):
         """
         return self.name == other.name
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes GPU information to a writer.
 
@@ -2240,7 +2240,7 @@ comptime _builtin_targets: List[StaticString] = [
 ]
 
 
-@always_inline
+@inline(.always)
 def _get_info_from_target[target_arch0: StaticString]() -> GPUInfo:
     """Gets `GPUInfo` for a specific target architecture.
 

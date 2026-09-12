@@ -80,7 +80,7 @@ def _get_run_name(
     )
 
 
-@always_inline
+@inline(.always)
 def _mix64(x: UInt64) -> UInt64:
     """SplitMix64's finalizer."""
     var z = x
@@ -89,7 +89,7 @@ def _mix64(x: UInt64) -> UInt64:
     return z ^ (z >> 31)
 
 
-@always_inline
+@inline(.always)
 def _u01(i: UInt64) -> Float64:
     """A uniform on [0, 1) keyed by `i` alone.
 
@@ -105,12 +105,12 @@ def _u01(i: UInt64) -> Float64:
     return Float64(h >> 11) * (1.0 / 9007199254740992.0)
 
 
-@always_inline
+@inline(.always)
 def _u_val(r: Int, c: Int, N: Int, k: Int) -> Float64:
     return _u01(((UInt64(r) * UInt64(N) + UInt64(c)) << 2) + UInt64(k))
 
 
-@always_inline
+@inline(.always)
 def _u_len(r: Int) -> Float64:
     return _u01(0x8000000000000000 + UInt64(r))
 
@@ -179,7 +179,7 @@ def execute_topk_bitonic[
     var idxs_t = TileTensor(idxs_buf, row_major(rows, K))
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(c: DeviceContext) raises {mut idxs_t, imm}:
         persistent_topk_block_split[
             ordered=ordered, deterministic=deterministic
@@ -192,7 +192,7 @@ def execute_topk_bitonic[
             rows,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

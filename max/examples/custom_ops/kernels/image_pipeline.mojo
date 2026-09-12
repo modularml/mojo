@@ -34,7 +34,7 @@ struct Grayscale:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def color_to_grayscale[
             simd_width: Int
         ](idx: Coord) -> SIMD[.uint8, simd_width]:
@@ -69,7 +69,7 @@ struct Brightness:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline  # Added for consistency
+        @inline(.always)  # Added for consistency
         def brighten[
             simd_width: Int  # Renamed 'width' to 'simd_width'
         ](idx: Coord) -> SIMD[.uint8, simd_width]:
@@ -94,7 +94,7 @@ struct Blur:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def blur_kernel[
             simd_width: Int
         ](idx: Coord) -> SIMD[.uint8, simd_width]:

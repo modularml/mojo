@@ -370,7 +370,7 @@ def test(ctx: DeviceContext) raises:
         comptime nrun = 200
         comptime nwarmup = 2
 
-        @always_inline
+        @inline(.always)
         def run_func(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[gemm](
                 c_tensor,

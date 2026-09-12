@@ -177,7 +177,7 @@ struct TensorMapSwizzle(
     comptime SWIZZLE_128B = Self(3)
     """128-byte swizzle pattern."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Converts the swizzle mode to an integer value.
 
@@ -186,7 +186,7 @@ struct TensorMapSwizzle(
         """
         return Int(self._value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two swizzle modes are equal.
 
@@ -198,7 +198,7 @@ struct TensorMapSwizzle(
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Checks if two swizzle modes are not equal.
 
@@ -210,7 +210,7 @@ struct TensorMapSwizzle(
         """
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def bytes(self) -> Int:
         """Gets the swizzle size in bytes.
 
@@ -219,7 +219,7 @@ struct TensorMapSwizzle(
         """
         return Int((2**self._value) * 16)
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the swizzle mode to a writer.
 
@@ -309,7 +309,7 @@ struct TMADescriptor(DevicePassable, ImplicitlyCopyable):
         """
         return "TMADescriptor"
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initializes an empty TMA descriptor.
 
@@ -334,7 +334,7 @@ def prefetch_tma_descriptor(desc_ptr: OpaquePointer[mut=False, _]):
     )
 
 
-@always_inline
+@inline(.always)
 def create_tma_descriptor[
     dtype: DType,
     rank: Int,

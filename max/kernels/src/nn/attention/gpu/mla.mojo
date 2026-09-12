@@ -168,7 +168,7 @@ comptime MLA_DECODE_MAX_SEQ_LEN = 8
 comptime AMD_MLA_DECODE_FOLD_MAX_NUM_HEADS = 16
 
 
-@always_inline
+@inline(.always)
 def mla_decode_max_seq_len[dtype: DType, num_heads: Int]() -> Int:
     """Max query tokens (S) the MLA *decode* branch can fold for this config.
 
@@ -213,7 +213,7 @@ comptime AMD_MLA_DECODE_FOLD_M_MAX = 128
 # so the check is a false positive here (proper fix: give the cache views
 # provably-disjoint origins instead of sharing the collection's).
 @__unsafe_nested_origins_read_only
-@always_inline
+@inline(.always)
 def flare_mla_decoding[
     rank: Int,
     cache_t: KVCacheT,
@@ -399,7 +399,7 @@ def flare_mla_decoding[
         " output=bfloat16."
     )
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -584,7 +584,7 @@ def flare_mla_decoding[
     )
 
 
-@always_inline
+@inline(.always)
 def flare_mla_decoding_dispatch[
     k_t: MHAOperand,
     mask_t: MHAMask,
@@ -979,7 +979,7 @@ def flare_mla_decoding_dispatch[
         # See heuristic dispatch below.
         comptime amd_fp8 = has_amd_gpu_accelerator() and q.dtype.is_float8()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def launch_with_BM[
             BM: Int,
@@ -1930,7 +1930,7 @@ def mla_decoding[
         ]()
 
 
-@always_inline
+@inline(.always)
 def mla_decoding_single_batch[
     q_type: DType,
     k_t: MHAOperand,
@@ -2226,7 +2226,7 @@ def mla_decoding_single_batch[
 
         q_gmem_iter._incr()
 
-    @always_inline
+    @inline(.always)
     def loop_over_kvcache[
         tile_size: Int, not_last_iter: Bool
     ](kv_tile_start_row: Int, end: Int) {
@@ -2572,7 +2572,7 @@ def mla_decoding_single_batch[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _ragged_kv_view(
     src: TileTensor[address_space=.GENERIC, ...],
 ) -> TileTensor[
@@ -2597,7 +2597,7 @@ def _ragged_kv_view(
     )
 
 
-@always_inline
+@inline(.always)
 def _ragged_offsets_view(
     src: TileTensor[.uint32, address_space=.GENERIC, ...],
 ) -> TileTensor[
@@ -2613,7 +2613,7 @@ def _ragged_offsets_view(
     )
 
 
-@always_inline
+@inline(.always)
 def _ragged_scales_view(
     src: TileTensor[address_space=.GENERIC, ...],
 ) -> TileTensor[
@@ -2631,7 +2631,7 @@ def _ragged_scales_view(
 
 
 # entrypoint for MLA prefill kernels
-@always_inline
+@inline(.always)
 def flare_mla_prefill[
     rank: Int,
     cache_t: KVCacheT,
@@ -2736,7 +2736,7 @@ def flare_mla_prefill[
     else:
         comptime assert False, "Q, K, V, output dtype combination not supported"
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -2825,7 +2825,7 @@ def flare_mla_prefill[
 
 
 # entrypoint for TileTensor as K_rope input, used by tests.
-@always_inline
+@inline(.always)
 def flare_mla_prefill[
     rank: Int,
     mask_t: MHAMask,
@@ -2871,7 +2871,7 @@ def flare_mla_prefill[
     else:
         comptime assert False, "Q, K, V, output dtype combination not supported"
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -2948,7 +2948,7 @@ def flare_mla_prefill[
 
 
 # entrypoint for TileTensor as K_rope input with scales, used by tests.
-@always_inline
+@inline(.always)
 def flare_mla_prefill[
     rank: Int,
     mask_t: MHAMask,
@@ -2986,7 +2986,7 @@ def flare_mla_prefill[
         q.dtype == .float32 or q.dtype.is_half_float()
     ), "Only support single and half precision."
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3066,7 +3066,7 @@ def flare_mla_prefill[
         )
 
 
-@always_inline
+@inline(.always)
 def flare_mla_prefill[
     rank: Int,
     mask_t: MHAMask,
@@ -3094,7 +3094,7 @@ def flare_mla_prefill[
         LayoutTensor[.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin]
     ] = None,
 ) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3205,7 +3205,7 @@ def flare_mla_prefill[
 # used by tests. Mirrors the contiguous per-token-scale entrypoint
 # above but swaps K_rope from a TileTensor to a paged KVCacheT
 # operand (matching the generic paged entrypoint at ~:1517).
-@always_inline
+@inline(.always)
 def flare_mla_prefill[
     rank: Int,
     cache_t: KVCacheT,
@@ -3234,7 +3234,7 @@ def flare_mla_prefill[
         LayoutTensor[.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin]
     ] = None,
 ) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -3340,7 +3340,7 @@ def flare_mla_prefill[
         )
 
 
-@always_inline
+@inline(.always)
 def flare_mla_prefill_dispatch[
     k_t: MHAOperand,
     v_t: MHAOperand,
@@ -3597,11 +3597,11 @@ def mla_prefill[
     var end_of_seq = Int(valid_length[batch_idx + 1])
     seq_len = end_of_seq - start_of_seq
 
-    @always_inline
+    @inline(.always)
     def q_block_idx() -> Int:
         return block_idx.x if is_nvidia_gpu() else block_idx.y
 
-    # @always_inline
+    # @inline(.always)
     # def head_idx() -> Int:
     #     return block_idx.y if is_nvidia_gpu() else block_idx.x
 
@@ -3668,7 +3668,7 @@ def mla_prefill[
         ]()
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_single_batch[
     q_type: DType,
     k_t: MHAOperand,
@@ -3987,7 +3987,7 @@ def mla_prefill_single_batch[
     #       loop_over_kvcache[tile_size, True]
     #   ```
     # Only the last iteration is doing boundary check.
-    @always_inline
+    @inline(.always)
     def loop_over_kvcache[
         tile_size: Int, not_last_iter: Bool
     ](kv_tile_start_row: Int, end: Int) {
@@ -4104,7 +4104,7 @@ def mla_prefill_single_batch[
         # P = Q @ K, register tile holding mma result.
         _ = p_reg_tile.fill(0)
 
-        @always_inline
+        @inline(.always)
         def _mask_tensor_row(
             tensor: LayoutTensor, num_rows: Int, out result: type_of(tensor)
         ) {imm}:
@@ -4527,7 +4527,7 @@ def set_buffer_lengths_to_zero[
         buffer_lengths[chunk_idx] = 0
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_plan[
     cache_t: KVCacheT,
 ](
@@ -4757,7 +4757,7 @@ def mla_prefill_plan_kernel[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _k_cache_to_buffer[
     dtype: DType,
     cache_t: KVCacheT,
@@ -4777,7 +4777,7 @@ def _k_cache_to_buffer[
     comptime assert buffer_row_offsets.flat_rank == 1
     comptime assert cache_offsets.flat_rank == 1
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(k_cache, buffer_row_offsets, cache_offsets)
     def copy_fn[

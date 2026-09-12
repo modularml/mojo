@@ -90,7 +90,7 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
         self._buffers.append(handle.value().unsafe_bitcast[_DeviceBufferCpp]())
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def call_with_pack_metal[
     func: Some[TrivialRegisterPassable],
@@ -208,7 +208,7 @@ def call_with_pack_metal[
         )
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def call_with_pack_checked_metal[
     func: Some[TrivialRegisterPassable],

@@ -156,7 +156,7 @@ def test_gelu_quick():
     print(gelu_quick(simd_val))
 
 
-@always_inline
+@inline(.always)
 def erf_libm[
     dtype: DType, simd_width: SIMDLength
 ](arg: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:

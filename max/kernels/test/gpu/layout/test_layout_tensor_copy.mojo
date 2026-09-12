@@ -38,7 +38,7 @@ from layout.layout_tensor import (
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def add_op[
     dtype: DType, width: SIMDLength
 ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -305,7 +305,7 @@ def run_swizzle_copy_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def partial_copy_dram_to_sram_async_kernel[
     layout: Layout,
     thread_layout: Layout,
@@ -411,7 +411,7 @@ def run_partial_copy_dram_to_sram_async_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def copy_dram_to_sram_kernel[
     layout: Layout,
     thread_layout: Layout,
@@ -513,7 +513,7 @@ def run_copy_dram_to_sram_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def copy_sram_to_dram_kernel[
     dtype: DType,
     layout: Layout,
@@ -684,7 +684,7 @@ def run_copy_sram_to_dram_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def copy_local_to_local_kernel[
     dtype: DType,
     layout: Layout,
@@ -827,7 +827,7 @@ def run_copy_local_to_local_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def copy_dram_to_local_kernel[
     layout: Layout, num_threads: Int, block_dim_count: Int
 ](
@@ -941,7 +941,7 @@ def run_copy_dram_to_local_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def copy_local_to_sram_kernel[
     dtype: DType,
     layout: Layout,

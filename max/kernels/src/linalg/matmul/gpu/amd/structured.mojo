@@ -39,23 +39,23 @@ trait Enum(TrivialRegisterPassable):
     """Defines a comparable enum-like trait exposing an integer value and equality.
     """
 
-    @always_inline
+    @inline(.always)
     def value(self) -> Int:
         ...
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self.value() == other.value()
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    @always_inline
+    @inline(.always)
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @always_inline
+    @inline(.always)
     def __isnot__(self, other: Self) -> Bool:
         return self != other
 
@@ -70,7 +70,7 @@ struct ThreadRole(Enum, Writable):
 
     var _value: Int
 
-    @always_inline
+    @inline(.always)
     def value(self) -> Int:
         return self._value
 
@@ -78,13 +78,13 @@ struct ThreadRole(Enum, Writable):
     comptime CONSUMER = Self(1)
     comptime PRODUCER_CONSUMER = Self(2)
 
-    @always_inline
+    @inline(.always)
     def write_to[W: Writer](self, mut writer: W) -> None:
         writer.write(String(self))
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def pipeline_layout[layout: Layout, pipeline_stages: Int]() -> Layout:
     """Builds a 2D layout extended with a pipeline-stage dimension.
 
@@ -143,7 +143,7 @@ struct SMemBuffer[
     @__allow_legacy_any_origin_fields
     var buffer: Self.SMemTile
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert Self.layout.rank() == 2, "layout must be 2D"
 
@@ -158,7 +158,7 @@ struct SMemBuffer[
 
         self.buffer = Self.SMemTile.stack_allocation()
 
-    @always_inline
+    @inline(.always)
     def get_tile(self, stage: Int) -> Self.BlockTileType:
         return self.buffer.tile[Self.BM, Self.BN](0, stage)
 
@@ -172,18 +172,18 @@ struct AMDSharedMemoryBarrier(TrivialRegisterPassable):
 
     var __repr: Int32
 
-    @always_inline
+    @inline(.always)
     def initialize[origin: MutOrigin](ref[AddressSpace.SHARED, origin] self):
         self.__repr = 0
 
-    @always_inline
+    @inline(.always)
     def value[
         origin: MutOrigin
     ](ref[AddressSpace.SHARED, origin] self) -> Int32:
         var bar = UnsafePointer(to=self.__repr).address_space_cast[.SHARED]()
         return _workgroup_atomic.load[ordering=Ordering.ACQUIRE](bar)
 
-    @always_inline
+    @inline(.always)
     def increment[
         origin: MutOrigin
     ](ref[AddressSpace.SHARED, origin] self, warp_id: Int):
@@ -192,7 +192,7 @@ struct AMDSharedMemoryBarrier(TrivialRegisterPassable):
             bar, _workgroup_atomic.load[ordering=Ordering.ACQUIRE](bar) + 1
         )
 
-    @always_inline
+    @inline(.always)
     def wait_until_greater_or_equal_to[
         origin: MutOrigin
     ](ref[AddressSpace.SHARED, origin] self, v: Int32):
@@ -214,11 +214,11 @@ struct AMDWarpSharedMemoryBarrier[size: Int](TrivialRegisterPassable):
 
     var __repr: StaticTuple[Int32, Self.size]
 
-    @always_inline
+    @inline(.always)
     def initialize(ref[AddressSpace.SHARED, MutAnyOrigin] self):
         self.__repr = StaticTuple[Int32, Self.size](fill=0)
 
-    @always_inline
+    @inline(.always)
     def value(ref[AddressSpace.SHARED] self) -> Int32:
         var sum: Int32 = 0
 
@@ -226,14 +226,14 @@ struct AMDWarpSharedMemoryBarrier[size: Int](TrivialRegisterPassable):
             sum += self.__repr[i]
         return sum
 
-    @always_inline
+    @inline(.always)
     def increment(ref[AddressSpace.SHARED, MutAnyOrigin] self, warp_id: Int):
         var bar = rebind[
             UnsafePointer[Int32, MutAnyOrigin, address_space=.SHARED]
         ](Pointer(to=self.__repr))
         bar[warp_id] += 1
 
-    @always_inline
+    @inline(.always)
     def wait_until_greater_or_equal_to(ref[AddressSpace.SHARED] self, v: Int32):
         while self.value() < v:
             inlined_assembly[
@@ -279,12 +279,12 @@ struct MMAConfig[
     comptime k_group_size_b = Self.simd_width // Self.registers_per_thread_b
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def adjusted_mma_k_shape_a() -> Int:
         return Self.mma_shape[2] * Self.k_group_size_a
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def adjusted_mma_k_shape_b() -> Int:
         return Self.mma_shape[2] * Self.k_group_size_b
 
@@ -399,7 +399,7 @@ struct AmdTileOperator[
     @__allow_legacy_any_origin_fields
     var out_reg_tile: Self.OutRegTile
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert (
             Self.simd_width >= Self._registers_per_thread_a
@@ -423,7 +423,7 @@ struct AmdTileOperator[
         # Initialize output accumulator to zero
         self.out_reg_tile = Self.OutRegTile.stack_allocation().fill(0)
 
-    @always_inline
+    @inline(.always)
     def a_reg_tile(
         self, k_tile_idx: Int
     ) -> Self.ARegTile.TileType[Self.num_m_mmas, Self.simd_width]:
@@ -437,7 +437,7 @@ struct AmdTileOperator[
             k_tile_idx, 0
         )
 
-    @always_inline
+    @inline(.always)
     def b_reg_tile(
         self, k_tile_idx: Int
     ) -> Self.BRegTile.TileType[Self.num_n_mmas, Self.simd_width]:
@@ -451,7 +451,7 @@ struct AmdTileOperator[
             k_tile_idx, 0
         )
 
-    @always_inline
+    @inline(.always)
     def reset_accumulator(self):
         """Reset the accumulator to zero for a new tile computation."""
         _ = self.out_reg_tile.fill(0)
@@ -465,7 +465,7 @@ struct AmdTileOperator[
         k_tile_idx: Int
     ] = k_tile_idx % Self.k_group_size_a
 
-    @always_inline
+    @inline(.always)
     def load_tile_fragment[
         k_tile_idx: Int
     ](self, smem_tile_a: LayoutTensor, smem_tile_b: LayoutTensor):
@@ -500,7 +500,7 @@ struct AmdTileOperator[
                 group_idx,
             )
 
-    @always_inline
+    @inline(.always)
     def mma_compute[k_tile_idx: Int](self):
         """Perform matrix multiply-accumulate for a specific K tile.
 

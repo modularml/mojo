@@ -88,7 +88,7 @@ def apply_penalties_to_logits[
     comptime assert frequency_penalty.element_size == 1
     comptime assert logits.element_size == 1
 
-    @always_inline
+    @inline(.always)
     def apply_penalties_fn[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert idx.rank == 1, "apply_penalties_fn: rank must be 1"
 
@@ -333,7 +333,7 @@ def update_frequency_data[
 
     else:
 
-        @always_inline
+        @inline(.always)
         def update_frequency_data_fn[
             width: Int, alignment: Int = 1
         ](idx: Coord) {var}:

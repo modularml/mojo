@@ -30,7 +30,7 @@ def id(
     output[tid] = Float32(BFloat16(input[tid]))
 
 
-@no_inline
+@inline(.never)
 def run_vec_add(ctx: DeviceContext) raises:
     print("== run_vec_add")
 

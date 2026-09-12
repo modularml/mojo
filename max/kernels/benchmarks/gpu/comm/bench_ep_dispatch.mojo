@@ -188,14 +188,14 @@ def bench_dispatch[
     dealloc(host_topk_ids^)
     dealloc(host_input_tokens^)
 
-    @always_inline
+    @inline(.always)
     def clean_up(
         ctx: DeviceContext,
         atomic_counter: DeviceBuffer[DType.int32],
     ) raises {}:
         ctx.enqueue_memset(atomic_counter, Int32(0))
 
-    @always_inline
+    @inline(.always)
     def setup_and_run_benchmark[
         TokenFmtType: TokenFormat,
         FormatHandlerType: TokenFormat,
@@ -245,7 +245,7 @@ def bench_dispatch[
 
         var func_wait = ctx.compile_function[dispatch_wait]()
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async(ctx: DeviceContext) raises {imm}:
             # the recv_buf ptrs and recv_count ptrs need to be passed in a InlinedArray
             var recv_buf_ptrs: Array[MutPointer[UInt8, MutAnyOrigin], 1] = [
@@ -268,7 +268,7 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_dispatch_async_wait(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function(
                 func_wait,
@@ -284,23 +284,23 @@ def bench_dispatch[
                 block_dim=hw_info.max_thread_block_size,
             )
 
-        @always_inline
+        @inline(.always)
         def run_e2e(ctx: DeviceContext) raises {imm}:
             run_dispatch_async(ctx)
             run_dispatch_async_wait(ctx)
 
         shmem_barrier_all_on_stream(ctx.stream())
 
-        @always_inline
+        @inline(.always)
         def run_func() raises {imm}:
             run_e2e(ctx)
             clean_up(ctx, atomic_counter)
 
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             run_func()
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) {imm}:
             bencher_iter_custom(b, kernel_launch, ctx)
 

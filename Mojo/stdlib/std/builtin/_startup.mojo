@@ -33,7 +33,7 @@ def _destroy_global_runtime(
     external_call["KGEN_CompilerRT_AsyncRT_ReleaseCPUDevice", NoneType](ptr)
 
 
-@always_inline
+@inline(.always)
 def _ensure_runtime_init():
     var current_runtime = external_call[
         "KGEN_CompilerRT_AsyncRT_GetCurrentCPUDevice",

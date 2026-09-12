@@ -30,7 +30,7 @@ struct DispatchSink(Writer):
 
     var checksum: UInt64
 
-    @always_inline
+    @inline(.always)
     def write_string(mut self, string: StringSlice):
         for byte in string.bytes():
             self.checksum = self.checksum * 31 + UInt64(byte)
@@ -40,12 +40,12 @@ struct DispatchSink(Writer):
 struct NullWritable(Writable):
     var string: StaticString
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         writer.write_string(self.string)
 
 
-@always_inline
+@inline(.always)
 def dispatch_print(tstring: Some[Writable]):
     var writer = DispatchSink(0)
     tstring.write_to(writer)
@@ -53,7 +53,7 @@ def dispatch_print(tstring: Some[Writable]):
 
 
 def bench_tstring_single_value_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var a = NullWritable("The quick brown fox")
         dispatch_print(t"{black_box(a)}")
@@ -62,7 +62,7 @@ def bench_tstring_single_value_dispatch(mut b: Bencher) raises:
 
 
 def bench_tstring_only_literal_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         dispatch_print(t"The quick brown fox jumps over the lazy dog")
 
@@ -70,7 +70,7 @@ def bench_tstring_only_literal_dispatch(mut b: Bencher) raises:
 
 
 def bench_tstring_many_values_no_literals_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var a = NullWritable("abcdef")
         var b = NullWritable("ghijklm")
@@ -85,7 +85,7 @@ def bench_tstring_many_values_no_literals_dispatch(mut b: Bencher) raises:
 
 
 def bench_tstring_long_literals_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var a = NullWritable("I'm short")
         var b = NullWritable("I'm on the other hand a very long string")
@@ -102,7 +102,7 @@ def bench_tstring_long_literals_dispatch(mut b: Bencher) raises:
 
 
 def bench_tstring_many_values_many_literals_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var a = NullWritable("abcdef")
         var b = NullWritable("ghijklm")
@@ -122,7 +122,7 @@ def bench_tstring_many_values_many_literals_dispatch(mut b: Bencher) raises:
 
 
 def bench_tstring_mixed_sizes_dispatch(mut b: Bencher) raises:
-    @always_inline
+    @inline(.always)
     def call_fn():
         var id = NullWritable("7")
         var status = NullWritable("ok")

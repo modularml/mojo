@@ -77,7 +77,7 @@ struct Conv2dProblemShape(Copyable, Movable):
     # Groups (currently only groups=1 supported)
     var groups: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         batch: Int,
@@ -112,7 +112,7 @@ struct Conv2dProblemShape(Copyable, Movable):
 
     # ========== Derived Dimensions ==========
 
-    @always_inline
+    @inline(.always)
     def out_height(self) -> Int:
         """Compute output height."""
         var effective_filter_h = (self.filter_h - 1) * self.dilation_h + 1
@@ -120,7 +120,7 @@ struct Conv2dProblemShape(Copyable, Movable):
             self.in_height + 2 * self.pad_h - effective_filter_h
         ) // self.stride_h + 1
 
-    @always_inline
+    @inline(.always)
     def out_width(self) -> Int:
         """Compute output width."""
         var effective_filter_w = (self.filter_w - 1) * self.dilation_w + 1
@@ -130,24 +130,24 @@ struct Conv2dProblemShape(Copyable, Movable):
 
     # ========== GEMM Dimension Mapping ==========
 
-    @always_inline
+    @inline(.always)
     def gemm_m(self) -> Int:
         """GEMM M dimension = batch * output_height * output_width."""
         return self.batch * self.out_height() * self.out_width()
 
-    @always_inline
+    @inline(.always)
     def gemm_n(self) -> Int:
         """GEMM N dimension = output_channels."""
         return self.out_channels
 
-    @always_inline
+    @inline(.always)
     def gemm_k(self) -> Int:
         """GEMM K dimension = input_channels * filter_height * filter_width."""
         return self.in_channels * self.filter_h * self.filter_w
 
     # ========== Tile Count Helpers ==========
 
-    @always_inline
+    @inline(.always)
     def num_m_tiles(self, tile_m: Int) -> Int:
         """Number of tiles in M dimension.
 
@@ -157,7 +157,7 @@ struct Conv2dProblemShape(Copyable, Movable):
         """
         return ceildiv(self.gemm_m(), tile_m)
 
-    @always_inline
+    @inline(.always)
     def num_n_tiles(self, tile_n: Int) -> Int:
         """Number of tiles in N dimension.
 
@@ -167,7 +167,7 @@ struct Conv2dProblemShape(Copyable, Movable):
         """
         return ceildiv(self.gemm_n(), tile_n)
 
-    @always_inline
+    @inline(.always)
     def num_k_tiles(self, tile_k: Int) -> Int:
         """Number of tiles in K dimension.
 
@@ -234,13 +234,13 @@ struct Conv2dConfig[
     # ========== Derived Types ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def accum_type() -> DType:
         """Accumulator type derived from output type."""
         return get_accum_type[Self.out_type]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def default_bf16[
         swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     ]() -> Self:
@@ -307,7 +307,7 @@ struct Conv2dConfig[
         return config^
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def default_bf16_1sm[
         swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
         num_pipeline_stages_override: Int = 0,
@@ -378,7 +378,7 @@ struct Conv2dConfig[
         return config^
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def default_fp16[
         swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     ]() -> Self:

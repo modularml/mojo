@@ -75,7 +75,7 @@ struct TileLoaderTMA[
     # Multicast mask for cluster distribution
     var multicast_mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, tma_op: Self.TmaOpPtr, multicast_mask: UInt16):
         """Initialize the TMA tile loader.
 
@@ -86,7 +86,7 @@ struct TileLoaderTMA[
         self.tma_op = tma_op
         self.multicast_mask = multicast_mask
 
-    @always_inline
+    @inline(.always)
     def load[
         dim0: Int,
         dim1: Int,
@@ -120,7 +120,7 @@ struct TileLoaderTMA[
             dest, barrier, (k_coord, row_coord), self.multicast_mask
         )
 
-    @always_inline
+    @inline(.always)
     def load[
         LayoutType: TensorLayout
     ](
@@ -184,7 +184,7 @@ struct TileLoader[
     var tma_op: Self.TmaOpPtr
     var multicast_mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__[
         tma_op_type: AnyType
     ](
@@ -204,7 +204,7 @@ struct TileLoader[
         self.tma_op = rebind[Self.TmaOpPtr](tma_op)
         self.multicast_mask = multicast_mask
 
-    @always_inline
+    @inline(.always)
     def load[
         LayoutType: TensorLayout
     ](
@@ -265,7 +265,7 @@ struct ScalesLoader[
 
     var tma_op: Self.TmaOpPtr
 
-    @always_inline
+    @inline(.always)
     def __init__[
         tma_op_type: AnyType
     ](out self, tma_op: Pointer[tma_op_type, Self.tma_origin]):
@@ -279,7 +279,7 @@ struct ScalesLoader[
         """
         self.tma_op = rebind[Self.TmaOpPtr](tma_op)
 
-    @always_inline
+    @inline(.always)
     def load[
         LayoutType: TensorLayout
     ](

@@ -72,7 +72,7 @@ def bench_count_graphemes[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).count_graphemes()
         keep(res)
@@ -85,7 +85,7 @@ def bench_count_codepoints[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var res = black_box(items).count_codepoints()
         keep(res)
@@ -98,7 +98,7 @@ def bench_grapheme_iter[
 ](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var count = 0
         for _ in black_box(items).graphemes():
@@ -117,7 +117,7 @@ def bench_grapheme_slice[
     var start = total // 4
     var end = (3 * total) // 4
 
-    @always_inline
+    @inline(.always)
     def call_fn() {imm}:
         var slice = StringSlice(black_box(items))
         var s = slice[grapheme=start:end]

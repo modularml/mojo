@@ -105,7 +105,7 @@ saturate NVLink bandwidth.
 """
 
 
-@always_inline
+@inline(.always)
 def circular_add[n: Int](x: Int, y: Int) -> Int:
     """Addition modulo n, assuming 0 <= x < n and 0 <= y < n.
 
@@ -248,7 +248,7 @@ struct Signal:
     barrier-based collectives on the same signal buffer.
     """
 
-    @always_inline
+    @inline(.always)
     def lamport_state_ptr(
         mut self,
     ) -> MutPointer[Scalar[Self.flag_t], MutAnyOrigin]:
@@ -264,7 +264,7 @@ struct Signal:
             .as_unsafe_any_origin()
         )
 
-    @always_inline
+    @inline(.always)
     def lamport_region_ptr[
         dtype: DType
     ](mut self) -> MutPointer[Scalar[dtype], MutAnyOrigin]:
@@ -332,7 +332,7 @@ def init_signal_buffer(
     _lamport_init(signal_buffer, ctx)
 
 
-@always_inline
+@inline(.always)
 def _multi_gpu_barrier[
     ngpus: Int,
     is_start: Bool,

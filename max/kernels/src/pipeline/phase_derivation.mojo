@@ -645,7 +645,7 @@ def apply_edge_rules(
     for _ in range(8):  # OpRole values 0-6 + NONE(255), use 8 slots
         by_role.append(List[Int]())
 
-    @always_inline
+    @inline(.always)
     def _role_idx(role: OpRole) -> Int:
         return role._value if role._value < 8 else 7
 
@@ -669,12 +669,12 @@ def apply_edge_rules(
         is_lc.append(body[i].subtile == lc_sel)
 
     # Half assignment per op.
-    @always_inline
+    @inline(.always)
     def _op_half(idx: Int) {half} -> Int:
         return 0 if idx < half else 1
 
     # _in_half for Phase 1: op at idx is in the half that processes stage.
-    @always_inline
+    @inline(.always)
     def _in_half(idx: Int, stage: Int) {half} -> Bool:
         return (stage == 0) == (idx < half)
 
@@ -968,7 +968,7 @@ def derive_prologue_from_program(
     var result = List[ScheduleEntry]()
     var slot = 0
 
-    @always_inline
+    @inline(.always)
     def _emit(
         mut result: List[ScheduleEntry],
         op: OpDesc,
@@ -990,7 +990,7 @@ def derive_prologue_from_program(
     var num_blocks = len(program.blocks)
 
     # Helper to emit a global load as a prologue entry with the given k_offset.
-    @always_inline
+    @inline(.always)
     def _emit_load(
         mut result: List[ScheduleEntry],
         gl: OpDesc,

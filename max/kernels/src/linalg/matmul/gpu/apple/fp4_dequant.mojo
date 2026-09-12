@@ -42,7 +42,7 @@ from layout.tile_layout import TensorLayout, row_major
 from linalg.fp4_utils import E2M1_TO_FLOAT32, NVFP4_SF_VECTOR_SIZE
 
 
-@always_inline
+@inline(.always)
 def dequant_fp4_nibble[
     out_type: DType
 ](packed_byte: UInt8, nibble_hi: Bool, scale_abs: Float32) -> Scalar[out_type]:
@@ -133,7 +133,7 @@ def fp4_materialize_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_fp4_materialize[
     out_type: DType
 ](

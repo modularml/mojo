@@ -47,7 +47,7 @@ from internal_utils import arg_parse, human_readable_size, CacheBustingBuffer
 from std.testing import assert_true
 
 
-@always_inline
+@inline(.always)
 def _input_value[dtype: DType](root: Int, j: Int) -> Scalar[dtype]:
     """Generate position-based input value that includes root rank.
 
@@ -220,11 +220,11 @@ def bench_broadcast[
             raise "Vendor CCL not available; skipping vendor path."
         vendor_ccl.init_comms(ngpus)
 
-    @always_inline
+    @inline(.always)
     def bench_iter(
         mut bencher: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(ctx_inner: DeviceContext, cache_iter: Int) raises {imm}:
             var in_tile = TileTensor(
                 cb_in.offset_ptr(cache_iter), row_major(length)

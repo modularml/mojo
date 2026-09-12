@@ -54,7 +54,7 @@ from .kernel import SM100MHADepth512
 comptime logger = Logger()
 
 
-@always_inline
+@inline(.always)
 def mha_sm100_depth512_dispatch[
     q_type: DType,
     KVType: MHAOperand,
@@ -266,12 +266,12 @@ def mha_sm100_depth512_dispatch[
     # ---- Nested closure dispatch (no sink) -----------------------------------
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def with_kv_offsets[
         KVRowOffsetsType: OptionalPointer
     ](kv_row_offsets: KVRowOffsetsType) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def with_valid_length[
             ValidLengthType: OptionalPointer
         ](valid_len: ValidLengthType) raises:

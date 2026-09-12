@@ -56,7 +56,7 @@ from linalg.matmul.gpu.amd import (
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _fp4_nibble_to_fp32(nibble: UInt8) -> Float32:
     """Decodes a 4-bit FP4 E2M1 nibble (lower 4 bits) to FP32."""
     var n = Int(nibble) & 0xF
@@ -72,7 +72,7 @@ def _fp4_nibble_to_fp32(nibble: UInt8) -> Float32:
     return -mag if sign == 1 else mag
 
 
-@always_inline
+@inline(.always)
 def _fp4_byte_to_fp32_pair(byte: UInt8) -> Tuple[Float32, Float32]:
     """Returns the (low, high) FP32 values stored in a packed FP4 byte."""
     var low = _fp4_nibble_to_fp32(byte & UInt8(0xF))
@@ -80,7 +80,7 @@ def _fp4_byte_to_fp32_pair(byte: UInt8) -> Tuple[Float32, Float32]:
     return (low, high)
 
 
-@always_inline
+@inline(.always)
 def _e8m0_to_fp32(byte: UInt8) -> Float32:
     """Decodes an E8M0 (exponent-only) byte to FP32. Byte 127 = 1.0."""
     var e = Int(byte)

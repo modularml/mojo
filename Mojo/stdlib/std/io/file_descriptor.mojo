@@ -64,7 +64,7 @@ struct FileDescriptor(TrivialRegisterPassable, Writer):
         """
         self.value = f._get_raw_fd()
 
-    @always_inline
+    @inline(.always)
     def write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a span of bytes to the file.
@@ -90,7 +90,7 @@ struct FileDescriptor(TrivialRegisterPassable, Writer):
         """
         self.write_bytes(string.as_bytes())
 
-    @always_inline
+    @inline(.always)
     def read_bytes(mut self, buffer: MutSpan[Byte, _]) raises -> Int:
         """Read a number of bytes from the file into a buffer.
 

@@ -605,7 +605,7 @@ name. This example defines a region and passes it to
 execution and later resumes by running the provided region:
 
 ```mojo
-@always_inline
+@inline(.always)
 def _suspend_async[
     body: def(AnyCoroutine) capturing -> None
 ]():

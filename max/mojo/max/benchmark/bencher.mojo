@@ -32,7 +32,7 @@ from max.algorithm import sync_parallelize
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def bench_multicontext[
     FuncType: def(mut Bencher, DeviceContext, Int) raises -> None,
 ](

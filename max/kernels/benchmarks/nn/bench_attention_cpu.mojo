@@ -88,19 +88,19 @@ def bench_attention[dtype: DType](mut m: Bench, spec: AttentionSpec) raises:
         output_alloc.unsafe_ptr(), RuntimeLayout[layout].row_major(q_shape)
     )
 
-    @always_inline
+    @inline(.always)
     def input_k_fn[
         simd_width: Int, _rank: Int
     ](idx: IndexList[_rank]) capturing -> SIMD[dtype, simd_width]:
         return k.load[width=simd_width](rebind[IndexList[3]](idx))
 
-    @always_inline
+    @inline(.always)
     def input_v_fn[
         simd_width: Int, _rank: Int
     ](idx: IndexList[_rank]) capturing -> SIMD[dtype, simd_width]:
         return v.load[width=simd_width](rebind[IndexList[3]](idx))
 
-    @always_inline
+    @inline(.always)
     def mask_fn[
         simd_width: Int, _rank: Int
     ](idx: IndexList[_rank]) capturing -> SIMD[dtype, simd_width]:
@@ -108,9 +108,9 @@ def bench_attention[dtype: DType](mut m: Bench, spec: AttentionSpec) raises:
 
     comptime scale = 0.25
 
-    @always_inline
+    @inline(.always)
     def flash_bench_fn(mut b: Bencher) {imm}:
-        @always_inline
+        @inline(.always)
         def iter_fn[depth_static_dim: Int]() {imm}:
             comptime output_static_shape = IndexList[3](
                 UNKNOWN_VALUE, UNKNOWN_VALUE, depth_static_dim
@@ -132,7 +132,7 @@ def bench_attention[dtype: DType](mut m: Bench, spec: AttentionSpec) raises:
                 # `iter` takes a closure value, and a parametric closure only
                 # names an overload set, so instantiate it behind a
                 # non-parametric one.
-                @always_inline
+                @inline(.always)
                 def iter_static() {imm}:
                     iter_fn[dim]()
 
@@ -140,7 +140,7 @@ def bench_attention[dtype: DType](mut m: Bench, spec: AttentionSpec) raises:
                 return
 
         # Fallback to dispatch with a dynamic shape.
-        @always_inline
+        @inline(.always)
         def iter_dynamic() {imm}:
             iter_fn[UNKNOWN_VALUE]()
 

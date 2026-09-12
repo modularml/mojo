@@ -727,7 +727,7 @@ def _allreduce_rmsnorm_fp8_launch[
     # Provide evidence that flat_rank >= 2 for output.store(Coord(..., ...)).
     comptime assert output.flat_rank >= 2
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(output)
     def output_fn[
@@ -886,7 +886,7 @@ def _allreduce_rmsnorm_fp8_launch_2stage[
     # Provide evidence that flat_rank >= 2 for output.store(Coord(..., ...)).
     comptime assert output.flat_rank >= 2
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(output)
     def output_fn[
@@ -973,7 +973,7 @@ def _launch_split_allreduce_rmsnorm_fp8[
 
     # Define input_fn for RMSNorm (reads from residual_output after allreduce).
     @__copy_capture(residual_output, _cols)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[
         width: Int, _rank: Int
@@ -1005,7 +1005,7 @@ def _launch_split_allreduce_rmsnorm_fp8[
 
     # Step 1: Allreduce with add epilogue → residual_output.
     @__copy_capture(residual, residual_output, _cols)
-    @always_inline
+    @inline(.always)
     @__parameter
     def add_epilogue[
         _dtype: DType,

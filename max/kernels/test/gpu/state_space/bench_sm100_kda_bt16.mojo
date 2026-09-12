@@ -305,7 +305,7 @@ def _bench[H: Int](ctx: DeviceContext, seq_len: Int) raises:
         TensorOrigin=type_of(out_t).origin,
     ]
 
-    @always_inline
+    @inline(.always)
     def launch_prep(
         lctx: DeviceContext,
     ) raises {
@@ -346,7 +346,7 @@ def _bench[H: Int](ctx: DeviceContext, seq_len: Int) raises:
             shared_mem_bytes=PREP_SMEM_BYTES,
         )
 
-    @always_inline
+    @inline(.always)
     def launch_chain(
         lctx: DeviceContext,
     ) raises {
@@ -387,7 +387,7 @@ def _bench[H: Int](ctx: DeviceContext, seq_len: Int) raises:
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def launch_both(
         lctx: DeviceContext,
     ) raises {imm launch_prep, imm launch_chain}:

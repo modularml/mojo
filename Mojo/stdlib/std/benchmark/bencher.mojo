@@ -73,7 +73,7 @@ struct BenchMetric(ImplicitlyCopyable, Writable):
         """
         writer.write(self.name, " (", self.unit, ")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `BenchMetric` to a writer.
 
@@ -201,7 +201,7 @@ struct ThroughputMeasure(ImplicitlyCopyable, Writable):
         """
         return writer.write(self.metric)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `ThroughputMeasure` to a writer.
 
@@ -274,7 +274,7 @@ struct Format(ImplicitlyCopyable, Writable):
         """
         writer.write(self.value)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `Format` to a writer.
 
@@ -566,9 +566,9 @@ struct Bench(Writable):
     var shape = IndexList[2](1024, 1024)
     var bench = Bench(BenchConfig(max_iters=100))
 
-    @always_inline
+    @inline(.always)
     def example(mut b: Bencher, shape: IndexList[2]) raises:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[example_kernel](
                 grid_dim=shape[0], block_dim=shape[1]
@@ -784,7 +784,7 @@ struct Bench(Writable):
 
         self.bench_function(input_closure, bench_id, measures)
 
-    @always_inline
+    @inline(.always)
     def bench_function[
         FuncType: def() raises -> None,
     ](
@@ -809,7 +809,7 @@ struct Bench(Writable):
             If the operation fails.
         """
 
-        @always_inline
+        @inline(.always)
         def bench_iter(
             mut b: Bencher,
         ) raises {imm func,}:
@@ -896,7 +896,7 @@ struct Bench(Writable):
             else:
                 func(b)
 
-        @always_inline
+        @inline(.always)
         def benchmark_fn(num_iters: Int) raises {ref} -> Int:
             """Executes benchmark for a target function.
 
@@ -1125,7 +1125,7 @@ struct Bench(Writable):
 
             writer.write("\n")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `Bench` to a writer.
 

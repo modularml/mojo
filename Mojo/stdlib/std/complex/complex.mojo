@@ -139,7 +139,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         comptime if Self.length > 1:
             writer.write_string("]")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Formats the complex value for debug representation.
 
@@ -151,7 +151,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
             Int(Self.length),
         ).fields(self)
 
-    @always_inline
+    @inline(.always)
     def __abs__(self) -> SIMD[Self.dtype, Self.length]:
         """Returns the magnitude of the complex value.
 
@@ -164,7 +164,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __add__(self, rhs: Self) -> Self:
         """Adds two complex values.
 
@@ -176,7 +176,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return Self(self.re + rhs.re, self.im + rhs.im)
 
-    @always_inline
+    @inline(.always)
     def __mul__(self, rhs: Self) -> Self:
         """Multiplies two complex values.
 
@@ -191,7 +191,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
             self.re.fma(rhs.im, self.im * rhs.re),
         )
 
-    @always_inline
+    @inline(.always)
     def __mul__(self, rhs: Scalar[Self.dtype]) -> Self:
         """Multiplies a complex value to a scalar.
 
@@ -203,7 +203,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return Self(self.re * rhs, self.im * rhs)
 
-    @always_inline
+    @inline(.always)
     def __rmul__(self, lhs: Scalar[Self.dtype]) -> Self:
         """Multiplies a complex value to a scalar.
 
@@ -215,7 +215,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return Self(self.re * lhs, self.im * lhs)
 
-    @always_inline
+    @inline(.always)
     def __imul__(mut self, rhs: Self):
         """Multiplies two complex values inplace.
 
@@ -224,7 +224,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         self = self * rhs
 
-    @always_inline
+    @inline(.always)
     def __imul__(mut self, rhs: Scalar[Self.dtype]):
         """Multiplies a complex value to a scalar inplace.
 
@@ -234,7 +234,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         self.re *= rhs
         self.im *= rhs
 
-    @always_inline
+    @inline(.always)
     def __sub__(self, rhs: Self) -> Self:
         """Subtracts two complex values.
 
@@ -246,7 +246,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return Self(self.re - rhs.re, self.im - rhs.im)
 
-    @always_inline
+    @inline(.always)
     def __truediv__(self, rhs: Self) -> Self:
         """Divides two complex values.
 
@@ -262,7 +262,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
             self.im.fma(rhs.re, -(self.re * rhs.im)) / denom,
         )
 
-    @always_inline
+    @inline(.always)
     def __neg__(self) -> Self:
         """Negates the complex value.
 
@@ -271,7 +271,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return ComplexSIMD(-self.re, -self.im)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs: Self) -> Bool:
         """Compares two ComplexSIMD for equality.
 
@@ -287,7 +287,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def conj(self) -> Self:
         """Return the complex conjugate of self.
 
@@ -296,7 +296,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         """
         return Self(self.re, -self.im)
 
-    @always_inline
+    @inline(.always)
     def norm(self) -> SIMD[Self.dtype, Self.length]:
         """Returns the magnitude of the complex value.
 
@@ -307,7 +307,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
             self.squared_norm()
         )
 
-    @always_inline
+    @inline(.always)
     def squared_norm(self) -> SIMD[Self.dtype, Self.length]:
         """Returns the squared magnitude of the complex value.
 
@@ -317,7 +317,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         return self.re.fma(self.re, self.im * self.im)
 
     # fma(self, b, c)
-    @always_inline
+    @inline(.always)
     def fma(self, b: Self, c: Self) -> Self:
         """Computes FMA operation.
 
@@ -337,7 +337,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
         )
 
     # fma(self, self, c)
-    @always_inline
+    @inline(.always)
     def squared_add(self, c: Self) -> Self:
         """Computes Square-Add operation.
 
@@ -354,7 +354,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
             self.re.fma(self.im + self.im, c.im),
         )
 
-    @always_inline
+    @inline(.always)
     def __exp__(self) -> Self:
         """Computes the exponential of the complex value.
 
@@ -372,7 +372,7 @@ struct ComplexSIMD[dtype: DType, length: SIMDLength](
 
 # TODO: we need this overload, because the Absable trait requires returning Self
 # dtype. We could maybe get rid of this if we had associated dtypes?
-@always_inline
+@inline(.always)
 def abs(x: ComplexSIMD[...]) -> SIMD[x.dtype, x.length]:
     """Performs elementwise abs (norm) on each element of the complex value.
 

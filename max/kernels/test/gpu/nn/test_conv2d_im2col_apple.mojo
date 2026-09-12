@@ -49,7 +49,7 @@ from std.utils.index import Index, IndexList
 # Opaque identity barrier: keep the conv dims runtime-valued so the fused-conv
 # kernel is JIT-compiled with full dynamic index math (no static-shape constant
 # folding) -- the exact instantiation FLUX.2's [dyn,dyn,dyn,*] conv hits.
-@no_inline
+@inline(.never)
 def _dyn(x: Int) -> Int:
     return x
 
@@ -127,7 +127,7 @@ def test_conv2d_fused_apple_dynamic_round(
     var C_out_i = C_out
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_ptr, W_out_i, HW_out_i, C_out_i)
     def round_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -321,7 +321,7 @@ def test_conv2d_im2col_direct[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output_lt)
         def scale_epilogue[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -481,7 +481,7 @@ def test_conv2d_fused_apple[
     comptime if with_epilogue:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output_lt)
         def scale_epilogue[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -636,7 +636,7 @@ def test_conv2d_gpu_dispatch[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(output_lt)
     def scale_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1

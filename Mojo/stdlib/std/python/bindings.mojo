@@ -738,7 +738,7 @@ struct PythonTypeBuilder(Copyable):
             If the slot insertion fails.
         """
 
-        @always_inline
+        @inline(.always)
         def default_init_func(
             out self: T, args: PythonObject, kwargs: PythonObject
         ) raises:
@@ -1300,7 +1300,7 @@ def _py_init_function_wrapper[
         return -1
 
 
-@always_inline
+@inline(.always)
 def _raising_py_init_wrapper[
     T: Movable & Deinitable,
     init_func: def(args: PythonObject, kwargs: PythonObject) thin -> T,
@@ -1308,7 +1308,7 @@ def _raising_py_init_wrapper[
     t = init_func(args, kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_c_function_wrapper[
     user_func: GenericPyFunction
 ](py_self_ptr: PyObjectPtr, args_ptr: PyObjectPtr, kwargs_ptr: PyObjectPtr) abi(
@@ -1410,7 +1410,7 @@ def _convert_kwargs(
     return result^
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_function_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1426,7 +1426,7 @@ def _py_kwargs_function_wrapper[
     (METH_FASTCALL) instead.
     """
 
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1438,7 +1438,7 @@ def _py_kwargs_function_wrapper[
     return GenericPyFunction(wrapper_with_kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_method_wrapper[
     SelfType: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1449,7 +1449,7 @@ def _py_kwargs_method_wrapper[
         var ** kwargs: PythonObject,
     ) raises thin -> RetType,
 ]() -> GenericPyFunction:
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1463,7 +1463,7 @@ def _py_kwargs_method_wrapper[
     return GenericPyFunction(wrapper_with_kwargs)
 
 
-@always_inline
+@inline(.always)
 def _py_kwargs_method_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1472,7 +1472,7 @@ def _py_kwargs_method_wrapper[
         self_: PythonObject, * args: * PyArgs, var ** kwargs: PythonObject
     ) raises thin -> RetType,
 ]() -> GenericPyFunction:
-    @always_inline
+    @inline(.always)
     def wrapper_with_kwargs(
         mut py_self: PythonObject,
         mut py_args: PythonObject,
@@ -1490,7 +1490,7 @@ def _py_kwargs_method_wrapper[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _py_function_fastcall_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1538,7 +1538,7 @@ def _py_function_fastcall_wrapper[
         return raise_python_exception(e)
 
 
-@always_inline
+@inline(.always)
 def _py_method_typed_fastcall_wrapper[
     SelfType: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1562,7 +1562,7 @@ def _py_method_typed_fastcall_wrapper[
         return raise_python_exception(e)
 
 
-@always_inline
+@inline(.always)
 def _py_method_fastcall_wrapper[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1603,7 +1603,7 @@ def _py_method_fastcall_wrapper[
 # are each handled by a dedicated dispatcher below.
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_function[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1630,7 +1630,7 @@ def _dispatch_python_object_function[
     return _return_python_object(result^)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_method[
     SelfArg: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1659,7 +1659,7 @@ def _dispatch_python_object_method[
 
 # TODO: Combine this overload if/when it's possible to make
 #       `_call_with_dynamic_pack_pointers` generic over presence of kwargs.
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_kwargs_function[
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
     RetType: Deinitable & Movable,
@@ -1694,7 +1694,7 @@ def _dispatch_python_object_kwargs_function[
 # TODO: Combine this overload if/when it's possible to make
 #       `_call_with_dynamic_pack_pointers` generic over presence of `SelfArg`
 #       and kwargs.
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dispatch_python_object_kwargs_method[
     SelfArg: Deinitable,
     PyArgs: TypeList[Trait=type_of(PythonObject), ...],
@@ -1935,11 +1935,11 @@ def _try_convert_arg[
 
 
 # NOTE:
-#   @always_inline is needed so that the unsafe_stack_allocation() that
+#   @inline(.always) is needed so that the unsafe_stack_allocation() that
 #   appears in the definition below is valid in the _callers_ stack frame,
 #   effectively allowing us to "return" a pointer to stack-allocated data
 #   from this function.
-@always_inline
+@inline(.always)
 def check_and_get_or_convert_arg[
     T: ConvertibleFromPython
 ](func_name: StaticString, py_args: PythonObject, index: Int) raises -> Pointer[
@@ -1982,7 +1982,7 @@ def check_and_get_or_convert_arg[
             )
         )
         # Return a pointer to stack data. Only valid because this function is
-        # @always_inline.
+        # @inline(.always).
         return converted_arg_ptr
 
 

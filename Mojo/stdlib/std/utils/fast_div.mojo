@@ -45,7 +45,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
     var _is_pow2: Bool
     var _log2_shift: UInt8
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, divisor: Int = 1):
         """Initializes FastDiv with the divisor.
 
@@ -92,7 +92,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
             self._sh1 = 0
             self._sh2 = 0
 
-    @always_inline
+    @inline(.always)
     def __rdiv__(self, other: Scalar[Self.uint_type]) -> Scalar[Self.uint_type]:
         """Divides the other scalar by the divisor.
 
@@ -104,7 +104,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
         """
         return other / self
 
-    @always_inline
+    @inline(.always)
     def __rtruediv__(
         self, other: Scalar[Self.uint_type]
     ) -> Scalar[Self.uint_type]:
@@ -139,7 +139,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
                 t + ((other - t) >> self._sh1.cast[Self.uint_type]())
             ) >> self._sh2.cast[Self.uint_type]()
 
-    @always_inline
+    @inline(.always)
     def __rmod__(self, other: Scalar[Self.uint_type]) -> Scalar[Self.uint_type]:
         """Computes the remainder of division.
 
@@ -152,7 +152,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
         var q = other / self
         return other - (q * self._div)
 
-    @always_inline
+    @inline(.always)
     def __divmod__(
         self, other: Scalar[Self.uint_type]
     ) -> Tuple[Scalar[Self.uint_type], Scalar[Self.uint_type]]:
@@ -167,7 +167,7 @@ struct FastDiv[dtype: DType](TrivialRegisterPassable, Writable):
         var q = other / self
         return q, (other - (q * self._div))
 
-    @no_inline
+    @inline(.never)
     def write_to[W: Writer](self, mut writer: W):
         """Writes the FastDiv parameters to a writer.
 

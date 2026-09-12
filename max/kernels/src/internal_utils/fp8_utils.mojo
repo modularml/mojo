@@ -20,7 +20,7 @@ from std.math import clamp
 from std.utils.numerics import isinf, isnan, max_finite, min_finite
 
 
-@always_inline
+@inline(.always)
 def guarded_inv_scale[dt: DType](scale: Scalar[dt]) -> Scalar[dt]:
     """Reciprocal of an FP8 scale factor, guarded to stay finite.
 
@@ -48,7 +48,7 @@ def guarded_inv_scale[dt: DType](scale: Scalar[dt]) -> Scalar[dt]:
     return inv_scale
 
 
-@always_inline
+@inline(.always)
 def compute_dynamic_fp8_scale[
     out_dtype: DType,
 ](
@@ -92,7 +92,7 @@ def compute_dynamic_fp8_scale[
     return (scale_factor, scale_factor_recip)
 
 
-@always_inline
+@inline(.always)
 def fp8_quantize[
     out_dtype: DType,
     *,
@@ -143,7 +143,7 @@ def fp8_quantize[
         return result.cast[out_dtype]()
 
 
-@always_inline
+@inline(.always)
 def cast_saturating[
     in_dtype: DType,
     width: SIMDLength,

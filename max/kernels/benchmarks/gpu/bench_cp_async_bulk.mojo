@@ -66,7 +66,7 @@ from internal_utils import arg_parse
 from layout.tma_async import SharedMemBarrier
 
 
-@always_inline
+@inline(.always)
 def _smem_ptr[
     BYTES_PER_COPY: Int, S: Int
 ](
@@ -77,7 +77,7 @@ def _smem_ptr[
     return base + (warp * S + slot) * BYTES_PER_COPY
 
 
-@always_inline
+@inline(.always)
 def _mbar_ref[
     S: Int
 ](
@@ -229,9 +229,9 @@ def main() raises:
         var src_dev = ctx.enqueue_create_buffer[.uint8](total_bytes)
         var dst_dev = ctx.enqueue_create_buffer[.uint8](total_bytes)
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) {imm}:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext) raises {imm}:
                 ctx.enqueue_function[
                     bulk_memcpy_kernel[NUM_THREADS, BYTES_PER_COPY, S, PREFETCH]

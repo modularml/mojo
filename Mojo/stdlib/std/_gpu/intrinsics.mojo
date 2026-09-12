@@ -149,7 +149,7 @@ struct CacheOperation(Equatable, TrivialRegisterPassable):
         """
         return Self(self._value | other._value)
 
-    @always_inline
+    @inline(.always)
     def mnemonic(self) -> StaticString:
         """Returns the PTX mnemonic string for this cache operation.
 
@@ -184,7 +184,7 @@ struct CacheOperation(Equatable, TrivialRegisterPassable):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ldg[
     dtype: DType,
     //,
@@ -300,7 +300,7 @@ def warpgroup_reg_dealloc[count: Int]():
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def lop[lut: Int32](a: Int32, b: Int32, c: Int32) -> Int32:
     """Performs an arbitrary logical operation on 3 inputs using a lookup table.
 
@@ -343,7 +343,7 @@ def lop[lut: Int32](a: Int32, b: Int32, c: Int32) -> Int32:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def byte_permute(a: UInt32, b: UInt32, c: UInt32) -> UInt32:
     """Permutes bytes from two 32-bit integers based on a control mask.
 
@@ -386,7 +386,7 @@ def _byte_permute_inst() -> StaticString:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: UInt16, b: UInt16) -> UInt32:
     """Calculates the most significant 32 bits of the product of two 16-bit
     unsigned integers.
@@ -417,7 +417,7 @@ def mulhi(a: UInt16, b: UInt16) -> UInt32:
     return au32 * bu32
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: Int16, b: Int16) -> Int32:
     """Calculates the most significant 32 bits of the product of two 16-bit
     signed integers.
@@ -447,7 +447,7 @@ def mulhi(a: Int16, b: Int16) -> Int32:
     return ai32 * bi32
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: UInt32, b: UInt32) -> UInt32:
     """Calculates the most significant 32 bits of the product of two 32-bit
     unsigned integers.
@@ -477,7 +477,7 @@ def mulhi(a: UInt32, b: UInt32) -> UInt32:
     return ((au64 * bu64) >> 32).cast[.uint32]()
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: Int32, b: Int32) -> Int32:
     """Calculates the most significant 32 bits of the product of two 32-bit
     signed integers.
@@ -507,7 +507,7 @@ def mulhi(a: Int32, b: Int32) -> Int32:
     return ((ai64 * bi64) >> 32).cast[.int32]()
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: UInt64, b: UInt64) -> UInt64:
     """Calculates the most significant 64 bits of the product of two 64-bit
     unsigned integers.
@@ -537,7 +537,7 @@ def mulhi(a: UInt64, b: UInt64) -> UInt64:
     return ((au128 * bu128) >> 64).cast[.uint64]()
 
 
-@always_inline
+@inline(.always)
 def mulhi(a: Int64, b: Int64) -> Int64:
     """Calculates the most significant 64 bits of the product of two 64-bit
     signed integers.
@@ -572,7 +572,7 @@ def mulhi(a: Int64, b: Int64) -> Int64:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def mulwide(a: UInt32, b: UInt32) -> UInt64:
     """Performs a wide multiplication of two 32-bit unsigned integers.
 
@@ -604,7 +604,7 @@ def mulwide(a: UInt32, b: UInt32) -> UInt64:
     return au64 * bu64
 
 
-@always_inline
+@inline(.always)
 def mulwide(a: Int32, b: Int32) -> Int64:
     """Performs a wide multiplication of two 32-bit signed integers.
 
@@ -636,7 +636,7 @@ def mulwide(a: Int32, b: Int32) -> Int64:
     return ai64 * bi64
 
 
-@always_inline
+@inline(.always)
 def get_ib_sts() -> Int32:
     """Returns the IB status of the current thread.
 
@@ -707,7 +707,7 @@ struct Scope(Equatable, ImplicitlyCopyable, Writable):
         """
         return self._value == other._value
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut w: Some[Writer]):
         """Writes the string representation of the scope to a writer.
 
@@ -739,7 +739,7 @@ struct Scope(Equatable, ImplicitlyCopyable, Writable):
         """
         t"Scope({self})".write_to(writer)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def mnemonic(self) -> StaticString:
         """Returns the mnemonic string representation of the memory scope.
 
@@ -762,7 +762,7 @@ struct Scope(Equatable, ImplicitlyCopyable, Writable):
         return "<<invalid scope>>"
 
 
-@always_inline
+@inline(.always)
 def threadfence[scope: Scope = Scope.GPU]():
     """Enforces ordering of memory operations across threads.
 
@@ -834,7 +834,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
     var desc: SIMD[.uint32, 4]
     """The 128-bit buffer descriptor encoded as four 32-bit values."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[
         dtype: DType
     ](
@@ -880,7 +880,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
             # GFX9 (CDNA/GCN)
             self.desc[3] = 0x00020000
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         """Constructs a zeroed AMD buffer resource descriptor."""
         comptime assert (
@@ -888,7 +888,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
         ), "The AMDBufferResource struct is only applicable on AMDGPU hardware."
         self.desc = 0
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_base_ptr(self) -> Int:
         """Gets the base pointer address from the buffer resource descriptor.
 
@@ -899,7 +899,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
             bitcast[.int64, 1](SIMD[.uint32, 2](self.desc[0], self.desc[1]))
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load[
         dtype: DType,
         width: Int,
@@ -948,7 +948,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
 
         return bitcast[dtype, width](load_val)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load_to_lds[
         dtype: DType,
         *,
@@ -1058,7 +1058,7 @@ struct AMDBufferResource(TrivialRegisterPassable):
                 to_i32(Int32(0)),
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def store[
         dtype: DType,
         width: SIMDLength,
@@ -1152,7 +1152,7 @@ def _cache_operation_to_amd_aux[cache_policy: CacheOperation]() -> Int32:
     # CacheOperation.VOLATILE_STREAMING -> 0x13 (SC=11, NT=1) - Volatile + streaming
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _raw_ptr_buffer_load_lds[
     scopes: __mlir_type.`!kgen.deferred`, aux: Int
 ](
@@ -1206,7 +1206,7 @@ def _get_buffer_intrinsic_simd_width[bytes: Int]() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def ds_read_tr16_b64[
     dtype: DType,
     //,
@@ -1247,7 +1247,7 @@ def ds_read_tr16_b64[
     ](shared_ptr)
 
 
-@always_inline
+@inline(.always)
 def ds_read_tr8_b64[
     dtype: DType,
     //,
@@ -1300,7 +1300,7 @@ def ds_read_tr8_b64[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def cvt_pk_fp8_f32_raw[
     dtype: DType,
 ](src: SIMD[.float32, 4]) -> SIMD[dtype, 4]:
@@ -1357,7 +1357,7 @@ def cvt_pk_fp8_f32_raw[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def permlane_swap[
     dtype: DType, //, stride: Int
 ](val1: Scalar[dtype], val2: Scalar[dtype]) -> SIMD[dtype, 2]:

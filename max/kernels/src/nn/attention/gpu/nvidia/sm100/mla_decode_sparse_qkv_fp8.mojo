@@ -239,7 +239,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
     ]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def zero_input_tail(
         q_smem: SharedMemPointer[Scalar[Self.fp8_type]],
         kv_smem: SharedMemPointer[Scalar[Self.fp8_type]],
@@ -407,7 +407,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
         var num_orig_blocks = ceildiv(topk, Self.config.BN_QK)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _pdl_early_exit_all_q():
             comptime if Self.fold_shared_index:
                 comptime for q_local in range(Self.q_len_fold):
@@ -733,7 +733,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _transform_indices_to_smem(
         d_indices: OptionalReg[UnsafePointer[Int32, MutAnyOrigin]],
         idx_smem: SharedMemPointer[Int32],
@@ -755,7 +755,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             idx_smem[row_in_tile] = tma_row
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def idx_producer(
         idx_bars: DecodeSM100MiscMBars[
             num_stages=Self.num_stages,
@@ -877,7 +877,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
                 te += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.fp8_type,
@@ -1032,7 +1032,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_one_tile(
         mut kv_prod: DecodeKVProducer[
             Self.fp8_type,
@@ -1075,7 +1075,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
         kv_prod.commit_step()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_tile_range(
         mut kv_prod: DecodeKVProducer[
             Self.fp8_type,
@@ -1127,7 +1127,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             t += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def reswizzleFP8(
         kv_smem_linear: SharedMemPointer[Scalar[Self.fp8_type]],
         kv_smem_sw64: SharedMemPointer[Scalar[Self.fp8_type]],
@@ -1243,7 +1243,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.fp8_type]],
@@ -1321,7 +1321,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.fp8_type]],

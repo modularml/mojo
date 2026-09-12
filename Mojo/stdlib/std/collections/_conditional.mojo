@@ -56,13 +56,13 @@ struct _ComptimeConditional[
         """Returns the type name of `T`, regardless of whether engaged."""
         return String(t"ComptimeConditional[{Self.T.get_type_name()}]")
 
-    @always_inline
+    @inline(.always)
     def __init__(out self) where not Self.engaged:
         """Constructs an empty (disengaged) instance."""
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
     @implicit
-    @always_inline
+    @inline(.always)
     def __init__(out self, var value: Self.T) where Self.engaged:
         """Constructs an engaged instance wrapping `value`.
 
@@ -71,7 +71,7 @@ struct _ComptimeConditional[
         """
         self._value = rebind_var[type_of(self._value)](value^)
 
-    @always_inline
+    @inline(.always)
     def __getitem__(ref self) -> ref[self._value] Self.T where Self.engaged:
         """Returns a reference to the stored value.
 

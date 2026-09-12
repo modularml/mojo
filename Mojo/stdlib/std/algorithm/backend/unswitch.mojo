@@ -28,7 +28,7 @@ comptime SwitchedFunction2 = def[sw0: Bool, sw1: Bool]() -> None
 """Signature for unswitch supporting 2 predicates."""
 
 
-@always_inline
+@inline(.always)
 def unswitch(
     dynamic_switch: Bool, switched_func: Some[SwitchedFunction]
 ) raises:
@@ -78,7 +78,7 @@ def unswitch(
         switched_func[False]()
 
 
-@always_inline
+@inline(.always)
 def unswitch(
     dynamic_switch: Bool, switched_func: Some[def[sw: Bool]() -> None]
 ):
@@ -126,7 +126,7 @@ def unswitch(
         switched_func[False]()
 
 
-@always_inline
+@inline(.always)
 def unswitch(
     dynamic_switch_a: Bool,
     dynamic_switch_b: Bool,
@@ -146,14 +146,14 @@ def unswitch(
     #  removed.
     if dynamic_switch_a:
 
-        @always_inline
+        @inline(.always)
         def switched_a_true[static_switch: Bool]() {imm}:
             switched_func[True, static_switch]()
 
         unswitch(dynamic_switch_b, switched_a_true)
     else:
 
-        @always_inline
+        @inline(.always)
         def switched_a_false[static_switch: Bool]() {imm}:
             switched_func[False, static_switch]()
 
@@ -177,7 +177,7 @@ comptime Static1DTileUnitFuncWithFlag = def[width: Int, flag: Bool](Int) -> None
 """Signature of a tiled function with a static tile size, offset, and flag."""
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def tile_and_unswitch[
     tile_size_list: List[Int],
 ](
@@ -226,7 +226,7 @@ comptime Dynamic1DTileUnswitchUnitFunc = def[sw: Bool](Int, Int, Int) -> None
 """Signature of a dynamic tiled unswitch unit function."""
 
 
-@always_inline
+@inline(.always)
 def tile_and_unswitch(
     offset: Int,
     upperbound: Int,
@@ -267,7 +267,7 @@ def tile_and_unswitch(
         )
 
 
-@always_inline
+@inline(.always)
 def tile_middle_unswitch_boundaries[
     middle_tile_sizes: List[Int],
     left_tile_size: Int = 1,  # No tiling by default.
@@ -336,7 +336,7 @@ comptime Static1DTileUnitFuncWithFlags = def[
 """Signature of a tiled function with left and right boundary flags."""
 
 
-@always_inline
+@inline(.always)
 def tile_middle_unswitch_boundaries[
     tile_size: Int,
     size: Int,
@@ -374,7 +374,7 @@ def tile_middle_unswitch_boundaries[
         work_fn[tile_size_lbound, True, False](offset)
 
         # middle
-        @always_inline
+        @inline(.always)
         def update_middle[_tile_size: Int](_offset: Int) {imm}:
             work_fn[_tile_size, False, False](_offset)
 

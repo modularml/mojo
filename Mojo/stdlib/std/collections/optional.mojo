@@ -279,7 +279,7 @@ struct Optional[T: AnyType](
         """
         self = Self()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @implicit
     @doc_hidden
     def __init__(
@@ -410,7 +410,7 @@ struct Optional[T: AnyType](
         """
         return _OptionalIter[Self.T](self^)
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         """Return the bounds of the `Optional`, which is 0 or 1.
 
@@ -436,7 +436,7 @@ struct Optional[T: AnyType](
         return (len, {len})
 
     @stable(since="1.0")
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         """Return true if the Optional has a value.
 
@@ -445,7 +445,7 @@ struct Optional[T: AnyType](
         """
         return not self._value.isa[_NoneType]()
 
-    @always_inline
+    @inline(.always)
     def __invert__(self) -> Bool:
         """Return False if the `Optional` has a value.
 
@@ -454,7 +454,7 @@ struct Optional[T: AnyType](
         """
         return not self
 
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self,
     ) raises EmptyOptionalError[Self.T] -> ref[self._value] Self.T:
@@ -559,7 +559,7 @@ struct Optional[T: AnyType](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def value(ref self) -> ref[self._value] Self.T:
         """Retrieve a reference to the value of the `Optional`.
 
@@ -592,11 +592,11 @@ struct Optional[T: AnyType](
 
         return self._unsafe_unchecked_value()
 
-    @always_inline
+    @inline(.always)
     def _unsafe_unchecked_value(ref self) -> ref[self._value] Self.T:
         return self._value._unsafe_unchecked_get[Self.T]()
 
-    @always_inline
+    @inline(.always)
     def unsafe_value(ref self) -> ref[self._value] Self.T:
         """Unsafely retrieve a reference to the value of the `Optional`.
 
@@ -833,7 +833,7 @@ struct Optional[T: AnyType](
             return None
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _unsafe_nullable[
         U: AnyType, origin: Origin, address_space: AddressSpace
     ](
@@ -1025,20 +1025,20 @@ struct _DefaultOptionalRegStorage[T: TrivialRegisterPassable](
     comptime _mlir_type = __mlir_type[`!kgen.variant<`, Self.T, `, i1>`]
     var _value: Self._mlir_type
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self._value = __mlir_op.`kgen.variant.create`[
             _type=Self._mlir_type, index=SIMDLength(1)._mlir_value
         ](__mlir_attr.false)
 
-    @always_inline
+    @inline(.always)
     def __init__[U: TrivialRegisterPassable](out self, value: U):
         comptime assert U == Self.T
         self._value = __mlir_op.`kgen.variant.create`[
             _type=Self._mlir_type, index=SIMDLength(0)._mlir_value
         ](rebind[Self.T](value))
 
-    @always_inline
+    @inline(.always)
     def value[U: TrivialRegisterPassable](self) -> U:
         comptime assert U == Self.T
         var value = __mlir_op.`kgen.variant.get`[
@@ -1046,7 +1046,7 @@ struct _DefaultOptionalRegStorage[T: TrivialRegisterPassable](
         ](self._value)
         return rebind[U](value)
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         return __mlir_op.`kgen.variant.is`[index=SIMDLength(0)._mlir_value](
             self._value
@@ -1063,25 +1063,25 @@ struct _NicheableOptionalRegStorage[
     ]
     var storage: Self.StorageType
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
         var ptr = Pointer(to=self.storage).unsafe_bitcast[MaybeUninit[Self.T]]()
         Self.T.write_niche[index=0](ptr)
 
-    @always_inline
+    @inline(.always)
     def __init__[U: TrivialRegisterPassable](out self, value: U):
         comptime assert U == Self.T
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
         var ptr = Pointer(to=self.storage).unsafe_bitcast[Self.T]()
         ptr.unsafe_write(rebind[Self.T](value))
 
-    @always_inline
+    @inline(.always)
     def value[U: TrivialRegisterPassable](self) -> U:
         comptime assert U == Self.T
         return Pointer(to=self.storage).unsafe_bitcast[U]()[]
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         var ptr = Pointer(to=self.storage).unsafe_bitcast[MaybeUninit[Self.T]]()
         return Self.T.classify_niche(ptr) == NicheIndex.NotANiche
@@ -1132,12 +1132,12 @@ struct OptionalReg[T: TrivialRegisterPassable](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Create an optional with a value of None."""
         self = Self(None)
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, value: Self.T):
         """Create an optional with a value.
@@ -1151,7 +1151,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
     #   This initializer should not be necessary, we should need
     #   only the initializer from a `NoneType`.
     @doc_hidden
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
@@ -1161,7 +1161,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
         """
         self = Self(value=NoneType(value))
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, value: NoneType):
         """Create an optional without a value from a None literal.
@@ -1171,7 +1171,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
         """
         self._value = {}
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(
         out self: OptionalReg[Self.T],
@@ -1221,7 +1221,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         """Return true if the optional has a value.
 
@@ -1234,7 +1234,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def value(self) -> Self.T:
         """Get the optional value.
 
@@ -1243,7 +1243,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
         """
         return self.unsafe_value()
 
-    @always_inline
+    @inline(.always)
     def unsafe_value(self) -> Self.T:
         """Get the optional value.
 
@@ -1267,7 +1267,7 @@ struct OptionalReg[T: TrivialRegisterPassable](
         return default
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _unsafe_nullable[
         U: AnyType, origin: Origin, address_space: AddressSpace
     ](

@@ -453,7 +453,7 @@ def empty_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]) abi("Mojo"):
     pass
 
 
-@no_inline
+@inline(.never)
 def unpack_state_ctx(
     async_ref: AnyAsyncValueRef,
 ) -> StateContext:
@@ -465,7 +465,7 @@ def unpack_state_ctx(
     return StateContext(ptr)
 
 
-@no_inline
+@inline(.never)
 def unpack_device_ctx(
     async_ref: AnyAsyncValueRef,
 ) -> DeviceContext:
@@ -477,7 +477,7 @@ def unpack_device_ctx(
     return DeviceContext(ptr)
 
 
-@no_inline
+@inline(.never)
 def unpack_buffer_ref(
     async_ref: AnyAsyncValueRef,
 ) -> OwnedByteBuffer:
@@ -494,7 +494,7 @@ def unpack_buffer_ref(
     return OwnedByteBuffer(view, AnyAsyncValueRef(retained_storage_of=value))
 
 
-@no_inline
+@inline(.never)
 def unpack_tensor[
     buffer_rank: Int,
     tensor_rank: Int,
@@ -525,7 +525,7 @@ def unpack_tensor[
     return {view, AnyAsyncValueRef(retained_storage_of=value)}
 
 
-@no_inline
+@inline(.never)
 def unpack_tensor_spec[
     spec_rank: Int
 ](async_ref: AnyAsyncValueRef) -> IndexList[spec_rank]:
@@ -542,7 +542,7 @@ def unpack_tensor_spec[
     return shape
 
 
-@always_inline
+@inline(.always)
 def get_buffer_data(
     buffer: MutByteBuffer,
 ) -> Pointer[Int8, MutAnyOrigin]:
@@ -555,7 +555,7 @@ def get_buffer_data(
 
 
 @register_internal("mgp.tensor.create")
-@no_inline
+@inline(.never)
 def mgp_tensor_create[
     spec_rank: Int,
     buffer_rank: Int,
@@ -589,7 +589,7 @@ def mgp_tensor_create[
 
 
 @register_internal("mgp.tensor.extract.tensor_spec")
-@no_inline
+@inline(.never)
 def mgp_tensor_extract_tensor_spec[
     tensor_rank: Int,
     buffer_rank: Int,
@@ -604,7 +604,7 @@ def mgp_tensor_extract_tensor_spec[
 
 
 @register_internal("mgp.tensor.extract.buffer")
-@no_inline
+@inline(.never)
 def mgp_tensor_extract_buffer[
     buffer_rank: Int,
     dtype: DType,
@@ -619,7 +619,7 @@ def mgp_tensor_extract_buffer[
 
 
 @register_internal("mgp.tensor.slice")
-@no_inline
+@inline(.never)
 def mgp_tensor_slice[
     rank: Int,
     dtype: DType,
@@ -689,7 +689,7 @@ def mgp_tensor_slice[
 
 
 @register_internal("mgp.buffer.alloc")
-@no_inline
+@inline(.never)
 def mgp_buffer_alloc(
     byte_size: Int, dev_context: DeviceContext
 ) raises -> OwnedByteBuffer:
@@ -701,7 +701,7 @@ def mgp_buffer_alloc(
 
 
 @register_internal("mgp.device_graph.alloc")
-@no_inline
+@inline(.never)
 def mgp_device_graph_alloc[
     is_host: Bool
 ](byte_size: Int, builder: DeviceGraphBuilder) raises -> OwnedByteBuffer:
@@ -724,7 +724,7 @@ def mgp_buffer_constant(
     return OwnedByteBuffer(view, AnyAsyncValueRef())
 
 
-@no_inline
+@inline(.never)
 def fill_buffer[dtype: DType](buf: MutByteBuffer, *vals: Int):
     var ptr = buf.unsafe_ptr().unsafe_bitcast[Scalar[dtype]]()
     var offset: Int = 0
@@ -734,7 +734,7 @@ def fill_buffer[dtype: DType](buf: MutByteBuffer, *vals: Int):
 
 
 @register_internal("mgp.buffer.set_with_index")
-@no_inline
+@inline(.never)
 def mgp_buffer_set_with_index[
     bDevice: StaticString
 ](buffer: OwnedByteBuffer, *vals: Int) raises:
@@ -755,7 +755,7 @@ def mgp_buffer_set_with_index[
 
 
 @register_internal("mgp.buffer.to_bool")
-@no_inline
+@inline(.never)
 def mgp_buffer_to_bool[bDevice: StaticString](buffer: OwnedByteBuffer) -> Bool:
     assert is_cpu[bDevice](), "to_bool can only work on cpu buffers"
     var bufSize = buffer.size()
@@ -764,7 +764,7 @@ def mgp_buffer_to_bool[bDevice: StaticString](buffer: OwnedByteBuffer) -> Bool:
 
 
 @register_internal("mgp.buffer.to_index")
-@no_inline
+@inline(.never)
 def mgp_buffer_to_index(
     buffer: OwnedByteBuffer,
 ) raises -> Int:
@@ -780,7 +780,7 @@ def mgp_buffer_to_index(
 
 
 @register_internal("mgp.buffer.slice")
-@no_inline
+@inline(.never)
 def mgp_buffer_slice(
     buffer: OwnedByteBuffer, offset: Int, size: Int, dev_context: DeviceContext
 ) raises -> OwnedByteBuffer:
@@ -811,7 +811,7 @@ def mgp_buffer_slice(
 
 
 @register_internal("mgp.buffer.bulk_slice")
-@no_inline
+@inline(.never)
 def mgp_buffer_bulk_slice[
     N: Int,
     //,
@@ -862,7 +862,7 @@ def mgp_buffer_bulk_slice[
 
 
 @register_internal("mgp.buffer.plan")
-@no_inline
+@inline(.never)
 def mgp_buffer_plan[
     num_static_sizes: Int,
     num_runtime_sizes: Int,
@@ -936,7 +936,7 @@ def mgp_buffer_plan[
 
 
 @register_internal("mgp.buffer.concat")
-@no_inline
+@inline(.never)
 def mgp_buffer_concat[
     bDevice: StaticString
 ](
@@ -965,7 +965,7 @@ def mgp_buffer_concat[
 
 
 @register_internal("mgp.buffer.device_to_host")
-@no_inline
+@inline(.never)
 def mgp_buffer_device_to_host[
     cOtherDevice: StaticString,
     dHostDevice: StaticString,
@@ -987,7 +987,7 @@ def mgp_buffer_device_to_host[
 
 
 @register_internal("mgp.buffer.device_to_device")
-@no_inline
+@inline(.never)
 def mgp_buffer_device_to_device[
     cSrcDevice: StaticString,
     dDstDevice: StaticString,
@@ -1018,7 +1018,7 @@ def mgp_buffer_device_to_device[
         )
 
 
-@no_inline
+@inline(.never)
 def _memset_buffer[
     dtype: DType, bDevice: StaticString
 ](
@@ -1058,7 +1058,7 @@ def _memset_buffer[
 
 
 @register_internal("mgp.buffer.memset")
-@no_inline
+@inline(.never)
 def mgp_buffer_memset[
     bDevice: StaticString
 ](
@@ -1109,7 +1109,7 @@ def mgp_buffer_memset[
 
 
 @register_internal("mgp.buffer.host_to_device")
-@no_inline
+@inline(.never)
 def mgp_buffer_host_to_device[
     cHostDevice: StaticString,
     dOtherDevice: StaticString,
@@ -1131,19 +1131,19 @@ def mgp_buffer_host_to_device[
 
 
 @register_internal("mgp.int.cache")
-@no_inline
+@inline(.never)
 def mgp_int_cache[bIntSlot: UInt64](ctx: StateContext, value: Int):
     ctx.cache_int(Int(bIntSlot), value)
 
 
 @register_internal("mgp.int.get_cached")
-@no_inline
+@inline(.never)
 def mgp_int_get_cached(ctx: StateContext, buffer_slot: Int) -> Int:
     return ctx.get_cached_int(buffer_slot)
 
 
 @register_internal("mgp.buffer.get_size")
-@no_inline
+@inline(.never)
 def mgp_buffer_get_size(
     buf: OwnedByteBuffer,
 ) -> Int:
@@ -1156,7 +1156,7 @@ def mgp_buffer_get_size(
 
 
 @register_internal("mgp.tensor_spec.create")
-@no_inline
+@inline(.never)
 def mgp_tensor_spec_create[
     aRawDims: IntTuple,
     aRawDimsRank: Int,
@@ -1175,7 +1175,7 @@ def mgp_tensor_spec_create[
 
 
 @register_internal("mgp.tensor_spec.get_dim")
-@no_inline
+@inline(.never)
 def mgp_tensor_spec_get_dim[
     spec_rank: Int, axis: UInt64
 ](spec: IndexList[spec_rank]) -> Int:
@@ -1197,13 +1197,13 @@ def mgp_device_context_destroy(dev_ctx: DeviceContext) abi("Mojo"):
 
 
 @register_internal("mgp.sync")
-@no_inline
+@inline(.never)
 def mgp_sync(ctx: StateContext, dev_ctx: DeviceContext) raises:
     dev_ctx.synchronize()
 
 
 @register_internal("mgp.device_wait")
-@no_inline
+@inline(.never)
 def mgp_device_wait(
     ctx: StateContext,
     waiting_dev_ctx: DeviceContext,
@@ -1216,7 +1216,7 @@ def mgp_device_wait(
 
 
 @register_internal("mgp.debug.print")
-@no_inline
+@inline(.never)
 def mgp_debug_print[
     aDebugString: StaticString,
     bLabel: StaticString,
@@ -1228,7 +1228,7 @@ def mgp_debug_print[
 
 
 @register_internal("mgp.debug.print.int")
-@no_inline
+@inline(.never)
 def mgp_debug_print_int[
     aLabel: StaticString,
 ](ctx: StateContext, value: Int):
@@ -1239,7 +1239,7 @@ def mgp_debug_print_int[
 
 
 @register_internal("mgp.debug.tensor.print")
-@no_inline
+@inline(.never)
 def mgp_debug_tensor_print[
     spec_rank: Int,
     dtype: DType,
@@ -1265,7 +1265,7 @@ def mgp_debug_tensor_print[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def get_simd_width_for_dtypes[
     dtypes: StaticTuple[DType, _], target: StaticString
 ]() -> Int:
@@ -1281,7 +1281,7 @@ def get_simd_width_for_dtypes[
 
 # TODO: this should take IOSpec as a param -- will require graph compiler changes
 # Used by the graph compiler to construct tensors from MGP repr. of tensor
-@always_inline
+@inline(.always)
 def to_managed_tensor_slice[
     dtype: DType, rank: Int, mut: Bool, input: IO
 ](
@@ -1307,7 +1307,7 @@ def to_managed_tensor_slice[
 
 
 # Extract a scalar from a managed tensor slice.
-@always_inline
+@inline(.always)
 def _get_scalar_from_managed_tensor_slice[
     dtype: DType,
 ](tensor: ManagedTensorSlice[dtype=dtype, ...]) -> Scalar[dtype]:
@@ -1337,19 +1337,19 @@ struct MyInt(Movable):
 
 
 @register_internal("testfuse.my_int.from_index")
-@no_inline
+@inline(.never)
 def test_my_int_from_index(x: Int) -> MyInt:
     return MyInt(x)
 
 
 @register_internal("testfuse.my_int.square")
-@no_inline
+@inline(.never)
 def test_my_int_square(x: MyInt) -> MyInt:
     return MyInt(x.val * x.val)
 
 
 @register_internal("testfuse.my_int.to_index")
-@no_inline
+@inline(.never)
 def test_my_int_to_index(x: MyInt) -> Int:
     return x.val
 
@@ -1365,19 +1365,19 @@ struct MyIntReg2(ImplicitlyCopyable, RegisterPassable):
 
 
 @register_internal("testfuse.my_int_reg2.from_index")
-@no_inline
+@inline(.never)
 def test_my_int_reg2_from_index(x: Int) -> MyIntReg2:
     return MyIntReg2(x)
 
 
 @register_internal("testfuse.my_int_reg2.square")
-@no_inline
+@inline(.never)
 def test_my_int_reg2_square(x: MyIntReg2) -> MyIntReg2:
     return MyIntReg2(x.val * x.val)
 
 
 @register_internal("testfuse.my_int_reg2.to_index")
-@no_inline
+@inline(.never)
 def test_my_int_reg2_to_index(x: MyIntReg2) -> Int:
     return x.val
 
@@ -1452,7 +1452,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
 
     var _handle: StateContextRef
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, handle: StateContextRef):
         """Builds the handle from the underlying C pointer.
 
@@ -1461,7 +1461,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
         """
         self._handle = handle
 
-    @always_inline
+    @inline(.always)
     def cache_int(self, slot: Int, value: Int):
         """Caches an integer value in the state slot at the given index.
 
@@ -1473,7 +1473,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
             slot, self._handle, value
         )
 
-    @always_inline
+    @inline(.always)
     def get_cached_int(self, slot: Int) -> Int:
         """Returns the integer value cached in the state slot at the given index.
 
@@ -1485,7 +1485,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
         """
         return external_call["MGP_RT_GetCachedInt", Int](slot, self._handle)
 
-    @always_inline
+    @inline(.always)
     def get_cached_buffer(
         self, slot: Int
     ) -> Tuple[MutByteBuffer, AnyAsyncValueRef]:
@@ -1518,7 +1518,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
 
         return {buffer, AnyAsyncValueRef(handle=async_value)}
 
-    @always_inline
+    @inline(.always)
     def get_device_graph_cache(
         self,
     ) -> ref[MutUntrackedOrigin] DeviceGraphCache:
@@ -1558,13 +1558,13 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
 
 
 @register_internal("mogg.as_scalar")
-@always_inline
+@inline(.always)
 def mogg_as_scalar(tensor: ManagedTensorSlice) -> Scalar[tensor.dtype]:
     return _get_scalar_from_managed_tensor_slice(tensor)
 
 
 @register_internal("mogg.async.unpack")
-@no_inline
+@inline(.never)
 def mogg_async_unpack[
     T: TrivialRegisterPassable
 ](async_ref: AnyAsyncValueRef) -> T:
@@ -1669,7 +1669,7 @@ def mogg_async_pack_value(
     """
     comptime Type = type_of(data)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def erased_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]):
         ptr.unsafe_bitcast[Type]().unsafe_deinit_pointee()
 
@@ -1723,7 +1723,7 @@ def mogg_assign_async_value(
 
 
 @register_internal("mogg.tensor.__init__")
-@always_inline
+@inline(.always)
 def mogg_tensor_init[
     LayoutType: TensorLayout,
     //,
@@ -1754,7 +1754,7 @@ def mogg_tensor_init[
 
 
 @register_internal("mogg.async.join")
-@no_inline
+@inline(.never)
 def mogg_async_check_task_error(mut error: Optional[Error]) raises:
     """Raises the captured error from an async task, if present.
 
@@ -1766,7 +1766,7 @@ def mogg_async_check_task_error(mut error: Optional[Error]) raises:
 
 
 @register_internal("mogg.raise")
-@no_inline
+@inline(.never)
 def mogg_format_kernel_error(
     kernel_name: String,
     error: Error,
@@ -1792,7 +1792,7 @@ def mogg_format_kernel_error(
 
 
 @register_internal("mogg.format_region_error")
-@no_inline
+@inline(.never)
 def mogg_format_region_error(
     region_name: String,
     error: Error,
@@ -1810,7 +1810,7 @@ def mogg_format_region_error(
 
 
 @register_internal("mogg.tensor.reshape")
-@always_inline
+@inline(.always)
 def reshape_contiguous_buffer[
     static_layout: TensorLayout, new_rank: Int
 ](
@@ -1836,7 +1836,7 @@ def reshape_contiguous_buffer[
 
 
 @register_internal("mgp.buffer.get_cached")
-@no_inline
+@inline(.never)
 def mgp_buffer_get_cached(
     ctx: StateContext,
     buffer_slot: Int,
@@ -1851,7 +1851,7 @@ def mgp_buffer_get_cached(
 
 
 @register_internal("mgp.assert")
-@no_inline
+@inline(.never)
 def mgp_assert(
     cond: Bool, msg_ptr: Pointer[mut=False, Byte, _], msg_len: Int
 ) raises:
@@ -1875,7 +1875,7 @@ def all_zeros(indices: IndexList) -> Bool:
 
 
 @register_internal("mo.split_dim")
-@always_inline
+@inline(.always)
 def split_dim_indices[
     rank: Int, axis: Int
 ](indices: IndexList[rank], new_shape_dim: Int) -> IndexList[rank + 1]:
@@ -1902,7 +1902,7 @@ def split_dim_indices[
 
 
 @register_internal("mo.merge_dim")
-@always_inline
+@inline(.always)
 def merge_dim_indices[
     rank: Int, axis: Int
 ](indices: IndexList[rank], old_shape_dim: Int) -> IndexList[rank - 1]:
@@ -1927,7 +1927,7 @@ def merge_dim_indices[
 
 
 @register_internal("mo.add_singleton_dim")
-@always_inline
+@inline(.always)
 def insert_index[
     rank: Int, axis: Int, value: Int
 ](indices: IndexList[rank]) -> IndexList[rank + 1]:
@@ -1944,7 +1944,7 @@ def insert_index[
     return out
 
 
-@always_inline
+@inline(.always)
 def _reshape_num_non_ones(shape: IntTuple, upto: Int) -> Int:
     # Count of non-1 dims in shape[0:upto].
     var n = 0
@@ -1954,7 +1954,7 @@ def _reshape_num_non_ones(shape: IntTuple, upto: Int) -> Int:
     return n
 
 
-@always_inline
+@inline(.always)
 def _reshape_nth_non_one_pos(shape: IntTuple, k: Int) -> Int:
     # Position of the k-th (0-indexed) non-1 dim in shape.
     var count = 0
@@ -1966,7 +1966,7 @@ def _reshape_nth_non_one_pos(shape: IntTuple, k: Int) -> Int:
     return len(shape)
 
 
-@always_inline
+@inline(.always)
 def _reshape_same_dropping_ones(a: IntTuple, b: IntTuple) -> Bool:
     # True iff a and b have identical non-1 dims in the same order, i.e. the
     # reshape only inserts/removes size-1 dims. Bounded loop (comptime-safe):
@@ -1987,7 +1987,7 @@ def _reshape_same_dropping_ones(a: IntTuple, b: IntTuple) -> Bool:
     return True
 
 
-@always_inline
+@inline(.always)
 def _reshape_common_prefix(a: IntTuple, b: IntTuple) -> Int:
     # Length of the leading run of dims STATICALLY equal in both shapes. A
     # dynamic dim (`-1`, `UNKNOWN_VALUE`) never matches -- two distinct dynamic
@@ -2003,7 +2003,7 @@ def _reshape_common_prefix(a: IntTuple, b: IntTuple) -> Int:
     return n
 
 
-@always_inline
+@inline(.always)
 def _reshape_common_suffix(a: IntTuple, b: IntTuple, avoid: Int) -> Int:
     # Length of the trailing run of dims statically equal in both shapes, not
     # overlapping the `avoid` dims already claimed as a common prefix.
@@ -2020,7 +2020,7 @@ def _reshape_common_suffix(a: IntTuple, b: IntTuple, avoid: Int) -> Int:
     return n
 
 
-@always_inline
+@inline(.always)
 def _reshape_num_dynamic_non_ones(shape: IntTuple) -> Int:
     # Count of dynamic (`-1`, `UNKNOWN_VALUE`) dims among the non-1 dims.
     var n = 0
@@ -2031,7 +2031,7 @@ def _reshape_num_dynamic_non_ones(shape: IntTuple) -> Int:
     return n
 
 
-@always_inline
+@inline(.always)
 def _reshape_static_index_list[rank: Int, shape: IntTuple]() -> IndexList[rank]:
     # The comptime `shape` as a runtime `IndexList` (a dynamic dim becomes -1).
     # Only used as the default when a caller omits the runtime shape, which the
@@ -2044,7 +2044,7 @@ def _reshape_static_index_list[rank: Int, shape: IntTuple]() -> IndexList[rank]:
 
 
 @register_internal("mogg.index.reshape")
-@always_inline
+@inline(.always)
 def mogg_index_reshape[
     from_rank: Int,
     //,
@@ -2157,7 +2157,7 @@ def mogg_index_reshape[
 
 
 @register_internal("pop.select")
-@always_inline
+@inline(.always)
 def select[
     T: TrivialRegisterPassable
 ](cond: Bool, true_case: T, false_case: T) -> T:
@@ -2168,7 +2168,7 @@ def select[
 
 
 @register_internal("pop.simd.select")
-@always_inline
+@inline(.always)
 def simd_select[
     T: TrivialRegisterPassable
 ](cond: Bool, true_case: T, false_case: T) -> T:
@@ -2181,7 +2181,7 @@ def simd_select[
 
 
 @register_internal("mogg.elemwise_for_each")
-@no_inline
+@inline(.never)
 def foreach[
     dtype: DType,
     rank: Int,
@@ -2212,7 +2212,7 @@ def foreach[
         ctx: The call context (forward this from the custom operation).
     """
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int,
         alignment: Int = 1,
@@ -2229,7 +2229,7 @@ def foreach[
 
 
 @register_internal("mogg.elemwise_for_each")
-@no_inline
+@inline(.never)
 def foreach[
     dtype: DType,
     rank: Int,
@@ -2342,7 +2342,7 @@ struct _ElementwiseFusionAdapter[
         io_spec=Self.io_spec, static_spec=Self.static_spec
     ]
 
-    @always_inline
+    @inline(.always)
     def __call__[width: Int, alignment: Int = 1](self, index: Coord):
         var idx = rebind[IndexList[Self.rank]](coord_to_index_list(index))
         var val = self.elem.compute[Self.dtype, Self.rank, width, alignment](
@@ -2352,7 +2352,7 @@ struct _ElementwiseFusionAdapter[
 
 
 @register_internal("mogg.call.foreach")
-@no_inline
+@inline(.never)
 def foreach_fusion[
     dtype: DType,
     rank: Int,
@@ -2808,7 +2808,7 @@ def mogg_tensor_create_transpose[
 
 
 @register_internal("mogg._tensor.load")
-@always_inline
+@inline(.always)
 def tile_tensor_strided_load[
     dtype: DType,
     simd_width: Int,
@@ -2874,7 +2874,7 @@ def tile_tensor_strided_load[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_stride1() -> SIMD[dtype, simd_width]:
         comptime if dtype == .bool:
             var v = ptr.unsafe_bitcast[UInt8]().unsafe_load[
@@ -2887,7 +2887,7 @@ def tile_tensor_strided_load[
             ](0)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_strided(stride: Int) -> SIMD[dtype, simd_width]:
         comptime if dtype == .bool:
             var v = strided_load[simd_width, invariant=invariant](
@@ -2919,7 +2919,7 @@ def tile_tensor_strided_load[
 
 
 @register_internal("mogg._tensor.store")
-@always_inline
+@inline(.always)
 def tile_tensor_strided_store[
     dtype: DType,
     simd_width: Int,
@@ -2976,7 +2976,7 @@ def tile_tensor_strided_store[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_stride1():
         comptime if dtype == .bool:
             ptr.unsafe_bitcast[UInt8]().unsafe_store(0, value.cast[.uint8]())
@@ -2984,7 +2984,7 @@ def tile_tensor_strided_store[
             ptr.unsafe_store[alignment=max_alignment](0, value)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_strided(stride: Int):
         comptime if dtype == .bool:
             strided_store(
@@ -3073,7 +3073,7 @@ struct _ElementwiseFusionTileAdapter[
         io_spec=Self.io_spec, static_spec=Self.static_spec
     ]
 
-    @always_inline
+    @inline(.always)
     def __call__(self) capturing:
         # One block per output tile: `block_idx.(y, x)` selects the tile row and
         # column. Carried into the kernel as a closure (the adapter is not
@@ -3125,7 +3125,7 @@ struct _ElementwiseFusionTileAdapter[
 
 
 @register_internal("mogg.call.foreach_tile")
-@no_inline
+@inline(.never)
 def foreach_fusion_tile[
     dtype: DType,
     rank: Int,
@@ -3199,7 +3199,7 @@ def foreach_fusion_tile[
 
 
 @register_internal("mogg.for_each.out_func")
-@no_inline
+@inline(.never)
 def foreach_out_func[
     dtype: DType,
     rank: Int,
@@ -3230,7 +3230,7 @@ def foreach_out_func[
         ctx: The call context (forward this from the custom operation).
     """
 
-    @always_inline
+    @inline(.always)
     def out_func_shim[_width: Int, _alignment: Int = 1](index: Coord) {var}:
         var idx = rebind[IndexList[rank]](coord_to_index_list(index))
         out_func[_width](idx)
@@ -3246,7 +3246,7 @@ def foreach_out_func[
 # z is a kernel output, and x a view of the input.
 @register_internal("mogg.call.materialize")
 @doc_hidden
-@no_inline
+@inline(.never)
 def view_copy_impl[
     dtype: DType,
     rank: Int,
@@ -3270,7 +3270,7 @@ def view_copy_impl[
     ](), "static shapes not compatible"
     assert x.shape() == z.shape(), "runtime shapes not compatible"
 
-    @always_inline
+    @inline(.always)
     def func[
         width: Int, element_alignment: Int
     ](idx: IndexList[z.rank]) {var x} -> SIMD[z.dtype, width]:

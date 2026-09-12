@@ -37,7 +37,7 @@ def get_locs() -> Tuple[SourceLocation, SourceLocation]:
     )
 
 
-@always_inline
+@inline(.always)
 def get_locs_inlined() -> Tuple[SourceLocation, SourceLocation]:
     return (
         source_location(),
@@ -58,7 +58,7 @@ def get_four_locs() -> (
     return (p1[0], p1[1], p2[0], p2[1])
 
 
-@always_inline
+@inline(.always)
 def get_four_locs_inlined() -> (
     Tuple[
         SourceLocation,
@@ -108,7 +108,7 @@ def get_inner_location_statically_with_debug() -> SourceLocation:
     return source_loc_with_debug()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def get_callsite_statically() -> SourceLocation:
     return call_location()
 
@@ -131,7 +131,7 @@ def test_parameter_context() raises:
     check_source_loc(108, 33, iloc2)
 
 
-@always_inline
+@inline(.always)
 def capture_call_loc[depth: Int = 1](cond: Bool = False) -> SourceLocation:
     if (
         not cond
@@ -140,7 +140,7 @@ def capture_call_loc[depth: Int = 1](cond: Bool = False) -> SourceLocation:
     return SourceLocation(-1, -1, "")
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def capture_call_loc_nodebug[
     depth: Int = 1
 ](cond: Bool = False) -> SourceLocation:
@@ -158,7 +158,7 @@ def get_call_locs() -> Tuple[SourceLocation, SourceLocation]:
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def get_call_locs_inlined[
     depth: Int = 1
 ]() -> Tuple[SourceLocation, SourceLocation]:
@@ -168,7 +168,7 @@ def get_call_locs_inlined[
     )
 
 
-@always_inline
+@inline(.always)
 def get_call_locs_inlined_twice[
     depth: Int = 1
 ]() -> Tuple[SourceLocation, SourceLocation]:
@@ -188,7 +188,7 @@ def get_four_call_locs() -> (
     return (p1[0], p1[1], p2[0], p2[1])
 
 
-@always_inline
+@inline(.always)
 def get_four_call_locs_inlined() -> (
     Tuple[
         SourceLocation,
@@ -230,7 +230,7 @@ def test_builtin_call_loc() raises:
     check_source_loc(l[3], c[3], loc_quad[3])
 
 
-@always_inline
+@inline(.always)
 def source_loc_with_debug() -> SourceLocation:
     var line: __mlir_type.index
     var col: __mlir_type.index

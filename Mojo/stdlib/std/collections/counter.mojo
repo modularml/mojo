@@ -303,7 +303,7 @@ struct Counter[
 
         writer.write_string("}")
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.V, Writable):
@@ -320,7 +320,7 @@ struct Counter[
             f_val=fmt.write_to[Int],
         ](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.V, Writable):
@@ -1067,7 +1067,7 @@ struct CountTuple[V: KeyElement & Copyable & Deinitable](Comparable, Copyable):
         """
         return self._count == other._count
 
-    @always_inline
+    @inline(.always)
     def __getitem__(self, idx: Int) -> Variant[Self.V, Int]:
         """Get an element in the `CountTuple`.
 

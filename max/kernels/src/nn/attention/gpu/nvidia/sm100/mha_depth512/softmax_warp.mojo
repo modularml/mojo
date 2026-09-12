@@ -91,7 +91,7 @@ from .smem import Depth512AttentionSMem
 comptime _SOFTMAX_EXCHANGE_BARRIER: Int32 = 0
 
 
-@always_inline
+@inline(.always)
 def depth512_scale_write_output[
     output_type: DType,
     qkv_dtype: DType,
@@ -185,7 +185,7 @@ def depth512_scale_write_output[
 
     # ---- Helper: load from TMEM, scale, write to SMEM --------------------
     @__parameter
-    @always_inline
+    @inline(.always)
     def read_scale_write(
         o_tmem: TmemAddress,
         col_base: Int,
@@ -267,7 +267,7 @@ def depth512_scale_write_output[
     cp_async_bulk_wait_group[0]()
 
 
-@always_inline
+@inline(.always)
 def depth512_softmax[
     MaskType: MHAMask,
     qkv_dtype: DType,
@@ -457,18 +457,18 @@ def depth512_softmax[
     # ---- Inner helpers ---------------------------------------------------
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def s_load[i: Int]() -> f32x2:
         return f32x2(s[2 * i], s[2 * i + 1])
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def s_store[i: Int](v: f32x2):
         s[2 * i] = v[0]
         s[2 * i + 1] = v[1]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def mask_batch[
         N: Int, //, mask_strategy: MaskStrategy
     ](mut batch: Array[Scalar[accum_dtype], N], kv_col: UInt32):
@@ -489,7 +489,7 @@ def depth512_softmax[
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def exchange_reduce[
         op: StringLiteral,  # "max" or "add"
     ](partial_val: Float32) -> Float32:
@@ -526,7 +526,7 @@ def depth512_softmax[
     # masking + max of batch N overlaps with the TMEM load of batch N+1.
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_mask_max_impl[
         *, mask_strategy: MaskStrategy
     ](s_tmem: UInt32, kv_row: UInt32) -> StaticTuple[Float32, max_unroll]:
@@ -597,7 +597,7 @@ def depth512_softmax[
         return vrow_max
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def init_load_mask_max[
         mask_strategy: MaskStrategy
     ](kv_row: UInt32) -> Float32:
@@ -607,7 +607,7 @@ def depth512_softmax[
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_mask_max[
         mask_strategy: MaskStrategy
     ](s_tmem: UInt32, kv_row: UInt32, old_max: Float32) -> Float32:
@@ -622,7 +622,7 @@ def depth512_softmax[
     # score_to_logit_ratio, then write P to SMEM in batches.
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def store_exp(row_max: Float32) -> f32x2:
         comptime exp_simd = 2
         comptime vs_len = effective_bn // exp_simd
@@ -646,13 +646,13 @@ def depth512_softmax[
             vneg_max_scaled = f32x2(-row_max * scale_log2e)
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def score_to_logit(score: f32x2) -> f32x2:
             return fma_ftz(score, vscale, vneg_max_scaled)
 
         # Interleaved exp: score_to_logit runs ahead by score_to_logit_ratio.
         @__parameter
-        @always_inline
+        @inline(.always)
         def exp_iter[idx: Int]():
             comptime if idx < vs_len // score_to_logit_ratio:
                 comptime for i in range(score_to_logit_ratio):
@@ -674,7 +674,7 @@ def depth512_softmax[
         ), "P store byte width (16) must be a multiple of dtype size"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def write_p_batch[start_elem: Int, num_elems: Int]():
             comptime assert num_elems % p_elems_per_store == 0, (
                 "write_p_batch num_elems must be a multiple of the per-store"
@@ -684,7 +684,7 @@ def depth512_softmax[
                 comptime base = start_elem + c
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def pack_vals[n: Int]() -> SIMD[qkv_dtype, n]:
                     var vec = SIMD[accum_dtype, n](0)
                     comptime for k in range(n):
@@ -781,7 +781,7 @@ def depth512_softmax[
     var s_nxt_tmem = s_even_tmem
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def main_loop_body[mask_strategy: MaskStrategy]():
         """One iteration of the main softmax loop."""
         var old_max = row_max

@@ -24,7 +24,7 @@ from std.utils import StaticTuple
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def to_llvm_shared_cluster_mem_ptr[
     type: AnyType
 ](
@@ -40,7 +40,7 @@ def to_llvm_shared_cluster_mem_ptr[
     ](ptr)
 
 
-@always_inline
+@inline(.always)
 def to_llvm_global_mem_ptr[
     type: AnyType
 ](ptr: Pointer[type, address_space=.GLOBAL, ...]) -> __mlir_type.`!llvm.ptr<1>`:
@@ -57,7 +57,7 @@ def to_llvm_global_mem_ptr[
     ](ptr)
 
 
-@always_inline
+@inline(.always)
 def to_llvm_shared_mem_ptr[
     type: AnyType
 ](ptr: Pointer[type, address_space=.SHARED, ...]) -> __mlir_type.`!llvm.ptr<3>`:
@@ -74,7 +74,7 @@ def to_llvm_shared_mem_ptr[
     ](ptr)
 
 
-@always_inline
+@inline(.always)
 def to_llvm_ptr[
     type: AnyType
 ](ptr: Pointer[type, ...]) -> __mlir_type.`!llvm.ptr`:
@@ -91,7 +91,7 @@ def to_llvm_ptr[
     ](ptr)
 
 
-@always_inline
+@inline(.always)
 def to_i32(val: Int32) -> __mlir_type.i32:
     """Cast Scalar I32 value into MLIR i32.
 
@@ -106,7 +106,7 @@ def to_i32(val: Int32) -> __mlir_type.i32:
     )
 
 
-@always_inline
+@inline(.always)
 def to_i16(val: UInt16) -> __mlir_type.i16:
     """Cast a scalar UInt16 value into MLIR i16.
 
@@ -121,7 +121,7 @@ def to_i16(val: UInt16) -> __mlir_type.i16:
     )
 
 
-@always_inline
+@inline(.always)
 def to_i64(val: Int64) -> __mlir_type.i64:
     """Cast Scalar I64 value into MLIR i64.
 
@@ -174,7 +174,7 @@ comptime _dtype_to_llvm_type_i64[dtype: DType] = __mlir_type.`i64` if dtype in (
 comptime dtype_to_llvm_type[dtype: DType] = _dtype_to_llvm_type_i64[dtype]
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dtype_to_llvm_type_str[dtype: DType]() -> StaticString:
     comptime if dtype == .float32:
         return "f32"
@@ -196,7 +196,7 @@ def _dtype_to_llvm_type_str[dtype: DType]() -> StaticString:
         return "i8"  # float8 variants
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_llvm_struct_fields[n: Int, dtype: DType]() -> StaticString:
     comptime s = _dtype_to_llvm_type_str[dtype]()
     comptime if n == 1:
@@ -216,7 +216,7 @@ comptime llvm_struct_dtype_splat_type[
 ]
 
 
-@always_inline
+@inline(.always)
 def simd_to_llvm_struct[
     dtype: DType, n: Int
 ](simd: SIMD[dtype, n]) -> llvm_struct_dtype_splat_type[dtype, n]:
@@ -266,7 +266,7 @@ def simd_to_llvm_struct[
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _dtype_to_pop_scalar_str[dtype: DType]() -> StaticString:
     comptime if dtype == .bool:
         return "!kgen.scalar<bool>"
@@ -310,7 +310,7 @@ def _dtype_to_pop_scalar_str[dtype: DType]() -> StaticString:
         comptime assert False, "unsupported dtype for !kgen.scalar"
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_kgen_struct_fields[n: Int, dtype: DType]() -> StaticString:
     comptime s = _dtype_to_pop_scalar_str[dtype]()
     comptime if n == 1:
@@ -333,7 +333,7 @@ comptime _kgen_pack_splat_type[dtype: DType, n: Int] = __mlir_type[
 ]
 
 
-@always_inline
+@inline(.always)
 def llvm_struct_to_simd[
     dtype: DType, n: Int
 ](llvmst: llvm_struct_dtype_splat_type[dtype, n]) -> SIMD[dtype, n]:
@@ -360,7 +360,7 @@ def llvm_struct_to_simd[
     return simd
 
 
-@always_inline
+@inline(.always)
 def array_to_llvm_struct[
     dtype: DType, n: Int
 ](array: StaticTuple[Scalar[dtype], n]) -> llvm_struct_dtype_splat_type[
@@ -412,7 +412,7 @@ def array_to_llvm_struct[
     )
 
 
-@always_inline
+@inline(.always)
 def llvm_struct_to_array[
     dtype: DType, n: Int
 ](llvmst: llvm_struct_dtype_splat_type[dtype, n]) -> StaticTuple[

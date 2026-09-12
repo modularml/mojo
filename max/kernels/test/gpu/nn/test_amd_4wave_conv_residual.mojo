@@ -43,7 +43,7 @@ from nn.conv.gpu.nvidia.sm100.conv_config import Conv2dProblemShape
 # coords[1] = C_out). Used to validate the SM100-style ordering
 # `D = lambda(Conv(A,B)) + beta * C`.
 @__parameter
-@always_inline
+@inline(.always)
 def _bias_compute_lambda[
     _dtype: DType,
     _width: SIMDLength,

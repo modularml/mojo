@@ -169,7 +169,7 @@ def _bench_one[
     # also routes through the framework body for all dtypes). Use
     # `structured_4wave_matmul` for all dtypes.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _ref_matmul() raises:
         structured_4wave_matmul(im2col_2d, filter, output, ctx)
 

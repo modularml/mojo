@@ -85,7 +85,7 @@ struct MmaWarpContext[
     var output_pipeline: Self.Pipeline
     var dealloc_barrier: Self.Dealloc
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tmem: Self.Tmem,
@@ -97,7 +97,7 @@ struct MmaWarpContext[
         self.dealloc_barrier = dealloc_barrier
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create(
         tmem_addr_storage: Self.Tmem.SmemAddrStorage,
         accum_barriers_ptr: MbarPtr,
@@ -123,16 +123,16 @@ struct MmaWarpContext[
         )
         return Self(tmem, output_pipeline, Self.Dealloc(dealloc_mbar))
 
-    @always_inline
+    @inline(.always)
     def __enter__(self) -> Self:
         Self.Sync.arrive()
         return self
 
-    @always_inline
+    @inline(.always)
     def __exit__(self):
         self.dealloc_barrier.complete_dealloc(self.tmem)
 
-    @always_inline
+    @inline(.always)
     def per_k_stage(
         mut self,
     ) -> MmaKStage[origin_of(self.output_pipeline), Self.opc]:
@@ -183,7 +183,7 @@ struct EpilogueWarpContext[
     var output_pipeline: Self.Pipeline
     var dealloc_barrier: Self.Dealloc
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tmem: Self.Tmem,
@@ -195,7 +195,7 @@ struct EpilogueWarpContext[
         self.dealloc_barrier = dealloc_barrier
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create(
         tmem_addr_storage: Self.Tmem.SmemAddrStorage,
         accum_barriers_ptr: MbarPtr,
@@ -223,15 +223,15 @@ struct EpilogueWarpContext[
         )
         return Self(tmem, output_pipeline, Self.Dealloc(dealloc_mbar))
 
-    @always_inline
+    @inline(.always)
     def __enter__(self) -> Self:
         return self
 
-    @always_inline
+    @inline(.always)
     def __exit__(self):
         self.dealloc_barrier.signal_complete()
 
-    @always_inline
+    @inline(.always)
     def per_k_stage[
         input_origin: MutOrigin,
         Payload: TilePayload,
@@ -333,7 +333,7 @@ struct MmaWarp[
     var output_pipeline: Self.Pipeline
     var dealloc_barrier: Self.Dealloc
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tmem: Self.Tmem,
@@ -345,7 +345,7 @@ struct MmaWarp[
         self.dealloc_barrier = dealloc_barrier
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create(
         tmem_addr_storage: Self.Tmem.SmemAddrStorage,
         accum_barriers_ptr: MbarPtr,
@@ -372,7 +372,7 @@ struct MmaWarp[
         Self.Sync.arrive()  # Signal epilogue that TMEM is ready
         return Self(tmem, output_pipeline, Self.Dealloc(dealloc_mbar))
 
-    @always_inline
+    @inline(.always)
     def per_k_stage(
         mut self,
     ) -> MmaKStage[origin_of(self.output_pipeline), Self.opc]:
@@ -382,7 +382,7 @@ struct MmaWarp[
         """
         return self.output_pipeline.per_k().produce()
 
-    @always_inline
+    @inline(.always)
     def acquire_k_stage_linear(
         mut self,
     ) -> MmaStage[origin_of(self.output_pipeline), Self.opc]:
@@ -398,7 +398,7 @@ struct MmaWarp[
         """
         return self.output_pipeline.acquire_mma_linear()
 
-    @always_inline
+    @inline(.always)
     def release(deinit self):
         """Wait for epilogue and deallocate TMEM.
 
@@ -442,7 +442,7 @@ struct EpilogueWarp[
     var output_pipeline: Self.Pipeline
     var dealloc_barrier: Self.Dealloc
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         tmem: Self.Tmem,
@@ -454,7 +454,7 @@ struct EpilogueWarp[
         self.dealloc_barrier = dealloc_barrier
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def create(
         tmem_addr_storage: Self.Tmem.SmemAddrStorage,
         accum_barriers_ptr: MbarPtr,
@@ -481,7 +481,7 @@ struct EpilogueWarp[
         )
         return Self(tmem, output_pipeline, Self.Dealloc(dealloc_mbar))
 
-    @always_inline
+    @inline(.always)
     def per_k_stage[
         input_origin: MutOrigin,
         Payload: TilePayload,
@@ -518,7 +518,7 @@ struct EpilogueWarp[
         """
         return self.output_pipeline.per_k_epilogue(input_pipeline.pipeline)
 
-    @always_inline
+    @inline(.always)
     def acquire_k_stage_linear(
         mut self,
     ) -> EpilogueStage[origin_of(self.output_pipeline), Self.opc]:
@@ -533,7 +533,7 @@ struct EpilogueWarp[
         """
         return self.output_pipeline.acquire_epilogue_linear()
 
-    @always_inline
+    @inline(.always)
     def release(deinit self):
         """Signal epilogue completion.
 

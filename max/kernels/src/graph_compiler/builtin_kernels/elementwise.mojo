@@ -67,7 +67,7 @@ from std.utils.numerics import isinf, isnan
 from .kernels import *
 
 
-@always_inline
+@inline(.always)
 def _elementwise_tile[
     Op: ElementwiseBinaryOp,
     dtype: DType,

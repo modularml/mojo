@@ -54,7 +54,7 @@ struct AddFusionTile(ElementwiseFusionTile):
     var a: TileTensor[.float32, FullLayout, MutUntrackedOrigin]
     var b: TileTensor[.float32, FullLayout, MutUntrackedOrigin]
 
-    @always_inline
+    @inline(.always)
     def compute[
         dtype: DType,
         rank: Int,

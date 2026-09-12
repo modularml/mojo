@@ -224,7 +224,7 @@ def _run_case[
             # reduce-scatter into `sum_view`, then `rms_norm_gpu` into
             # `normed_view`. Writing both outputs lets it hit the same oracles.
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
                     in_bufs, world_sum, rank_sigs, list_of_ctx[i], my_rank=i
@@ -506,13 +506,13 @@ def _rms_norm_shard[
         row_major(Coord(Index(num_cols))),
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(src_view)
     @__parameter
     def input_fn[width: Int](coords: Coord) -> SIMD[in_dtype, width]:
         return src_view.raw_load[width=width](src_view.layout(coords))
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(dst_view)
     @__parameter
     def output_fn[
@@ -695,7 +695,7 @@ def _run_prod_oracle_case[
             # reduce-scatter into `sum_view`, then `rms_norm_gpu` into
             # `normed_view`.
             @__parameter
-            @always_inline
+            @inline(.always)
             def two_launch() raises:
                 reducescatter[
                     dtype=in_dtype,
@@ -910,7 +910,7 @@ def _run_prod_oracle_case[
     return normed_mismatch
 
 
-@always_inline
+@inline(.always)
 def _bf16_ulp_key(bits: Int) -> Int:
     """Map bf16's sign-magnitude bits to a monotonic key.
 
@@ -1804,7 +1804,7 @@ def _run_rank_validation_case[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def two_launch_marker() raises:
         raise Error("two_launch ran with an unvalidated residual")
 

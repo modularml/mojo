@@ -192,7 +192,7 @@ def test_sliding_window_causal_mask() raises:
 
     comptime mask = SlidingWindowCausalMask[3]()
 
-    @always_inline
+    @inline(.always)
     def check_status(
         offset: IndexList[2, ...],
         size: type_of(offset),
@@ -298,7 +298,7 @@ def test_sliding_window_noncausal_mask() raises:
     masked_vec = mask.mask(Index(0, 0, 2, 0), SIMD[type, 4](0, 1, 2, 3))
     assert_equal(masked_vec, SIMD[type, 4](0, 1, 2, 3))
 
-    @always_inline
+    @inline(.always)
     def check_status(
         offset: IndexList[2, ...],
         size: type_of(offset),

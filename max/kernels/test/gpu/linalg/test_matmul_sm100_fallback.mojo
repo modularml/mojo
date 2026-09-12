@@ -115,7 +115,7 @@ def test_matmul_sm100_fallback[
     var c_tensor_lt = c_tensor.to_layout_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def epilogue_fn[
         _dtype: DType,

@@ -42,7 +42,7 @@ from layout import TensorLayout, TensorEngine, TileTensor
 # ---------------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def _cubic_weight(x: Float32) -> Float32:
     """Catmull-Rom cubic weight (a = -0.75), matching PyTorch F.interpolate."""
     var a: Float32 = -0.75

@@ -59,7 +59,7 @@ def _init_mpi_dylib() -> OwnedDLHandle:
         abort(t"failed to load MPI library: {e}")
 
 
-@always_inline
+@inline(.always)
 def _get_mpi_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:

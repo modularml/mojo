@@ -98,7 +98,7 @@ from nn.attention.gpu.nvidia.common import (
 )
 
 
-@always_inline
+@inline(.always)
 def _optional_lt_to_tt[
     dtype: DType,
 ](
@@ -120,7 +120,7 @@ def _optional_lt_to_tt[
     return None
 
 
-@always_inline
+@inline(.always)
 def _get_position[
     KVLUTType: MHAOperand,
     MaxSeqLenType: OptionallyStaticInt,
@@ -203,7 +203,7 @@ def _get_position[
     ret = {q_row, q_col, q_offset, num_keys, start_pos, seq_info}
 
 
-@always_inline
+@inline(.always)
 def get_q_head_idx[
     BM: Int,
     BN: Int,
@@ -253,7 +253,7 @@ def get_q_head_idx[
         indices = {position.head_idx}
 
 
-@always_inline
+@inline(.always)
 def _apply_mask[
     BM: Int,
     BN: Int,
@@ -317,7 +317,7 @@ def _apply_mask[
     var mask_warp_row: UInt32 = mask_warp_row_arg + fragment_row
     var mask_warp_col: UInt32 = kv_tile_start_row + fragment_col
 
-    @always_inline
+    @inline(.always)
     def _apply_mask_capture[masked: Bool]() {imm}:
         comptime for m_mma in range(num_m_mmas):
             comptime for n_mma in range(num_n_mmas):
@@ -411,7 +411,7 @@ def _apply_mask[
         )
 
 
-@always_inline
+@inline(.always)
 def produce[
     qkv_type: DType,
     BM: Int,
@@ -595,7 +595,7 @@ def produce[
     var position = initial_position
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def q_producer(
         q_idx: UInt32, offset: UInt32 = 0
     ) -> LayoutTensor[
@@ -613,7 +613,7 @@ def produce[
     comptime assert pipeline_stages >= 2
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def kv_tile(
         idx: UInt32,
         out tile: LayoutTensor[
@@ -649,7 +649,7 @@ def produce[
     ]()
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _num_valid_pages(end_row: UInt32, current_kv_row: UInt32) -> UInt32:
         return min(
             UInt32(ceildiv(Int(end_row - current_kv_row), page_size)),
@@ -657,7 +657,7 @@ def produce[
         )
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def produce_kv[
         is_k_side: Bool,
         wait: Bool,
@@ -706,7 +706,7 @@ def produce[
         state.step()
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def produce_kv_partial[
         is_k_side: Bool,
         wait: Bool,
@@ -762,7 +762,7 @@ def produce[
         state.step()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def get_position(seq_info: SeqInfo) -> PositionType:
         return _get_position[
             BM,
@@ -1056,8 +1056,8 @@ def produce[
         )
 
 
-@always_inline
-@always_inline
+@inline(.always)
+@inline(.always)
 def output_reg_to_smem[
     output_type: DType,
     accum_type: DType,

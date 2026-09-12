@@ -257,12 +257,12 @@ def test_overloaded() raises:
     qb.dump_report()
 
 
-@always_inline
+@inline(.always)
 def exp(x: SIMD[.float32, 4]) -> type_of(x):
     return std.math.exp(x)
 
 
-@always_inline
+@inline(.always)
 def tanh(x: SIMD[.float32, 4]) -> type_of(x):
     return std.math.tanh(x)
 

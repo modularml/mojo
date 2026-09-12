@@ -26,7 +26,7 @@ def print_elements[dtype: DType](tensor: TileTensor[dtype, ...]) raises:
     print("New shape:", coord_to_index_list(shape))
     print("New strides:", stride)
 
-    @always_inline
+    @inline(.always)
     def print_elements_lambda[
         simd_width: Int, alignment: Int = 1
     ](coords: Coord) {var}:

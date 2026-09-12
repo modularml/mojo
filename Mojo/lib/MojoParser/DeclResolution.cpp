@@ -43,6 +43,7 @@
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Regex.h"
@@ -762,10 +763,12 @@ LogicalResult FnSigDecorators::applyOne(ExprNode *decorator) {
     // clear, and this will suppress errors about missing self arguments.
     funcOp.setIsStatic(true);
   } else if (spelling == "always_inline") {
+    // Mojo 2.0: remove @always_inline
     applyAlwaysInline(decorator->getLoc(), callNode);
   } else if (spelling == "inline") {
     applyInline(decorator->getLoc(), callNode);
   } else if (spelling == "no_inline") {
+    // Mojo 2.0: remove @no_inline
     applyArgumentless(spelling, callNode, [&]() {
       trySetInlineLevel(
           decorator->getLoc(), spelling,
@@ -1162,6 +1165,7 @@ void FnSigDecorators::trySetInlineLevel(SMLoc loc, StringRef spelling,
   funcOp.setInlineLevelAttr(spec);
 }
 
+// Mojo 2.0: remove @always_inline
 void FnSigDecorators::applyAlwaysInline(SMLoc decoratorLoc,
                                         const CallNode *callNode) {
   StringRef spelling = "always_inline";
@@ -1236,6 +1240,25 @@ void FnSigDecorators::applyInline(SMLoc decoratorLoc,
         << "'@inline' argument must be an InlineLevel, not a string; use "
            "'.always', '.nodebug', '.never' or '.automatic'";
     return;
+  }
+
+  // `InlineLevel` conforms to `Equatable`, whose own members carry this
+  // decorator, so evaluating the argument as a value can need the decorator
+  // being resolved. Map the shorthand by name to stay out of that cycle;
+  // everything else falls through to the type checked path below.
+  if (auto *shorthand = dyn_cast<InferredAttributeRefNode>(operand.expr)) {
+    std::optional<InlineLevel> level =
+        llvm::StringSwitch<std::optional<InlineLevel>>(shorthand->spelling)
+            .Case("automatic", InlineLevel::Automatic)
+            .Case("always", InlineLevel::Always)
+            .Case("nodebug", InlineLevel::AlwaysNoDebug)
+            .Case("never", InlineLevel::Never)
+            .Default(std::nullopt);
+    if (level) {
+      trySetInlineLevel(decoratorLoc, "inline",
+                        getInlineLevelAttr(funcOp.getContext(), *level));
+      return;
+    }
   }
 
   // The contextual type is what lets the argument be written as `.always`,

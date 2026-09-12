@@ -23,7 +23,7 @@ from std.utils.index import IndexList
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def arange[
     dtype: DType, simd_width: Int
 ](
@@ -53,7 +53,7 @@ def arange[
     return start + (iota[dtype, simd_width](Scalar[dtype](index[0])) * step)
 
 
-@always_inline
+@inline(.always)
 def arange_shape[
     dtype: DType
 ](

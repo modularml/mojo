@@ -76,7 +76,7 @@ comptime elementwise_epilogue_type = def[
 ](Coord, SIMD[dtype, length=width]) capturing -> None
 
 
-@always_inline
+@inline(.always)
 def _load_reduce[
     dtype: DType,
     in_tile_layout: TensorLayout,
@@ -230,7 +230,7 @@ struct ReduceScatterConfig[
     var axis_remainder: Int
     var unit_numel: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         axis_size: Int,
@@ -249,7 +249,7 @@ struct ReduceScatterConfig[
         self.axis_part, self.axis_remainder = divmod(axis_size, Self.ngpus)
         self.unit_numel = unit_numel
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         num_elements: Int,
@@ -264,42 +264,42 @@ struct ReduceScatterConfig[
         )
         self.unit_numel = Self.simd_width
 
-    @always_inline
+    @inline(.always)
     def rank_unit_start(self, rank: Int) -> Int:
         """Start unit index along scatter axis for this rank."""
         return rank * self.axis_part + min(rank, self.axis_remainder)
 
-    @always_inline
+    @inline(.always)
     def rank_units(self, rank: Int) -> Int:
         """Number of units for this rank."""
         return self.axis_part + Int(rank < self.axis_remainder)
 
-    @always_inline
+    @inline(.always)
     def rank_num_elements(self, rank: Int) -> Int:
         """Total elements for this rank."""
         return self.rank_units(rank) * self.unit_numel
 
-    @always_inline
+    @inline(.always)
     def rank_start(self, rank: Int) -> Int:
         """Flat element start offset for this rank."""
         return self.rank_unit_start(rank) * self.unit_numel
 
-    @always_inline
+    @inline(.always)
     def rank_end(self, rank: Int) -> Int:
         """Flat element end offset for this rank."""
         return self.rank_start(rank + 1)
 
-    @always_inline
+    @inline(.always)
     def rank_part(self, rank: Int) -> Int:
         """Number of elements for this rank (alias for rank_num_elements)."""
         return self.rank_num_elements(rank)
 
-    @always_inline
+    @inline(.always)
     def thr_local_start(self, thread_idx: Int) -> Int:
         return thread_idx * Self.simd_width
 
 
-@always_inline
+@inline(.always)
 def _reduce_scatter_impl[
     dtype: DType,
     in_tile_layout: TensorLayout,
@@ -689,7 +689,7 @@ def _reducescatter_relay_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def _reducescatter_p2p_relay[
     dtype: DType,
     ngpus: Int,
@@ -822,7 +822,7 @@ def _reducescatter_p2p_relay[
     )
 
 
-@always_inline
+@inline(.always)
 def _reducescatter_p2p[
     dtype: DType,
     ngpus: Int,

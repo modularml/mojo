@@ -72,7 +72,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -390,7 +390,7 @@ struct cudnnFusedOpsConstParamLabel_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_PARAM_XDESC:
             return writer.write_string("CUDNN_PARAM_XDESC")
@@ -478,7 +478,7 @@ struct cudnnFusedOpsConstParamLabel_t(
             return writer.write_string("CUDNN_PARAM_BN_DBIAS_PLACEHOLDER")
         abort("invalid cudnnFusedOpsConstParamLabel_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnFusedOpsConstParamLabel_t({self})".write_to(writer)
 
@@ -513,7 +513,7 @@ struct cudnnReorderType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_DEFAULT_REORDER:
             return writer.write_string("CUDNN_DEFAULT_REORDER")
@@ -521,7 +521,7 @@ struct cudnnReorderType_t(
             return writer.write_string("CUDNN_NO_REORDER")
         abort("invalid cudnnReorderType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnReorderType_t({self})".write_to(writer)
 
@@ -650,7 +650,7 @@ struct cudnnFusedOps_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_FUSED_SCALE_BIAS_ACTIVATION_CONV_BNSTATS:
             return writer.write(
@@ -682,7 +682,7 @@ struct cudnnFusedOps_t(
             )
         abort("invalid cudnnFusedOps_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnFusedOps_t({self})".write_to(writer)
 
@@ -726,7 +726,7 @@ struct cudnnFusedOpsPointerPlaceHolder_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_PTR_NULL:
             return writer.write_string("CUDNN_PTR_NULL")
@@ -736,7 +736,7 @@ struct cudnnFusedOpsPointerPlaceHolder_t(
             return writer.write_string("CUDNN_PTR_16B_ALIGNED")
         abort("invalid cudnnFusedOpsPointerPlaceHolder_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnFusedOpsPointerPlaceHolder_t({self})".write_to(writer)
 
@@ -854,7 +854,7 @@ struct cudnnFusedOpsVariantParamLabel_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_PTR_XDATA:
             return writer.write_string("CUDNN_PTR_XDATA")
@@ -918,7 +918,7 @@ struct cudnnFusedOpsVariantParamLabel_t(
             return writer.write_string("CUDNN_SCALAR_DOUBLE_BN_EPSILON")
         abort("invalid cudnnFusedOpsVariantParamLabel_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnFusedOpsVariantParamLabel_t({self})".write_to(writer)
 
@@ -1334,7 +1334,7 @@ struct cudnnConvolutionMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_CONVOLUTION:
             return writer.write_string("CUDNN_CONVOLUTION")
@@ -1342,7 +1342,7 @@ struct cudnnConvolutionMode_t(
             return writer.write_string("CUDNN_CROSS_CORRELATION")
         abort("invalid cudnnConvolutionMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnConvolutionMode_t({self})".write_to(writer)
 

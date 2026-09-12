@@ -356,7 +356,7 @@ def _reducescatter_rmsnorm_launch[
 # --- Public API ---
 
 
-@always_inline
+@inline(.always)
 def _check_residual_extent[
     in_dtype: DType,
     //,

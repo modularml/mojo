@@ -23,7 +23,7 @@ struct Property(Equatable, TrivialRegisterPassable, Writable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.MAJOR_VERSION:
             return writer.write_string("MAJOR_VERSION")
@@ -78,7 +78,7 @@ struct DataType(Equatable, TrivialRegisterPassable, Writable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.R_16F:
             return writer.write_string("R_16F")

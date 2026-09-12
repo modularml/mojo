@@ -131,7 +131,7 @@ struct FusedAttentionAlias:
         )
 
 
-@always_inline
+@inline(.always)
 def matmul_b_transpose(
     lhs: LayoutTensor,
     rhs: LayoutTensor,
@@ -171,7 +171,7 @@ def matmul_b_transpose(
 # $$$
 
 
-@always_inline
+@inline(.always)
 def fused_attention_cpu[
     BN: Int, BD: Int
 ](
@@ -225,7 +225,7 @@ def fused_attention_cpu[
             O.tile[BN, BD](tile_n, tile_d).copy_from(O_i)
 
 
-@always_inline
+@inline(.always)
 def matmul[
     target: StaticString,
     transpose_b: Bool = False,

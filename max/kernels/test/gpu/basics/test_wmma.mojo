@@ -277,7 +277,7 @@ def run_mma_fp32_tf32(
     comptime MMA_N = 8
     comptime MMA_K = 8
 
-    @always_inline
+    @inline(.always)
     def run_func_mma(ctx: DeviceContext) raises {imm}:
         comptime kernel = mma_kernel_fp32_tf32
         ctx.enqueue_function[kernel](
@@ -328,7 +328,7 @@ def run_mma_fp32_tf32(
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             DType.float32,
@@ -446,7 +446,7 @@ def run_mma_fp32_bf16(
     comptime MMA_N = 8
     comptime MMA_K = 8
 
-    @always_inline
+    @inline(.always)
     def run_func_mma(ctx: DeviceContext) raises {imm}:
         comptime kernel = mma_kernel_fp32_bf16
         ctx.enqueue_function[kernel](
@@ -494,7 +494,7 @@ def run_mma_fp32_bf16(
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             DType.float32,
@@ -611,7 +611,7 @@ def run_mma_fp32_bf16_2(
     comptime MMA_N = 8
     comptime MMA_K = 8
 
-    @always_inline
+    @inline(.always)
     def run_func_mma(ctx: DeviceContext) raises {imm}:
         comptime kernel = mma_kernel_fp32_bf16_2
         ctx.enqueue_function[kernel](
@@ -659,7 +659,7 @@ def run_mma_fp32_bf16_2(
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             DType.float32,
@@ -776,7 +776,7 @@ def run_mma_fp32_fp16(
     comptime MMA_N = 8
     comptime MMA_K = 8
 
-    @always_inline
+    @inline(.always)
     def run_func_mma(ctx: DeviceContext) raises {imm}:
         comptime kernel = mma_kernel_fp32_fp16
         ctx.enqueue_function[kernel](
@@ -824,7 +824,7 @@ def run_mma_fp32_fp16(
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             DType.float32,
@@ -941,7 +941,7 @@ def run_mma_fp16_fp16(
     comptime MMA_N = 8
     comptime MMA_K = 8
 
-    @always_inline
+    @inline(.always)
     def run_func_mma(ctx: DeviceContext) raises {imm}:
         comptime kernel = mma_kernel_fp16_fp16
         ctx.enqueue_function[kernel](
@@ -989,7 +989,7 @@ def run_mma_fp16_fp16(
         row_major(Coord(K, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
             DType.float32,

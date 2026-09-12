@@ -144,7 +144,7 @@ struct stat_result(Copyable, Writable):
         self.st_rdev = st_rdev
         self.st_flags = st_flags
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """
         Formats this path to the provided Writer.

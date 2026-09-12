@@ -248,7 +248,7 @@ def reducescatter_test[
             row_major(runtime_shape),
         )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(out_bufs)
     def outputs_lambda[
@@ -415,7 +415,7 @@ def reducescatter_test[
     _ = host_in^
 
 
-@always_inline
+@inline(.always)
 def _residual_value[
     dtype: DType
 ](group_id: Int, flat_idx: Int) -> Scalar[dtype]:

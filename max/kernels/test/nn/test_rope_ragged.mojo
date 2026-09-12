@@ -140,7 +140,7 @@ def test_rope_ragged[
         start_pos_host_buffer[i] = start_positions[i]
     var start_pos_tensor = TileTensor(start_pos_host_buffer, start_pos_layout)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {var q_out_tensor} -> None:
@@ -289,13 +289,13 @@ def test_rope_ragged_rope_first[
     )
     var start_pos_tensor = TileTensor(start_pos_host_buffer, start_pos_layout)
 
-    @always_inline
+    @inline(.always)
     def full_output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {var full_out_tensor} -> None:
         full_out_tensor.store[width=width](Coord(idx), val)
 
-    @always_inline
+    @inline(.always)
     def prefix_output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {

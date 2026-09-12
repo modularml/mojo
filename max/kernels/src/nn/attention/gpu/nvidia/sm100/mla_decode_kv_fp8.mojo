@@ -648,7 +648,7 @@ struct MLA_SM100_Decode_KV_FP8[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.q_type,
@@ -820,7 +820,7 @@ struct MLA_SM100_Decode_KV_FP8[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_scales_for_tile(
         scale_smem_base: SharedMemPointer[UInt8],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
@@ -866,7 +866,7 @@ struct MLA_SM100_Decode_KV_FP8[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def convertFP8ToBF16(
         kv_smem_fp8: SharedMemPointer[Scalar[Self.kv_type]],
         kv_smem_bf16: SharedMemPointer[Scalar[Self.q_type]],
@@ -1093,7 +1093,7 @@ struct MLA_SM100_Decode_KV_FP8[
     # |__T0__|__T1__|__T2__|__T3__|
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.q_type]],
@@ -1173,7 +1173,7 @@ struct MLA_SM100_Decode_KV_FP8[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.q_type]],

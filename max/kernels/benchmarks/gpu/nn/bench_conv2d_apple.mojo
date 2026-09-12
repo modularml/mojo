@@ -173,7 +173,7 @@ def bench_shape[
     var gz = N
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def run_naive() raises:
         ctx.enqueue_function[naive](
             input_lt,

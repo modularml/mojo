@@ -429,7 +429,7 @@ def _fill_strides[
 # ===------------------------------------------------------------------=== #
 # Transpose Permutation simplification
 # ===------------------------------------------------------------------=== #
-@always_inline
+@inline(.always)
 def _collapse_unpermuted_dims[
     rank: Int, tuple_size: Int
 ](
@@ -454,7 +454,7 @@ def _collapse_unpermuted_dims[
     simplified_perms[rank - 1] = 0
 
 
-@always_inline
+@inline(.always)
 def _devare_size_1_dim[
     rank: Int, tuple_size: Int
 ](
@@ -478,7 +478,7 @@ def _devare_size_1_dim[
     simplified_perms[rank - 1] = 0
 
 
-@always_inline
+@inline(.always)
 def _simplify_transpose_perms_impl[
     rank: Int, tuple_size: Int
 ](
@@ -509,7 +509,7 @@ def _simplify_transpose_perms_impl[
                 return
 
 
-@always_inline
+@inline(.always)
 def _simplify_transpose_perms[
     rank: Int
 ](
@@ -535,7 +535,7 @@ def _simplify_transpose_perms[
     )
 
 
-@always_inline
+@inline(.always)
 def _convert_transpose_perms_to_static_int_tuple[
     rank: Int
 ](perms: UnsafePointer[mut=False, Int, _]) -> IndexList[rank]:
@@ -549,7 +549,7 @@ def _convert_transpose_perms_to_static_int_tuple[
 # ===------------------------------------------------------------------=== #
 #  Transpose special cases
 # ===------------------------------------------------------------------=== #
-@always_inline
+@inline(.always)
 def _process_tile[
     tile_size_m: Int, tile_size_n: Int, dtype: DType
 ](
@@ -603,7 +603,7 @@ def _transpose_2d_serial_tiled[
     var N = simplified_input_shape[simplified_rank - 2]
     var M = simplified_input_shape[simplified_rank - 1]
 
-    @always_inline
+    @inline(.always)
     def process_tile[
         tile_size_m: Int, tile_size_n: Int
     ](m: Int, n: Int) {var N, var M, imm}:
@@ -615,7 +615,7 @@ def _transpose_2d_serial_tiled[
     tile[[tile_size, 1], [tile_size, 1]](0, 0, M, N, process_tile)
 
 
-@always_inline
+@inline(.always)
 def _should_run_parallel(
     M: Int, N: Int, simd_width: Int, min_work_per_task: Int
 ) -> Bool:
@@ -679,7 +679,7 @@ def _transpose_2d_parallel_tiled[
 
     var work_block_size = ceildiv(work, num_tasks)
 
-    @always_inline
+    @inline(.always)
     def _parallel_tile(
         thread_id: Int,
     ) {var work_block_size, var m_tiles, var N, var M, imm}:
@@ -808,7 +808,7 @@ def _transpose_4d_swap_middle_helper[
 
         var work_block_size = ceildiv(work, num_tasks)
 
-        @always_inline
+        @inline(.always)
         def _parallel_copy(thread_id: Int) {var work, var work_block_size, imm}:
             var begin = work_block_size * thread_id
             var end = min(work_block_size * (thread_id + 1), work)
@@ -1051,7 +1051,7 @@ def _copy_with_strides[
             unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=axis_dim)
         else:
 
-            @always_inline
+            @inline(.always)
             def _copy[
                 simd_width: Int
             ](offset: Int) {
@@ -1108,7 +1108,7 @@ def _copy_with_strides[
         var work = axis_dim
         var work_block_size = ceildiv(work, num_tasks)
 
-        @always_inline
+        @inline(.always)
         def _parallel_copy(
             thread_id: Int,
         ) raises {

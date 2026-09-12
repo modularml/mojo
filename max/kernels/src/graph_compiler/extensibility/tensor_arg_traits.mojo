@@ -106,7 +106,7 @@ trait UnsafeFusedView(Fused, TrivialRegisterPassable):
     comptime FusedViewType: TrivialRegisterPassable
 
 
-@always_inline
+@inline(.always)
 def unsafe_fused_view[
     T: UnsafeFusedView,
     *,

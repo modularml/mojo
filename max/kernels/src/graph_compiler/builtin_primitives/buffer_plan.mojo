@@ -43,7 +43,7 @@ def _compute_shareable_rows[
     i and j have non-overlapping lifetimes and may share a memory block.
     """
 
-    @always_inline
+    @inline(.always)
     def result_init(i: Int) {imm can_share} -> BitSet[N]:
         var row: BitSet[N] = {}
         for j in range(N):
@@ -178,14 +178,14 @@ struct BufferPlanState[
         self.num_reused = 0
         self.offsets = Array[Int, Self.num_allocs](fill=0)
 
-    @always_inline
+    @inline(.always)
     def take_results(
         deinit self,
     ) -> Tuple[Int, Array[Int, Self.num_allocs]]:
         assert self.allocated == Self.num_allocs
         return self.pool_size, self.offsets.copy()
 
-    @always_inline
+    @inline(.always)
     def stats(self) -> BufferPlanStats:
         """Returns a lightweight snapshot of planning statistics for logging."""
         return BufferPlanStats(
@@ -216,12 +216,12 @@ struct BufferPlanState[
                 best_size = self.blocks[block_idx].size
                 result = block_idx
 
-    @always_inline
+    @inline(.always)
     def append_result(mut self, index: Int, value: Int):
         self.offsets[index] = value
         self.allocated += 1
 
-    @always_inline
+    @inline(.always)
     def shareable_set(self, index: Int) -> BitSet[Self.num_allocs]:
         assert Self.enable_sharing, "unable to get shareable set"
         return self.shareable_sets[index].copy()
@@ -256,7 +256,7 @@ struct BufferPlanState[
         else:
             self.allocate_new_block(result_idx, alloc_size)
 
-    @always_inline
+    @inline(.always)
     def allocate_greedy[start: Int = 0](mut self, sizes: Array[Int, _]):
         comptime if not Self.enable_sharing:
             # No allocations can be shared; skip the greedy search entirely.

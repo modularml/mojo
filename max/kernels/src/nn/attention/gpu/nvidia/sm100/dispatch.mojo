@@ -68,7 +68,7 @@ comptime logger = Logger()
 comptime FA4_WS_POISON: Bool = get_defined_int["FA4_WS_POISON", 0]() != 0
 
 
-@always_inline
+@inline(.always)
 def _bucket_ws[sm_count: Int](n: Int, p_max: Int, raw_grid: Int) -> Int:
     """Snap a desired workspace split-K partition count UP to the nearest
     `splitk_p_ladder` rung, then CAP at `p_max` (`ws_p_ceiling`'s
@@ -126,7 +126,7 @@ comptime WS_RAW_GRID_CLAMP: UInt32 = 4
 comptime WS_SWEEP_MAX_RAW_GRID: UInt32 = 24
 
 
-@always_inline
+@inline(.always)
 def ws_p_ceiling[sm_count: Int](raw_grid: UInt32) -> UInt32:
     """Capture-invariant partition-count ceiling for the split-K crossover:
     follows one GPC wave's SM-fill, holds the plateau through
@@ -154,7 +154,7 @@ def ws_p_ceiling[sm_count: Int](raw_grid: UInt32) -> UInt32:
     )
 
 
-@always_inline
+@inline(.always)
 def _raw_grid[
     dtype: DType, //, cfg: FA4Config[dtype]
 ](max_prompt_len: UInt32, batch_size: UInt32) -> UInt32:
@@ -176,7 +176,7 @@ def _raw_grid[
 comptime SK_WS_KEYS_PER_PARTITION: UInt32 = 384
 
 
-@always_inline
+@inline(.always)
 def _sk_ws_partitions[
     sm_count: Int
 ](visible_keys: UInt32, raw_grid: UInt32) -> UInt32:
@@ -221,7 +221,7 @@ def _sk_ws_partitions[
     return p
 
 
-@always_inline
+@inline(.always)
 def _visible_keys[
     MaskType: MHAMask, //, BM_mask: Int, BN: Int, page_size: Int
 ](mask: MaskType, num_keys: UInt32) -> UInt32:
@@ -285,7 +285,7 @@ def _visible_keys[
     )
 
 
-@always_inline
+@inline(.always)
 def _cluster_splitk_candidates[sm_count: Int]() -> List[Int]:
     """Cluster/DSMEM split-K candidate set: partition counts whose per-GPC
     tiling wastes zero SMs (`clusters_per_wave[C] * C == sm_count`).
@@ -322,7 +322,7 @@ def _cluster_splitk_candidates[sm_count: Int]() -> List[Int]:
         ), "_cluster_splitk_candidates: only B200 (148) / B300 (160) modeled"
 
 
-@always_inline
+@inline(.always)
 def mha_sm100_dispatch[
     q_type: DType,
     KVType: MHAOperand,
@@ -461,7 +461,7 @@ def mha_sm100_dispatch[
     var batch_size: UInt32 = UInt32(batch_size_arg)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def with_fa4_config[
         NumPartitionsType: OptionallyStaticInt,
         PartitionType: MHAPartitionScheme,
@@ -688,15 +688,15 @@ def mha_sm100_dispatch[
         var scheduler: SchedulerType = SchedulerType()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def with_sink[SinkType: OptionalPointer](sink_ptr: SinkType) raises:
             @__parameter
-            @always_inline
+            @inline(.always)
             def with_kv_offsets[
                 KVRowOffsetsType: OptionalPointer
             ](kv_row_offsets: KVRowOffsetsType) raises:
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def with_valid_length[
                     ValidLengthType: OptionalPointer
                 ](valid_len: ValidLengthType) raises:
@@ -854,7 +854,7 @@ def mha_sm100_dispatch[
             with_sink[NullPointer[KVType.dtype]]({})
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def launch_workspace[fa4_config: FA4Config[KVType.dtype]](p: UInt32) raises:
         """Traditional (unfused / workspace) split-K launch: run the plain 1Q
         config over an over-launched grid that writes each partition's

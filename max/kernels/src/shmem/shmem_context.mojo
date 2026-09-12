@@ -373,7 +373,7 @@ struct SHMEMContext[tcp: Bool = False](ImplicitlyCopyable):
         """
         return SHMEMBuffer[dtype](self._ctx, size)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def enqueue_function[
         declared_arg_types: TypeList[Trait=AnyType, ...],
@@ -460,7 +460,7 @@ struct SHMEMContext[tcp: Bool = False](ImplicitlyCopyable):
 
         shmem_module_finalize(gpu_kernel)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def enqueue_function_collective_checked[
         declared_arg_types: TypeList[Trait=AnyType, ...],
@@ -616,7 +616,7 @@ struct SHMEMContext[tcp: Bool = False](ImplicitlyCopyable):
         self._main_stream.enqueue_wait_for(self._end_event)
         shmem_module_finalize(gpu_kernel)
 
-    @always_inline
+    @inline(.always)
     def synchronize(self) raises:
         """Blocks until all asynchronous calls on the stream associated with
         this device context have completed.
@@ -627,7 +627,7 @@ struct SHMEMContext[tcp: Bool = False](ImplicitlyCopyable):
         # const char * AsyncRT_DeviceContext_synchronize(const DeviceContext *ctx)
         self._ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def get_device_context(self) -> DeviceContext:
         """Returns the device context associated with this SHMEMContext.
 
@@ -637,7 +637,7 @@ struct SHMEMContext[tcp: Bool = False](ImplicitlyCopyable):
         return self._ctx
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def number_of_devices(
         *, api: String = String(DeviceContext.default_device_info.api)
     ) -> Int:

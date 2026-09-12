@@ -142,7 +142,7 @@ struct KBufferRDNA[
     var strip_idx: Int
     var load_tile_id: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[
@@ -166,12 +166,12 @@ struct KBufferRDNA[
         self.strip_idx = 0
         self.load_tile_id = 0
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def get_dtype() -> DType:
         return Self._dtype
 
-    @always_inline
+    @inline(.always)
     def load_from_dram(mut self):
         """Load the next BK strip of K from DRAM into the staging
         register slot. The gmem_tile's runtime row count drives SRD
@@ -190,11 +190,11 @@ struct KBufferRDNA[
         self.strip_idx += 1
         self.load_tile_id = (self.load_tile_id + 1) % Self.num_stages
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile(self) -> Self.MMATileType:
         return self.mma_tile
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared[tile_id: Int = 0](self):
         """Write the staging register slot `tile_id` to LDS, distributing
         the (BN, BK) tile across threads using the same row_major(
@@ -225,7 +225,7 @@ struct KBufferRDNA[
             comptime for j in range(Self.simd_width):
                 self.smem_tile[smem_row, smem_col + j] = src[i, j]
 
-    @always_inline
+    @inline(.always)
     def load_from_shared[k_mma: Int](self):
         """SMEM->fragment, wave-cooperative.
 
@@ -366,7 +366,7 @@ struct VBufferRDNA[
     var current_stage: Int
     var remaining_rows: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[
@@ -399,17 +399,17 @@ struct VBufferRDNA[
         self.current_stage = 0
         self.remaining_rows = total_rows.value() if total_rows else Int.MAX
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def get_dtype() -> DType:
         return Self._dtype
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def pad[dim: Int]() -> Int:
         return pad[Self.cache_dtype, Self.depth, dim]()
 
-    @always_inline
+    @inline(.always)
     def load_from_dram(mut self):
         """Load the next BK strip of V from DRAM into the staging
         register slot. Per-thread chunks are bounds-clamped via
@@ -459,11 +459,11 @@ struct VBufferRDNA[
         self.remaining_rows -= Self.BK
         self.current_stage = (self.current_stage + 1) % Self.num_stages
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile(self) -> Self.MMATileType:
         return self.mma_tile
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared[tile_id: Int = 0](self):
         """V transpose-on-write: smem[depth_pos, seq_pos] from
         load_tile[seq_pos, depth_pos] (with depth_pos blocked into
@@ -517,7 +517,7 @@ struct VBufferRDNA[
                     ]
                     self.smem_tile[smem_row, Int(smem_col)] = val
 
-    @always_inline
+    @inline(.always)
     def load_from_shared[k_mma: Int](self):
         """SMEM->fragment, wave-cooperative.
 
@@ -626,11 +626,11 @@ struct QRegisterBufferRDNA[
     var reg_tile: Self.RegisterTileType
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_dtype() -> DType:
         return Self.reg_dtype
 
-    @always_inline
+    @inline(.always)
     def __init__[
         q_layout: TensorLayout,
         q_engine: TensorEngine,
@@ -704,7 +704,7 @@ struct QRegisterBufferRDNA[
                             self.reg_tile[frag_idx, j] = 0
                             self.reg_tile[frag_idx, Self.simd_width + j] = 0
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile[tile_idx: Int, k_idx: Int](self) -> Self.MMATileType:
         """MMA fragment for the `tile_idx`-th depth tile, `k_idx`-th K
         strip within it.
@@ -719,11 +719,11 @@ struct QRegisterBufferRDNA[
             ](tile_idx, 0).tile[Self.num_mmas, Self.rdna_frag_size](k_idx, 0)
         )
 
-    @always_inline
+    @inline(.always)
     def get_reg_tile[stage: Int = 0](self) -> Self.RegisterTileType:
         return self.reg_tile
 
-    @always_inline
+    @inline(.always)
     def zero(self):
         _ = self.reg_tile.fill(0)
 
@@ -764,22 +764,22 @@ struct OutputRegisterBufferRDNA[
     @__allow_legacy_any_origin_fields
     var reg_tile: Self.RegisterTileType
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.reg_tile = tt_stack_allocation[Self.dtype, address_space=.LOCAL](
             Self.reg_tile_layout
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_dtype() -> DType:
         return Self.reg_dtype
 
-    @always_inline
+    @inline(.always)
     def zero(self):
         _ = self.reg_tile.fill(0)
 
-    @always_inline
+    @inline(.always)
     def get_reg_tile[stage: Int = 0](self) -> Self.RegisterTileType:
         return self.reg_tile
 
@@ -854,7 +854,7 @@ struct PRegisterBufferRDNA[
         Scalar[Self.dtype], MutAnyOrigin, address_space=.SHARED
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         shared_ptr: UnsafePointer[
@@ -866,7 +866,7 @@ struct PRegisterBufferRDNA[
         ](Self.reg_tile_layout)
         self.shared_memory_ptr = shared_ptr
 
-    @always_inline
+    @inline(.always)
     def get_mma_tile[tile_idx: Int, k_idx: Int](self) -> Self.MMATileType:
         """Load one MMA fragment from the SMEM-staged P scores. SMEM is
         keyed as `key * BM + seq`; each lane reads its (seq, key) slot.
@@ -895,19 +895,19 @@ struct PRegisterBufferRDNA[
         return mma_reg_tile
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def get_dtype() -> DType:
         return Self.mma_dtype
 
-    @always_inline
+    @inline(.always)
     def zero(self):
         _ = self.reg_tile.fill(0)
 
-    @always_inline
+    @inline(.always)
     def get_reg_tile[stage: Int = 0](self) -> Self.RegisterTileType:
         return self.reg_tile
 
-    @always_inline
+    @inline(.always)
     def copy_to_shared[chunk_idx: Int](self):
         """Cast accumulator → dtype and write the `chunk_idx`-th BK
         chunk of P to SMEM. Only the warp that owns that chunk

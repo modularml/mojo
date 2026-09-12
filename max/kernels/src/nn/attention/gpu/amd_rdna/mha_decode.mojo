@@ -29,7 +29,7 @@ from .mma import rdna_mma
 
 
 __extension AttentionRDNA:
-    @always_inline
+    @inline(.always)
     def mha_decode(
         mut self,
         exp_sum_ptr: UnsafePointer[
@@ -45,7 +45,7 @@ __extension AttentionRDNA:
             Self.output_depth == Self.depth
         ), "RDNA decode requires output_depth == depth (no MLA)"
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def loop_over_kvcache[
             tile_size: Int

@@ -107,7 +107,7 @@ struct SwizzleMode(
     comptime _64B = Self(2)
     comptime _128B = Self(3)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Convert SwizzleMode to integer representation.
 
@@ -116,7 +116,7 @@ struct SwizzleMode(
         """
         return Int(self._value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Check equality between two SwizzleMode instances.
 
@@ -128,7 +128,7 @@ struct SwizzleMode(
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Check inequality between two SwizzleMode instances.
 
@@ -140,7 +140,7 @@ struct SwizzleMode(
         """
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def bytes(self) -> Int:
         """Get the swizzle size in bytes.
 
@@ -153,7 +153,7 @@ struct SwizzleMode(
         """
         return Int((2**self._value) * 16)
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Write a human-readable representation of the SwizzleMode to a writer.
 
@@ -243,7 +243,7 @@ struct TensorMap(DevicePassable, ImplicitlyCopyable):
         """
         return "TensorMap"
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize an empty TensorMap descriptor.
 
@@ -254,7 +254,7 @@ struct TensorMap(DevicePassable, ImplicitlyCopyable):
         self.data = StaticTuple[UInt8, 128]()
 
 
-@always_inline
+@inline(.always)
 def create_tensormap[
     dtype: DType,
     rank: Int,
@@ -344,7 +344,7 @@ def create_tensormap[
     return tensormap
 
 
-@always_inline
+@inline(.always)
 def create_tensormap_im2col[
     dtype: DType,
     rank: Int,

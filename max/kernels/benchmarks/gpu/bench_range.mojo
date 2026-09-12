@@ -137,7 +137,7 @@ def grid_stride_kernel(
     dst[unsafe_offset=Int(global_idx.x)] = acc
 
 
-@no_inline
+@inline(.never)
 def bench_range(mut b: Bench, ctx: DeviceContext) raises:
     var threads = GRID_DIM * BLOCK_DIM
     var src_host = List(length=SIZE, fill=Scalar[DTYPE](1))

@@ -252,7 +252,7 @@ def _bench_shape[
         row_major(Coord(num_seqs, Idx[H], Idx[128], Idx[128])),
     )
 
-    @always_inline
+    @inline(.always)
     def launch(
         lctx: DeviceContext,
     ) raises {

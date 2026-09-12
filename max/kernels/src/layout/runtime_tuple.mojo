@@ -88,7 +88,7 @@ struct RuntimeTuple[
     var value: IndexList[Self.scalar_length, element_type=Self.element_type]
     """Storage for the actual tuple values, implemented as an IndexList with the appropriate size and element type."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize a `RuntimeTuple` with default values.
 
@@ -107,7 +107,7 @@ struct RuntimeTuple[
             else:
                 self.value[i] = UNKNOWN_VALUE
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *values: Int):
         """Initialize a `RuntimeTuple` with the provided values.
 
@@ -116,7 +116,7 @@ struct RuntimeTuple[
         """
         self.value = type_of(self.value)(*values)
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__[l: Int](out self, values: IndexList[l, ...]):
         """Initialize a `RuntimeTuple` from an `IndexList`.
@@ -139,7 +139,7 @@ struct RuntimeTuple[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def offset_until[i: Int]() -> Int:
         """Calculates the offset in the flattened value array for a given tuple index.
 
@@ -159,7 +159,7 @@ struct RuntimeTuple[
             result += len(flatten(Self.S[j]))
         return result
 
-    @always_inline
+    @inline(.always)
     def get_int(self) -> Scalar[Self.element_type]:
         """Returns the integer value of this RuntimeTuple.
 
@@ -177,7 +177,7 @@ struct RuntimeTuple[
         else:
             return Scalar[Self.element_type](self.value[0])
 
-    @always_inline
+    @inline(.always)
     def __getitem_param__[
         i: Int
     ](self, out res: RuntimeTuple[Self.S[i], element_type=Self.element_type]):
@@ -199,7 +199,7 @@ struct RuntimeTuple[
         comptime for i in range(res.scalar_length):
             res.value[i] = self.value[i + offset]
 
-    @always_inline
+    @inline(.always)
     def concat[
         R: IntTuple
     ](
@@ -238,7 +238,7 @@ struct RuntimeTuple[
             comptime if R_flat[i] == UNKNOWN_VALUE:
                 result.value[Self.scalar_length + i] = rhs.value[i]
 
-    @always_inline
+    @inline(.always)
     def flatten(
         self,
         out result: RuntimeTuple[
@@ -280,7 +280,7 @@ struct RuntimeTuple[
                     writer.write(", ")
             writer.write(")")
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the length (number of top-level elements) of the `RuntimeTuple`.
 
@@ -295,7 +295,7 @@ struct RuntimeTuple[
         comptime l = len(Self.S)
         return l
 
-    @always_inline
+    @inline(.always)
     def cast[
         dtype: DType
     ](self, out result: RuntimeTuple[Self.S, element_type=dtype]):
@@ -312,7 +312,7 @@ struct RuntimeTuple[
         """
         return {self.value.cast[dtype]()}
 
-    @always_inline
+    @inline(.always)
     def __int__(self) -> Int:
         """Converts the RuntimeTuple to an integer value.
 
@@ -362,7 +362,7 @@ def is_int[t: IntTuple](tuple: RuntimeTuple[t, ...]) -> Bool:
     return t.is_value()
 
 
-@always_inline
+@inline(.always)
 def prefix_product[
     t: IntTuple
 ](tuple: RuntimeTuple[t, ...]) -> RuntimeTuple[prefix_product_int_tuple(t)]:
@@ -389,7 +389,7 @@ def prefix_product[
     return res
 
 
-@always_inline
+@inline(.always)
 def product[t: IntTuple](tuple: RuntimeTuple[t, ...]) -> Int:
     """Computes the product of all elements in the `RuntimeTuple`.
 
@@ -413,7 +413,7 @@ def product[t: IntTuple](tuple: RuntimeTuple[t, ...]) -> Int:
     return res
 
 
-@always_inline
+@inline(.always)
 def idx2crd[
     idx_t: IntTuple,
     shape_t: IntTuple,
@@ -458,7 +458,7 @@ def idx2crd[
 
 
 # take shape as return type
-@always_inline
+@inline(.always)
 def idx2crd[
     idx_t: IntTuple,
     shape_t: IntTuple,
@@ -569,7 +569,7 @@ def crd2idx[
 # TODO: This isn't necessarily needed. We need to revisit and simplify
 # the implementation. We are keeping it here to be consistent with IntTuple
 # shape_div.
-@always_inline
+@inline(.always)
 def signum(a: Int) -> Int:
     """Returns the sign of an integer value.
 

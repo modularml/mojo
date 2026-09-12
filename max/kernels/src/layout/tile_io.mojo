@@ -27,7 +27,7 @@ from .tile_layout import Layout
 from .tile_tensor import TileTensor
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_worker_idx[thread_scope: ThreadScope]() -> Int:
     """Returns the worker index for the current thread scope.
 
@@ -153,7 +153,7 @@ struct GenericToSharedTileCopier[
     comptime dst_address_space = AddressSpace.SHARED
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -213,7 +213,7 @@ struct SharedToGenericTileCopier[
     comptime dst_address_space = AddressSpace.GENERIC
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -305,7 +305,7 @@ struct GenericToLocalTileCopier[
     comptime dst_address_space = AddressSpace.LOCAL
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -357,7 +357,7 @@ struct LocalToGenericTileCopier[
     comptime dst_address_space = AddressSpace.GENERIC
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -411,7 +411,7 @@ struct SharedToLocalTileCopier[
     comptime dst_address_space = AddressSpace.LOCAL
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -463,7 +463,7 @@ struct LocalToSharedTileCopier[
     comptime dst_address_space = AddressSpace.SHARED
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -568,7 +568,7 @@ struct GenericToSharedAsyncTileCopier[
     comptime dst_address_space = AddressSpace.SHARED
     """Destination `AddressSpace` this copier writes to."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -590,7 +590,7 @@ struct GenericToSharedAsyncTileCopier[
         """
         self.copy_bounded(dst, src, None)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy_bounded(
         self,
         dst: TileTensor[mut=True, address_space=Self.dst_address_space, ...],
@@ -827,7 +827,7 @@ struct GenericToSharedAsyncTileCopier[
 #     are left to the follow-up that ports those callers.
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram[
     thread_layout: Layout,
     *,
@@ -863,7 +863,7 @@ def copy_dram_to_sram[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_sram_to_dram[
     thread_layout: Layout,
     *,
@@ -898,7 +898,7 @@ def copy_sram_to_dram[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_dram[
     thread_layout: Layout,
     *,
@@ -931,7 +931,7 @@ def copy_local_to_dram[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_local[
     thread_layout: Layout,
     *,
@@ -964,7 +964,7 @@ def copy_dram_to_local[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_shared[
     thread_layout: Layout,
     *,
@@ -1002,7 +1002,7 @@ def copy_local_to_shared[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_sram_to_local[
     thread_layout: Layout,
     *,
@@ -1031,7 +1031,7 @@ def copy_sram_to_local[
     ]().copy(dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram_async[
     thread_layout: Layout,
     *,

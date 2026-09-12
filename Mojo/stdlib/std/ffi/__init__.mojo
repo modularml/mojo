@@ -223,7 +223,7 @@ struct _DLCallable[
     """An immutable borrow of the owning handle. Its presence forces the
     compiler to keep the handle alive for the lifetime of this callable."""
 
-    @always_inline
+    @inline(.always)
     def __call__[*T: AnyType](self, *args: *T) -> Self.return_type:
         """Invokes the underlying C function with the given arguments.
 
@@ -280,7 +280,7 @@ struct OwnedDLHandle(Boolable, Movable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, flags: Int = DEFAULT_RTLD) raises:
         """Initialize an owned handle to all global symbols in the current
         process.
@@ -312,7 +312,7 @@ struct OwnedDLHandle(Boolable, Movable):
         self._handle = _DLHandle(path, flags)
 
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, unsafe_uninitialized: Bool):
         self._handle = _DLHandle({})
 
@@ -420,7 +420,7 @@ struct OwnedDLHandle(Boolable, Movable):
             Pointer(to=self),
         )
 
-    @always_inline
+    @inline(.always)
     def _get_function[
         func_name: StaticString, result_type: TrivialRegisterPassable
     ](self) -> result_type:
@@ -436,7 +436,7 @@ struct OwnedDLHandle(Boolable, Movable):
         """
         return self._handle._get_function[func_name, result_type]()
 
-    @always_inline
+    @inline(.always)
     def _get_function[
         result_type: TrivialRegisterPassable
     ](self, *, cstr_name: CStringSpan[_]) -> result_type:
@@ -526,7 +526,7 @@ struct OwnedDLHandle(Boolable, Movable):
             .unsafe_origin_cast[origin]()
         )
 
-    @always_inline
+    @inline(.always)
     def call[
         name: StaticString,
         return_type: RegisterPassable = NoneType,
@@ -588,7 +588,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
     var handle: OptionalPointer[NoneType, MutUntrackedOrigin]
     """The handle to the dynamic library."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, flags: Int = DEFAULT_RTLD) raises:
         """Initialize a dynamic library handle to all global symbols in the
         current process.
@@ -721,7 +721,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
             cstr_name=name.as_c_string_span()
         )
 
-    @always_inline
+    @inline(.always)
     def _get_function[
         func_name: StaticString, result_type: TrivialRegisterPassable
     ](self) -> result_type:
@@ -741,7 +741,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
             cstr_name=func_name_literal.as_c_string_span(),
         )
 
-    @always_inline
+    @inline(.always)
     def _get_function[
         result_type: TrivialRegisterPassable
     ](self, *, cstr_name: CStringSpan[_]) -> result_type:
@@ -841,7 +841,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
 
         return res.value()
 
-    @always_inline
+    @inline(.always)
     def call[
         name: StaticString,
         return_type: RegisterPassable = NoneType,
@@ -874,7 +874,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         ]()(*args)
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     dylib_global: _Global[StorageType=OwnedDLHandle, ...],
     func_name: StaticString,
@@ -1099,7 +1099,7 @@ struct _Global[
         return unsafe_cast[Type=Self.StorageType](ptr).value()
 
 
-@always_inline
+@inline(.always)
 def _get_global[
     name: StaticString,
     init_fn: def() thin -> OptionalPointer[NoneType, UntrackedOrigin[mut=True]],
@@ -1117,7 +1117,7 @@ def _get_global[
     )
 
 
-@always_inline
+@inline(.always)
 def _get_global_or_null(
     name: StringSlice,
 ) -> OptionalPointer[NoneType, UntrackedOrigin[mut=True]]:
@@ -1132,7 +1132,7 @@ def _get_global_or_null(
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def external_call[
     callee: StaticString,
     return_type: RegisterPassable,
@@ -1242,7 +1242,7 @@ def external_call[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _external_call_const[
     callee: StaticString,
     return_type: TrivialRegisterPassable,

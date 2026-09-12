@@ -151,7 +151,7 @@ def topk_wrapper[
         barrier()
 
 
-@always_inline
+@inline(.always)
 def normalize(value: BFloat16) -> UInt16:
     """
     Normalizes a bfloat16 value to an unsigned 16-bit integer for radix sort
@@ -159,7 +159,7 @@ def normalize(value: BFloat16) -> UInt16:
     values.
     """
 
-    @always_inline
+    @inline(.always)
     def reinterpret(value: BFloat16) -> UInt16:
         # For unsigned integral types: No conversion needed, return as-is
         return bitcast[.uint16, 1](value)
@@ -176,7 +176,7 @@ def normalize(value: BFloat16) -> UInt16:
         return bits ^ UInt16(sign_bit_mask)
 
 
-@always_inline
+@inline(.always)
 def normalize_u32(value: UInt32) -> UInt32:
     """
     Returns a uint32 value unchanged since unsigned integers already sort
@@ -185,14 +185,14 @@ def normalize_u32(value: UInt32) -> UInt32:
     return value
 
 
-@always_inline
+@inline(.always)
 def normalize(value: Int32) -> UInt32:
     """
     Normalizes a signed 32-bit integer to unsigned by flipping the most
     significant bit so negative values sort before positive ones.
     """
 
-    @always_inline
+    @inline(.always)
     def reinterpret(value: Int32) -> UInt32:
         # For signed integral types: Convert to unsigned int to ensure proper
         # comparison
@@ -206,7 +206,7 @@ def normalize(value: Int32) -> UInt32:
     return reinterpret(value) ^ UInt32(sign_bit_mask)
 
 
-@always_inline
+@inline(.always)
 def normalize(value: UInt16) -> UInt16:
     """
     Returns a uint16 value unchanged since unsigned integers already sort
@@ -215,14 +215,14 @@ def normalize(value: UInt16) -> UInt16:
     return value
 
 
-@always_inline
+@inline(.always)
 def normalize(value: Float32) -> UInt32:
     """
     Normalizes a float32 value to an unsigned 32-bit integer for radix sort
     by reinterpreting its bit pattern and flipping bits for negative values.
     """
 
-    @always_inline
+    @inline(.always)
     def reinterpret(value: Float32) -> UInt32:
         # For floating-point types: Reinterpret the bit pattern as an unsigned int
         # This allows for comparison of floating-point values based on their binary
@@ -236,7 +236,7 @@ def normalize(value: Float32) -> UInt32:
     return bits ^ ((-(bits >> UInt32(sign_bit))) | UInt32(0b1 << sign_bit))
 
 
-@always_inline
+@inline(.always)
 def normalize(
     value: Scalar,
     out result: Scalar[_uint_type_of_width[bit_width_of[value.dtype]()]()],
@@ -264,7 +264,7 @@ def normalize(
         comptime assert False, "unhandled normalize type"
 
 
-@always_inline
+@inline(.always)
 @__name(t"radix_sort_pairs_{dtype}_{out_idx_type}_{ascending}")
 def radix_sort_pairs_kernel[
     dtype: DType,
@@ -516,7 +516,7 @@ struct DoubleBuffer[dtype: DType](ImplicitlyCopyable):
         self._selection = copy._selection
         self._size = copy._size
 
-    @always_inline
+    @inline(.always)
     def current(self, ctx: DeviceContext) -> DeviceBuffer[Self.dtype]:
         if self._d_buffers[self._selection]:
             return DeviceBuffer[Self.dtype](
@@ -528,7 +528,7 @@ struct DoubleBuffer[dtype: DType](ImplicitlyCopyable):
         else:
             return DeviceBuffer[Self.dtype].empty(ctx)
 
-    @always_inline
+    @inline(.always)
     def alternate(self, ctx: DeviceContext) -> DeviceBuffer[Self.dtype]:
         if self._d_buffers[self._selection ^ 1]:
             return DeviceBuffer[Self.dtype](
@@ -540,12 +540,12 @@ struct DoubleBuffer[dtype: DType](ImplicitlyCopyable):
         else:
             return DeviceBuffer[Self.dtype].empty(ctx)
 
-    @always_inline
+    @inline(.always)
     def swap(mut self):
         self._selection ^= 1
 
 
-@always_inline
+@inline(.always)
 def run_radix_sort_pairs_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -608,7 +608,7 @@ def run_radix_sort_pairs_gpu[
         key_ids.swap()
 
 
-@always_inline
+@inline(.always)
 @__name(t"topp_minp_sampling_{dtype}_{out_idx_type}_{is_top_p}")
 def topp_minp_sampling_kernel[
     dtype: DType,
@@ -698,7 +698,7 @@ def topp_minp_sampling_kernel[
                     break
 
 
-@always_inline
+@inline(.always)
 def _is_supported_dtype[dtype: DType]() -> Bool:
     """
     Check if the type is supported by the radix sort kernel.
@@ -712,7 +712,7 @@ def _is_supported_dtype[dtype: DType]() -> Bool:
     return False
 
 
-@always_inline
+@inline(.always)
 def _topp_minp_sampling_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -897,7 +897,7 @@ def _topp_minp_sampling_gpu[
     _ = ids_buf^
 
 
-@always_inline
+@inline(.always)
 def top_p_sampling_gpu[
     dtype: DType,
     out_idx_type: DType,
@@ -928,7 +928,7 @@ def top_p_sampling_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def min_p_sampling_gpu[
     dtype: DType,
     out_idx_type: DType,

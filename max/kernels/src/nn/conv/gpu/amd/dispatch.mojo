@@ -145,7 +145,7 @@ def _transpose_fcrs_to_frsc_kpad[
 # ---------------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def _launch_amd_4wave_conv2d_runtime[
     input_type: DType,
     filter_type: DType,
@@ -184,7 +184,7 @@ def _launch_amd_4wave_conv2d_runtime[
     """
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _launch[stride_v: Int, pad_v: Int]() raises:
         var _rt_N = Int(input.dim[0]())
         var _rt_H = Int(input.dim[1]())
@@ -446,7 +446,7 @@ def dispatch_amd_4wave_conv2d[
         ].unsafe_dangling()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _src_immut() -> UnsafePointer[Scalar[output_type], ImmutAnyOrigin]:
             comptime if has_residual:
                 # When called with has_residual=True, the caller must
@@ -464,7 +464,7 @@ def dispatch_amd_4wave_conv2d[
         comptime if _all_hw_static:
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_static[stride_v: Int, pad_v: Int]() raises -> Bool:
                 comptime _eff_R = _R
                 comptime _eff_S = _S

@@ -481,7 +481,7 @@ def main() raises:
             trace_buf_dev.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
         )
 
-        @always_inline
+        @inline(.always)
         def kernel_launch(
             ctx: DeviceContext, iteration: Int
         ) raises {
@@ -678,7 +678,7 @@ def main() raises:
                             attributes=pdl_launch_attributes(PDLLevel.ON),
                         )
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut b: Bencher) raises {imm}:
             bencher_iter_custom(b, kernel_launch, ctx)
 

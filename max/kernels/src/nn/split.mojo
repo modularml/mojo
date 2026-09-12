@@ -94,7 +94,7 @@ def split[
     comptime for i in range(num_outputs):
         output_sizes[i] = Int(outputs[i].dim(axis))
 
-    @always_inline
+    @inline(.always)
     def elementwise_fn_wrapper[
         width: Int, alignment: Int = 1
     ](input_coords: Coord) {var output_sizes, var input, var outputs,}:

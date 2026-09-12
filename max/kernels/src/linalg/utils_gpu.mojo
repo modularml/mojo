@@ -59,7 +59,7 @@ def block_swizzle(
     return _block_swizzle_by_scale[3](block_idx, grid_dim)
 
 
-@always_inline
+@inline(.always)
 def _block_swizzle_by_scale[
     scale0: Int
 ](block_idx: IndexList[2, ...], grid_dim: type_of(block_idx)) -> type_of(
@@ -329,7 +329,7 @@ def _bk_base[type: DType, amd_kernel: Bool = False]() -> Int:
         return 16
 
 
-@always_inline
+@inline(.always)
 def _shared_memory_usage[
     a_type: DType, b_type: DType, c_type: DType
 ](block_mnk: IndexList[3], num_pipeline_stages: Int, slice_k: Int = 1) -> Int:

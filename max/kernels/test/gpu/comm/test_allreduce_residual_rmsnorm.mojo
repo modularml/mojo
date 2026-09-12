@@ -297,7 +297,7 @@ def test_fused_allreduce_rmsnorm_fp8[
     var ref_sum_ptr = ref_sum_dev.unsafe_ptr()
 
     @__copy_capture(ref_sum_ptr)
-    @always_inline
+    @inline(.always)
     @__parameter
     def ref_input_fn[
         width: Int, _rank: Int
@@ -674,7 +674,7 @@ def test_fused_allreduce_residual_rmsnorm_fp8[
     var ref_sum_ptr = ref_sum_dev.unsafe_ptr()
 
     @__copy_capture(ref_sum_ptr)
-    @always_inline
+    @inline(.always)
     @__parameter
     def ref_input_fn[
         width: Int, _rank: Int

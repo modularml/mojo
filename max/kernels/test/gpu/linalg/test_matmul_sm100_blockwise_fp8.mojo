@@ -142,7 +142,7 @@ def test_matmul_sm100_blockwise_scaled_fp8[
     var c_tensor = c_device_nd
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor)
     def epilogue_fn[
         _dtype: DType,

@@ -465,7 +465,7 @@ def test_reduce_add[
     var upd_tt = TileTensor(upd_dev, row_major[n_idx, cols]())
     var idx_tt = TileTensor(idx_dev, row_major[n_idx, 1]())
 
-    @always_inline
+    @inline(.always)
     def reduce_fn[
         dtype: DType, width: SIMDLength
     ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -553,45 +553,45 @@ def test_unaligned_slice(ctx: DeviceContext) raises:
     _ = idx_dev
 
 
-@always_inline
+@inline(.always)
 def _add[
     ty: DType, width: SIMDLength
 ](lhs: SIMD[ty, width], rhs: SIMD[ty, width]) -> SIMD[ty, width]:
     return lhs + rhs
 
 
-@always_inline
+@inline(.always)
 def _mul[
     ty: DType, width: SIMDLength
 ](lhs: SIMD[ty, width], rhs: SIMD[ty, width]) -> SIMD[ty, width]:
     return lhs * rhs
 
 
-@always_inline
+@inline(.always)
 def _max[
     ty: DType, width: SIMDLength
 ](lhs: SIMD[ty, width], rhs: SIMD[ty, width]) -> SIMD[ty, width]:
     return max(lhs, rhs)
 
 
-@always_inline
+@inline(.always)
 def _min[
     ty: DType, width: SIMDLength
 ](lhs: SIMD[ty, width], rhs: SIMD[ty, width]) -> SIMD[ty, width]:
     return min(lhs, rhs)
 
 
-@always_inline
+@inline(.always)
 def _upd_ones[dt: DType](k: Int) -> Scalar[dt]:
     return Scalar[dt](1)
 
 
-@always_inline
+@inline(.always)
 def _upd_twos_then_ones[dt: DType, n_twos: Int](k: Int) -> Scalar[dt]:
     return Scalar[dt](2 if k < n_twos else 1)
 
 
-@always_inline
+@inline(.always)
 def _upd_modular[dt: DType, mod: Int](k: Int) -> Scalar[dt]:
     return Scalar[dt]((k * 37) % mod)
 

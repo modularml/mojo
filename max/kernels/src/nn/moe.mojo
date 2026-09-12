@@ -72,7 +72,7 @@ from max.gpu.memory import (
 comptime _BLOCK_THREADS = 512
 
 
-@always_inline
+@inline(.always)
 def _cta_atomic_scope() -> StaticString:
     """Returns the narrowest atomic scope the target has for CTA-local counters.
 
@@ -251,7 +251,7 @@ def moe_create_indices_kernel[
         expert_usage_stats[Coord(1)] = UInt32(num_experts)
 
 
-@always_inline
+@inline(.always)
 def moe_create_indices[
     input_type: DType,
     //,
@@ -334,7 +334,7 @@ def moe_create_indices[
 
 
 # Function to perform warp-level sorting
-@always_inline
+@inline(.always)
 @__parameter
 def _warp_bitonic_sort[
     T: DType,
@@ -358,7 +358,7 @@ def _warp_bitonic_sort[
 
     comptime assert num_lanes.is_power_of_two(), "num_lanes must be power of 2"
 
-    @always_inline
+    @inline(.always)
     def bitonic_sort_step(
         v: TopK_2[T],
         step: UInt32,
@@ -628,7 +628,7 @@ def group_limited_router_kernel[
                 expert_weights[token_idx, tid] = original_weight
 
 
-@always_inline
+@inline(.always)
 def router_group_limited[
     scores_type: DType,
     bias_type: DType,
@@ -723,7 +723,7 @@ def router_group_limited[
         )
 
 
-@always_inline
+@inline(.always)
 def _block_top_k[
     scores_type: DType,
     //,
@@ -1158,7 +1158,7 @@ def single_group_router_eplb_kernel[
                 expert_weights[token_idx, l_id] = original_weight
 
 
-@always_inline
+@inline(.always)
 def single_group_router[
     scores_type: DType,
     bias_type: DType,
@@ -1445,7 +1445,7 @@ def sink_gate_router_kernel[
                 ] = weight
 
 
-@always_inline
+@inline(.always)
 def sink_gate_router[
     scores_type: DType,
     bias_type: DType,
@@ -1539,7 +1539,7 @@ def sink_gate_router[
 
 
 # EPLB remap (log2hy id) kernel
-@always_inline
+@inline(.always)
 def single_group_router_eplb[
     scores_type: DType,
     bias_type: DType,
@@ -1658,7 +1658,7 @@ def single_group_router_eplb[
         )
 
 
-@always_inline
+@inline(.always)
 def _pick_replica[
     max_replicas: Int,
     hash_decorrelate: Bool,
@@ -1830,7 +1830,7 @@ def eplb_remap_kernel[
                 phy_idx.store((n, k), phy)
 
 
-@always_inline
+@inline(.always)
 def eplb_remap[
     num_log: Int,
     max_replicas: Int,

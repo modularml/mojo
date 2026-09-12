@@ -100,7 +100,7 @@ comptime P3_MAX_RANKS = 8
 # n_abs, m_end, expert_id); 32 Int32 covers `num_stages <= 8`, which
 # `TileWriter` asserts. The kernel owns the single allocation site -- both the
 # producing epilogue warps and the consuming send warps must see the SAME
-# storage, and an `@always_inline` helper that allocated it locally would give
+# storage, and an `@inline(.always)` helper that allocated it locally would give
 # each call site its own `.shared` object.
 comptime P5_SEND_MBX_INTS = 32
 comptime P5_SEND_MBX_STRIDE = 4
@@ -333,7 +333,7 @@ struct NullPeerSink(EpiloguePeerSink):
     comptime SendWarps = 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def send_tile[
         stage: Int, num_threads: Int, TileT: AnyType
     ](
@@ -350,7 +350,7 @@ struct NullPeerSink(EpiloguePeerSink):
         pass
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def service[
         TilesT: AnyType
     ](tiles: TilesT, send_tid: Int, p3_control: Int, p3_cfg: P3PeerSendConfig,):
@@ -358,13 +358,13 @@ struct NullPeerSink(EpiloguePeerSink):
         pass
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def drain(p3_control: Int, p3_cfg: P3PeerSendConfig):
         """No-op; nothing is ever deferred."""
         pass
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def shutdown(
         p3_control: Int, p3_cfg: P3PeerSendConfig, drain_pending: Bool
     ):
@@ -608,7 +608,7 @@ struct TileWriter[
 
     var c_tma_op: Self.TmaOpPtr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, c_tma_op: Self.TmaOpPtr):
         """Initialize with pointer to TMA descriptor.
 
@@ -620,7 +620,7 @@ struct TileWriter[
         ), "stage_stride_cols must be positive"
         self.c_tma_op = c_tma_op
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, c_tma_ops: Self.TmaOpArrayPtr):
         """Initialize from the `c_tma_ops` array pointer (`TileWriterLike`).
 
@@ -637,7 +637,7 @@ struct TileWriter[
         ), "stage_stride_cols must be positive"
         self.c_tma_op = Pointer(to=c_tma_ops[][0])
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def get_epilogue_dtype() -> DType:
         if (Self.a_type == Self.c_type == .bfloat16) or (
@@ -649,7 +649,7 @@ struct TileWriter[
 
     # ========== Public Write Methods ==========
 
-    @always_inline
+    @inline(.always)
     def write(
         self,
         c_tiles: Self.CTileArray,
@@ -669,7 +669,7 @@ struct TileWriter[
         """
         self._copy_to_gmem(c_tiles, stage, tile_coord, shape)
 
-    @always_inline
+    @inline(.always)
     def write_batched(
         self,
         c_tiles: Self.CTileArray,
@@ -689,7 +689,7 @@ struct TileWriter[
         """
         self._copy_to_gmem_batched(c_tiles, stage, tile_coord, shape, alpha)
 
-    @always_inline
+    @inline(.always)
     def write_splitk[
         reduction_layout: TensorLayout,
         reduction_engine: TensorEngine,
@@ -726,7 +726,7 @@ struct TileWriter[
 
         self._copy_to_gmem(c_tiles, stage, (work_info.m, work_info.n), shape)
 
-    @always_inline
+    @inline(.always)
     def write_absolute_with_bounds_check[
         c_tensor_layout: TensorLayout,
     ](
@@ -783,7 +783,7 @@ struct TileWriter[
             p3_cfg=p3_cfg,
         )
 
-    @always_inline
+    @inline(.always)
     def _copy_to_gmem(
         self,
         c_tiles: Self.CTileArray,
@@ -799,7 +799,7 @@ struct TileWriter[
         else:
             self._copy_to_gmem_impl(c_tiles, output_stage, c_coord, c_shape)
 
-    @always_inline
+    @inline(.always)
     def _copy_to_gmem_batched(
         self,
         c_tiles: Self.CTileArray,
@@ -833,7 +833,7 @@ struct TileWriter[
                 c_coord[2],
             )
 
-    @always_inline
+    @inline(.always)
     def _copy_to_gmem_with_elementwise_epilogue_impl(
         self,
         c_tiles: Self.CTileArray,
@@ -983,7 +983,7 @@ struct TileWriter[
 
     # ========== Shared Output Helpers ==========
 
-    @always_inline
+    @inline(.always)
     def _cast_frags_and_write_to_smem[
         c_tile_layout: TensorLayout,
     ](
@@ -1040,7 +1040,7 @@ struct TileWriter[
         )
         WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()
 
-    @always_inline
+    @inline(.always)
     def _tma_store_to_gmem[
         stage: Int,
         c_tile_layout: TensorLayout,
@@ -1097,7 +1097,7 @@ struct TileWriter[
         comptime if stage > 0 or stage == Self.num_stages - 1:
             WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()
 
-    @always_inline
+    @inline(.always)
     def _copy_to_gmem_impl(
         self,
         c_tiles: Self.CTileArray,
@@ -1303,7 +1303,7 @@ struct TileWriter[
                 UInt32(lane),
             )
 
-    @always_inline
+    @inline(.always)
     def _write_absolute_with_bounds_check[
         c_tensor_layout: TensorLayout,
     ](
@@ -2045,7 +2045,7 @@ struct TileWriter[
                 WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _store_with_bounds_check[
         c_tensor_layout: TensorLayout,
         c_smem_layout: TensorLayout,
@@ -2172,7 +2172,7 @@ struct TileWriter[
                         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _store_with_bounds_check_transpose[
         c_tensor_layout: TensorLayout,
     ](
@@ -2250,7 +2250,7 @@ struct TileWriter[
     # ========== Residual Add Support ==========
     # Methods for D = lambda(accum) + beta * C residual operations
 
-    @always_inline
+    @inline(.always)
     def write_with_residual[
         pipeline_origin: MutOrigin,
         //,
@@ -2320,7 +2320,7 @@ struct TileWriter[
             shape,
         )
 
-    @always_inline
+    @inline(.always)
     def _copy_to_gmem_with_residual[
         pipeline_origin: MutOrigin,
         //,
@@ -2581,7 +2581,7 @@ struct TileWriter[
                     UInt32(lane),
                 )
 
-    @always_inline
+    @inline(.always)
     def write_batched_with_tma_epilogue_load[
         epi_load_swizzle: TensorMapSwizzle,
         epilogue_layout: TensorLayout,
@@ -2856,7 +2856,7 @@ struct TileWriter[
                 UInt32(lane),
             )
 
-    @always_inline
+    @inline(.always)
     def write_batched_with_1d_bias[
         epilogue_layout: TensorLayout,
     ](
@@ -3060,7 +3060,7 @@ struct TileWriter[
                 UInt32(lane),
             )
 
-    @always_inline
+    @inline(.always)
     def write_batched_with_tma_epilogue_load_strips[
         epi_load_swizzle: TensorMapSwizzle,
         num_epi_stages: Int,
@@ -3271,7 +3271,7 @@ struct StandardOutputWriter(OutputWriter):
     comptime num_peers = 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def write_batched[
         tma_origin: ImmOrigin,
         c_type: DType,

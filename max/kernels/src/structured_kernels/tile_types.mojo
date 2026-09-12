@@ -687,7 +687,7 @@ struct SMemTileArrayWithLayout[
         """
         self.ptr = rebind[type_of(self.ptr)](unsafe_ptr)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at the given index.
 
@@ -725,7 +725,7 @@ struct SMemTileArrayWithLayout[
         """
         return type_of(result)(self.ptr + Self.tile_size * start)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation() -> Self:
         """Allocate the array on the stack (in shared memory).
@@ -835,7 +835,7 @@ struct SMemTileArray[
         """
         self.ptr = rebind[type_of(self.ptr)](unsafe_ptr)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at the given index.
 
@@ -882,7 +882,7 @@ struct SMemTileArray[
         """
         return type_of(result)(self.ptr + Self.tile_size * start)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation() -> Self:
         """Allocate the array on the stack (in shared memory).
@@ -1004,7 +1004,7 @@ struct SMemTileArray2D[
         Self.dtype, Self.dim0, Self.dim1, Self.swizzle_bytes
     ]
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at the given index.
 
@@ -1023,7 +1023,7 @@ struct SMemTileArray2D[
             Self.tile_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def get_with_layout[
         tile_layout: Layout, T: Intable
     ](self, index: T) -> SMemTile[
@@ -1072,7 +1072,7 @@ struct SMemTileArray2D[
         """
         return type_of(result)(self.ptr + Self.tile_size * start)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation() -> Self:
         """Allocate the array on the stack (in shared memory).
@@ -1168,7 +1168,7 @@ struct SMemTileArray2DRowMajor[
         """
         self.ptr = rebind[type_of(self.ptr)](unsafe_ptr)
 
-    @always_inline
+    @inline(.always)
     def __getitem__[T: Intable](self, index: T) -> Self.Tile:
         """Get tile at the given index.
 
@@ -1209,7 +1209,7 @@ struct SMemTileArray2DRowMajor[
         """
         return type_of(result)(self.ptr + Self.tile_size * start)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stack_allocation() -> Self:
         """Allocate the array on the stack (in shared memory).

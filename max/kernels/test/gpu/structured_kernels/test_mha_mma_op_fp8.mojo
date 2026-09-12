@@ -69,7 +69,7 @@ from nn.attention.gpu.amd_structured.mha_mma_op import (
 # --------------------------------------------------------------------------- #
 
 
-@always_inline
+@inline(.always)
 def _pattern_fp8(r: Int, c: Int) -> Float8_e4m3fn:
     return Float8_e4m3fn(Float32((r + c) % 7))
 

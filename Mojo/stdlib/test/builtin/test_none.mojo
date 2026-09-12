@@ -28,7 +28,7 @@ struct FromNone:
         self.value = -1
 
     # FIXME: None literal should be of NoneType not !kgen.none.
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, none: __mlir_type.`!kgen.none`):
         self = NoneType()

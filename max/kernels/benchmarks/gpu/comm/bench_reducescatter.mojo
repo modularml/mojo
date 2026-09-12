@@ -47,7 +47,7 @@ from internal_utils import (
 from std.testing import assert_almost_equal, assert_true
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _per_gpu_value[
     dtype: DType,
@@ -217,11 +217,11 @@ def bench_reducescatter_2d[
             )
         list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_iter_2d(
         mut b: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_bufs, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_bufs, imm}:
@@ -453,11 +453,11 @@ def bench_reducescatter[
         )
         list_of_ctx[i].synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_iter(
         mut b: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut in_bufs, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut in_bufs, imm}:

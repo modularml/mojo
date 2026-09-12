@@ -53,7 +53,7 @@ struct SIMDLength(
         """
         self._mlir_value = value.__mlir_index__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[T: Indexer](out self, value: T):
         """Construct a SIMDLength from the given Indexer.
 
@@ -248,7 +248,7 @@ struct SIMDLength(
             mlir_value=__mlir_op.`index.mul`(self._mlir_value, rhs._mlir_value)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __imul__(mut self, rhs: Self):
         """Compute self*rhs and save the result in self.
 
@@ -277,7 +277,7 @@ struct SIMDLength(
             ),
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __irshift__(mut self, rhs: Self):
         """Compute `self >> rhs` and save the result in self.
 
@@ -286,7 +286,7 @@ struct SIMDLength(
         """
         self = self >> rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __pow__(self, exp: Self) -> Self:
         """Return the value raised to the power of the given exponent.
 

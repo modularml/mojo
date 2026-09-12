@@ -197,7 +197,7 @@ def bench_dequant_mxfp4[
     var b_scales_tt = TileTensor(b_scales_device, row_major[N, scale_K]())
     var b_fp8_tt = TileTensor(b_fp8_device, row_major((Idx[N], Idx[K])))
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut b_fp8_tt, imm}:
@@ -210,7 +210,7 @@ def bench_dequant_mxfp4[
             num_cols=K,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut bencher: Bencher) raises {imm}:
         bencher_iter_custom(bencher, kernel_launch, ctx)
 
@@ -248,13 +248,13 @@ def bench_cast_bf16_to_fp8[
 
     from linalg.matmul.gpu.amd.mxfp4_dequant_matmul_amd import _cast_bf16_to_fp8
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut a_fp8_tt, imm}:
         _cast_bf16_to_fp8(ctx, a_fp8_tt, a_tt, M, K)
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut bencher: Bencher) raises {imm}:
         bencher_iter_custom(bencher, kernel_launch, ctx)
 
@@ -309,7 +309,7 @@ def bench_fp8_matmul[
 
     from linalg.matmul.gpu import _matmul_gpu
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut c_tt, imm}:
@@ -317,7 +317,7 @@ def bench_fp8_matmul[
             c_tt, a_fp8_tt, b_fp8_tt, ctx
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut bencher: Bencher) raises {imm}:
         bencher_iter_custom(bencher, kernel_launch, ctx)
 
@@ -358,7 +358,7 @@ def bench_mxfp4_matmul[
     var b_scales_tt = TileTensor(b_scales_device, row_major[N, scale_K]())
     var c_tt = TileTensor(c_device, row_major((M, Idx[N])))
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut c_tt, imm}:
@@ -367,7 +367,7 @@ def bench_mxfp4_matmul[
 
     if run_benchmark:
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, kernel_launch, ctx)
 

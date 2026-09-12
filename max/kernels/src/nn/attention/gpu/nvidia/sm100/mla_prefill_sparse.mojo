@@ -1043,7 +1043,7 @@ struct MLAPrefillSparse[
                     Int(num_k_blocks),
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def k_tma_gather4_load[
         col_range: Tuple[UInt32, UInt32],
@@ -1092,7 +1092,7 @@ struct MLAPrefillSparse[
                     indices[3],
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def v_tma_gather4_load[
         local_row_range: Tuple[Int, Int],
@@ -1180,7 +1180,7 @@ struct MLAPrefillSparse[
                     token_idx_v4[3],
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_k(
         k_tma_op: TMATensorTile[
@@ -1317,7 +1317,7 @@ struct MLAPrefillSparse[
                 1,
             )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_v(
         v_tma_op: TMATensorTile[
@@ -1403,7 +1403,7 @@ struct MLAPrefillSparse[
         )
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_sparse[
     output_dtype: DType,
     q_type: DType,

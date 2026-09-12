@@ -207,7 +207,7 @@ struct Depth512SM100Config[
 
         self.smem_used = smem_use
 
-    @always_inline
+    @inline(.always)
     def BM_eff(self) -> Int:
         """Number of distinct sequence positions per CTA tile.
 
@@ -218,23 +218,23 @@ struct Depth512SM100Config[
             return self.BM // self.group
         return self.BM
 
-    @always_inline
+    @inline(.always)
     def rope_depth(self) -> Int:
         return self.qk_depth - self.ov_depth
 
-    @always_inline
+    @inline(.always)
     def num_q(self) -> Int:
         return 1
 
-    @always_inline
+    @inline(.always)
     def correction_smem_elements(self) -> Int:
         return self.BM
 
-    @always_inline
+    @inline(.always)
     def num_active_warps_per_group(self) -> Int:
         return 4
 
-    @always_inline
+    @inline(.always)
     def num_active_threads_per_group(self) -> Int:
         return WARP_SIZE * self.num_active_warps_per_group()
 

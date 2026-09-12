@@ -26,7 +26,7 @@ from max.gpu.compute.mma import _str_iota  # TODO: move to a string module
 from max.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptor
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def check_blackwell_constraint():
     """Compile-time constraint ensuring Blackwell hardware is targeted."""
     comptime assert _has_blackwell_tcgen05(), (
@@ -44,7 +44,7 @@ struct TensorMemory(TrivialRegisterPassable):
     var num_cols: UInt32
     """The number of columns in the tensor memory."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, num_cols: UInt32):
         """Initialize the TensorMemory struct.
 
@@ -60,7 +60,7 @@ struct TensorMemory(TrivialRegisterPassable):
         self.num_cols = num_cols
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def tcgen05_alloc[
     cta_group: Int32
 ](
@@ -94,7 +94,7 @@ def tcgen05_alloc[
     )
 
 
-@always_inline
+@inline(.always)
 def tcgen05_dealloc[cta_group: Int32](tmem_addr: UInt32, num_cols: UInt32):
     """Deallocates tensor memory allocated by tcgen05_alloc().
 
@@ -123,7 +123,7 @@ def tcgen05_dealloc[cta_group: Int32](tmem_addr: UInt32, num_cols: UInt32):
     ](tmem_addr, num_cols)
 
 
-@always_inline
+@inline(.always)
 def tcgen05_ld[
     *,
     datapaths: Int,
@@ -217,7 +217,7 @@ def tcgen05_ld[
     comptime addr_str = "[$" + String(width) + "]"
 
     @__parameter
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def call_ld_intrinsic[
         pack_type: TrivialRegisterPassable
     ]() -> Array[Scalar[dtype], width]:
@@ -460,7 +460,7 @@ def tcgen05_st[
     # fmt: on
 
 
-@always_inline
+@inline(.always)
 def tcgen05_release_allocation_lock[cta_group: Int32]():
     """Releases the allocation lock for the current CTA group.
 
@@ -483,7 +483,7 @@ def tcgen05_release_allocation_lock[cta_group: Int32]():
     ]()
 
 
-@always_inline
+@inline(.always)
 def tcgen05_load_wait():
     """Waits for tensor memory loads to complete.
 
@@ -501,7 +501,7 @@ def tcgen05_load_wait():
     ]()
 
 
-@always_inline
+@inline(.always)
 def tcgen05_store_wait():
     """Waits for tensor memory stores to complete.
 
@@ -518,7 +518,7 @@ def tcgen05_store_wait():
     ]()
 
 
-@always_inline
+@inline(.always)
 def tcgen05_fence_before():
     """Orders all the prior asynchronous `tcgen05` operations.
 
@@ -535,7 +535,7 @@ def tcgen05_fence_before():
     ]()
 
 
-@always_inline
+@inline(.always)
 def tcgen05_fence_after():
     """Orders all the subsequent asynchronous `tcgen05` operations.
 
@@ -552,7 +552,7 @@ def tcgen05_fence_after():
     ]()
 
 
-@always_inline
+@inline(.always)
 def tcgen05_cp[
     *,
     cta_group: Int32,

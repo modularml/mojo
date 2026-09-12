@@ -89,7 +89,7 @@ def _is_finite_bf16(v: Float32) -> Bool:
     return v == v and abs(v) < Float32(1e38)
 
 
-@always_inline
+@inline(.always)
 def _mha_prefill_v2_launch[
     k_t: MHAOperand,
     v_t: MHAOperand,

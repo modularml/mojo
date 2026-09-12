@@ -37,7 +37,7 @@ from linalg.arch.amd.block_scaled_mma import (
 )
 
 
-@always_inline
+@inline(.always)
 def _pack_e8m0_scale_word(value: Float32) -> Int32:
     """Packs one exact E8M0 scale into all four bytes of the MFMA scale word."""
     var scale = _convert_f32_to_float8_ue8m0[target=DType.float8_e8m0fnu](value)

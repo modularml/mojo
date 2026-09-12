@@ -119,7 +119,7 @@ def _create_mma_desc_pair[
     return MMASmemDescriptorPair.create[SBO, LBO, swizzle_mode](ptr)
 
 
-@always_inline
+@inline(.always)
 def smem_descriptor[
     dtype: DType,
     //,
@@ -211,7 +211,7 @@ struct MmaOpSM100_SS[
     var idesc: UMMAInsDescriptor[Self._get_umma_kind[Self.a_type]()]
     var mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert (
             Self.transpose_b
@@ -266,7 +266,7 @@ struct MmaOpSM100_SS[
             comptime if Self.cta_group == 2:
                 self.mask |= dim1_mask << UInt16(block_id_in_cluster.x ^ 1)
 
-    @always_inline
+    @inline(.always)
     def make_a_desc(
         self,
         a: TileTensor[address_space=.SHARED, ...],
@@ -286,7 +286,7 @@ struct MmaOpSM100_SS[
         """
         return _create_mma_desc_k_major[a.dtype, Self.a_swizzle](a.ptr)
 
-    @always_inline
+    @inline(.always)
     def make_b_desc(
         self,
         b: TileTensor[address_space=.SHARED, ...],
@@ -303,7 +303,7 @@ struct MmaOpSM100_SS[
         """
         return _create_mma_desc_k_major[b.dtype, Self.b_swizzle](b.ptr)
 
-    @always_inline
+    @inline(.always)
     def mma(
         self,
         a: TileTensor[address_space=.SHARED, ...],
@@ -324,7 +324,7 @@ struct MmaOpSM100_SS[
             self.make_a_desc(a), self.make_b_desc(b), c_tmem, init_c
         )
 
-    @always_inline
+    @inline(.always)
     def mma_from_desc(
         self,
         a_desc: MMASmemDescriptor,
@@ -374,7 +374,7 @@ struct MmaOpSM100_SS[
                 c_scale=c_scale,
             )
 
-    @always_inline
+    @inline(.always)
     def commit(
         self,
         ptr_mbar: UnsafePointer[address_space=.SHARED, ...],
@@ -384,7 +384,7 @@ struct MmaOpSM100_SS[
         else:
             mma_arrive_multicast[Self.cta_group](ptr_mbar, self.mask)
 
-    @always_inline
+    @inline(.always)
     def wait(self):
         pass
 
@@ -451,7 +451,7 @@ struct MmaOpSM100_BlockScaled_SS[
     var idesc: UMMAInsDescriptor[Self.scaling_kind]
     var mask: UInt16
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         comptime assert Self.scaling_kind in (
             UMMAKind.KIND_MXF8F6F4,
@@ -521,7 +521,7 @@ struct MmaOpSM100_BlockScaled_SS[
             comptime if Self.cta_group == 2:
                 self.mask |= dim1_mask << UInt16(block_id_in_cluster.x ^ 1)
 
-    @always_inline
+    @inline(.always)
     def mma(
         self,
         a: TileTensor[address_space=.SHARED, ...],
@@ -688,7 +688,7 @@ struct MmaOpSM100_BlockScaled_SS[
                     c_scale=c_scale,
                 )
 
-    @always_inline
+    @inline(.always)
     def commit(
         self,
         ptr_mbar: UnsafePointer[address_space=.SHARED, ...],
@@ -698,11 +698,11 @@ struct MmaOpSM100_BlockScaled_SS[
         else:
             mma_arrive_multicast[Self.cta_group](ptr_mbar, self.mask)
 
-    @always_inline
+    @inline(.always)
     def wait(self):
         pass
 
-    @always_inline
+    @inline(.always)
     def _copy_sf_to_tmem_tt[
         sf_dtype: DType,
         SFLayoutType: TensorLayout,

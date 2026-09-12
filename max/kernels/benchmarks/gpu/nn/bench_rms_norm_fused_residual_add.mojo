@@ -72,31 +72,31 @@ def bench_rms_norm_fused_residual_add_gpu[
 
     # `Output0Fn` precedes `OutputResidualFn`, the reverse of the deleted
     # `..._gpu` kernel's order.
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
         return data_buf.load[width=width](coords)
 
-    @always_inline
+    @inline(.always)
     def residual_input_fn[
         width: Int
     ](coords: Coord) {var residual_buf} -> SIMD[dtype, width]:
         return residual_buf.load[width=width](coords)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var output_buf} -> None:
         output_buf.store[alignment=alignment](coords, val)
 
-    @always_inline
+    @inline(.always)
     def residual_output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[dtype, width]) {var residual_output_buf} -> None:
         residual_output_buf.store[alignment=alignment](coords, val)
 
-    @always_inline
+    @inline(.always)
     def bench_fn(
         mut b: Bencher,
     ) raises {
@@ -112,7 +112,7 @@ def bench_rms_norm_fused_residual_add_gpu[
         var residual_output_fn,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             rms_norm_fused_residual_add[
                 dtype,

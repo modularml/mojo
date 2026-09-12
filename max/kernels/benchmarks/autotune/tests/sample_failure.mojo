@@ -24,9 +24,9 @@ from internal_utils import arg_parse, update_bench_config_args
 
 
 def bench_func(mut m: Bench, pe_rank: Int, sleep_secs: Float64) raises:
-    @always_inline
+    @inline(.always)
     def bench_iter(mut b: Bencher) {var sleep_secs}:
-        @always_inline
+        @inline(.always)
         def call_fn() {var sleep_secs}:
             sleep(sleep_secs)
 

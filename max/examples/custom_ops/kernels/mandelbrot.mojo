@@ -44,7 +44,7 @@ struct Mandelbrot:
         ctx: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def elementwise_mandelbrot[
             width: Int
         ](idx: Coord) -> SIMD[output.dtype, width]:

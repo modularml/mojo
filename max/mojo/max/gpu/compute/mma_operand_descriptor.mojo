@@ -19,7 +19,7 @@ trait MMAOperandDescriptor(TrivialRegisterPassable):
     This trait defines the interface for WGMMA operand descriptors used in GPU matrix operations.
     """
 
-    @always_inline
+    @inline(.always)
     def __add__(self, offset: Int) -> Self:
         """Adds an offset to the operand descriptor.
 

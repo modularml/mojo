@@ -202,7 +202,7 @@ def bench_rms_norm_gemm_pdl[
     comptime CBWeightsType = type_of(cb_weights)
     comptime NormShapeType = type_of(norm_shape)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(a_normed)
     @__parameter
     def output_fn[
@@ -212,7 +212,7 @@ def bench_rms_norm_gemm_pdl[
             a_normed.layout(coords), val
         )
 
-    @always_inline
+    @inline(.always)
     def run_pair[
         norm_pdl: PDLLevel,
         gemm_pdl: PDLLevel,
@@ -231,7 +231,7 @@ def bench_rms_norm_gemm_pdl[
         weight_offset: Scalar[dtype],
         norm_shape: NormShapeType,
     ) raises {}:
-        @always_inline
+        @inline(.always)
         @__copy_capture(a_raw)
         @__parameter
         def input_fn[width: Int](coords: Coord) -> SIMD[dtype, width]:
@@ -353,7 +353,7 @@ def bench_rms_norm_gemm_pdl[
             == 5 else "gemm_only"
         )
 
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {
@@ -385,7 +385,7 @@ def bench_rms_norm_gemm_pdl[
                 norm_shape,
             )
 
-        @always_inline
+        @inline(.always)
         def bench_fn(mut bench: Bencher) raises {imm}:
             bencher_iter_custom(bench, call_fn, ctx)
 

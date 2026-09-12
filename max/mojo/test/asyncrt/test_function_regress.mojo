@@ -44,7 +44,7 @@ struct ZeroSized(
     def get_type_name() -> String:
         return "ZeroSized"
 
-    @always_inline
+    @inline(.always)
     def value(self) -> S:
         return 2
 
@@ -75,7 +75,7 @@ struct NotZeroSized(
     def __init__(out self):
         self.val = 2
 
-    @always_inline
+    @inline(.always)
     def value(self) -> S:
         return self.val
 

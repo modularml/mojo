@@ -92,7 +92,7 @@ def _host_matmul_nn[
     return acc
 
 
-@always_inline
+@inline(.always)
 def _within_tol[c_type: DType](got: Float32, exp: Float32) -> Bool:
     """Standard mixed tolerance: ``|got - exp| <= atol + rtol * |exp|``.
 
@@ -251,7 +251,7 @@ def _run_8x8_bias_case[
     var row_stride = N  # output is row_major(M, N)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr, bias_ptr, row_stride)
     def bias_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1
@@ -1621,7 +1621,7 @@ def test_kernel_128_nn_fp16_bf16_no_lambda(ctx: DeviceContext) raises:
     print("PASS")
 
 
-@always_inline
+@inline(.always)
 def _run_bias_epilogue_test[
     in_type: DType,
     c_type: DType,
@@ -1665,7 +1665,7 @@ def _run_bias_epilogue_test[
     var bias_ptr = bias_dev.unsafe_ptr()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr, bias_ptr)
     def bias_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1
@@ -1888,7 +1888,7 @@ def test_kernel_128_nt_fp16_fp16_relu_compose_epilogue(
     var d_ptr = d_dev.unsafe_ptr()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr)
     def relu_compose_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1
@@ -1969,7 +1969,7 @@ def test_kernel_128_nt_fp16_fp16_bias_relu_compose_epilogue(
     var bias_ptr = bias_dev.unsafe_ptr()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr, bias_ptr)
     def bias_relu_compose_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1
@@ -2056,7 +2056,7 @@ def test_kernel_ragged_100x100x97_nt_fp16_fp16_bias_epilogue(
     var bias_ptr = bias_dev.unsafe_ptr()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr, bias_ptr)
     def bias_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1
@@ -2199,7 +2199,7 @@ def test_kernel_64x130x64_nn_fp16_fp16_oddn_bias_epilogue(
     var bias_ptr = bias_dev.unsafe_ptr()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(d_ptr, bias_ptr)
     def bias_epilogue[
         dt: DType, w: SIMDLength, *, alignment: Int = 1

@@ -120,7 +120,7 @@ struct Attribute(Equatable, TrivialRegisterPassable, Writable):
     """The block scheduling policy of a function. The value type is
     CUclusterSchedulingPolicy / cudaClusterSchedulingPolicy."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two Attribute instances are equal.
 
@@ -132,7 +132,7 @@ struct Attribute(Equatable, TrivialRegisterPassable, Writable):
         """
         return self.code == other.code
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, other: Self) -> Bool:
         """Checks if two Attribute instances are not equal.
 
@@ -200,7 +200,7 @@ struct FuncAttribute(Equatable, TrivialRegisterPassable):
     comptime NULL = FuncAttribute(Attribute(-1), -1)
     """A null/invalid function attribute constant."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two `FuncAttribute` instances are equal.
 
@@ -212,7 +212,7 @@ struct FuncAttribute(Equatable, TrivialRegisterPassable):
         """
         return self.attribute == other.attribute and self.value == other.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ne__(self, other: Self) -> Bool:
         """Checks if two `FuncAttribute` instances are not equal.
 
@@ -224,7 +224,7 @@ struct FuncAttribute(Equatable, TrivialRegisterPassable):
         """
         return not (self == other)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def CACHE_MODE_CA(val: Bool) -> FuncAttribute:
         """Creates a CACHE_MODE_CA function attribute.
@@ -240,7 +240,7 @@ struct FuncAttribute(Equatable, TrivialRegisterPassable):
         """
         return FuncAttribute(Attribute.CACHE_MODE_CA, Int32(Int(val)))
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def MAX_DYNAMIC_SHARED_SIZE_BYTES(val: UInt32) -> FuncAttribute:
         """Creates a MAX_DYNAMIC_SHARED_SIZE_BYTES function attribute.
@@ -259,7 +259,7 @@ struct FuncAttribute(Equatable, TrivialRegisterPassable):
             Attribute.MAX_DYNAMIC_SHARED_SIZE_BYTES, val.cast[.int32]()
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def PREFERRED_SHARED_MEMORY_CARVEOUT(val: Int32) -> FuncAttribute:
         """Creates a PREFERRED_SHARED_MEMORY_CARVEOUT function attribute.

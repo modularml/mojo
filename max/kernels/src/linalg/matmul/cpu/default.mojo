@@ -43,7 +43,7 @@ struct Inner_matmul_default(InnerMatmulKernel, Movable):
     and writes the result back to the C matrix with optional boundary checks.
     """
 
-    @always_inline
+    @inline(.always)
     def _accumulate[
         simd_size: Int, kernel_rows: Int, kernel_cols: Int
     ](
@@ -107,7 +107,7 @@ struct Inner_matmul_default(InnerMatmulKernel, Movable):
                 )
                 c_local.fma(idx0, idx1, a_val, b_val)
 
-    @always_inline
+    @inline(.always)
     def __inner_matmul__[
         kernel_rows: Int,
         kernel_cols: Int,

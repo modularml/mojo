@@ -93,7 +93,7 @@ def test_4wave_epilogue[
     # Capturing lambda: writes the SIMD into `out_tt` at the supplied
     # global coords. 4wave hits this with `width=c_frag_size=4`.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_tt)
     def epilogue_fn[
         _dtype: DType,

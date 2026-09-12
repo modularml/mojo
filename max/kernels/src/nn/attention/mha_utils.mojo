@@ -78,7 +78,7 @@ comptime MHA_PDL_LEVEL = PDLLevel.OVERLAP_AT_END if get_defined_bool[
 ]() else PDLLevel.OFF
 
 
-@always_inline
+@inline(.always)
 def as_dynamic_row_major_1d[
     dtype: DType
 ](
@@ -130,19 +130,19 @@ struct FlashAttentionAlgorithm(Defaultable, TrivialRegisterPassable, Writable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, version: Int) -> Bool:
         return self._value == Int32(version)
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def init(self, dtype: DType) -> Self:
         if self._value == -1:
             comptime if is_sm90or100:
@@ -158,7 +158,7 @@ struct FlashAttentionAlgorithm(Defaultable, TrivialRegisterPassable, Writable):
         else:
             return self
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         if self._value == 0:
             writer.write("naive-attention")
@@ -430,7 +430,7 @@ struct MHAConfig[dtype: DType](TrivialRegisterPassable, Writable):
         writer.write(",num_attention_heads = ", self.num_heads)
 
 
-@always_inline
+@inline(.always)
 def indexer_key_bound[
     kpool: Int = 1
 ](num_keys: Int, seq_len: Int, tok_local: Int, causal: Int) -> Int:
@@ -463,7 +463,7 @@ def indexer_key_bound[
     return (num_keys - (seq_len - 1 - tok_local) * causal) // kpool
 
 
-@always_inline
+@inline(.always)
 def _kernel_mask[
     dtype: DType, width: SIMDLength
 ](
@@ -482,7 +482,7 @@ def _kernel_mask[
     return masked_vec
 
 
-@always_inline
+@inline(.always)
 def _copy_frag_to_smem_nvidia[
     BM: Int,
     BN: Int,
@@ -577,7 +577,7 @@ def _copy_frag_to_smem_nvidia[
                 tile_BMxBK.ptr.store[alignment=align](offset_BMxBK, vec)
 
 
-@always_inline
+@inline(.always)
 def _copy_frag_to_smem_amd[
     BM: Int,
     BN: Int,
@@ -653,7 +653,7 @@ def _copy_frag_to_smem_amd[
                 tile_BMxBK.ptr.store(offset_BMxBK, vec)
 
 
-@always_inline
+@inline(.always)
 def _copy_frag_to_smem[
     BM: Int,
     BN: Int,
@@ -690,7 +690,7 @@ def _copy_frag_to_smem[
         ]()
 
 
-@always_inline
+@inline(.always)
 def get_start_and_end_for_partitions[
     tile_size: Int
 ](num_keys: Int, num_partitions: Int, partition_idx: Int) -> Tuple[Int, Int]:
@@ -727,7 +727,7 @@ def get_start_and_end_for_partitions[
 comptime callback_fn_type = def[mask_t: MHAMask](mask: mask_t) raises -> None
 
 
-@always_inline
+@inline(.always)
 def dispatch_mask[
     mask_type: String,
     local_window_size: Int = -1,
@@ -755,7 +755,7 @@ def dispatch_mask[
         `local_window_size` is inconsistent with the selected mask.
     """
 
-    @always_inline
+    @inline(.always)
     def outer_wrapper[mask_t: MHAMask](mask: mask_t) raises {imm}:
         return callback_fn(mask)
 
@@ -788,7 +788,7 @@ def dispatch_mask[
         comptime assert False, "Unsupported mask type: " + mask_type
 
 
-@always_inline
+@inline(.always)
 def dispatch_materialized_mask[
     dtype: DType,
     layout: Layout,
@@ -824,7 +824,7 @@ def dispatch_materialized_mask[
     return callback_fn(mask)
 
 
-@always_inline
+@inline(.always)
 def dispatch_relative_logits_mask[
     dtype: DType,
     layout: Layout,
@@ -902,15 +902,15 @@ struct StaticInt[value: Int](
 
     comptime static_value: Optional[Int] = Optional[Int](Self.value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self):
         pass
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         return Self.value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def as_uint32(self) -> UInt32:
         return UInt32(Self.value)
 
@@ -926,20 +926,20 @@ struct DynamicInt(OptionallyStaticInt, TrivialRegisterPassable):
     var value: UInt32
     comptime static_value: Optional[Int] = None
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self, value: Int):
         self.value = UInt32(value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         return Int(self.value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def as_uint32(self) -> UInt32:
         return self.value
 
 
-@always_inline
+@inline(.always)
 def _is_decoding[int_t: OptionallyStaticInt]() -> Bool:
     return int_t.static_value.or_else(0) == 1
 
@@ -952,7 +952,7 @@ trait OptionalPointer(Copyable, TrivialRegisterPassable):
     comptime is_null: Bool
     comptime address_space: AddressSpace
 
-    @always_inline
+    @inline(.always)
     def value(
         self,
     ) -> UnsafePointer[
@@ -982,16 +982,16 @@ struct NonNullPointer[dtype_: DType, address_space_: AddressSpace = .GENERIC](
     @__allow_legacy_any_origin_fields
     var ptr: Self.PtrType
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr: Self.PtrType):
         self.ptr = ptr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr: DeviceBuffer[Self.dtype]):
         comptime assert Self.address_space == .GENERIC
         self.ptr = rebind[Self.PtrType](ptr.unsafe_ptr())
 
-    @always_inline
+    @inline(.always)
     def value(self) -> Self.PtrType:
         assert Int(self.ptr) != 0, (
             "NonNullPointer is supposed to provide a compile-time guarantee"
@@ -1018,11 +1018,11 @@ struct NullPointer[dtype_: DType, address_space_: AddressSpace = .GENERIC](
         Scalar[Self.dtype], ImmutAnyOrigin, address_space=Self.address_space
     ]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         pass
 
-    @always_inline
+    @inline(.always)
     def value(self) -> Self.PtrType:
         # NullPointer.value() should never be called at runtime — it exists
         # only for trait conformance. Return dangling as a safe sentinel.
@@ -1045,7 +1045,7 @@ trait MHAPartitionScheme(Copyable, TrivialRegisterPassable):
     # partial-statistics buffer cannot hand out a pointer to one.
     comptime LSEPointerType: OptionalPointer
 
-    @always_inline
+    @inline(.always)
     def num_partitions(self) -> UInt32:
         ...
 
@@ -1054,7 +1054,7 @@ trait MHAPartitionScheme(Copyable, TrivialRegisterPassable):
     # launched grid shape is stable across num_keys (one CUDA graph per batch
     # size). CTAs with partition index >= num_partitions() early-return. Equal
     # to num_partitions() when the scheme does not over-launch.
-    @always_inline
+    @inline(.always)
     def max_num_partitions(self) -> UInt32:
         ...
 
@@ -1062,7 +1062,7 @@ trait MHAPartitionScheme(Copyable, TrivialRegisterPassable):
     # through it must first establish `do_partition` (see
     # `MHAPosition.exp_sum_qk_max_ptr`), which is what makes the mutability
     # laundering at those sites sound.
-    @always_inline
+    @inline(.always)
     def lse_pointer(self) -> Self.LSEPointerType:
         ...
 
@@ -1084,19 +1084,19 @@ struct NoPartition[dtype: DType](
     comptime accum_dtype: DType = Self.dtype
     comptime LSEPointerType = NullPointer[Self.accum_dtype]
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         pass
 
-    @always_inline
+    @inline(.always)
     def num_partitions(self) -> UInt32:
         return 1
 
-    @always_inline
+    @inline(.always)
     def max_num_partitions(self) -> UInt32:
         return 1
 
-    @always_inline
+    @inline(.always)
     def lse_pointer(self) -> Self.LSEPointerType:
         return {}
 
@@ -1126,7 +1126,7 @@ struct SplitKPartition[dtype: DType](
     var num_partitions_value: UInt32
     var max_num_partitions_value: UInt32
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ptr: UnsafePointer[Scalar[Self.accum_dtype], MutAnyOrigin],
@@ -1137,14 +1137,14 @@ struct SplitKPartition[dtype: DType](
         self.num_partitions_value = num_partitions_value
         self.max_num_partitions_value = max_num_partitions_value
 
-    @always_inline
+    @inline(.always)
     def num_partitions(self) -> UInt32:
         return self.num_partitions_value
 
-    @always_inline
+    @inline(.always)
     def max_num_partitions(self) -> UInt32:
         return self.max_num_partitions_value
 
-    @always_inline
+    @inline(.always)
     def lse_pointer(self) -> Self.LSEPointerType:
         return {self.ptr.as_imm().as_unsafe_any_origin()}

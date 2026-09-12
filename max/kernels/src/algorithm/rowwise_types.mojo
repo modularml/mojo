@@ -37,7 +37,7 @@ from std.utils.coord import Coord, DynamicCoord
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def tile_alignment[dtype: DType, ws: Int, target: StaticString]() -> Int:
     """Alignment, **in elements**, a row-wise body's store — or its
     `input_fn`'s load — may assume for a width-`ws` tile of `dtype` on
@@ -162,7 +162,7 @@ struct ContextParams(TrivialRegisterPassable):
     few-rows-by-very-long-inner shapes. Scaffolder-internal; set only by
     the tier picker, never read by a body."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         axis: Int,
@@ -251,7 +251,7 @@ struct Context[params: ContextParams](TrivialRegisterPassable):
     same width."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def element_alignment[dtype: DType, ws: Int]() -> Int:
         """Store/load alignment for a width-`ws` tile of `dtype` on this
         `Context`'s target — element-natural on CPU, SIMD-natural on GPU.
@@ -308,7 +308,7 @@ struct Context[params: ContextParams](TrivialRegisterPassable):
     `> p`, and writes the output only when `p == N`. Set per launch by
     `_PointwiseSplitkKernel` from the K+1-launch loop."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         partials_base: UnsafePointer[UInt8, MutUntrackedOrigin],
@@ -340,7 +340,7 @@ struct Context[params: ContextParams](TrivialRegisterPassable):
         self._phase = phase
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def empty() -> Self:
         """Returns a `Context` with zeroed runtime fields. Used by CPU
         bodies and non-split-K GPU kernels.
@@ -401,7 +401,7 @@ struct RowCoord[rank: Int](
     var coord: DynamicCoord[DType.int64, Self.rank]
     """The wrapped coordinates."""
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, row_coords: Coord):
         """Builds a handle from any `Coord`, dropping static dims.
@@ -413,7 +413,7 @@ struct RowCoord[rank: Int](
             row_coords.make_dynamic[DType.int64]()
         )
 
-    @always_inline
+    @inline(.always)
     def write_axis[axis: Int](mut self, pos: Int):
         """Sets the reduce axis to `pos`, in place.
 
@@ -427,7 +427,7 @@ struct RowCoord[rank: Int](
             rebind[type_of(self.coord[axis])](Scalar[DType.int64](pos))
         )
 
-    @always_inline
+    @inline(.always)
     def at_axis[axis: Int](self, pos: Int) -> Self:
         """A copy with the reduce axis set to `pos`.
 
@@ -445,7 +445,7 @@ struct RowCoord[rank: Int](
         return result
 
 
-@always_inline
+@inline(.always)
 def _num_outputs_excluding_axis[axis: Int](shape: Coord) -> Int:
     """Product of `shape`'s dims other than `axis`.
 

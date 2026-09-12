@@ -348,7 +348,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     # invoked — if TileWriter skips the lambda the result will be 1x, not 2x,
     # and the comparison against 2x reference will fail.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor)
     def epilogue_fn[
         _dtype: DType,

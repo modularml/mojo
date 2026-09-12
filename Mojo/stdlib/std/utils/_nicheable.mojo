@@ -28,7 +28,7 @@ struct NicheIndex(Equatable, TrivialRegisterPassable):
 
     var _index: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, index: Int):
         """Construct a `NicheIndex` with the given index value. Must be in the
         range (`0` <= index <= `Int.MAX`).
@@ -38,7 +38,7 @@ struct NicheIndex(Equatable, TrivialRegisterPassable):
         """
         self._index = index
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Returns whether two `NicheIndex` values are equal.
 
@@ -277,7 +277,7 @@ trait UnsafeSingleNicheable(UnsafeNicheable):
         ...
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def niche_count() -> Int:
         """Returns `1`, since this type has exactly one niche.
@@ -288,7 +288,7 @@ trait UnsafeSingleNicheable(UnsafeNicheable):
         return 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def write_niche[index: Int](memory: MutPointer[MaybeUninit[Self], _]):
         """Implements `UnsafeNicheable.write_niche` by delegating to the
@@ -304,7 +304,7 @@ trait UnsafeSingleNicheable(UnsafeNicheable):
         Self.write_niche(memory)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def classify_niche(memory: ImmPointer[MaybeUninit[Self], _]) -> NicheIndex:
         """Implements `UnsafeNicheable.classify_niche` by delegating to

@@ -78,7 +78,7 @@ from structured_kernels.tile_types import (
 )
 
 
-@always_inline
+@inline(.always)
 def _get_accumulator_size[
     *,
     c_smem_layout: Layout,
@@ -113,7 +113,7 @@ def _get_accumulator_size[
     return Index(num_stages, num_elements)
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -310,7 +310,7 @@ def load_AB[
         )
 
 
-@always_inline
+@inline(.always)
 def multi_stage_reg_epilogue[
     c_rank: Int,
     c_tile_shape: IndexList[c_rank],
@@ -516,7 +516,7 @@ def multi_stage_reg_epilogue[
             named_barrier[Int32(num_output_warps * WARP_SIZE)]()
 
 
-@always_inline
+@inline(.always)
 def promote_accumulators[
     pipeline_stages: Int,
     num_accum_pipeline_stages: Int,

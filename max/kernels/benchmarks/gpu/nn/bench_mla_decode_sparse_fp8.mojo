@@ -237,7 +237,7 @@ def execute_mla_decode_sparse[
         d_indices_device.unsafe_ptr()
     )
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         launch_ctx: DeviceContext,
     ) raises {
@@ -266,7 +266,7 @@ def execute_mla_decode_sparse[
             indices_stride=top_k,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

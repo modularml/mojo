@@ -175,7 +175,7 @@ struct Status(Equatable, TrivialRegisterPassable, Writable):
     def __int__(self) -> Int:
         return Int(self._value)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.SUCCESS:
             return writer.write_string("SUCCESS")

@@ -66,7 +66,7 @@ from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
 from std.testing import assert_almost_equal, assert_equal
 
 
-@always_inline
+@inline(.always)
 def not_finite[dtype: DType](x: Scalar[dtype]) -> Bool:
     # NaN via isnan; Inf via magnitude (any real Inf exceeds 1e30, while bf16/f32
     # finite values of interest here are far smaller). Avoids depending on an
@@ -87,7 +87,7 @@ struct MLAMaskType(TrivialRegisterPassable):
         return self.value != rhs.value
 
 
-@always_inline
+@inline(.always)
 def host_cast_k_fp8_to_bf16[
     kv_fp8_t: DType,
     k_bf16_t: DType,
@@ -112,7 +112,7 @@ def host_cast_k_fp8_to_bf16[
 # near or above the e4m3 max (±448). `stress` ~= target peak magnitude; with
 # randn (|x| up to ~4-5 sigma) a stress of ~120 pushes the tail past 448 and
 # the bulk into the high-magnitude e4m3 range where precision collapses.
-@always_inline
+@inline(.always)
 def magnitude_stress_inplace[
     dtype: DType
 ](buf: MutPointer[Scalar[dtype], _], n: Int, stress: Float32):
@@ -201,7 +201,7 @@ def test[
     var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(q_tt, k_tt, out_tt, scalar_args_buf_tt)
     def kernel_launch(ctx: DeviceContext) raises:
         # CAUSAL only (production MLA mask). See main() — every cell is CAUSAL.

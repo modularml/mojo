@@ -550,7 +550,7 @@ struct FileHandle(Defaultable, Movable, Writer):
 
             total_written += chunk_written
 
-    @always_inline
+    @inline(.always)
     def write_bytes(mut self, bytes: Span[Byte, _]):
         """Write a span of bytes to the file.
 

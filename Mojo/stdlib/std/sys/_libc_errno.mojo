@@ -429,7 +429,7 @@ struct ErrNo(Equatable, TrivialRegisterPassable, Writable):
         )
         string.write_to(writer)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Checks if two `ErrNo` values are equal.
 
@@ -441,7 +441,7 @@ struct ErrNo(Equatable, TrivialRegisterPassable, Writable):
         """
         return self.value == other.value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Checks if two `ErrNo` values are not equal.
 

@@ -924,7 +924,7 @@ struct MLA_SM100_Decode_Sparse[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _transform_indices_to_smem(
         d_indices: OptionalReg[UnsafePointer[Int32, MutAnyOrigin]],
         idx_smem: SharedMemPointer[Int32],
@@ -960,7 +960,7 @@ struct MLA_SM100_Decode_Sparse[
     # Index producer: warp 11 transforms indices and loads scales
     # ------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def idx_producer(
         idx_bars: DecodeSM100MiscMBars[
             num_stages=2,
@@ -1178,7 +1178,7 @@ struct MLA_SM100_Decode_Sparse[
     # Load: warp 8 consumes indices from idx pipeline, issues TMA
     # ------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.q_type,
@@ -1349,7 +1349,7 @@ struct MLA_SM100_Decode_Sparse[
             )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_scales_for_tile(
         scale_smem_base: SharedMemPointer[UInt8],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
@@ -1395,7 +1395,7 @@ struct MLA_SM100_Decode_Sparse[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_one_tile(
         mut kv_load_prod: KVLoad2CvtProducer[Self.fp8_type, Self.config],
         is_leader: Bool,
@@ -1468,7 +1468,7 @@ struct MLA_SM100_Decode_Sparse[
         kv_load_prod.commit_step()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_tile_range(
         mut kv_load_prod: KVLoad2CvtProducer[Self.fp8_type, Self.config],
         is_leader: Bool,
@@ -1545,7 +1545,7 @@ struct MLA_SM100_Decode_Sparse[
             t += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_scales_for_tile_sparse(
         scale_smem_base: SharedMemPointer[UInt8],
         scales_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
@@ -1592,7 +1592,7 @@ struct MLA_SM100_Decode_Sparse[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def convertFP8ToBF16(
         kv_nope_smem_fp8: SharedMemPointer[Scalar[Self.fp8_type]],
         kv_smem_bf16: SharedMemPointer[Scalar[Self.q_type]],
@@ -1843,7 +1843,7 @@ struct MLA_SM100_Decode_Sparse[
     # |__T0__|__T1__|__T2__|__T3__|
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.q_type]],
@@ -1926,7 +1926,7 @@ struct MLA_SM100_Decode_Sparse[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.q_type]],

@@ -138,11 +138,11 @@ def run_mha_prefill_v2[
 
     if bench:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut b: Bencher,
         ) raises {var cb_q, var cb_k, var cb_v, var cb_o, imm}:
-            @always_inline
+            @inline(.always)
             def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 var q_ptr = (
                     cb_q.offset_ptr(iteration)

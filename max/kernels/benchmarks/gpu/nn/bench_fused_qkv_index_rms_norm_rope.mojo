@@ -334,7 +334,7 @@ def bench_fused_qkv_index_rms_norm_rope[
     var gamma_bytes = 4 * head_dim * elt
     var bytes_per_iter = rw_bytes + freqs_bytes + gamma_bytes
 
-    @always_inline
+    @inline(.always)
     def bench_unfused(
         mut b: Bencher,
     ) {
@@ -359,7 +359,7 @@ def bench_fused_qkv_index_rms_norm_rope[
         var total_seq_len,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             # Named vars bind the per-iter ring-window pointer's origin before
             # it flows into the cache collection / input lambdas.
@@ -394,7 +394,7 @@ def bench_fused_qkv_index_rms_norm_rope[
                 row_major((total_seq_len, Idx[index_q_heads], Idx[head_dim])),
             ).as_immut()
 
-            @always_inline
+            @inline(.always)
             @__parameter
             @__copy_capture(q_main_src)
             def q_main_fn[
@@ -404,7 +404,7 @@ def bench_fused_qkv_index_rms_norm_rope[
                     Coord(Index(token, head, col))
                 )
 
-            @always_inline
+            @inline(.always)
             @__parameter
             @__copy_capture(q_index_src)
             def q_index_fn[
@@ -461,7 +461,7 @@ def bench_fused_qkv_index_rms_norm_rope[
         [ThroughputMeasure(BenchMetric.bytes, bytes_per_iter)],
     )
 
-    @always_inline
+    @inline(.always)
     def bench_fused(
         mut b: Bencher,
     ) {
@@ -486,7 +486,7 @@ def bench_fused_qkv_index_rms_norm_rope[
         var total_seq_len,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var main_kv_lt = LayoutTensor[dtype, kv_block_layout](
                 cb_main_kv_fused.offset_ptr(iteration), main_kv_rt
@@ -519,7 +519,7 @@ def bench_fused_qkv_index_rms_norm_rope[
                 row_major((total_seq_len, Idx[index_q_heads], Idx[head_dim])),
             ).as_immut()
 
-            @always_inline
+            @inline(.always)
             @__parameter
             @__copy_capture(q_main_src)
             def q_main_fn[
@@ -529,7 +529,7 @@ def bench_fused_qkv_index_rms_norm_rope[
                     Coord(Index(token, head, col))
                 )
 
-            @always_inline
+            @inline(.always)
             @__parameter
             @__copy_capture(q_index_src)
             def q_index_fn[

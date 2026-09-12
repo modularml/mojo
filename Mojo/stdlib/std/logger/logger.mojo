@@ -95,7 +95,7 @@ struct Level(
     comptime CRITICAL = Self(60)
     """A serious error indicating that the program itself may be unable to continue running."""
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Returns True if this level equals the other level.
 
@@ -224,7 +224,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
         self._prefix = prefix
         self._source_location = source_location
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _is_disabled[target_level: Level]() -> Bool:
         """Returns True if logging at the target level is disabled.
@@ -240,7 +240,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
             return True
         return Self.level > target_level
 
-    @always_inline
+    @inline(.always)
     def trace[
         *Ts: Writable
     ](
@@ -272,7 +272,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
                 location=location.or_else(call_location()),
             )
 
-    @always_inline
+    @inline(.always)
     def debug[
         *Ts: Writable
     ](
@@ -304,7 +304,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
                 location=location.or_else(call_location()),
             )
 
-    @always_inline
+    @inline(.always)
     def info[
         *Ts: Writable
     ](
@@ -336,7 +336,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
                 location=location.or_else(call_location()),
             )
 
-    @always_inline
+    @inline(.always)
     def warning[
         *Ts: Writable
     ](
@@ -368,7 +368,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
                 location=location.or_else(call_location()),
             )
 
-    @always_inline
+    @inline(.always)
     def error[
         *Ts: Writable
     ](
@@ -400,7 +400,7 @@ struct Logger[level: Level = DEFAULT_LEVEL](ImplicitlyCopyable):
                 location=location.or_else(call_location()),
             )
 
-    @always_inline
+    @inline(.always)
     def critical[
         *Ts: Writable
     ](

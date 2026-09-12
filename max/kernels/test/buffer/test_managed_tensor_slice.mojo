@@ -421,7 +421,7 @@ def _check_value_form_rank1[dtype: DType]() raises:
 
     var bias = Scalar[dtype](3)
 
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var bias} -> SIMD[dtype, width]:
         return SIMD[dtype, width](bias)
 
@@ -456,7 +456,7 @@ def _check_value_form_rank2[dtype: DType]() raises:
     # `Coord` carries the index of the vector's first element, so the body
     # fills the remaining lanes along the last axis itself. A wrong index or a
     # collapsed vector shows up as a wrong element.
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var scale} -> SIMD[dtype, width]:
         var il = coord_to_index_list(idx)
         var base_val = Scalar[dtype](il[0]) * scale + Scalar[dtype](il[1])
@@ -500,13 +500,13 @@ def _check_value_matches_parametric[dtype: DType]() raises:
     # a capture list; the comptime form cannot capture at all without
     # `@__parameter`, so it spells the multiplier inline. Same arithmetic, two
     # dispatch paths — any divergence is the new overload's fault.
-    @always_inline
+    @inline(.always)
     def value_body[width: Int](idx: Coord) {var two} -> SIMD[dtype, width]:
         return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) * two + 1
 
     foreach(value_body, value_out, ctx)
 
-    @always_inline
+    @inline(.always)
     def param_body[width: Int](idx: Coord) capturing -> SIMD[dtype, width]:
         return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) * 2 + 1
 
@@ -549,7 +549,7 @@ def _check_capture_outer_tensor[dtype: DType]() raises:
 
     # The shape every migrated `max/examples/` caller uses: capture the input
     # tensor and read it through `load`.
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var x} -> SIMD[dtype, width]:
         return x.load[width](idx) + 1
 
@@ -581,7 +581,7 @@ def _check_capture_tensor_and_scalar[dtype: DType]() raises:
     var addend = Scalar[dtype](7)
 
     # The `add_constant` shape: a tensor and a loose scalar in one capture list.
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var x, var addend} -> SIMD[dtype, width]:
         return x.load[width](idx) + addend
 
@@ -621,7 +621,7 @@ def _check_capture_input_tensor[dtype: DType]() raises:
     var out = _flat_output[dtype, N](out_ptr)
     var view = _flat_view[dtype, N](out_ptr)
 
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var x} -> SIMD[dtype, width]:
         return x.load[width](idx) + _lane_ramp[dtype, width](
             coord_to_index_list(idx)[0]
@@ -651,7 +651,7 @@ def _check_simd_width_one[dtype: DType]() raises:
 
     # `simd_width=1` is what `image_pipeline.mojo` and `grayscale.mojo` pass;
     # the body asserts it actually arrives.
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var one} -> SIMD[dtype, width]:
         comptime assert width == 1, "simd_width=1 was not honored"
         return SIMD[dtype, width](
@@ -711,7 +711,7 @@ def _check_fused_store[dtype: DType]() raises:
     var fused_out = out._bind_to_fused_output(_MarkingOutFusion(fused_ptr))
     var one = Scalar[dtype](1)
 
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) {var one} -> SIMD[dtype, width]:
         return SIMD[dtype, width](
             Scalar[dtype](coord_to_index_list(idx)[0]) * one
@@ -746,7 +746,7 @@ def _check_parametric_form_still_resolves[dtype: DType]() raises:
 
     # No capture list: a `capturing` body written without `@__parameter` does
     # not actually capture, so anything it needs has to come from `idx`.
-    @always_inline
+    @inline(.always)
     def body[width: Int](idx: Coord) capturing -> SIMD[dtype, width]:
         return _lane_ramp[dtype, width](coord_to_index_list(idx)[0]) + 5
 

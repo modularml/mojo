@@ -38,7 +38,7 @@ def test_stopping_criteria() raises:
     # Stop when min_runtime_secs has elapsed and either max_runtime_secs or max_iters
     # is reached
 
-    @always_inline
+    @inline(.always)
     def time_me():
         sleep(0.002)
         clobber_memory()
@@ -105,7 +105,7 @@ struct SomeStruct(TrivialRegisterPassable):
     var x: Int
     var y: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.x = 5
         self.y = 4
@@ -115,7 +115,7 @@ struct SomeTrivialStruct(TrivialRegisterPassable):
     var x: Int
     var y: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.x = 3
         self.y = 5
@@ -220,7 +220,7 @@ def test_bencher_iter_unified() raises:
 
     var count = 0
 
-    @always_inline
+    @inline(.always)
     def increment() {
         mut count,
     }:
@@ -237,7 +237,7 @@ def test_bencher_iter_unified_raising() raises:
     var count = 0
     var data = [1, 2, 3]
 
-    @always_inline
+    @inline(.always)
     def increment() raises {
         mut count,
         var data^,
@@ -256,7 +256,7 @@ def test_bencher_iter_unified_raising_propagates() raises:
 
     var count = 0
 
-    @always_inline
+    @inline(.always)
     def fail_on_second() raises {
         mut count,
     }:
@@ -277,12 +277,12 @@ def test_bencher_iter_preproc_unified() raises:
     var count = 0
     var state = 0
 
-    @always_inline
+    @inline(.always)
     def work(mut state: Int) {mut count}:
         count += 1
         state += 1
 
-    @always_inline
+    @inline(.always)
     def preproc(mut state: Int):
         state += 10
 
@@ -295,7 +295,7 @@ def test_bencher_iter_custom_unified() raises:
     """Tests Bencher.iter_custom with a unified closure."""
     var bencher = Bencher(5)
 
-    @always_inline
+    @inline(.always)
     def custom_timer(num_iters: Int) -> Int:
         return num_iters * 100
 
@@ -309,11 +309,11 @@ def test_bench_function_unified() raises:
 
     var call_count = 0
 
-    @always_inline
+    @inline(.always)
     def noop():
         pass
 
-    @always_inline
+    @inline(.always)
     def my_bench(
         mut b: Bencher,
     ) {mut call_count,}:
@@ -331,14 +331,14 @@ def test_bench_with_input_unified() raises:
 
     var call_count = 0
 
-    @always_inline
+    @inline(.always)
     def my_bench(
         mut b: Bencher,
         input: Int,
     ) {mut call_count,}:
         call_count += 1
 
-        @always_inline
+        @inline(.always)
         def noop():
             pass
 
@@ -355,7 +355,7 @@ def test_bench_function_no_arg_unified() raises:
 
     var count = 0
 
-    @always_inline
+    @inline(.always)
     def my_func() {
         mut count,
     }:
@@ -371,7 +371,7 @@ def test_bench_function_no_arg_raising_unified() raises:
 
     var count = 0
 
-    @always_inline
+    @inline(.always)
     def my_func() raises {
         mut count,
     }:

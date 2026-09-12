@@ -25,7 +25,7 @@ from std.sys import align_of, is_gpu
 from std._plugin import CurrentPlugin
 
 
-@always_inline
+@inline(.always)
 def unsafe_stack_allocation[
     count: Int,
     dtype: DType,
@@ -61,7 +61,7 @@ comptime _StackAllocationPluginHookFnType[address_space: AddressSpace] = def[
 """Plugin-hook signature for `PluginHooks.stack_allocation_fn`; keep in sync with `unsafe_stack_allocation`."""
 
 
-@always_inline
+@inline(.always)
 def unsafe_stack_allocation[
     count: Int,
     type: AnyType,
@@ -150,7 +150,7 @@ def unsafe_stack_allocation[
     }
 
 
-@always_inline
+@inline(.always)
 def stack_allocation[
     count: Int,
     dtype: DType,
@@ -179,7 +179,7 @@ def stack_allocation[
     ]()
 
 
-@always_inline
+@inline(.always)
 def stack_allocation[
     count: Int,
     type: AnyType,

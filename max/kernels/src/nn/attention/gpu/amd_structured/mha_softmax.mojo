@@ -118,7 +118,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
 
     # ---- Lifecycle ----
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """No-sink init: `max_vec`/`max_vec_prev`/`norm_vec` to 0,
         `scale_vec` to 1 so the epilogue's unconditional
@@ -129,7 +129,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         self.max_vec = Float32(0.0)
         self.max_vec_prev = Float32(0.0)
 
-    @always_inline
+    @inline(.always)
     def reseed_with_sink(mut self, sw_log2: Float32):
         """Re-init for the sink path: pre-seed the recurrence with the
         virtual sink token's contribution.
@@ -154,7 +154,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
     # ---- Reduction helpers (static methods) ----
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _col_reduce_at_j[
         layout: TensorLayout,
         //,
@@ -209,7 +209,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             return swapped[0] + swapped[1]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _col_max_scalar_v3max[
         layout: TensorLayout,
         //,
@@ -276,7 +276,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         return max(swapped[0], swapped[1])
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _col_max_scalar[
         layout: TensorLayout,
         //,
@@ -289,7 +289,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         return Self._col_reduce_at_j["max", j=0](src)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _col_sum_scalar[
         layout: TensorLayout,
         //,
@@ -302,7 +302,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         return Self._col_reduce_at_j["add", j=0](src)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _sub_scalar_inplace[
         layout: TensorLayout,
         //,
@@ -330,7 +330,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             dst_v[i, 0, 0] = dst_v[i, 0, 0] - v_simd
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _fms_scalar_inplace[
         layout: TensorLayout,
         //,
@@ -368,7 +368,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             dst_v[i, 0, 0] = dst_v[i, 0, 0] * mul_simd - sub_simd
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _mul_scalar_inplace[
         dtype: DType
     ](mut dst: RegTile[dtype, ...], scalar: Float32,):
@@ -392,7 +392,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             dst_v[i, 0, 0] = dst_v[i, 0, 0] * v_simd
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _div_scalar_inplace(
         mut dst: RegTile[.float32, ...],
         scalar: Float32,
@@ -421,7 +421,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
 
     # ---- Recurrence steps ----
 
-    @always_inline
+    @inline(.always)
     def seed_tile0[
         layout: TensorLayout,
         //,
@@ -451,7 +451,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         self.max_vec_prev = self.max_vec
         Self._sub_scalar_inplace(att_block, self.max_vec)
 
-    @always_inline
+    @inline(.always)
     def col_max_acc[
         layout: TensorLayout,
         //,
@@ -479,7 +479,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         """
         self.max_vec = max(self.max_vec_prev, Self._col_max_scalar(att_block))
 
-    @always_inline
+    @inline(.always)
     def sub_max[
         layout: TensorLayout,
         //,
@@ -501,7 +501,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         """
         Self._sub_scalar_inplace(att_block, self.max_vec)
 
-    @always_inline
+    @inline(.always)
     def seed_tile0_scaled[
         layout: TensorLayout,
         //,
@@ -530,7 +530,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         self.max_vec_prev = self.max_vec
         Self._fms_scalar_inplace(att_block, log2_scale, self.max_vec)
 
-    @always_inline
+    @inline(.always)
     def col_max_acc_scaled[
         layout: TensorLayout,
         //,
@@ -570,7 +570,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             log2_scale * Self._col_max_scalar_v3max(att_block),
         )
 
-    @always_inline
+    @inline(.always)
     def sub_max_scaled[
         layout: TensorLayout,
         //,
@@ -598,7 +598,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         """
         Self._fms_scalar_inplace(att_block, log2_scale, self.max_vec)
 
-    @always_inline
+    @inline(.always)
     def lazy_rescale_decision[
         att_full_dtype: DType
     ](
@@ -675,7 +675,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
             self.scale_vec = Float32(1.0)
         return pending_scale
 
-    @always_inline
+    @inline(.always)
     def update_scale_unconditional(mut self):
         """UNCONDITIONAL rescale: `scale_vec = exp2(max_prev - max_new)`,
         then `max_vec_prev = max_vec`.
@@ -689,7 +689,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         self.scale_vec = math_exp2(self.max_vec_prev - self.max_vec)
         self.max_vec_prev = self.max_vec
 
-    @always_inline
+    @inline(.always)
     def rescale_output(
         mut self,
         mut o_reg: RegTile[.float32, _, MutUntrackedOrigin],
@@ -706,7 +706,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         """
         Self._mul_scalar_inplace(o_reg, self.scale_vec)
 
-    @always_inline
+    @inline(.always)
     def apply_norm_rescale_if_pending(mut self, pending_scale: Bool):
         """`if pending_scale: norm_vec *= scale_vec`.
 
@@ -721,7 +721,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         if pending_scale:
             self.norm_vec = self.norm_vec * self.scale_vec
 
-    @always_inline
+    @inline(.always)
     def apply_unconditional_norm_rescale(mut self):
         """UNCONDITIONAL `norm_vec *= scale_vec`.
 
@@ -730,7 +730,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         (`lazy_rescale_decision` maintains this on the skip branch)."""
         self.norm_vec = self.norm_vec * self.scale_vec
 
-    @always_inline
+    @inline(.always)
     def col_sum_acc[
         layout: TensorLayout,
         //,
@@ -751,7 +751,7 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         """
         self.norm_vec = self.norm_vec + Self._col_sum_scalar(att_block)
 
-    @always_inline
+    @inline(.always)
     def normalize_output(
         mut self,
         mut o_reg: RegTile[.float32, _, MutUntrackedOrigin],

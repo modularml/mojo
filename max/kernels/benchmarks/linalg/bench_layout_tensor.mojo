@@ -338,7 +338,7 @@ def matmul_layout_transposed(mut C: Matrix, A: Matrix, B: Matrix):
     sync_parallelize(calc_row, M // tile_m)
 
 
-@always_inline
+@inline(.always)
 def bench[
     func: def(mut Matrix, Matrix, Matrix) thin -> None, name: StaticString
 ]() raises:
@@ -346,7 +346,7 @@ def bench[
     var B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
 
-    @always_inline
+    @inline(.always)
     def test_fn() {mut C, imm A, imm B}:
         _ = func(C, A, B)
 
@@ -362,7 +362,7 @@ def bench[
     _ = py.print(py.str("{:<13}{:>8.3f} GFLOPS").format(name, gflops))
 
 
-@always_inline
+@inline(.always)
 def test_matrix_equal[
     func: def(mut Matrix, Matrix, Matrix) thin -> None
 ](mut C: Matrix, A: Matrix, B: Matrix) raises -> Bool:

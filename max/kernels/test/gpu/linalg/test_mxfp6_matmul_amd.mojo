@@ -158,7 +158,7 @@ def _pack_fp6(
                 packed[unsafe_offset=byte + 1] |= UInt8(code >> (8 - shift))
 
 
-@always_inline
+@inline(.always)
 def _e8m0(bits: UInt8) -> Float64:
     """Decodes an E8M0 scale byte to `2^(bits - 127)` in float64."""
     var exponent = Int(bits) - 127

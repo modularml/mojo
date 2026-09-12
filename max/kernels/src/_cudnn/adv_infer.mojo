@@ -53,7 +53,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -232,7 +232,7 @@ struct cudnnForwardMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_FWD_MODE_INFERENCE:
             return writer.write_string("CUDNN_FWD_MODE_INFERENCE")
@@ -240,7 +240,7 @@ struct cudnnForwardMode_t(
             return writer.write_string("CUDNN_FWD_MODE_TRAINING")
         abort("invalid cudnnForwardMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnForwardMode_t({self})".write_to(writer)
 
@@ -781,7 +781,7 @@ struct cudnnSeqDataAxis_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SEQDATA_TIME_DIM:
             return writer.write_string("CUDNN_SEQDATA_TIME_DIM")
@@ -793,7 +793,7 @@ struct cudnnSeqDataAxis_t(
             return writer.write_string("CUDNN_SEQDATA_VECT_DIM")
         abort("invalid cudnnSeqDataAxis_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSeqDataAxis_t({self})".write_to(writer)
 

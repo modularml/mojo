@@ -237,7 +237,7 @@ struct Batch(TrivialRegisterPassable, Writable):
             ")",
         )
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `Batch` to a writer.
 
@@ -503,9 +503,9 @@ def run(
         If the operation fails.
     """
 
-    @always_inline
+    @inline(.always)
     def benchmark_fn(num_iters: Int) raises {f} -> Int:
-        @always_inline
+        @inline(.always)
         def iter_fn() raises {num_iters, f}:
             for _ in range(num_iters):
                 f()
@@ -524,7 +524,7 @@ def run(
     )
 
 
-@always_inline
+@inline(.always)
 def _run_impl(opts: _RunOptions) raises -> Report:
     var report = Report()
 
@@ -622,7 +622,7 @@ def _is_significant_measurement(
     return False
 
 
-@always_inline
+@inline(.always)
 def _run_impl_fixed(
     timing_fn: Some[def(Int) raises -> Int], fixed_iterations: Int
 ) raises -> Report:

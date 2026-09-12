@@ -120,7 +120,7 @@ struct Fp8WeightLoader[
     # `Fp8WeightLoader.from_kernel_args`.
     var weight: TileTensor[.float8_e4m3fn, Self.w_layout, ImmUntrackedOrigin]
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def from_kernel_args(
         weight: TileTensor[
@@ -139,7 +139,7 @@ struct Fp8WeightLoader[
             )
         )
 
-    @always_inline
+    @inline(.always)
     def load_col_chunk[
         width: Int
     ](self, n: Int, k0: Int) -> SIMD[.float32, width]:
@@ -239,7 +239,7 @@ def fp8_gemv_kernel[
             c.store(Coord(0, n_idx), y)
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_fp8_gemv[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -330,7 +330,7 @@ def fp8_materialize_kernel[
     out_w[n, k] = rebind[out_w.ElementType](wv.cast[out_type]())
 
 
-@always_inline
+@inline(.always)
 def enqueue_fp8_materialize[
     out_type: DType
 ](
@@ -363,7 +363,7 @@ def enqueue_fp8_materialize[
     )
 
 
-@always_inline
+@inline(.always)
 def _enqueue_apple_fp8_materialize_dense[
     c_type: DType,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type],
@@ -441,7 +441,7 @@ def _enqueue_apple_fp8_materialize_dense[
     _ = wdense_dev^
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_fp8_matmul[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,

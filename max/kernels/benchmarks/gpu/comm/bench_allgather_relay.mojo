@@ -74,7 +74,7 @@ comptime PAIR = 2 * GROUP
 comptime dtype = DType.bfloat16
 
 
-@always_inline
+@inline(.always)
 def _pattern(gpu_rank: Int, j: Int) -> Scalar[dtype]:
     # 251 is the largest prime < 256; using a prime avoids power-of-two
     # aliasing between the rank term and the index term.
@@ -193,15 +193,15 @@ def main() raises:
         dtype, type_of(row_major(max_length)), MutAnyOrigin
     ]
 
-    @always_inline
+    @inline(.always)
     def in_tile(rank: Int, length: Int) {imm} -> InTileType:
         return TileTensor(in_ptrs[rank], row_major(length)).as_immut()
 
-    @always_inline
+    @inline(.always)
     def out_tile(rank: Int, src: Int, length: Int) {imm} -> OutTileType:
         return TileTensor(out_ptrs[rank * GROUP + src], row_major(length))
 
-    @always_inline
+    @inline(.always)
     def launch_baseline(
         rank: Int,
         ctx: DeviceContext,
@@ -236,14 +236,14 @@ def main() raises:
 
     comptime sm_version = DeviceContext.default_device_info.version
 
-    @always_inline
+    @inline(.always)
     def table_recipe(length: Int) {imm} -> RelayTuningConfig:
         """The recipe `allgather` would pick for a shard of this size."""
         return dispatch_select_comm_config[
             GROUP, sm_version, allgather_relay_tuning_table
         ](length * size_of[dtype]())
 
-    @always_inline
+    @inline(.always)
     def launch_relay(
         rank: Int,
         ctx: DeviceContext,
@@ -308,7 +308,7 @@ def main() raises:
             rank - pair_base,
         )
 
-    @always_inline
+    @inline(.always)
     def verify(label: String, length: Int) raises {imm}:
         for gpu_idx in range(WORLD):
             var ctx = list_of_ctx[gpu_idx]
@@ -341,7 +341,7 @@ def main() raises:
 
     var times_ms = List[Float64](length=WORLD, fill=0.0)
 
-    @always_inline
+    @inline(.always)
     def measure[
         LaunchType: def(Int, DeviceContext) raises -> None
     ](launch: LaunchType, length: Int) raises {mut times_ms, imm} -> Float64:
@@ -372,7 +372,7 @@ def main() raises:
             slowest = max(slowest, times_ms[rank])
         return slowest
 
-    @always_inline
+    @inline(.always)
     def run_baseline(
         length: Int, max_num_blocks: Optional[Int], label: String
     ) raises {mut times_ms, imm} -> Float64:
@@ -383,7 +383,7 @@ def main() raises:
         verify(label, length)
         return ms
 
-    @always_inline
+    @inline(.always)
     def run_relay(
         length: Int,
         override: Optional[RelayTuningConfig],
@@ -396,7 +396,7 @@ def main() raises:
         verify(label, length)
         return ms
 
-    @always_inline
+    @inline(.always)
     def gbps(length: Int, ms: Float64) {imm} -> Float64:
         return Float64(GROUP * length * size_of[dtype]()) / (ms * 1.0e6)
 

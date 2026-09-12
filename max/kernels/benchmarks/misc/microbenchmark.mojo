@@ -40,7 +40,7 @@ trait Benchmarkable:
         ...
 
 
-@always_inline
+@inline(.always)
 def run[
     T: Benchmarkable
 ](benchmark_obj: T, name: String, num_iters: Int = 10) -> None:

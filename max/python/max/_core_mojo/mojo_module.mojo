@@ -86,7 +86,7 @@ struct PyArrayObject[dtype: DType](ImplicitlyCopyable):
         return num_elts
 
 
-@always_inline
+@inline(.always)
 def _mojo_block_hasher[
     dtype: DType,
     //,
@@ -157,7 +157,7 @@ def mojo_block_hasher(
     return results^
 
 
-@always_inline
+@inline(.always)
 def _mojo_block_hasher_sha256(
     tokens_ptr: Pointer[PyArrayObject[.int32], _],
     block_size: Int,
@@ -211,7 +211,7 @@ def _mojo_block_hasher_sha256(
         )
 
 
-@always_inline
+@inline(.always)
 def _mojo_sha256_oneshot(
     data_ptr: Pointer[PyArrayObject[.uint8], _],
     out_ptr: Pointer[PyArrayObject[.uint8], _],

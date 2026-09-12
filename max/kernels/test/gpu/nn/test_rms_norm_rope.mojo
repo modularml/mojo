@@ -142,7 +142,7 @@ def run_rms_norm_rope_gpu[
     var cos_vals = TileTensor(cos_d, row_major(Coord(shape)))
     var sin_vals = TileTensor(sin_d, row_major(Coord(shape)))
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
@@ -151,7 +151,7 @@ def run_rms_norm_rope_gpu[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def cos_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var cos_vals} -> SIMD[cos_sin_dtype, width]:
@@ -160,7 +160,7 @@ def run_rms_norm_rope_gpu[
             width=width, alignment=alignment * align_of[cos_sin_dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def sin_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var sin_vals} -> SIMD[cos_sin_dtype, width]:
@@ -169,7 +169,7 @@ def run_rms_norm_rope_gpu[
             width=width, alignment=alignment * align_of[cos_sin_dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[output_dtype, width]) {var output_buf} -> None:

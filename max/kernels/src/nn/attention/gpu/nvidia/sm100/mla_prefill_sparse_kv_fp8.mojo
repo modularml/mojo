@@ -313,7 +313,7 @@ struct MLAPrefillSparseFP8[
     # FP8 KV-cache helpers (used by kernel_fp8 only)
     # ------------------------------------------------------------------
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_k_fp8_tma(
         k_tma_op_fp8: TMATensorTile[
@@ -378,7 +378,7 @@ struct MLAPrefillSparseFP8[
                 idx_v4[3],
             )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_k_scales_to_smem[
         scale_block_size: Int
@@ -420,7 +420,7 @@ struct MLAPrefillSparseFP8[
             k_scales_smem_ptr[Int(i)] = scale_val
             i += UInt32(WARPGROUP_SIZE)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def convert_k_fp8_to_bf16[
         scale_block_size: Int
@@ -565,7 +565,7 @@ struct MLAPrefillSparseFP8[
 
         fence_async_view_proxy()
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_v_fp8_tma(
         v_tma_op_fp8: TMATensorTile[
@@ -649,7 +649,7 @@ struct MLAPrefillSparseFP8[
                     idx_v4[3],
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def load_v_scales_to_smem[
         scale_block_size: Int
@@ -702,7 +702,7 @@ struct MLAPrefillSparseFP8[
             v_scales_smem_ptr[Int(i)] = scale_val
             i += UInt32(WARPGROUP_SIZE)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def convert_v_fp8_to_bf16[
         scale_block_size: Int
@@ -1693,7 +1693,7 @@ struct MLAPrefillSparseFP8[
                 )
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_sparse_fp8[
     output_dtype: DType,
     q_type: DType,

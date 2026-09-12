@@ -65,7 +65,7 @@ def random_uniform[
     var strides = shape.get_row_major_strides()
     var delta = Float32(upper_bound - lower_bound)
 
-    @always_inline
+    @inline(.always)
     def generate[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert width <= 4
 

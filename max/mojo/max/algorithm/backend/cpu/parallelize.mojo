@@ -29,7 +29,7 @@ from max.gpu.host import DeviceContext
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def sync_parallelize[
     FuncType: def(Int) raises -> None,
 ](func: FuncType, num_work_items: Int, ctx: Optional[DeviceContext] = None):
@@ -57,7 +57,7 @@ def sync_parallelize[
     # parent. Otherwise parent_id will be zero.
     var parent_id = tracing.get_current_trace_id[TraceLevel.THREAD]()
 
-    @always_inline
+    @inline(.always)
     def func_wrapped(i: Int) {imm}:
         with FlushDenormals():
             try:
@@ -81,7 +81,7 @@ def sync_parallelize[
         abort(String(e))
 
 
-@always_inline
+@inline(.always)
 def parallelize[
     FuncType: def(Int) -> None,
 ](func: FuncType, num_work_items: Int, ctx: Optional[DeviceContext] = None):
@@ -99,7 +99,7 @@ def parallelize[
     _parallelize_impl(func, num_work_items, parallelism_level(ctx), ctx)
 
 
-@always_inline
+@inline(.always)
 def parallelize[
     FuncType: def(Int) -> None,
 ](
@@ -123,7 +123,7 @@ def parallelize[
     _parallelize_impl(func, num_work_items, num_workers, ctx)
 
 
-@always_inline
+@inline(.always)
 def _parallelize_impl[
     FuncType: def(Int) -> None,
 ](
@@ -150,7 +150,7 @@ def _parallelize_impl[
 
     # We coalesce consecutive groups of work items into a single dispatch by
     # using the coarse_grained_func below.
-    @always_inline
+    @inline(.always)
     def coarse_grained_func(
         thread_idx: Int,
     ) {imm func, imm chunk_size, imm extra_items,}:
@@ -168,7 +168,7 @@ def _parallelize_impl[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _get_num_workers(
     problem_size: Int,
     grain_size: Int = 32768,
@@ -231,7 +231,7 @@ def parallelize_over_rows[
     )
     var chunk_size = ceildiv(num_rows, num_workers)
 
-    @always_inline
+    @inline(.always)
     def task_func(
         task_id: Int,
     ) {imm func, imm chunk_size, imm num_rows,}:

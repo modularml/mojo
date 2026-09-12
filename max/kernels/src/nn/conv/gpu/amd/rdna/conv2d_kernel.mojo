@@ -56,7 +56,7 @@ comptime SMEM_PAD = 8
 # =========================================================================
 
 
-@always_inline
+@inline(.always)
 def _load_im2col_a_tile[
     dtype: DType,
     BLOCK_M: Int,
@@ -137,7 +137,7 @@ def _load_im2col_a_tile[
 # =========================================================================
 
 
-@always_inline
+@inline(.always)
 def _load_b_tile_to_smem[
     dtype: DType,
     tile_layout: TensorLayout,

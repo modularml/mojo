@@ -173,7 +173,7 @@ def _test_rope_ragged_gpu_impl[
 
     var q_out_device_tensor = TileTensor(q_out_device_buffer, q_layout)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {
@@ -419,7 +419,7 @@ def test_rope_ragged_gpu_rope_first[
         prefix_out_device_buffer, prefix_layout
     )
 
-    @always_inline
+    @inline(.always)
     def full_output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {
@@ -427,7 +427,7 @@ def test_rope_ragged_gpu_rope_first[
     } -> None:
         full_out_device_tensor.store[width=width](Coord(idx), val)
 
-    @always_inline
+    @inline(.always)
     def prefix_output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {

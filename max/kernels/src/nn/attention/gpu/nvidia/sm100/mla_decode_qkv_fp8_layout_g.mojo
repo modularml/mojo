@@ -253,7 +253,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
     #   local_lo  = max(global_lo - kv_start_row, 0)
     #   tile_skip = local_lo // BN_QK
     @staticmethod
-    @always_inline
+    @inline(.always)
     def sliding_window_tile_skip(
         offset_position: OffsetPosition[
             Self.config,
@@ -280,7 +280,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
     # Each lane owns one row x (BN_QK/4) cols register-resident; per-row
     # max/sum reduces in registers, then cross-warp via SMEM exchange.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def Softmax_Layout_G[
         num_sp_stages: Int,
     ](
@@ -756,7 +756,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
     #   col = mma_round * BN_PV + slot * (BN_PV // 2) + half_idx * BK_PV
     # Layout G's per-warp stripes are contiguous (vs. interleaved in E).
     @staticmethod
-    @always_inline
+    @inline(.always)
     def Output_Store_Layout_G(
         out_pipeline: OutPipeline[
             num_out_stages=DecodeOutProducer[
@@ -889,7 +889,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
     # across the WG because all 4 warps see the same scale_value after
     # the softmax 4-way SMEM exchange.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def Correction_Layout_G(
         tmem_addr: UInt32,
         o_bars: DecodeSM100MiscMBars[
@@ -1404,7 +1404,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
     # Load: TMA Q (FP8) and TMA KV (FP8). Cloned from the Layout E sibling;
     # TMA descriptors are config-driven so the BM=32 shapes flow through.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.kv_type,
@@ -1539,7 +1539,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
 
     # MMA QK: Q(FP8) x K(FP8) -> S(TMEM). M=32, N=64, K=576 (18 K-mmas).
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.fp8_type]],
@@ -1619,7 +1619,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
 
     # MMA PV: P(FP8) x V(FP8) -> O(TMEM). M=32, N=256, K=64 (2 K-mmas).
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.fp8_type]],

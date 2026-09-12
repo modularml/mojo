@@ -379,7 +379,7 @@ def _run_shaped[
     var out_ptr = out_d.unsafe_ptr()
     var out_idx_ptr = out_idx_d.unsafe_ptr()
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var in_buf} -> SIMD[dtype, width]:
@@ -390,7 +390,7 @@ def _run_shaped[
             ](idx)
         )
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[dtype, width]) {var out_ptr, var shape}:
@@ -404,7 +404,7 @@ def _run_shaped[
             row, rebind[SIMD[rd_type, width]](val)
         )
 
-    @always_inline
+    @inline(.always)
     def idx_output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[idx_type, width]) {var out_idx_ptr, var shape}:

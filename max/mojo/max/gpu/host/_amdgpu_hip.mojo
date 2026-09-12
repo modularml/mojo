@@ -43,7 +43,7 @@ comptime hipModule_t = OptionalPointer[_ihipModule_t, UntrackedOrigin[mut=True]]
 # Accessor function to get access to the underlying hipDevice_t from an abstract DeviceContext.
 # Use `var hip_dev: hipDevice_t = HIP(ctx)` where ctx is a `DeviceContext` to get access to the
 # underlying hipDevice_t.
-@always_inline
+@inline(.always)
 def HIP(ctx: DeviceContext) raises -> hipDevice_t:
     var result = hipDevice_t()
     # const char *AsyncRT_DeviceContext_hip_device(hipDevice_t *result, const DeviceContext *ctx)
@@ -58,7 +58,7 @@ def HIP(ctx: DeviceContext) raises -> hipDevice_t:
 
 # Accessor function to get access to the underlying hipStream_t from an abstract DeviceStream.
 # Use `var hip_stream: hipStream_t = HIP(ctx.stream())` where ctx is a `DeviceContext` to get access to the underlying hipStream_t.
-@always_inline
+@inline(.always)
 def HIP(stream: DeviceStream) raises -> hipStream_t:
     var result = hipStream_t()
     # const char *AsyncRT_DeviceStream_hip_stream(hipStream_t *result, const DeviceStream *stream)
@@ -75,7 +75,7 @@ def HIP(stream: DeviceStream) raises -> hipStream_t:
 
 
 # Accessor function to get access to the underlying hipModule_t from a DeviceFunction.
-@always_inline
+@inline(.always)
 def HIP_MODULE(func: DeviceFunction) raises -> hipModule_t:
     var result = hipModule_t()
     # const char *AsyncRT_DeviceFunction_hip_module(hipModule_t *result, const DeviceFunction *func)

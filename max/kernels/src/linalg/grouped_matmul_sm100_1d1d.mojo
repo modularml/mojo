@@ -123,7 +123,7 @@ from std.math.uutils import ufloordiv
 comptime WarpRole = _WarpRole[has_scheduler=False]
 
 
-@always_inline
+@inline(.always)
 def copy_accum_to_gmem[
     c_type: DType,
     c_tile_rank: Int,
@@ -642,7 +642,7 @@ def copy_accum_to_gmem[
             named_barrier[Int32(num_output_warps * WARP_SIZE)]()
 
 
-@always_inline
+@inline(.always)
 def multi_stage_store_C[
     c_type: DType,
     c_tile_rank: Int,
@@ -886,7 +886,7 @@ struct B200BlockScaledMatmulSmem[
     var tmem_addr: Array[UInt32, 1]
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -1163,7 +1163,7 @@ def load_AB[
             )
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -2549,7 +2549,7 @@ def grouped_matmul_dynamic_scaled_nvfp4[
     if num_active_experts == 0:
         return
 
-    @always_inline
+    @inline(.always)
     def description_fn() {var c, var a, imm} -> String:
         # fmt: off
         return String(

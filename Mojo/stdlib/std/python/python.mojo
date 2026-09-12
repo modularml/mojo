@@ -91,7 +91,7 @@ struct Python(Defaultable, ImplicitlyCopyable):
             to=cpython
         ).unsafe_origin_cast[ImmStaticOrigin]()
 
-    @always_inline
+    @inline(.always)
     def cpython(self) -> ref[ImmStaticOrigin] CPython:
         """Handle to the low-level C API of the CPython interpreter present in
         the current process.
@@ -471,7 +471,7 @@ struct Python(Defaultable, ImplicitlyCopyable):
             _ = cpy.PyTuple_SetItem(tup_ptr, i, values[i].steal_data())
         return PythonObject(from_owned=tup_ptr)
 
-    @no_inline
+    @inline(.never)
     def as_string_slice(self, obj: PythonObject) -> StringSlice[ImmutAnyOrigin]:
         """Return a string representing the given Python object.
 

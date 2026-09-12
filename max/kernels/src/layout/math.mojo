@@ -33,7 +33,7 @@ from layout import (
 from std.utils.index import IndexList
 
 
-@always_inline
+@inline(.always)
 def outer_product_acc(
     res: LayoutTensor[mut=True, ...],
     lhs: LayoutTensor,
@@ -81,7 +81,7 @@ def outer_product_acc(
             ) * rebind[res.element_type](rhs[j].cast[dtype]())
 
 
-@always_inline
+@inline(.always)
 def _reduce[
     axis: Int,
     init_func: def[dtype: DType, width: Int]() thin -> SIMD[dtype, width],
@@ -139,7 +139,7 @@ def _reduce[
             outp[j] = reduce_val
 
 
-@always_inline
+@inline(.always)
 def sum[axis: Int](inp: LayoutTensor, outp: LayoutTensor[mut=True, ...]):
     """Computes sum reduction along specified axis.
 
@@ -193,7 +193,7 @@ def sum[axis: Int](inp: LayoutTensor, outp: LayoutTensor[mut=True, ...]):
     _reduce[axis, sum_init, sum_func](inp, outp)
 
 
-@always_inline
+@inline(.always)
 def max[axis: Int](inp: LayoutTensor, outp: LayoutTensor[mut=True, ...]):
     """Computes maximum reduction along specified axis.
 
@@ -234,7 +234,7 @@ def _reduce_res_row_major_shape(axis: Int, in_layout: Layout) -> Layout:
     return Layout.row_major(res_shape)
 
 
-@always_inline
+@inline(.always)
 def max[
     axis: Int
 ](
@@ -275,7 +275,7 @@ def max[
     return res_tensor
 
 
-@always_inline
+@inline(.always)
 def max[
     dtype: DType, layout: Layout
 ](
@@ -312,7 +312,7 @@ def max[
     return res_tensor
 
 
-@always_inline
+@inline(.always)
 def sum[
     axis: Int,
 ](
@@ -370,7 +370,7 @@ def mean(src: LayoutTensor) raises -> Scalar[src.dtype]:
     assert src.size() != 0, "input must not be empty"
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_1d[
         dtype_: DType, width: Int
     ](idx: Int) capturing -> SIMD[dtype_, width]:
@@ -416,7 +416,7 @@ def mean[
 
     comptime if dst.dtype.is_integral():
 
-        @always_inline
+        @inline(.always)
         def normalize_integral[simd_width: Int](idx: Int) {var dst_1d, var n}:
             var idx_1d = dst_1d.runtime_layout(
                 RuntimeTuple[IntTuple(UNKNOWN_VALUE)](idx)
@@ -429,7 +429,7 @@ def mean[
     else:
         var n_recip = Scalar[dst.dtype](1) / Scalar[src.dtype](n)
 
-        @always_inline
+        @inline(.always)
         def normalize_floating[
             simd_width: Int
         ](idx: Int) {var dst_1d, var n, var n_recip}:
@@ -463,7 +463,7 @@ def variance(
         May raise on GPU targets when a device error occurs.
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn_1d[
         dtype_: DType, width: Int
@@ -494,7 +494,7 @@ def variance(src: TileTensor, correction: Int = 1) raises -> Scalar[src.dtype]:
         May raise on GPU targets when a device error occurs.
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn_1d[
         dtype_: DType, width: Int
@@ -524,7 +524,7 @@ def mean(src: TileTensor) raises -> Scalar[src.dtype]:
     assert src.num_elements() != 0, "input must not be empty"
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn_1d[
         dtype_: DType, width: Int
     ](idx: Int) capturing -> SIMD[dtype_, width]:

@@ -43,12 +43,12 @@ from std.utils._ansi import Color, Text
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _assert_error[T: Writable](msg: T, loc: SourceLocation) -> Error:
     return Error(loc.prefix(t"AssertionError: {msg}"))
 
 
-@always_inline
+@inline(.always)
 def assert_true[
     T: Boolable, //
 ](
@@ -74,7 +74,7 @@ def assert_true[
         raise _assert_error(msg, location.or_else(call_location()))
 
 
-@always_inline
+@inline(.always)
 def assert_false[
     T: Boolable, //
 ](
@@ -100,7 +100,7 @@ def assert_false[
         raise _assert_error(msg, location.or_else(call_location()))
 
 
-@always_inline
+@inline(.always)
 def assert_equal[
     T: Equatable & Writable,
     //,
@@ -143,7 +143,7 @@ def assert_equal[
 #   Once Mojo supports parametric traits, implement Equatable for
 #   StringSlice such that string slices with different origin types can be
 #   compared, then drop this overload.
-@always_inline
+@inline(.always)
 def assert_equal[
     O1: ImmOrigin, O2: ImmOrigin
 ](
@@ -182,7 +182,7 @@ def assert_equal[
         )
 
 
-@always_inline
+@inline(.always)
 def assert_equal(
     lhs: StringSlice,
     rhs: StringSlice,
@@ -210,7 +210,7 @@ def assert_equal(
         )
 
 
-@always_inline
+@inline(.always)
 def assert_equal_pyobj(
     lhs: PythonObject,
     rhs: PythonObject,
@@ -239,7 +239,7 @@ def assert_equal_pyobj(
         )
 
 
-@always_inline
+@inline(.always)
 def assert_not_equal[
     T: Equatable & Writable,
     //,
@@ -274,7 +274,7 @@ def assert_not_equal[
         )
 
 
-@always_inline
+@inline(.always)
 def assert_almost_equal[
     dtype: DType, size: SIMDLength
 ](
@@ -334,7 +334,7 @@ def assert_almost_equal[
         raise _assert_error(err, location.or_else(call_location()))
 
 
-@always_inline
+@inline(.always)
 def assert_is[
     T: Identifiable & Writable, //
 ](
@@ -368,7 +368,7 @@ def assert_is[
         )
 
 
-@always_inline
+@inline(.always)
 def assert_is_not[
     T: Identifiable & Writable, //
 ](
@@ -495,7 +495,7 @@ struct assert_raises:
     var call_location: SourceLocation
     """Assigned the value returned by call_locations() at Self.__init__."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, location: Optional[SourceLocation] = None):
         """Construct a context manager with no message pattern.
 
@@ -505,7 +505,7 @@ struct assert_raises:
         self.message_contains = None
         self.call_location = location.or_else(call_location())
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,

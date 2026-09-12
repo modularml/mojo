@@ -34,7 +34,7 @@ from std.itertools import product
 from std.utils.coord import dyn_coord
 
 
-@always_inline
+@inline(.always)
 def map_output_to_input_coord(output_coord: Int, scale: Float32) -> Float32:
     """Map output pixel coordinate to input coordinate using center alignment.
     This implements the standard coordinate mapping for image resizing:
@@ -78,7 +78,7 @@ def cubic_kernel(x: Float32) -> Float32:
         return 0
 
 
-@always_inline
+@inline(.always)
 def cubic_kernel(x: SIMD) -> type_of(x):
     """Cubic interpolation kernel matching PyTorch/torchvision's BICUBIC
     filter.

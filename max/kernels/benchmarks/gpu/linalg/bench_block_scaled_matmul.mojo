@@ -407,7 +407,7 @@ def bench_matmul[
     # Choose a size larger than the two times the L2 cache
     # 128 MiB is larger that twice the L2 cache on the A100, A10, and L4.
     # update: using 512 to be 2x the infinity cache on MI300x
-    @always_inline
+    @inline(.always)
     def get_size(shape: Coord) -> Int:
         return Int(shape[0].value()) * Int(shape[1].value())
 
@@ -487,7 +487,7 @@ def bench_matmul[
             c_row_major=True,
         )
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {
@@ -504,7 +504,7 @@ def bench_matmul[
             cb_b_scales.offset_ptr(iteration), row_major(b_scales_shape)
         )
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(c)
         def test_lambda_add_coords_prod[
             _dtype: DType,
@@ -540,7 +540,7 @@ def bench_matmul[
                 ctx,
             )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 
@@ -720,7 +720,7 @@ def bench_mxfp4_amd[
 
     # Run hipBLASLt on the given tensors. Repacks 2D uint8 scales into
     # 2D LayoutTensors and calls the handle-taking vendor_blas entry.
-    @always_inline
+    @inline(.always)
     def run_vendor_blas(
         ctx: DeviceContext,
         c: TileTensor[mut=True, .float32, ...],
@@ -754,7 +754,7 @@ def bench_mxfp4_amd[
                 c_row_major=True,
             )
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut cb_a, mut cb_b, mut cb_c, mut cb_sfa, mut cb_sfb, imm}:
@@ -772,7 +772,7 @@ def bench_mxfp4_amd[
         else:
             block_scaled_matmul_amd(c_tt, a_tt, b_tt, sfa_tt, sfb_tt, ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut bencher: Bencher) raises {imm}:
         bencher_iter_custom(bencher, kernel_launch, ctx)
 

@@ -108,7 +108,7 @@ def test_matches_one_row_kernel[
     var bias = TileTensor[mut=False](bias_dev, row_major(Coord(Idx[1], Idx[N])))
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c, bias)
     def bias_epilogue[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1

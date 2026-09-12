@@ -925,7 +925,7 @@ struct DStateVecLoader[
     ``contig`` parameter: the caller hoists the runtime ``bc_contig`` branch
     ONCE outside the chunk loop, keeping the fast path a straight-line unrolled
     vec-load loop (a per-chunk runtime branch measured ~18% slower on M5). Every
-    method is ``@always_inline``. The vectorized fast path (unit innermost
+    method is ``@inline(.always)``. The vectorized fast path (unit innermost
     stride) serves every row-major caller; a non-unit stride selects the exact
     v1 scalar gather/scatter, so the result is bit-identical for any layout.
 
@@ -994,7 +994,7 @@ struct DStateVecLoader[
         self.pool_contig = pool_dstate_stride == 1
         self.bc_contig = (b_dstate_stride == 1) and (c_dstate_stride == 1)
 
-    @always_inline
+    @inline(.always)
     def load_state(
         self,
         mut state: Array[SIMD[.float32, Self.VEC], Self.NCHUNK],
@@ -1021,7 +1021,7 @@ struct DStateVecLoader[
                     ).cast[.float32]()
                 state[c] = chunk
 
-    @always_inline
+    @inline(.always)
     def load_bc[
         c: Int, contig: Bool
     ](
@@ -1059,7 +1059,7 @@ struct DStateVecLoader[
                     self.C.raw_load(c_base + UInt32(n * self.c_dstate_stride))
                 ).cast[.float32]()
 
-    @always_inline
+    @inline(.always)
     def store_state(
         self,
         state: Array[SIMD[.float32, Self.VEC], Self.NCHUNK],

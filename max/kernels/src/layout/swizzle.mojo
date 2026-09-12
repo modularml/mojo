@@ -232,7 +232,7 @@ from .layout import Layout
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def shiftr(a: Scalar, s: Scalar[a.dtype]) -> Scalar[a.dtype]:
     """Shift right/left based on sign of shift for scalars.
 
@@ -249,7 +249,7 @@ def shiftr(a: Scalar, s: Scalar[a.dtype]) -> Scalar[a.dtype]:
     return a >> s if s > 0 else a << -s
 
 
-@always_inline
+@inline(.always)
 def shiftl(a: Scalar, s: Scalar[a.dtype]) -> Scalar[a.dtype]:
     """Shift left/right based on sign of shift for scalars.
 
@@ -315,7 +315,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
     var zzz_mask: Int
     """Mask for the target bits."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, bits: Int, base: Int, shift: Int):
         """Initialize a Swizzle object.
 
@@ -344,7 +344,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
             self.base - min(self.shift, 0)
         )
 
-    @always_inline
+    @inline(.always)
     def __call__(self, index: IntTuple) -> Int:
         """Apply swizzle to an IntTuple index.
 
@@ -359,7 +359,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
         """
         return self.__call__(index.value())
 
-    @always_inline
+    @inline(.always)
     def __call__(self, offset: Int) -> Int:
         """Apply swizzle to an integer offset.
 
@@ -374,7 +374,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
         """
         return offset ^ shiftr(offset & self.yyy_mask, self.shift)
 
-    @always_inline
+    @inline(.always)
     def __call__(self, offset: Scalar) -> Scalar[offset.dtype]:
         """Apply swizzle to a scalar offset.
 
@@ -392,7 +392,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
             Scalar[offset.dtype](self.shift),
         )
 
-    @always_inline
+    @inline(.always)
     def size(self) -> Int:
         """Get the size of the swizzle pattern.
 
@@ -404,7 +404,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
         """
         return 1 << (self.bits + self.base + abs(self.shift))
 
-    @always_inline
+    @inline(.always)
     def cosize(self) -> Int:
         """Get the cosize of the swizzle pattern.
 
@@ -428,7 +428,7 @@ struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
         writer.write("(", self.bits, ",", self.base, ",", self.shift, ")")
 
 
-@always_inline
+@inline(.always)
 def make_ldmatrix_swizzle[
     dtype: DType, row_size: Int, log2_vector_width: Int = 0
 ]() -> Swizzle:
@@ -473,7 +473,7 @@ def make_ldmatrix_swizzle[
     return Swizzle(bits, log2_vector_width, shifts)
 
 
-@always_inline
+@inline(.always)
 def make_swizzle[num_rows: Int, row_size: Int, access_size: Int]() -> Swizzle:
     """Create a 2D swizzle to avoid bank conflicts.
 
@@ -497,7 +497,7 @@ def make_swizzle[num_rows: Int, row_size: Int, access_size: Int]() -> Swizzle:
     return Swizzle(bits, base, shifts)
 
 
-@always_inline
+@inline(.always)
 def make_swizzle[dtype: DType, mode: TensorMapSwizzle]() -> Swizzle:
     """Create swizzle based on predefined swizzle modes.
 
@@ -545,7 +545,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
     var layout_b: Swizzle
     """The swizzle to apply."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, var layout_a: Layout, layout_b: Swizzle):
         """Initialize ComposedLayout with a layout and swizzle.
 
@@ -559,7 +559,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         self.layout_a = layout_a^
         self.layout_b = layout_b
 
-    @always_inline
+    @inline(.always)
     def __call__(self, idx: IntTuple) -> Int:
         """Apply composed layout to an index.
 
@@ -574,7 +574,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         var offset_val = Self.offset.value() if Self.offset else 0
         return self.layout_b(offset_val + self.layout_a(idx))
 
-    @always_inline
+    @inline(.always)
     def __call__(self, idx: IntTuple, offset_val: Int) -> Int:
         """Apply composed layout with runtime offset.
 
@@ -593,7 +593,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         ), "Static offset set; runtime offset not allowed."
         return self.layout_b(offset_val + self.layout_a(idx))
 
-    @always_inline
+    @inline(.always)
     def size(self) -> Int:
         """Get the size of the composed layout.
 
@@ -604,7 +604,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         """
         return self.layout_a.size()
 
-    @always_inline
+    @inline(.always)
     def cosize(self) -> Int:
         """Get the cosize of the composed layout.
 
@@ -616,7 +616,7 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         return self.layout_b.cosize()
 
 
-@always_inline
+@inline(.always)
 def eval_composed[
     composed_layout: ComposedLayout
 ](idx: Int, offset: Int = 0) -> Int:

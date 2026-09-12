@@ -170,7 +170,7 @@ comptime allgather_relay_tuning_table = Table(
 )
 
 
-@always_inline
+@inline(.always)
 def _allgather_naive[
     dtype: DType,
     ngpus: Int,
@@ -434,7 +434,7 @@ def _allgather_tma_kernel[
         )
 
 
-@always_inline
+@inline(.always)
 def _allgather_p2p_tma[
     dtype: DType,
     ngpus: Int,
@@ -678,7 +678,7 @@ def _allgather_relay_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def _allgather_p2p_relay[
     dtype: DType,
     ngpus: Int,
@@ -793,7 +793,7 @@ def _allgather_p2p_relay[
     )
 
 
-@always_inline
+@inline(.always)
 def _allgather_p2p[
     dtype: DType,
     rank: Int,
@@ -1007,7 +1007,7 @@ def _allgather_p2p[
     )
 
 
-@always_inline
+@inline(.always)
 def allgather[
     dtype: DType,
     ngpus: Int,

@@ -29,7 +29,7 @@ from max.algorithm.functional import _get_start_indices_of_nth_subvolume
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_cpu[
     simd_width: Int,
     FuncType: def[width: Int, alignment: Int = 1](Coord) -> None,
@@ -54,7 +54,7 @@ def _elementwise_impl_cpu[
     impl[simd_width](func, shape, ctx)
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_cpu_1d[
     simd_width: Int,
     FuncType: def[width: Int, alignment: Int = 1](Coord) -> None,
@@ -81,13 +81,13 @@ def _elementwise_impl_cpu_1d[
     var num_workers = _get_num_workers(problem_size, ctx=ctx)
     var chunk_size = ceildiv(problem_size, num_workers)
 
-    @always_inline
+    @inline(.always)
     def task_func(i: Int) {imm}:
         var start_offset = i * chunk_size
         var end_offset = min((i + 1) * chunk_size, problem_size)
         var len = end_offset - start_offset
 
-        @always_inline
+        @inline(.always)
         def func_wrapper[
             simd_width: Int
         ](idx: Int) {imm start_offset, imm func,}:
@@ -99,7 +99,7 @@ def _elementwise_impl_cpu_1d[
     sync_parallelize(task_func, num_workers, ctx)
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_cpu_nd[
     simd_width: Int,
     FuncType: def[width: Int, alignment: Int = 1](Coord) -> None,
@@ -138,7 +138,7 @@ def _elementwise_impl_cpu_nd[
     var parallelism_size = total_size // SIMDLength(shape[rank - 1].value())
     var chunk_size = ceildiv(parallelism_size, num_workers)
 
-    @always_inline
+    @inline(.always)
     def task_func(i: Int) {imm}:
         var start_parallel_offset = i * chunk_size
         var end_parallel_offset = min((i + 1) * chunk_size, parallelism_size)
@@ -149,7 +149,7 @@ def _elementwise_impl_cpu_nd[
 
         var indices = IndexList[rank]()
 
-        @always_inline
+        @inline(.always)
         def func_wrapper_nd[
             simd_width: Int
         ](idx: Int) {mut indices, imm func, imm}:

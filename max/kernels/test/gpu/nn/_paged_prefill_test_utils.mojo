@@ -85,7 +85,7 @@ comptime ROPE_SCALE_BLOCK_IDX = HEAD_DIM_GRAN - 1  # 8 — the block holding rop
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def paged_block_elems(
     total_pages: Int, page_size: Int, head_size: Int = CACHE_DEPTH
 ) -> Int:
@@ -98,19 +98,19 @@ def paged_block_elems(
     return total_pages * NUM_LAYERS * page_size * KV_NUM_HEADS * head_size
 
 
-@always_inline
+@inline(.always)
 def page_stride(page_size: Int, head_size: Int = CACHE_DEPTH) -> Int:
     """Per-page element stride in the paged block array."""
     return NUM_LAYERS * page_size * KV_NUM_HEADS * head_size
 
 
-@always_inline
+@inline(.always)
 def token_stride(head_size: Int = CACHE_DEPTH) -> Int:
     """Per-token element stride within a page."""
     return KV_NUM_HEADS * head_size
 
 
-@always_inline
+@inline(.always)
 def lut_max_pages_per_batch(num_keys: Int, page_size: Int) -> Int:
     """LUT row stride (pages-per-batch padded to multiple of 8).
 
@@ -858,7 +858,7 @@ def run_test_paged_prefill[
 # contiguously per-token.
 
 
-@always_inline
+@inline(.always)
 def paged_scale_block_elems(
     total_pages: Int, page_size: Int, head_dim_gran: Int = HEAD_DIM_GRAN
 ) -> Int:
@@ -870,7 +870,7 @@ def paged_scale_block_elems(
     return total_pages * NUM_LAYERS * page_size * KV_NUM_HEADS * head_dim_gran
 
 
-@always_inline
+@inline(.always)
 def scale_page_stride(
     page_size: Int, head_dim_gran: Int = HEAD_DIM_GRAN
 ) -> Int:
@@ -878,13 +878,13 @@ def scale_page_stride(
     return NUM_LAYERS * page_size * KV_NUM_HEADS * head_dim_gran
 
 
-@always_inline
+@inline(.always)
 def scale_token_stride(head_dim_gran: Int = HEAD_DIM_GRAN) -> Int:
     """Per-token element stride within a page in the paged scales array."""
     return KV_NUM_HEADS * head_dim_gran
 
 
-@always_inline
+@inline(.always)
 def _palette_scale(idx: Int) -> Float32:
     """Pick a non-uniform scale from a tight 8-entry palette centered
     around 1.0.

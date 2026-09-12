@@ -33,14 +33,14 @@ def main():
 ```
 
 Example using `call_location()` for a custom assertion that reports the
-caller's location. Note that `@always_inline` is required for `call_location()`
+caller's location. Note that `@inline(.always)` is required for `call_location()`
 to work - the function must be inlined so the compiler can capture the caller's
 location:
 
 ```mojo
 from std.reflection import call_location
 
-@always_inline  # Required for call_location() to work
+@inline(.always)  # Required for call_location() to work
 def my_assert(cond: Bool, msg: String = "assertion failed") raises:
     if not cond:
         raise Error(call_location().prefix(msg))
@@ -91,7 +91,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
     var _file_name: StaticString
     """The file name."""
 
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def __init__(out self, line: Int, col: Int, file_name: StaticString):
         """Constructs a `SourceLocation` from line, column, and file name.
@@ -110,7 +110,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         self._col = col
         self._file_name = file_name
 
-    @always_inline
+    @inline(.always)
     def line(self) -> Int:
         """Returns the 1-indexed line number.
 
@@ -119,7 +119,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         """
         return self._line
 
-    @always_inline
+    @inline(.always)
     def column(self) -> Int:
         """Returns the 1-indexed column number.
 
@@ -128,7 +128,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         """
         return self._col
 
-    @always_inline
+    @inline(.always)
     def file_name(self) -> StaticString:
         """Returns the file name.
 
@@ -137,7 +137,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         """
         return self._file_name
 
-    @no_inline
+    @inline(.never)
     def prefix[T: Writable](self, msg: T) -> String:
         """Returns the given message prefixed with the source location.
 
@@ -165,7 +165,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
     comptime _LineByteOffset = reflect[Self].field_offset[name="_line"]()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def write_niche(memory: MutPointer[MaybeUninit[Self], _]):
         memory.unsafe_bitcast[Byte]().unsafe_offset(
@@ -173,7 +173,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         ).unsafe_bitcast[Int]().write(Self._LineNiche)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def isa_niche(memory: ImmPointer[MaybeUninit[Self], _]) -> Bool:
         return (
@@ -184,7 +184,7 @@ struct SourceLocation(TrivialRegisterPassable, UnsafeSingleNicheable, Writable):
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def source_location() -> SourceLocation:
     """Returns the location for where this function is called.
 
@@ -222,19 +222,19 @@ def source_location() -> SourceLocation:
     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def call_location[*, inline_count: Int = 1]() -> SourceLocation:
     """Returns the location for where the caller of this function is called.
 
     An optional `inline_count` parameter can be specified to skip over that many
     levels of calling functions.
 
-    This should only be used when enclosed in a series of `@always_inline` or
-    `@always_inline("nodebug")` function calls, where the layers of calling
+    This should only be used when enclosed in a series of `@inline(.always)` or
+    `@inline(.nodebug)` function calls, where the layers of calling
     functions is no fewer than `inline_count`.
 
     For example, when `inline_count = 1`, only the caller of this function needs
-    to be `@always_inline` or `@always_inline("nodebug")`. This function will
+    to be `@inline(.always)` or `@inline(.nodebug)`. This function will
     return the source location of the caller's invocation.
 
     When `inline_count = 2`, the caller of the caller of this function also
@@ -256,7 +256,7 @@ def call_location[*, inline_count: Int = 1]() -> SourceLocation:
     ```mojo
     from std.reflection import call_location
 
-    @always_inline  # Required for call_location() to work
+    @inline(.always)  # Required for call_location() to work
     def assert_positive(value: Int) raises:
         # call_location() returns where assert_positive() was called,
         # not where call_location() itself is called.

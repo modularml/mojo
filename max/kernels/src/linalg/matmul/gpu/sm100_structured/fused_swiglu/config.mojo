@@ -469,7 +469,7 @@ def choose_swiglu_config[
     else:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def select_mma_mn(M: Int, N: Int, _swapAB: Bool = False):
             var N_aligned = align_up(N, 16)
             var max_mma_n = min(N_aligned, 256)

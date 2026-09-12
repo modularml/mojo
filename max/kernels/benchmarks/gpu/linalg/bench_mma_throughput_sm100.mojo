@@ -107,7 +107,7 @@ from std.utils.numerics import get_accum_type
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def mma_ws_cta1[
     kind: UMMAKind,
     //,
@@ -580,7 +580,7 @@ def main() raises:
             num_threads=num_threads,
         ]
 
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {mut sink, imm}:
             ctx.enqueue_function[kernel](
                 a_tma_op,
@@ -594,7 +594,7 @@ def main() raises:
                 ),
             )
 
-        @always_inline
+        @inline(.always)
         def bench_func(mut bencher: Bencher) raises {imm}:
             bencher_iter_custom(bencher, kernel_launch, ctx)
 

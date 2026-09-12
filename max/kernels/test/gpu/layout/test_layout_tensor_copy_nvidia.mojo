@@ -279,7 +279,7 @@ def run_swizzle_copy_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def masked_async_copy_kernel[
     layout: Layout, num_rows: Int
 ](input: LayoutTensor[.float32, layout, MutAnyOrigin]):
@@ -406,7 +406,7 @@ def run_masked_async_copy_tests(ctx: DeviceContext) raises:
 # ----------------------------------------------------------------------
 
 
-@always_inline
+@inline(.always)
 def masked_copy_kernel[
     layout: Layout, num_rows: Int
 ](input: LayoutTensor[.float32, layout, MutAnyOrigin]):
@@ -524,7 +524,7 @@ def run_masked_copy_tests(ctx: DeviceContext) raises:
     ](ctx)
 
 
-@always_inline
+@inline(.always)
 def masked_copy_dram_to_local_kernel[
     layout: Layout, num_rows: Int
 ](

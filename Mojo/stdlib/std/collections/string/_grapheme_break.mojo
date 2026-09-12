@@ -42,7 +42,7 @@ from std.collections import Span
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _is_safe_ascii_for_grapheme(b: Byte) -> Bool:
     """Return `True` if byte `b` is in the safe-ASCII range for grapheme
     iteration.
@@ -91,7 +91,7 @@ comptime INCB_LINKER: UInt8 = 3
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _range_lookup[
     starts_table: Array[UInt32, _],
     values_table: Array[UInt8, _],
@@ -132,7 +132,7 @@ def _range_lookup[
     return values[lo - 1]
 
 
-@always_inline
+@inline(.always)
 def _gbp_lookup(cp: UInt32) -> UInt8:
     """Look up the Grapheme Break Property for a codepoint.
 
@@ -153,7 +153,7 @@ def _gbp_lookup(cp: UInt32) -> UInt8:
     return _range_lookup[_GBP_RANGE_STARTS, _GBP_RANGE_VALUES, GBP_OTHER](cp)
 
 
-@always_inline
+@inline(.always)
 def _incb_lookup(cp: UInt32) -> UInt8:
     """Look up the Indic_Conjunct_Break property for a codepoint.
 
@@ -215,7 +215,7 @@ struct _GraphemeBreakState(ImplicitlyCopyable):
         self.in_incb_conjunct = False
 
 
-@always_inline
+@inline(.always)
 def _reset_grapheme_state_to_other(mut state: _GraphemeBreakState):
     """Mutate `state` to the configuration after consuming an `Other`
     codepoint.
@@ -231,7 +231,7 @@ def _reset_grapheme_state_to_other(mut state: _GraphemeBreakState):
     state.seen_incb_linker = False
 
 
-@always_inline
+@inline(.always)
 def _is_grapheme_break(mut state: _GraphemeBreakState, cp: UInt32) -> Bool:
     """Determine if there is a grapheme cluster boundary before `cp`.
 
@@ -362,7 +362,7 @@ def _is_grapheme_break(mut state: _GraphemeBreakState, cp: UInt32) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _decode_previous_codepoint(
     span: ImmSpan[Byte, _], end: Int
 ) -> Tuple[UInt32, Int]:

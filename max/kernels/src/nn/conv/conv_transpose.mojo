@@ -96,7 +96,7 @@ from .conv_utils import (
 #       StarGAN, CycleGAN-and-pix2pix, Mask-RCNN are covered by this version.
 
 
-@always_inline
+@inline(.always)
 def conv_transpose_naive[
     dtype: DType,
 ](
@@ -195,7 +195,7 @@ def conv_transpose_naive[
                                         )
 
 
-@always_inline
+@inline(.always)
 def conv_transpose_shape[
     dtype: DType,
     strides_type: DType,
@@ -273,7 +273,7 @@ def conv_transpose_shape[
     output_shape[input.rank - 1] = output_channels
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def compute_output_spatial_dim(
         input_spatial_dim: Int,
         kernel_spatial_dim: Int,
@@ -592,7 +592,7 @@ struct ConvTransposedPacked[
 
         sync_parallelize(task_func, num_tasks, ctx)
 
-    @always_inline
+    @inline(.always)
     def _zero_output(self, n: Int, g: Int):
         """Zero the output buffer."""
         comptime simd_size = simd_width_of[Self.output_type]()
@@ -607,7 +607,7 @@ struct ConvTransposedPacked[
 
         for _ in range(num_rows):
 
-            @always_inline
+            @inline(.always)
             def zero[width: Int](offset: Int) {output_ptr, mut}:
                 output_ptr.store(offset, SIMD[Self.output_type, width](0))
 
@@ -668,7 +668,7 @@ struct ConvTransposedPacked[
         comptime simd_size = simd_width_of[Self.output_type]()
         comptime micro_kernel_f_size = micro_kernel_width * simd_size
 
-        @always_inline
+        @inline(.always)
         def f_tile_iteration[
             size: Int
         ](f_tile_offset: Int, f_tile_size: Int) {imm}:
@@ -719,7 +719,7 @@ struct ConvTransposedPacked[
                 c_tile_size,
             )
 
-    @always_inline
+    @inline(.always)
     def input_space_loop[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -826,7 +826,7 @@ struct ConvTransposedPacked[
                 right_pad_impact_start,
             )
 
-    @always_inline
+    @inline(.always)
     def input_space_loop_2d[
         output_dt: DType,
         input_dt: DType,
@@ -873,7 +873,7 @@ struct ConvTransposedPacked[
 
             # TODO(MOCO-4664): `var h` copy-captures the loop variable to work
             # around wrong debug-info scopes on implicit nested-scope captures.
-            @always_inline
+            @inline(.always)
             def work_fn[
                 height: Int, effected_by_padding: Bool
             ](w: Int) {var h, mut input_base, mut output_base, imm}:
@@ -915,7 +915,7 @@ struct ConvTransposedPacked[
             _ = input_base
             _ = output_base
 
-    @always_inline
+    @inline(.always)
     def input_space_loop_3d[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -969,7 +969,7 @@ struct ConvTransposedPacked[
                 # TODO(MOCO-4664): `var d`/`var h` copy-capture the loop
                 # variables to work around wrong debug-info scopes on
                 # implicit nested-scope captures.
-                @always_inline
+                @inline(.always)
                 def work_fn[
                     height: Int, effected_by_padding: Bool
                 ](w: Int) {var d, var h, mut input_base, mut output_base, imm}:
@@ -1013,7 +1013,7 @@ struct ConvTransposedPacked[
                 _ = input_base
                 _ = output_base
 
-    @always_inline
+    @inline(.always)
     def apply_epilogue(self, n: Int, g: Int):
         comptime simd_size = simd_width_of[Self.output_type]()
 
@@ -1054,7 +1054,7 @@ struct ConvTransposedPacked[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def update_w_tile_2d[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -1170,7 +1170,7 @@ def update_w_tile_2d[
             )
 
 
-@always_inline
+@inline(.always)
 def update_w_tile_3d[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -1294,7 +1294,7 @@ def update_w_tile_3d[
                 )
 
 
-@always_inline
+@inline(.always)
 def accumulate_wo_tile[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -1369,7 +1369,7 @@ def accumulate_wo_tile[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _get_group_filter_base(
     packed_filter: TileTensor, group_idx: Int, f_per_group: Int
 ) -> UnsafePointer[
@@ -1381,7 +1381,7 @@ def _get_group_filter_base(
     return packed_filter.ptr
 
 
-@always_inline
+@inline(.always)
 def pack_filter_shape(
     filter: TileTensor[mut=False, ...], num_groups: Int
 ) -> IndexList[filter.rank + 1]:
@@ -1421,7 +1421,7 @@ def pack_filter_shape(
     return packed_shape
 
 
-@always_inline
+@inline(.always)
 def pack_filter(
     filter: TileTensor[mut=False, ...],
     packed_filter: TileTensor[mut=True, ...],
@@ -1470,7 +1470,7 @@ def pack_filter(
 
         # TODO(MOCO-4664): `var g` copy-captures the loop variable to work
         # around wrong debug-info scopes on implicit nested-scope captures.
-        @always_inline
+        @inline(.always)
         def pack[
             f_tile_size: Int
         ](f_tile_start: Int) {
@@ -1584,7 +1584,7 @@ def conv_transposed_cpu[
         ctx: Optional device context used to query the parallelism level.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         # fmt: off
         return String(
@@ -1653,7 +1653,7 @@ def conv_transposed_cpu[
         )
 
         # The closure updates a row segment of the output.
-        @always_inline
+        @inline(.always)
         @__parameter
         def elementwise_epilogue[
             rank: Int
@@ -1661,7 +1661,7 @@ def conv_transposed_cpu[
             comptime simd_size = simd_width_of[output.dtype]()
             comptime input_rank = input.rank
 
-            @always_inline
+            @inline(.always)
             def body[width: Int](idx: Int) {coords, output, mut}:
                 # Coordinates of the current index.
                 var curr_coords = rebind[IndexList[input_rank]](coords)
@@ -1753,7 +1753,7 @@ def conv_transposed_gpu[
             ctx,
         )
 
-        @always_inline
+        @inline(.always)
         def epilogue_wrapper[
             _width: Int, alignment: Int = 1
         ](coords: Coord) {var}:

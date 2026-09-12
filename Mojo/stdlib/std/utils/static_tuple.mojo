@@ -116,13 +116,13 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[Self.element_type, Self.size]()
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, mlir_value: Self._mlir_type):
         """Constructs from an array type.
 
@@ -132,7 +132,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         _static_tuple_construction_checks[Self.element_type, Self.size]()
         self._mlir_value = mlir_value
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, fill: Self.element_type):
         """Constructs a static tuple given a fill value.
 
@@ -150,7 +150,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
             ]
         ](fill)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *elems: Self.element_type):
         """Constructs a static tuple given a set of arguments.
 
@@ -166,7 +166,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         comptime for idx in range(Self.size):
             self[idx] = elems[idx]
 
-    @always_inline
+    @inline(.always)
     def __init__[*values: Self.element_type](out self):
         """Creates a tuple constant using the specified values.
 
@@ -186,7 +186,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         comptime for idx in range(Self.size):
             self[idx] = values[idx]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
 
@@ -195,7 +195,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         """
         return Self.size
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem__[I: Indexer, //](self, idx: I) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
@@ -211,7 +211,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         assert Self.size > index(idx), "index must be within bounds"
         return self._unsafe_ref(index(idx))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __setitem__[I: Indexer, //](mut self, idx: I, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
@@ -225,7 +225,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         assert Self.size > index(idx), "index must be within bounds"
         self._unsafe_ref(index(idx)) = val
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get[index: Int](self) -> Self.element_type:
         """Returns the value of the tuple at the given index.
 
@@ -242,7 +242,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         ](self._mlir_value)
         return val
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _unsafe_ref(ref self, idx: Int) -> ref[self] Self.element_type:
         var ptr = __mlir_op.`pop.array.gep`(
             Pointer(to=self._mlir_value)._get_kgen_pointer(),
@@ -250,7 +250,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         )
         return Pointer[origin=origin_of(self)](_mlir_value=ptr)[]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _replace[idx: Int](self, val: Self.element_type) -> Self:
         """Replaces the value at the specified index.
 
@@ -278,7 +278,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
 
         return Self(mlir_value=array)
 
-    @always_inline
+    @inline(.always)
     def __eq__(
         self, other: Self
     ) -> Bool where conforms_to(
@@ -301,7 +301,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
                 return False
         return True
 
-    @always_inline
+    @inline(.always)
     def __ne__(
         self, other: Self
     ) -> Bool where conforms_to(
@@ -317,7 +317,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         """
         return not (self == other)
 
-    @always_inline
+    @inline(.always)
     def __lt__(
         self, other: Self
     ) -> Bool where conforms_to(
@@ -342,7 +342,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
                 return False
         return False
 
-    @always_inline
+    @inline(.always)
     def __le__(
         self, other: Self
     ) -> Bool where conforms_to(
@@ -359,7 +359,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         """
         return not (other < self)
 
-    @always_inline
+    @inline(.always)
     def __gt__(
         self, other: Self
     ) -> Bool where conforms_to(
@@ -375,7 +375,7 @@ struct StaticTuple[element_type: _StaticTupleTraits, size: Int](
         """
         return other < self
 
-    @always_inline
+    @inline(.always)
     def __ge__(
         self, other: Self
     ) -> Bool where conforms_to(

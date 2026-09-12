@@ -29,7 +29,7 @@ from ._b64encode import _b64encode
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _ascii_to_value(char: Byte) raises -> Byte:
     """Converts an ASCII character to its integer value for base64 decoding.
 
@@ -78,7 +78,7 @@ def _ascii_to_value(char: Byte) raises -> Byte:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def b64encode(input_bytes: ImmSpan[Byte, _], mut result: String):
     """Performs base64 encoding on the input string.
 
@@ -93,7 +93,7 @@ def b64encode(input_bytes: ImmSpan[Byte, _], mut result: String):
     _b64encode(input_bytes, result)
 
 
-@always_inline
+@inline(.always)
 def b64encode(input_string: StringSlice[_]) -> String:
     """Performs base64 encoding on the input string.
 
@@ -106,7 +106,7 @@ def b64encode(input_string: StringSlice[_]) -> String:
     return b64encode(input_string.as_bytes())
 
 
-@always_inline
+@inline(.always)
 def b64encode(input_bytes: ImmSpan[Byte, _]) -> String:
     """Performs base64 encoding on the input string.
 
@@ -126,7 +126,7 @@ def b64encode(input_bytes: ImmSpan[Byte, _]) -> String:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _is_ascii_whitespace(char: Byte) -> Bool:
     """Returns True if `char` is one of the six ASCII whitespace bytes.
 
@@ -149,7 +149,7 @@ def _is_ascii_whitespace(char: Byte) -> Bool:
     return char == ` ` or (char >= `\t` and char <= `\r`)
 
 
-@always_inline
+@inline(.always)
 def _next_significant_byte(
     data: ImmSpan[Byte, _], pos: Int
 ) -> Tuple[Byte, Int]:
@@ -292,7 +292,7 @@ def b16decode(str: StringSlice[_]) raises -> List[Byte]:
     comptime `9` = Byte(ord("9"))
 
     # TODO: Measure perf against lookup table approach
-    @always_inline
+    @inline(.always)
     def decode(c: Byte) raises -> Byte:
         if `0` <= c <= `9`:
             return c - `0`

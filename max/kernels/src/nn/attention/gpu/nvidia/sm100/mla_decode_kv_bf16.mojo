@@ -546,7 +546,7 @@ struct MLA_SM100_Decode_KV_BF16[
     # MLA decoding load_q and load_kv function
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.q_type,
@@ -722,7 +722,7 @@ struct MLA_SM100_Decode_KV_BF16[
     # |__T0__|__T1__|__T2__|__T3__|
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.q_type]],
@@ -794,7 +794,7 @@ struct MLA_SM100_Decode_KV_BF16[
             tile_idx += 1
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.q_type]],

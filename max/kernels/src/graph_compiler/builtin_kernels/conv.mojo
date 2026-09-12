@@ -386,7 +386,7 @@ struct Conv:
         ctx: DeviceContext,
     ) capturing raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output)
         def output_fn[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -575,7 +575,7 @@ struct Conv2dResidualAdd:
         ctx: DeviceContext,
     ) capturing raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(output, bias)
         def output_fn[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -716,7 +716,7 @@ struct ConvTranspose:
             pad_w = Index(paddings[4], paddings[5])
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def output_fn[
             _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
         ](coords: IndexList[_rank], val: SIMD[_dtype, _width]):
@@ -817,7 +817,7 @@ struct LayoutTransformRSFC2FRSCf:
     """Registers the `layout_transform_RSFC_to_FRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_filter_rank: Int
@@ -833,7 +833,7 @@ struct LayoutTransformQRSFC2FQRSCf:
     """Registers the `layout_transform_QRSFC_to_FQRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_filter_rank: Int
@@ -849,7 +849,7 @@ struct PackConvFilterShape:
     """Registers the `pack_conv_filter_shape` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute(filter_buf: InputTensor) raises:
         raise Error("Only meant to be used for shape function!")
@@ -903,7 +903,7 @@ struct LayoutTransformQRSCF2FQRSCf:
     """Registers the `layout_transform_QRSCF_to_FQRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_rank: Int, num_groups: Int
@@ -921,7 +921,7 @@ struct LayoutTransformRSCF2FRSCf:
     """Registers the `layout_transform_RSCF_to_FRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_rank: Int, num_groups: Int
@@ -939,7 +939,7 @@ struct LayoutTransformFCRS2FRSCf:
     """Registers the `layout_transform_FCRS_to_FRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_rank: Int, num_groups: Int
@@ -957,7 +957,7 @@ struct LayoutTransformFCQRS2FQRSCf:
     """Registers the `layout_transform_FCQRS_to_FQRSCf` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, filter_rank: Int, packed_rank: Int, num_groups: Int

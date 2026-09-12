@@ -25,7 +25,7 @@ from std.utils._select import _select_register_value as select
 from std.utils.index import IndexList
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _normalize_and_clamp_dim(start: Int, step: Int, dim_i: Int) -> Int:
     # Normalize the start/stop indices
     var normalized_idx = select(start < 0, start + dim_i, start)
@@ -43,7 +43,7 @@ def _normalize_and_clamp_dim(start: Int, step: Int, dim_i: Int) -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def slice_dim_as_view[
     dtype: DType, dim: Int
 ](
@@ -111,7 +111,7 @@ def slice_dim_as_view[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def slice_as_view[
     dtype: DType,
     start_type: DType,
@@ -194,7 +194,7 @@ def slice_as_view[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def copy_to_slice[
     dtype: DType,
     start_type: DType,
@@ -238,7 +238,7 @@ def copy_to_slice[
 
     var buffer_slice_view = slice_as_view(buffer, start, end, step)
 
-    @always_inline
+    @inline(.always)
     def copy[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         buffer_slice_view.store[width=simd_width](
             idx, in_slice.load[width=simd_width](idx)
@@ -256,7 +256,7 @@ def copy_to_slice[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def slice_as_copy[
     dtype: DType,
     index_type: DType,
@@ -287,7 +287,7 @@ def slice_as_copy[
     var sliced = slice_as_view(tensor, start, end, step)
 
     # Copy lambda sliced view into output buffer.
-    @always_inline
+    @inline(.always)
     def copy[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         output.store[width=simd_width](idx, sliced.load[width=simd_width](idx))
 
@@ -300,7 +300,7 @@ def slice_as_copy[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def slice_shape[
     input_type: DType,
     start_type: DType,

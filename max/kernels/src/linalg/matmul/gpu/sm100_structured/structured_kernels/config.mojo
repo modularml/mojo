@@ -68,7 +68,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
     comptime BLOCK_SCALED_1D2D_FP8 = Self(3)
     """BLOCK_SCALED_1D2D_FP8 type."""
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Convert GEMM kind to an integer value.
 
@@ -77,7 +77,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return Int(self._value)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         """Check if two GEMM kinds are equal.
 
@@ -89,7 +89,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         """Check if two GEMM kinds are not equal.
 
@@ -101,7 +101,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         """
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         """Write the GEMM kind to a writer.
 
@@ -119,7 +119,7 @@ struct GEMMKind(Equatable, Hashable, TrivialRegisterPassable, Writable):
         else:
             writer.write("kind::unknown")
 
-    @always_inline
+    @inline(.always)
     def __str__(self) -> String:
         """Convert GEMM kind to a string."""
         if self == Self.GEMM:
@@ -927,7 +927,7 @@ def choose_config[
     else:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def select_mma_mn(M: Int, N: Int, _swapAB: Bool = False):
             for bm in [64, 128]:
                 var N_aligned = align_up(N, 16)
@@ -1525,7 +1525,7 @@ def choose_block_scaled_config[
     else:
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def select_mma_mn(M: Int, N: Int, _swapAB: Bool = False):
             var N_alignby64 = align_up(N, 64)
             var max_mma_n = min(N_alignby64, 256)

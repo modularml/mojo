@@ -112,14 +112,14 @@ comptime epilogue_func_type = def[
 ](SIMD[dtype, width]) capturing -> SIMD[dtype, width]
 
 
-@always_inline
+@inline(.always)
 def test_epilogue[
     dtype: DType
 ](m: Int, n: Int, val: Scalar[dtype]) -> Scalar[dtype]:
     return val + 4 * (Scalar[dtype]((m + n) % 21 - 10))
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def add_two[
     dtype: DType,
@@ -293,7 +293,7 @@ def bench_grouped_matmul[
     ctx.enqueue_copy(a_offsets_dev_buffer, a_offsets_host_ptr)
     ctx.enqueue_copy(expert_ids_dev_buffer, expert_ids_host_ptr)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_dev)
     @__parameter
     def epilogue_fn[
@@ -405,7 +405,7 @@ def bench_grouped_matmul[
             row_major(Coord(Int64(num_experts))),
         ).as_unsafe_any_origin()
 
-        @always_inline
+        @inline(.always)
         def bench_func_nvfp4(
             mut bench: Bencher,
         ) {
@@ -420,7 +420,7 @@ def bench_grouped_matmul[
             var expert_scales_tt,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 comptime if use_vendor_blas:
                     # TODO: Implement vendor grouped matmul
@@ -584,7 +584,7 @@ def bench_grouped_matmul[
             row_major(Coord(Int64(num_experts))),
         ).as_unsafe_any_origin()
 
-        @always_inline
+        @inline(.always)
         def bench_func_mxf8f6f4(
             mut bench: Bencher,
         ) {
@@ -599,7 +599,7 @@ def bench_grouped_matmul[
             var expert_scales_tt,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 comptime if use_vendor_blas:
                     # TODO: Implement vendor grouped matmul
@@ -708,7 +708,7 @@ def bench_grouped_matmul[
             ctx,
         )
 
-        @always_inline
+        @inline(.always)
         def bench_func_fp8_1d2d(
             mut bench: Bencher,
         ) {
@@ -721,7 +721,7 @@ def bench_grouped_matmul[
             var b_scales_dev,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 comptime if use_vendor_blas:
                     # TODO: Implement vendor grouped matmul
@@ -787,7 +787,7 @@ def bench_grouped_matmul[
         _ = b_scales_dev_buffer^
     else:
 
-        @always_inline
+        @inline(.always)
         def bench_func(
             mut bench: Bencher,
         ) {
@@ -798,7 +798,7 @@ def bench_grouped_matmul[
             var expert_ids_dev,
             imm,
         }:
-            @always_inline
+            @inline(.always)
             def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
                 comptime if use_vendor_blas:
                     # TODO: Implement vendor grouped matmul

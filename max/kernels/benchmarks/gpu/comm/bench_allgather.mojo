@@ -41,7 +41,7 @@ from internal_utils import arg_parse, human_readable_size, CacheBustingBuffer
 from std.testing import assert_true
 
 
-@always_inline
+@inline(.always)
 def _per_gpu_value[dtype: DType](gpu_rank: Int, j: Int) -> Scalar[dtype]:
     # 251 is the largest prime < 256; using a prime avoids power-of-two aliasing.
     return Scalar[dtype](Scalar[dtype](gpu_rank + 1) + Scalar[dtype](j % 251))
@@ -218,11 +218,11 @@ def bench_allgather[
             )
         list_of_ctx[gpu_idx].synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_iter(
         mut bencher: Bencher, ctx: DeviceContext, ctx_idx: Int
     ) raises {mut tt_in, imm}:
-        @always_inline
+        @inline(.always)
         def call_fn(
             ctx_inner: DeviceContext, cache_iter: Int
         ) raises {mut tt_in, imm}:

@@ -184,7 +184,7 @@ def _quantize_a_buffer[
 
         var am_ptr = a.ptr.unsafe_offset(ko)
 
-        @always_inline
+        @inline(.always)
         def process_rows[
             tile_m: Int
         ](m: Int) {mut am_ptr, mut a_quant_ptr, mut a_scale_ptr, imm}:
@@ -348,7 +348,7 @@ def _unpack_weights[
             )
 
 
-@always_inline
+@inline(.always)
 def _scale_and_accumulate[
     group_size: Int,
     b_scale_type: DType,
@@ -370,7 +370,7 @@ def _scale_and_accumulate[
     )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def apply_a_scale[row: Int](a_scale: Float32):
         comptime for col in range(tile_n):
             var dot = c_int32[row, col]
@@ -455,17 +455,17 @@ trait _MatmulQInt4Kernel:
 
 
 struct _MatmulQInt4Kernel_x86_vnni(_MatmulQInt4Kernel):
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_type() -> DType:
         return .uint8
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_tuple_type() -> DType:
         return .int32
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
@@ -543,7 +543,7 @@ struct _MatmulQInt4Kernel_x86_vnni(_MatmulQInt4Kernel):
             a_scale_ptr, b_scale_ptr, c_int32, c_float
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def process_group_unpacked[
         group_size: Int, tile_m: Int, tile_n: Int, simd_width: Int
@@ -591,17 +591,17 @@ struct _MatmulQInt4Kernel_x86_vnni(_MatmulQInt4Kernel):
 
 
 struct _MatmulQInt4Kernel_x86_avx(_MatmulQInt4Kernel):
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_type() -> DType:
         return .uint8
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_tuple_type() -> DType:
         return .int32
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
@@ -699,7 +699,7 @@ struct _MatmulQInt4Kernel_x86_avx(_MatmulQInt4Kernel):
             a_scale_ptr, b_scale_ptr, c_int32, c_float
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def process_group_unpacked[
         group_size: Int, tile_m: Int, tile_n: Int, simd_width: Int
@@ -752,17 +752,17 @@ struct _MatmulQInt4Kernel_x86_avx(_MatmulQInt4Kernel):
 
 
 struct _MatmulQInt4Kernel_neon_dotprod(_MatmulQInt4Kernel):
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_type() -> DType:
         return .int8
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_tuple_type() -> DType:
         return .int32
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
@@ -818,7 +818,7 @@ struct _MatmulQInt4Kernel_neon_dotprod(_MatmulQInt4Kernel):
             a_scale_ptr, b_scale_ptr, c_int32, c_float
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def process_group_unpacked[
         group_size: Int, tile_m: Int, tile_n: Int, simd_width: Int
@@ -862,12 +862,12 @@ struct _MatmulQInt4Kernel_neon_dotprod(_MatmulQInt4Kernel):
 
 
 struct _MatmulQInt4Kernel_neon_i8mm(_MatmulQInt4Kernel):
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_type() -> DType:
         return .int8
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def aq_tuple_type() -> DType:
         return .int64
@@ -905,7 +905,7 @@ struct _MatmulQInt4Kernel_neon_i8mm(_MatmulQInt4Kernel):
             a_ptr, a_scale_ptr, b_ptr, c_float
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def process_group_unpacked[
         group_size: Int, tile_m: Int, tile_n: Int, simd_width: Int
@@ -1024,7 +1024,7 @@ def _matmul_qint4_m_1[
 
         var b_ptr = b.ptr.unsafe_bitcast[Int8]()
 
-        @always_inline
+        @inline(.always)
         def process_cols[tile_n: Int](n_idx: Int) {imm}:
             var n = task_n_start + n_idx * simd_width
 
@@ -1114,7 +1114,7 @@ def _matmul_qint4_m_any[
             # TODO(MOCO-4664): Capture the loop-scoped values by copy to work
             # around the wrong debug-info scope emitted for implicit
             # nested-scope captures, which breaks --debug-level=full builds.
-            @always_inline
+            @inline(.always)
             def process_cols[
                 tile_n: Int
             ](n_idx: Int) {var ko, var ko_count, var ko_group, imm}:
@@ -1166,7 +1166,7 @@ def _matmul_qint4_m_any[
                 var ak_ptr = a_quant.ptr.unsafe_offset(ko * M)
                 var ak_scale_ptr = a_scale.ptr.unsafe_offset(ko_group * M)
 
-                @always_inline
+                @inline(.always)
                 def process_rows[
                     tile_m: Int
                 ](m: Int) {mut ak_scale_ptr, mut ak_ptr, imm}:

@@ -17,7 +17,7 @@ comptime tM = 8
 comptime tN = 4
 
 
-@always_inline
+@inline(.always)
 def clear(C_r: SIMD[.float32, tM * tN]) -> SIMD[.float32, tM * tN]:
     """Clear accumulator array (initialize to zero).
 

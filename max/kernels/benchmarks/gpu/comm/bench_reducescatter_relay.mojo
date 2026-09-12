@@ -86,7 +86,7 @@ comptime dtype = DType.bfloat16
 comptime accum_type = get_accum_type[dtype]()
 
 
-@always_inline
+@inline(.always)
 def _pattern(gpu_rank: Int, j: Int) -> Scalar[accum_type]:
     # Every value has to be exact in `dtype` as well as in the accumulator, or
     # the check's sum of exact patterns would drift from the kernel's sum of
@@ -96,7 +96,7 @@ def _pattern(gpu_rank: Int, j: Int) -> Scalar[accum_type]:
     return Scalar[accum_type](gpu_rank + 1) + Scalar[accum_type](j % 127)
 
 
-@always_inline
+@inline(.always)
 def _res_pattern(group_id: Int, j: Int) -> Scalar[accum_type]:
     """Residual pattern: replicated within a group, distinct between groups."""
     return Scalar[accum_type](j % 31) + Scalar[accum_type](32 * group_id)
@@ -233,17 +233,17 @@ def main() raises:
         dtype, type_of(row_major(max_part)), MutAnyOrigin
     ]
 
-    @always_inline
+    @inline(.always)
     def in_tile(rank: Int, numel: Int) {imm} -> InTileType:
         return TileTensor(in_ptrs[rank], row_major(numel)).as_immut()
 
-    @always_inline
+    @inline(.always)
     def out_tile(rank: Int, numel: Int) {imm} -> OutTileType:
         return TileTensor(out_ptrs[rank], row_major(numel))
 
     comptime sm_version = DeviceContext.default_device_info.version
 
-    @always_inline
+    @inline(.always)
     def table_recipe(part: Int) {imm} -> RelayTuningConfig:
         """The recipe `reducescatter` would pick for this partition size."""
         comptime table = reducescatter_relay_residual_tuning_table if HAS_RESIDUAL else reducescatter_relay_tuning_table
@@ -251,7 +251,7 @@ def main() raises:
             part * size_of[dtype]()
         )
 
-    @always_inline
+    @inline(.always)
     def launch_baseline(
         rank: Int, ctx: DeviceContext, part: Int, max_num_blocks: Optional[Int]
     ) raises {imm}:
@@ -291,7 +291,7 @@ def main() raises:
                 Optional[Int](rank - group_base),
             )
 
-    @always_inline
+    @inline(.always)
     def launch_relay(
         rank: Int,
         ctx: DeviceContext,
@@ -346,7 +346,7 @@ def main() raises:
             rank - pair_base,
         )
 
-    @always_inline
+    @inline(.always)
     def verify(label: String, part: Int) raises {imm}:
         for gpu_idx in range(WORLD):
             var ctx = list_of_ctx[gpu_idx]
@@ -377,7 +377,7 @@ def main() raises:
 
     var times_ms = List[Float64](length=WORLD, fill=0.0)
 
-    @always_inline
+    @inline(.always)
     def measure[
         LaunchType: def(Int, DeviceContext) raises -> None
     ](launch: LaunchType, part: Int) raises {mut times_ms, imm} -> Float64:
@@ -404,7 +404,7 @@ def main() raises:
             slowest = max(slowest, times_ms[rank])
         return slowest
 
-    @always_inline
+    @inline(.always)
     def run_baseline(
         part: Int, max_num_blocks: Optional[Int], label: String
     ) raises {mut times_ms, imm} -> Float64:
@@ -415,7 +415,7 @@ def main() raises:
         verify(label, part)
         return ms
 
-    @always_inline
+    @inline(.always)
     def run_relay(
         part: Int, override: Optional[RelayTuningConfig], label: String
     ) raises {mut times_ms, imm} -> Float64:
@@ -426,7 +426,7 @@ def main() raises:
         verify(label, part)
         return ms
 
-    @always_inline
+    @inline(.always)
     def gbps(part: Int, ms: Float64) {imm} -> Float64:
         return Float64(GROUP * part * size_of[dtype]()) / (ms * 1.0e6)
 

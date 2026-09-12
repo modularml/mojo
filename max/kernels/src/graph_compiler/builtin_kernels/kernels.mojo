@@ -171,7 +171,7 @@ from nn.tpool_patch_merger import (
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def reduce_shape(
     input_buf: Some[Tensor], axis: Int
 ) raises -> IndexList[type_of(input_buf).rank]:
@@ -195,7 +195,7 @@ def reduce_shape(
     return output_shape
 
 
-@always_inline
+@inline(.always)
 def _unsafe_str_to_coord[
     str_slice: StaticString
 ]() -> DynamicCoord[.int64, len(str_slice.split("_"))]:
@@ -253,7 +253,7 @@ struct Range:
         step: Scalar[dtype],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def func[
             width: Int, element_alignment: Int
         ](idx: IndexList[1]) {var start, var step} -> SIMD[dtype, width]:
@@ -309,7 +309,7 @@ struct Copy:
         ctx: DeviceContext,
     ) capturing raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def func[
             width: Int, element_alignment: Int
         ](idx: IndexList[rank]) -> SIMD[dtype, width]:
@@ -819,7 +819,7 @@ struct RandomNormal:
         seed_value: InputTensor[dtype=.uint64, rank=1, ...],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def output_fn[
             _width: SIMDLength,
             _rank: Int,
@@ -896,7 +896,7 @@ struct RandomUniform:
         seed_value: InputTensor[dtype=.uint64, rank=1, ...],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         def output_fn[
             _width: SIMDLength,
             _rank: Int,
@@ -991,7 +991,7 @@ def concat_shape_impl[
     var axis = normalize_neg_index(axis0, rank)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def shape_equal_ignore_axis(
         s1: IndexList[rank], s2: IndexList[rank]
     ) -> Bool:
@@ -1049,7 +1049,7 @@ def concat_from_list_shape_impl[
     var axis = normalize_neg_index(axis0, rank)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def shape_equal_ignore_axis(
         s1: IndexList[rank], s2: IndexList[rank]
     ) -> Bool:
@@ -1266,7 +1266,7 @@ struct IRFFT:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged_kernel_api[
     dtype: DType,
     weight_type: DType,
@@ -1330,7 +1330,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_kernel_api[
     )
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_paged_ragged_kernel_api_bias[
     dtype: DType,
     weight_type: DType,
@@ -1399,7 +1399,7 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_kernel_api_bias[
     )
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_bshd_paged_kernel_api[
     dtype: DType,
     target: StaticString,
@@ -1462,7 +1462,7 @@ struct Struct_rope_split_store_ragged_paged[interleaved: Bool]:
             imag) as in safetensors.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -1519,7 +1519,7 @@ struct Struct_rope_split_store_ragged_paged_with_position_id[interleaved: Bool]:
             imag) as in safetensors.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -1591,7 +1591,7 @@ struct Struct_rope_split_store_ragged_paged_with_position_id[interleaved: Bool]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qk_rope_bshd_paged_ragged_kernel_api[
     dtype: DType,
     freq_dtype: DType,
@@ -1689,7 +1689,7 @@ struct Struct_rope_ragged_paged[interleaved: Bool, rope_first: Bool]:
             than the other way around.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -1705,7 +1705,7 @@ struct Struct_rope_ragged_paged[interleaved: Bool, rope_first: Bool]:
         freqs_cis: InputTensor[dtype=freq_dtype, rank=2, ...],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         @__parameter
         def description_fn() -> String:
             return String(";").join(
@@ -1725,7 +1725,7 @@ struct Struct_rope_ragged_paged[interleaved: Bool, rope_first: Bool]:
                 )
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](idx: IndexList[3], val: SIMD[dtype, width]) {var output} -> None:
@@ -1767,7 +1767,7 @@ struct Struct_rope_ragged_paged_with_position_id[interleaved: Bool]:
             imag) as in safetensors.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1783,7 +1783,7 @@ struct Struct_rope_ragged_paged_with_position_id[interleaved: Bool]:
         position_ids: InputTensor[dtype=.uint32, rank=2, ...],
         ctx: DeviceContext,
     ) capturing raises:
-        @always_inline
+        @inline(.always)
         @__parameter
         def description_fn() -> String:
             return String(";").join(
@@ -1803,7 +1803,7 @@ struct Struct_rope_ragged_paged_with_position_id[interleaved: Bool]:
                 )
             )
 
-        @always_inline
+        @inline(.always)
         def output_fn[
             width: SIMDLength, alignment: Int
         ](idx: IndexList[3], val: SIMD[dtype, width]) {var output} -> None:
@@ -1844,7 +1844,7 @@ struct Struct_rope_ragged_paged_with_position_id[interleaved: Bool]:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _unmarshal_mha_decode_dispatch_metadata(
     mha_decode_dispatch_metadata: InputTensor[dtype=.int64, rank=1, ...],
 ) -> MHADecodeDispatchMetadata:
@@ -1856,7 +1856,7 @@ def _unmarshal_mha_decode_dispatch_metadata(
     )
 
 
-@always_inline
+@inline(.always)
 def _execute_mha_ragged_paged_scalar_args[
     q_dtype: DType,
     //,
@@ -1934,7 +1934,7 @@ def _execute_mha_ragged_paged_scalar_args[
         )
 
 
-@always_inline
+@inline(.always)
 def _execute_mha_ragged_paged_rel_logits[
     q_dtype: DType,
     //,
@@ -2036,7 +2036,7 @@ struct Struct_moe_create_indices:
     """Registers the `mo.moe.create.indices` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -2065,7 +2065,7 @@ struct Struct_moe_router_group_limited:
     """Registers the `mo.moe.router.group.limited` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2087,7 +2087,7 @@ struct Struct_moe_router_group_limited:
         context: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def scores_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[scores_type, width]:
@@ -2120,7 +2120,7 @@ struct Struct_moe_create_indices_with_scales_offset:
     """Registers the `mo.moe.create.indices.with.scales.offset` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -2151,7 +2151,7 @@ struct Struct_moe_single_group_router_eplb:
     """Registers the `mo.moe.single.group.router.eplb` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2178,7 +2178,7 @@ struct Struct_moe_single_group_router_eplb:
         context: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def scores_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[scores_type, width]:
@@ -2216,7 +2216,7 @@ struct Struct_moe_single_group_router:
     """Registers the `mo.moe.single.group.router` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2236,7 +2236,7 @@ struct Struct_moe_single_group_router:
         context: DeviceContext,
     ) raises:
         @__parameter
-        @always_inline
+        @inline(.always)
         def scores_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[scores_type, width]:
@@ -2267,7 +2267,7 @@ struct Struct_moe_sink_gate_router:
     """Registers the `mo.moe.sink.gate.router` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2309,7 +2309,7 @@ struct Struct_moe_sink_gate_router:
 struct Struct_moe_eplb_remap:
     """Registers the `mo.moe.eplb.remap` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2394,7 +2394,7 @@ struct PackConvTransposeFilterShape:
     """Registers the `pack_conv_transpose_filter_shape` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         rank: Int,
@@ -2570,7 +2570,7 @@ struct Struct_fused_token_sampling:
     """Registers the `sampler.fused_token_sampling` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2654,7 +2654,7 @@ struct Struct_fused_token_sampling_with_dist:
     `sampler.fused_token_sampling` rather than an optional output on it.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2710,7 +2710,7 @@ struct Struct_topk_topp_masked_probs:
     tensor, so nothing is sorted and no distribution is rebuilt in-graph.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2755,7 +2755,7 @@ struct Struct_gumbel_argmax_from_probs:
     draft positions share one noise row.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -2783,7 +2783,7 @@ struct Struct_gumbel_argmax_from_probs:
 struct Struct_min_p_sampling:
     """Registers the `min_p_sampling` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2822,7 +2822,7 @@ struct Struct_sampler_apply_penalties:
     """Registers the `sampler.apply_penalties` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         logit_type: DType,
@@ -2857,7 +2857,7 @@ struct Struct_sampler_update_frequency_data:
     """Registers the `sampler.update_frequency_data` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         token_type: DType,
@@ -2887,7 +2887,7 @@ struct Struct_sampler_update_frequency_data:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _check_signal_buffer_size(
     signal_buffer_size: Int, input_size_bytes: Int
 ) raises:
@@ -2991,7 +2991,7 @@ struct BundledAllReduceSum:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def output_lambda[
             _dtype: DType,
@@ -3150,7 +3150,7 @@ struct EaglePrefillShiftTokens:
     """Registers the `mo.eagle_prefill_shift_tokens` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -3183,7 +3183,7 @@ struct Learnable2DInterpPosEmb:
     """Registers the `learnable_2d_interp_pos_emb` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -3215,7 +3215,7 @@ struct Learnable2DInterpPosEmb:
 struct SpatialMerge:
     """Registers the `mo.spatial_merge` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -3245,7 +3245,7 @@ struct SpatialMerge:
 struct TPoolPatchMerger:
     """Registers the `tpool_patch_merger` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -3936,7 +3936,7 @@ struct Mamba2SSDChunkScanVarlenFwd[dt_softplus: Bool = True]:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def launch_cpu[DSTATE_VAL: Int]() raises:
             mamba2_ssd_chunk_scan_varlen_fwd_cpu[dtype, DSTATE_VAL](
                 nheads,
@@ -3971,7 +3971,7 @@ struct Mamba2SSDChunkScanVarlenFwd[dt_softplus: Bool = True]:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def launch_gpu[DSTATE_VAL: Int]() raises:
             comptime BLOCK_SIZE = 64
             var num_p_blocks = ceildiv(head_dim, BLOCK_SIZE)
@@ -4240,7 +4240,7 @@ struct Mamba2SSDChunkScanVarlenFwdInplace[dt_softplus: Bool = True]:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def launch_cpu[DSTATE_VAL: Int]() raises:
             # The CPU kernel stores fp32 state only; bf16 state is wired on
             # the Apple GPU kernel alone. The `comptime if` keeps the bf16
@@ -4291,7 +4291,7 @@ struct Mamba2SSDChunkScanVarlenFwdInplace[dt_softplus: Bool = True]:
                 )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def launch_gpu[DSTATE_VAL: Int]() raises:
             # NVIDIA B200 (sm_100) gets the cooperative DSTATE-split
             # decode-occupancy variant (r7); every other device (AMD MI355
@@ -4768,7 +4768,7 @@ struct CausalConv1DVarlenFwd[
             var silu_activation_int8 = Int8(silu_activation)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def launch_gpu[kWidth: Int]() raises:
                 # Prefill/mixed segments (at least one sequence has >1
                 # token) route to the grid-z sequence-tiled kernel; pure

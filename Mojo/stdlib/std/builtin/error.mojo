@@ -67,7 +67,7 @@ struct StackTrace(ImplicitlyCopyable, Movable, Writable):
         )
 
     @staticmethod
-    @no_inline
+    @inline(.never)
     def collect_if_enabled(depth: Int = 0) -> Optional[StackTrace]:
         """Collect a stack trace if enabled by configuration.
 
@@ -162,7 +162,7 @@ struct Error(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, var value: String, *, depth: Int = -1):
         """Construct an Error object with a given String.
@@ -175,7 +175,7 @@ struct Error(
         self._error = value^
         self._stack_trace = StackTrace.collect_if_enabled(depth)
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, value: StringLiteral):
         """Construct an Error object with a given string literal.
@@ -187,7 +187,7 @@ struct Error(
         self._stack_trace = StackTrace.collect_if_enabled(0)
 
     @implicit
-    @no_inline
+    @inline(.never)
     def __init__[*Ts: Writable](out self, *args: *Ts):
         """Construct an Error by concatenating a sequence of Writable arguments.
 
@@ -204,7 +204,7 @@ struct Error(
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """
         Formats this error to the provided Writer.
@@ -214,7 +214,7 @@ struct Error(
         """
         self._error.write_to(writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """
         Formats this error to the provided Writer.

@@ -436,7 +436,7 @@ struct LayoutTensor[
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericAddressSpaceLayoutTensor,
         span: Span[Scalar[Self.dtype], Self.origin],
@@ -451,7 +451,7 @@ struct LayoutTensor[
         """
         self = Self.GenericAddressSpaceLayoutTensor(span.unsafe_ptr())
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericAddressSpaceLayoutTensor,
         span: Span[Scalar[Self.dtype], Self.origin],
@@ -472,7 +472,7 @@ struct LayoutTensor[
             span.unsafe_ptr(), runtime_layout
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericAddressSpaceLayoutTensor,
         span: Span[Scalar[Self.dtype], Self.origin],
@@ -496,7 +496,7 @@ struct LayoutTensor[
             span.unsafe_ptr(), runtime_layout, element_runtime_layout
         )
 
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def __init__(
         out self,
@@ -508,7 +508,7 @@ struct LayoutTensor[
     ):
         self = Self(unsafe_ptr._unsafe_nullable())
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         unsafe_ptr: Pointer[
@@ -537,7 +537,7 @@ struct LayoutTensor[
         self.runtime_layout = {}
         self.runtime_element_layout = {}
 
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def __init__(
         out self,
@@ -550,7 +550,7 @@ struct LayoutTensor[
     ):
         self = Self(unsafe_ptr._unsafe_nullable(), runtime_layout)
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         unsafe_ptr: Pointer[
@@ -580,7 +580,7 @@ struct LayoutTensor[
         ]()
         self.runtime_element_layout = {}
 
-    @always_inline
+    @inline(.always)
     @doc_hidden
     def __init__(
         out self,
@@ -598,7 +598,7 @@ struct LayoutTensor[
             element_runtime_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         unsafe_ptr: Pointer[
@@ -640,7 +640,7 @@ struct LayoutTensor[
     ]
     """LayoutTensor type with generic address space."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] device_buffer: DeviceBuffer[Self.dtype],
@@ -694,7 +694,7 @@ struct LayoutTensor[
             .unsafe_origin_cast[Self.origin]()
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] host_buffer: HostBuffer[Self.dtype],
@@ -729,7 +729,7 @@ struct LayoutTensor[
             unsafe_cast[origin=Self.origin](host_ptr),
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] device_buffer: DeviceBuffer[Self.dtype],
@@ -755,7 +755,7 @@ struct LayoutTensor[
             runtime_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] host_buffer: HostBuffer[Self.dtype],
@@ -781,7 +781,7 @@ struct LayoutTensor[
             runtime_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] device_buffer: DeviceBuffer[Self.dtype],
@@ -807,7 +807,7 @@ struct LayoutTensor[
             element_runtime_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self: Self.GenericLayoutTensorType,
         ref[Self.origin] host_buffer: HostBuffer[Self.dtype],
@@ -874,7 +874,7 @@ struct LayoutTensor[
         self.runtime_layout = other.runtime_layout
         self.runtime_element_layout = other.runtime_element_layout
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __merge_with__[
         other_type: type_of(
             LayoutTensor[
@@ -942,7 +942,7 @@ struct LayoutTensor[
         element_layout: The element layout for the result tensor.
     """
 
-    @always_inline
+    @inline(.always)
     def bitcast[
         new_dtype: DType,
         /,
@@ -1000,7 +1000,7 @@ struct LayoutTensor[
     """Mutable LayoutTensor type with MutAnyOrigin."""
     comptime _AsMut = Self.OriginCastType[mut=True, _]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def as_unsafe_any_origin(
         self,
     ) -> type_of(self).OriginCastType[UnsafeAnyOrigin[mut=Self.mut]]:
@@ -1023,7 +1023,7 @@ struct LayoutTensor[
         }
 
     @doc_hidden
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @deprecated(use=as_unsafe_any_origin)
     def as_any_origin(
         self,
@@ -1049,7 +1049,7 @@ struct LayoutTensor[
         address_space: The target address space for the result tensor.
     """
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def address_space_cast[
         target_address_space: AddressSpace = Self.address_space,
     ](self) -> Self.AddressSpaceCastType[target_address_space]:
@@ -1068,7 +1068,7 @@ struct LayoutTensor[
             self.runtime_element_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def as_imm(
         self,
     ) -> Self.OriginCastType[ImmOrigin(Self.origin)]:
@@ -1084,7 +1084,7 @@ struct LayoutTensor[
             self.runtime_element_layout,
         }
 
-    @always_inline
+    @inline(.always)
     @deprecated(use=as_imm)
     def get_immutable(
         self,
@@ -1097,7 +1097,7 @@ struct LayoutTensor[
         """
         return self.as_imm()
 
-    @always_inline
+    @inline(.always)
     def _offset(self, m: Int, n: Int) -> Int:
         """Calculate the memory offset for a 2D tensor element.
 
@@ -1112,7 +1112,7 @@ struct LayoutTensor[
         """
         return self._offset(Index(m, n))
 
-    @always_inline
+    @inline(.always)
     def _offset(self, coords: IndexList) -> Int:
         """Calculate the memory offset for a tensor element.
 
@@ -1153,7 +1153,7 @@ struct LayoutTensor[
 
         return offset
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def ptr_at_offset(
         self, coords: IndexList
     ) -> Pointer[
@@ -1170,7 +1170,7 @@ struct LayoutTensor[
 
         return self.ptr + self._offset(coords)
 
-    @always_inline
+    @inline(.always)
     def _elementwise_unary[
         func: def(Self.element_type) capturing -> (Self.element_type),
     ](self) -> Self:
@@ -1205,7 +1205,7 @@ struct LayoutTensor[
             )
         return self
 
-    @always_inline
+    @inline(.always)
     def _elementwise_binary_with_broadcast[
         other_mut: Bool,
         //,
@@ -1321,7 +1321,7 @@ struct LayoutTensor[
             )
         return self
 
-    @always_inline
+    @inline(.always)
     def __add__(
         self, other: Scalar[Self.dtype]
     ) -> Self.OriginCastType[MutAnyOrigin]:
@@ -1351,7 +1351,7 @@ struct LayoutTensor[
 
         return self._stack_copy()._elementwise_unary[add_val]()
 
-    @always_inline
+    @inline(.always)
     def __iadd__(self, other: Scalar[Self.dtype]):
         """Add a scalar value to each element of the tensor in-place.
 
@@ -1372,7 +1372,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_unary[add_val]()
 
-    @always_inline
+    @inline(.always)
     def __add__[
         other_layout: Layout
     ](
@@ -1421,7 +1421,7 @@ struct LayoutTensor[
             other
         )
 
-    @always_inline
+    @inline(.always)
     def __iadd__[
         other_layout: Layout
     ](
@@ -1463,7 +1463,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_binary_with_broadcast[add_val](other)
 
-    @always_inline
+    @inline(.always)
     def __mul__(
         self, other: Scalar[Self.dtype]
     ) -> Self.OriginCastType[MutAnyOrigin]:
@@ -1493,7 +1493,7 @@ struct LayoutTensor[
 
         return self._stack_copy()._elementwise_unary[mul_val]()
 
-    @always_inline
+    @inline(.always)
     def __mul__[
         other_layout: Layout
     ](
@@ -1546,7 +1546,7 @@ struct LayoutTensor[
             other
         )
 
-    @always_inline
+    @inline(.always)
     def __imul__(self, other: Scalar[Self.dtype]):
         """Multiply each element of the tensor by a scalar value in-place.
 
@@ -1568,7 +1568,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_unary[mul_val]()
 
-    @always_inline
+    @inline(.always)
     def __imul__[
         other_layout: Layout
     ](
@@ -1612,7 +1612,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_binary_with_broadcast[mul_val](other)
 
-    @always_inline
+    @inline(.always)
     def __sub__(
         self, other: Scalar[Self.dtype]
     ) -> Self.OriginCastType[MutAnyOrigin]:
@@ -1642,7 +1642,7 @@ struct LayoutTensor[
 
         return self._stack_copy()._elementwise_unary[sub_val]()
 
-    @always_inline
+    @inline(.always)
     def __sub__[
         other_layout: Layout,
     ](
@@ -1691,7 +1691,7 @@ struct LayoutTensor[
             other
         )
 
-    @always_inline
+    @inline(.always)
     def __isub__(self, other: Scalar[Self.dtype]):
         """Subtract a scalar value from each element of the tensor in-place.
 
@@ -1713,7 +1713,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_unary[sub_val]()
 
-    @always_inline
+    @inline(.always)
     def __isub__[
         other_layout: Layout
     ](
@@ -1754,7 +1754,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_binary_with_broadcast[sub_val](other)
 
-    @always_inline
+    @inline(.always)
     def __truediv__(
         self, other: Scalar[Self.dtype]
     ) -> Self.OriginCastType[MutAnyOrigin]:
@@ -1790,7 +1790,7 @@ struct LayoutTensor[
 
         return self._stack_copy()._elementwise_unary[div_val]()
 
-    @always_inline
+    @inline(.always)
     def __truediv__[
         other_layout: Layout
     ](
@@ -1869,7 +1869,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_unary[div_val]()
 
-    @always_inline
+    @inline(.always)
     def __itruediv__[
         other_layout: Layout
     ](
@@ -1915,7 +1915,7 @@ struct LayoutTensor[
 
         _ = self._elementwise_binary_with_broadcast[div_val](other)
 
-    @always_inline
+    @inline(.always)
     def __exp__(self) -> Self:
         """Computes element-wise exponential function.
 
@@ -1942,7 +1942,7 @@ struct LayoutTensor[
             self.runtime_element_layout,
         }
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _load_offset(
         self, offset: Scalar[Self.linear_idx_type]
     ) -> Self.element_type:
@@ -1963,7 +1963,7 @@ struct LayoutTensor[
             .element_data
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _load_scalar_offset(
         self, offset: Scalar[Self.linear_idx_type]
     ) -> Scalar[Self.dtype]:
@@ -1981,7 +1981,7 @@ struct LayoutTensor[
         """
         return self._load_offset(offset)[0]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem__[*Tys: Indexer](self, *args: *Tys) -> Self.element_type:
         """Retrieves a single element from the tensor at the specified indices.
 
@@ -2035,7 +2035,7 @@ struct LayoutTensor[
         var offset = Self._get_offset[rank=arg_count](strides, index_list)
         return self._load_offset(Scalar[Self.linear_idx_type](offset))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem__(self, crd: RuntimeTuple) -> Self.element_type:
         """Retrieves a single element from the tensor at the specified indices.
 
@@ -2053,7 +2053,7 @@ struct LayoutTensor[
         var offset = self.runtime_layout(crd)
         return self._load_offset(offset)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load_scalar[*Tys: Indexer](self, *args: *Tys) -> Scalar[Self.dtype]:
         """Retrieves a single scalar from the tensor at the specified indices.
 
@@ -2097,7 +2097,7 @@ struct LayoutTensor[
         var offset = Self._get_offset[rank=arg_count](strides, index_list)
         return self._load_scalar_offset(Scalar[Self.linear_idx_type](offset))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load_scalar(self, crd: RuntimeTuple) -> Scalar[Self.dtype]:
         """Retrieves a single scalar from the tensor at the specified coordinates.
 
@@ -2116,7 +2116,7 @@ struct LayoutTensor[
         var offset = self.runtime_layout(crd)
         return self._load_scalar_offset(offset)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __setitem__[
         *Tys: Indexer
     ](self, *args: *Tys, val: Self.element_type) where Self.mut:
@@ -2165,7 +2165,7 @@ struct LayoutTensor[
             val, self.runtime_element_layout
         ).store(self.ptr.unsafe_mut_cast[True]() + offset)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load[
         width: Int,
         load_alignment: Int = Self.alignment,
@@ -2228,7 +2228,7 @@ struct LayoutTensor[
             width=width, alignment=load_alignment, non_temporal=non_temporal
         ](self._offset(m, n))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def load[
         width: Int,
         load_alignment: Int = Self.alignment,
@@ -2276,7 +2276,7 @@ struct LayoutTensor[
             width=width, alignment=load_alignment, non_temporal=non_temporal
         ](self._offset(coords))
 
-    @always_inline
+    @inline(.always)
     def prefetch(self, m: Int, n: Int):
         """Prefetch tensor data at the specified 2D coordinates into cache.
 
@@ -2309,7 +2309,7 @@ struct LayoutTensor[
             self.ptr + self._offset(m, n)
         )
 
-    @always_inline
+    @inline(.always)
     def prefetch(self, coords: IndexList):
         """Prefetch tensor data at the specified coordinates into cache.
 
@@ -2341,7 +2341,7 @@ struct LayoutTensor[
             self.ptr + self._offset(coords)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def aligned_load[
         width: Int
     ](self, m: Int, n: Int) -> SIMD[Self.dtype, width]:
@@ -2385,7 +2385,7 @@ struct LayoutTensor[
             self._offset(m, n)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def aligned_load[
         width: Int
     ](self, coords: IndexList[...]) -> SIMD[Self.dtype, width]:
@@ -2434,7 +2434,7 @@ struct LayoutTensor[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def store[
         width: SIMDLength, store_alignment: Int = Self.alignment
     ](
@@ -2512,7 +2512,7 @@ struct LayoutTensor[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def store[
         width: SIMDLength, store_alignment: Int = Self.alignment
     ](
@@ -2558,7 +2558,7 @@ struct LayoutTensor[
         )
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def aligned_store[
         width: SIMDLength
     ](self: Self._AsMut, m: Int, n: Int, val: SIMD[Self.dtype, width]):
@@ -2601,7 +2601,7 @@ struct LayoutTensor[
         comptime _alignment = align_of[SIMD[Self.dtype, width]]()
         return self.ptr.store[alignment=_alignment](self._offset(m, n), val)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def size(self) -> Int:
         """
         Get the total number of elements that the tensor can contain.
@@ -2617,7 +2617,7 @@ struct LayoutTensor[
             return self.runtime_layout.size()
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def stack_allocation[
         *, stack_alignment: Int = Self.alignment
     ]() -> Self.StackTensorType:
@@ -2680,7 +2680,7 @@ struct LayoutTensor[
         )
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def null() -> Self.StackTensorType:
         """
         Returns a null `LayoutTensor` object.
@@ -2703,7 +2703,7 @@ struct LayoutTensor[
     ]
     """LayoutTensor type for stack-allocated tensors."""
 
-    @always_inline
+    @inline(.always)
     def to_device_buffer(self, ctx: DeviceContext) -> DeviceBuffer[Self.dtype]:
         """Convert the tensor to a `DeviceBuffer`.
 
@@ -2723,7 +2723,7 @@ struct LayoutTensor[
             owning=False,
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _stack_copy(
         self,
     ) -> Self.StackTensorType:
@@ -2744,7 +2744,7 @@ struct LayoutTensor[
         return copy._elementwise_binary_with_broadcast[self_value](self)
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _to_static[
         t: IntTuple, element_type: DType
     ]() -> IndexList[len(t), element_type=element_type]:
@@ -2756,7 +2756,7 @@ struct LayoutTensor[
         return st
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _get_rank_stride_offset(rank_idx: Int) -> Int:
         var offset = 0
         for i in range(rank_idx):
@@ -2764,7 +2764,7 @@ struct LayoutTensor[
         return offset
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _get_rank_offset[
         num_strides: Int, rank: Int, //, rank_idx: Int
     ](stride: IndexList[num_strides, ...], vals: IndexList[rank, ...]) -> Int:
@@ -2776,7 +2776,7 @@ struct LayoutTensor[
         return 0
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _expand_indices(
         ridx: Self.idx_list_t[Self.rank],
     ) -> Self.idx_list_t[Self.num_strides]:
@@ -2814,7 +2814,7 @@ struct LayoutTensor[
         return eidx
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _get_offset[
         rank: Int,
     ](
@@ -2845,7 +2845,7 @@ struct LayoutTensor[
             offset += Scalar[Self.linear_idx_type](idxs[i] * stride[i])
         return Int(offset)
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def is_static_shape[idx: Int]() -> Bool where idx != UNKNOWN_VALUE:
         """Returns the whether the specified dimension is statically known.
@@ -2876,7 +2876,7 @@ struct LayoutTensor[
         ]()
         return shape[idx] != UNKNOWN_VALUE
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def shape[idx: Int]() -> Int where idx != UNKNOWN_VALUE:
         """Returns the size of the tensor along the specified dimension.
@@ -2912,7 +2912,7 @@ struct LayoutTensor[
         ]()
         return shape[idx]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_shape(self) -> IndexList[Self.rank]:
         """Get the flattened shape of a LayoutTensor.
 
@@ -2923,7 +2923,7 @@ struct LayoutTensor[
             self.runtime_layout.shape.value.canonicalize()
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def get_stride(self) -> IndexList[Self.rank]:
         """Get the flattened stride of a LayoutTensor.
 
@@ -2934,7 +2934,7 @@ struct LayoutTensor[
             self.runtime_layout.stride.value.canonicalize()
         )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def stride[idx: Int]() -> Int where idx != UNKNOWN_VALUE:
         """Returns the memory stride of the tensor along the specified
@@ -2979,7 +2979,7 @@ struct LayoutTensor[
         ]()
         return stride[idx]
 
-    @always_inline
+    @inline(.always)
     def dim(self, idx: Int) -> Int:
         """Returns the runtime dimension size of the tensor along the specified
         axis.
@@ -3008,7 +3008,7 @@ struct LayoutTensor[
 
         return self.runtime_layout.shape.value[idx]
 
-    @always_inline
+    @inline(.always)
     def stride(self, idx: Int) -> Int:
         """Returns the runtime stride of the tensor along the specified
         axis.
@@ -3037,7 +3037,7 @@ struct LayoutTensor[
 
         return self.runtime_layout.stride.value[idx]
 
-    @always_inline
+    @inline(.always)
     def dim[idx: Int](self) -> Int:
         """Returns the dimension size of the tensor along the specified
         axis.
@@ -3101,7 +3101,7 @@ struct LayoutTensor[
         element_layout: The element layout for the coalesced tensor.
     """
 
-    @always_inline
+    @inline(.always)
     def coalesce(self) -> Self.CoalesceType[Self.element_layout]:
         """Creates a tensor with a coalesced memory layout from this tensor.
 
@@ -3203,7 +3203,7 @@ struct LayoutTensor[
         return zipped_divide(materialize[Self.layout](), tiler)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _prop_unknown_shape[idx: Int, src: Layout, target: Layout]() -> Layout:
         """Propagate all unknown dim from target to a new layout."""
         var new_shape = src.shape
@@ -3244,7 +3244,7 @@ struct LayoutTensor[
             tensor.
     """
 
-    @always_inline
+    @inline(.always)
     def tile[
         *tile_sizes: Int
     ](self, *tile_coords: Int) -> self.TileType[*tile_sizes]:
@@ -3370,7 +3370,7 @@ struct LayoutTensor[
         tile_size: The size of the tile along the tiled axis.
     """
 
-    @always_inline
+    @inline(.always)
     def simd_tile[
         tile_size: Int
     ](self, tile_idx: Int) -> Self.SIMDTileType[tile_size]:
@@ -3394,7 +3394,7 @@ struct LayoutTensor[
     ]
     """Index list type for corner coordinates."""
 
-    @always_inline
+    @inline(.always)
     def tile_with_offset[
         *tile_sizes: Int,
     ](
@@ -3513,7 +3513,7 @@ struct LayoutTensor[
         axis: The axis along which to iterate.
     """
 
-    @always_inline
+    @inline(.always)
     def tiled_iterator[
         *tile_sizes: Int,
         axis: Int = 0,
@@ -3720,7 +3720,7 @@ struct LayoutTensor[
         axis: The axis along which to split.
     """
 
-    @always_inline
+    @inline(.always)
     def split[
         count: Int,
         axis: Int = 0,
@@ -3791,7 +3791,7 @@ struct LayoutTensor[
         axis: The axis along which to split.
     """
 
-    @always_inline
+    @inline(.always)
     def split[
         axis: Int = 0,
         split_alignment: Int = 1,
@@ -3884,7 +3884,7 @@ struct LayoutTensor[
             ),
         )
 
-    @always_inline
+    @inline(.always)
     def _clamp_distribute_shape[
         thread_layout: Layout,
     ](self, thread_id: Int) -> IndexList[
@@ -3948,7 +3948,7 @@ struct LayoutTensor[
         axis: Optional axis to distribute along.
     """
 
-    @always_inline
+    @inline(.always)
     def distribute[
         threads_layout: Layout,
         axis: Optional[Int] = None,
@@ -4165,7 +4165,7 @@ struct LayoutTensor[
                     self.runtime_element_layout,
                 )
 
-    @always_inline
+    @inline(.always)
     def distribute_with_offset[
         threads_layout: Layout,
         axis: Optional[Int] = None,
@@ -4382,7 +4382,7 @@ struct LayoutTensor[
         linear_vectorize: Whether to vectorize in a linear manner.
     """
 
-    @always_inline
+    @inline(.always)
     def _vectorize_2[
         vector_len: Int,
         linear_vectorize: Bool = True,
@@ -4408,7 +4408,7 @@ struct LayoutTensor[
             linear_vectorize=linear_vectorize,
         ]()
 
-    @always_inline
+    @inline(.always)
     def _vectorize_2[
         _origin: ImmOrigin,  # FIXME: MOCO-1912
         vector_shape: IntTuple,
@@ -4524,7 +4524,7 @@ struct LayoutTensor[
         vector_shape: The shape of each vector unit along each axis.
     """
 
-    @always_inline
+    @inline(.always)
     def vectorize[
         *vector_shape: Int
     ](self) -> Self.VectorizedType[*vector_shape]:
@@ -4595,7 +4595,7 @@ struct LayoutTensor[
     ]
     """Result type for SIMD-width vectorization."""
 
-    @always_inline
+    @inline(.always)
     def vectorize(self) -> Self.SIMDVectorizedType:
         """Return a SIMD[dtype] vectorized view of this tensor.
 
@@ -4666,7 +4666,7 @@ struct LayoutTensor[
         d1_slice: Slice specification for the second dimension.
     """
 
-    @always_inline
+    @inline(.always)
     def slice[
         d0_slice: Slice, d1_slice: Slice
     ](self) -> Self.SliceType[d0_slice, d1_slice]:
@@ -4770,7 +4770,7 @@ struct LayoutTensor[
         __offset_dims: Number of fixed dimensions.
     """
 
-    @always_inline
+    @inline(.always)
     def slice[
         d0_slice: Slice,
         d1_slice: Slice,
@@ -4892,7 +4892,7 @@ struct LayoutTensor[
 
     # FIXME: Can't overload slice, hitting compiler issue.
     # https://linear.app/modularml/issue/MOCO-174
-    @always_inline
+    @inline(.always)
     def slice_1d[
         d0_slice: Slice,
         slice_indices: IndexList[1],
@@ -4993,7 +4993,7 @@ struct LayoutTensor[
     ]
     """Result type for transpose operations."""
 
-    @always_inline
+    @inline(.always)
     def transpose(self) -> Self.TransposeType:
         """Create a transposed view of a tensor.
 
@@ -5062,7 +5062,7 @@ struct LayoutTensor[
         dst_layout: The target layout for the reshaped tensor.
     """
 
-    @always_inline
+    @inline(.always)
     def reshape[
         dst_layout: Layout,
     ](self) -> Self.ReshapeType[dst_layout]:
@@ -5110,7 +5110,7 @@ struct LayoutTensor[
         ), "Masked tensor does not support reshape."
         return Self.ReshapeType[dst_layout](self.ptr)
 
-    @always_inline
+    @inline(.always)
     def reshape[
         dst_layout: Layout,
     ](self, runtime_layout: RuntimeLayout[dst_layout]) -> Self.ReshapeType[
@@ -5177,7 +5177,7 @@ struct LayoutTensor[
     """Type alias for flattened tensor types.
     """
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def flatten(self) -> Self.FlattenedType:
         """Convert a LayoutTensor to a flattened dynamic layout.
 
@@ -5210,7 +5210,7 @@ struct LayoutTensor[
         dst_layout: The resulting composed layout.
     """
 
-    @always_inline
+    @inline(.always)
     def composition[
         rhs_layout: Layout,
         dst_layout: Layout = composition(Self.layout, rhs_layout),
@@ -5260,7 +5260,7 @@ struct LayoutTensor[
         return self.CompositionType[rhs_layout, dst_layout](self.ptr)
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def distance(
         self: Self.Immut,
         addr: ImmPointer[
@@ -5308,7 +5308,7 @@ struct LayoutTensor[
         ) // Scalar[Self.linear_idx_type](size_of[Self.dtype]())
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def distance[
         _layout: Layout,
         _uint_dtype: DType = _get_unsigned_type(_layout, Self.address_space),
@@ -5372,7 +5372,7 @@ struct LayoutTensor[
 
     # Returns the linear index of an elem_i 0 ... size(layout).
     #
-    @always_inline
+    @inline(.always)
     def _get_element_idx[elem_i: Int](self) -> Scalar[Self.linear_idx_type]:
         comptime element_size = self.element_size
 
@@ -5392,7 +5392,7 @@ struct LayoutTensor[
             return idx
 
     @__allow_legacy_custom_self_type
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy_from(self: Self._AsMut, other: LayoutTensor):
         """Copy data from another tensor to this tensor.
 
@@ -5486,7 +5486,7 @@ struct LayoutTensor[
 
             dst_element.transfer(src_element)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def copy_from_async[
         is_masked: Bool = False,
         swizzle: Optional[Swizzle] = None,
@@ -5738,7 +5738,7 @@ struct LayoutTensor[
                 )
 
     @__allow_legacy_custom_self_type
-    @always_inline
+    @inline(.always)
     def fill[
         *,
         use_runtime_layout: Bool = (
@@ -5879,7 +5879,7 @@ struct LayoutTensor[
         if self.runtime_layout.size() == 0:
             return
 
-        @always_inline
+        @inline(.always)
         def is_2d_print(layout: Layout) -> Bool:
             return (
                 len(layout) == 2
@@ -5914,7 +5914,7 @@ struct LayoutTensor[
                 writer.write(" ")
 
 
-@always_inline
+@inline(.always)
 def _pretty_print_2d_tensor[W: Writer](tensor: LayoutTensor, mut writer: W):
     comptime assert tensor.layout.rank() == 2
 
@@ -6113,7 +6113,7 @@ struct ThreadScope(TrivialRegisterPassable, Writable):
         return Int(self._value)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_worker_idx[
     thread_scope: ThreadScope, block_dim_count: Int = 1
 ]() -> Int:
@@ -6155,7 +6155,7 @@ def _get_worker_idx[
         return lane_id()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_dram_to_sram_validate_args(
     dst: LayoutTensor[mut=True, ...], src: LayoutTensor
 ):
@@ -6200,7 +6200,7 @@ def _copy_dram_to_sram_validate_args(
     ), "dst address space must be SHARED."
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram[
     src_thread_layout: Layout,
     dst_thread_layout: Layout = src_thread_layout,
@@ -6349,7 +6349,7 @@ def copy_dram_to_sram[
                 )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram[
     src_thread_layout: Layout,
     dst_thread_layout: Layout = src_thread_layout,
@@ -6438,7 +6438,7 @@ def copy_dram_to_sram[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_k_major[
     dtype: DType,
     eviction_policy: CacheEviction = CacheEviction.EVICT_NORMAL,
@@ -6551,7 +6551,7 @@ def cp_async_k_major[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram[
     thread_layout: Layout,
     swizzle: Optional[Swizzle] = None,
@@ -6614,7 +6614,7 @@ def copy_dram_to_sram[
     ](dst, src_iter, bound)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram[
     thread_layout: Layout,
     swizzle: Optional[Swizzle] = None,
@@ -6677,7 +6677,7 @@ def copy_dram_to_sram[
     ](dst, src)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram_async[
     src_thread_layout: Layout,
     dst_thread_layout: Layout,
@@ -6849,7 +6849,7 @@ def copy_dram_to_sram_async[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_sram_async[
     thread_layout: Layout,
     swizzle: Bool = False,
@@ -6917,7 +6917,7 @@ Returns:
 """
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_sram_to_dram[
     thread_layout: Layout,
     swizzle: Optional[Swizzle] = None,
@@ -7123,7 +7123,7 @@ def copy_sram_to_dram[
                     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_sram_to_local[
     src_warp_layout: Layout,
     axis: Optional[Int] = None,
@@ -7181,7 +7181,7 @@ def copy_sram_to_local[
         dst.copy_from(src_fragments)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_local_to_dram_validate_args(dst: LayoutTensor, src: LayoutTensor):
     comptime assert (
         src.address_space == .LOCAL
@@ -7193,7 +7193,7 @@ def _copy_local_to_dram_validate_args(dst: LayoutTensor, src: LayoutTensor):
     ), "dst address space must be GENERIC or GLOBAL."
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_dram[
     dst_thread_layout: Layout,
     num_threads: Int = dst_thread_layout.size(),
@@ -7286,7 +7286,7 @@ def copy_local_to_dram[
                 ).store(dst_fragments.ptr + dst_idx)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_local_to_dram_static_row_major[
     dst_type: DType
 ](
@@ -7315,7 +7315,7 @@ def _copy_local_to_dram_static_row_major[
             )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_local_to_dram[
     dst_thread_layout: Layout,
     num_threads: Int = dst_thread_layout.size(),
@@ -7390,7 +7390,7 @@ def _copy_local_to_dram[
                     )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_dram[
     dst_thread_layout: Layout,
     num_threads: Int = dst_thread_layout.size(),
@@ -7448,7 +7448,7 @@ def copy_local_to_dram[
     ](dst, src, buffer)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_dram_to_local[
     src_thread_layout: Layout,
     num_threads: Int = src_thread_layout.size(),
@@ -7485,7 +7485,7 @@ def _copy_dram_to_local[
         src_fragments.layout.all_dims_known()
     ), "src_fragments must have known layout."
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def offset_helper(offset_val: Int):
         var src_frag_offset = Int32(
@@ -7514,7 +7514,7 @@ def _copy_dram_to_local[
         offset_helper(ufloordiv(Int(src.ptr) - base_ptr, size_of[src.dtype]()))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_local[
     src_thread_layout: Layout,
     num_threads: Int = src_thread_layout.size(),
@@ -7582,7 +7582,7 @@ def copy_dram_to_local[
     ](dst, src, buffer, offset)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _copy_dram_to_local[
     src_thread_layout: Layout,
     num_threads: Int = src_thread_layout.size(),
@@ -7608,7 +7608,7 @@ def _copy_dram_to_local[
     ](dst, src_tensor, buffer, Int(src_iter.offset))
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_local[
     src_thread_layout: Layout,
     num_threads: Int = src_thread_layout.size(),
@@ -7671,7 +7671,7 @@ def copy_dram_to_local[
     ](dst, src_iter, buffer)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_dram_to_local[
     src_thread_layout: Layout,
     num_threads: Int = src_thread_layout.size(),
@@ -7763,7 +7763,7 @@ def copy_dram_to_local[
                 ).store(dst.ptr + dst_idx)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def copy_local_to_shared[
     thread_layout: Layout,
     swizzle: Optional[Swizzle] = None,
@@ -7912,7 +7912,7 @@ def copy_local_to_shared[
                 dst_element.transfer(src_element)
 
 
-@always_inline
+@inline(.always)
 def copy_local_to_local(dst: LayoutTensor[mut=True, ...], src: LayoutTensor):
     """Synchronously copy data between local memory (register) tensors with type
     conversion.
@@ -8128,7 +8128,7 @@ struct LayoutTensorIter[
     var idx: Self.linear_uint_type
     """Current logical index position within the iteration sequence."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize an empty iterator.
 
@@ -8158,7 +8158,7 @@ struct LayoutTensorIter[
         self.dimension_bound = 0
         self.idx = 0
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ptr: Pointer[
@@ -8204,7 +8204,7 @@ struct LayoutTensorIter[
         self.dimension_bound = 0
         self.idx = 0
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ptr: Pointer[
@@ -8225,7 +8225,7 @@ struct LayoutTensorIter[
         """
         return Self(ptr, Self.linear_uint_type(bound))
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ptr: Pointer[
@@ -8372,7 +8372,7 @@ struct LayoutTensorIter[
     ]
     """The LayoutTensor type returned by this iterator."""
 
-    @always_inline
+    @inline(.always)
     def get(self) -> Self.LayoutTensorType:
         """Get the layout tensor at the current iterator position.
 
@@ -8391,7 +8391,7 @@ struct LayoutTensorIter[
             self.runtime_layout,
         )
 
-    @always_inline
+    @inline(.always)
     def __getitem__(
         self,
     ) -> Self.LayoutTensorType:
@@ -8405,7 +8405,7 @@ struct LayoutTensorIter[
         """
         return self.get()
 
-    @always_inline
+    @inline(.always)
     def _clip_shape(self) -> Self.RuntimeLayoutType:
         """Clip the shape based on dimension bounds.
 
@@ -8422,7 +8422,7 @@ struct LayoutTensorIter[
         )
         return Self.RuntimeLayoutType(new_shape, self.runtime_layout.stride)
 
-    @always_inline
+    @inline(.always)
     def __iadd__[T: Intable](mut self, rhs: T):
         """Increment the iterator by an integer value.
 
@@ -8441,7 +8441,7 @@ struct LayoutTensorIter[
         """
         self += Self.linear_uint_type(Int(rhs))
 
-    @always_inline
+    @inline(.always)
     def __iadd__(mut self, rhs: Self.linear_uint_type):
         """Increment the iterator by a uint value.
 
@@ -8466,7 +8466,7 @@ struct LayoutTensorIter[
         comptime if Self.circular:
             self.offset = self.offset % self.bound
 
-    @always_inline
+    @inline(.always)
     def _incr(mut self):
         """Increment the iterator by 1.
 
@@ -8482,7 +8482,7 @@ struct LayoutTensorIter[
                 >= self.bound else self.offset
             )
 
-    @always_inline
+    @inline(.always)
     def next[T: Intable](self, rhs: T) -> Self:
         """Return an iterator pointing to a position ahead by rhs steps.
 
@@ -8525,7 +8525,7 @@ struct LayoutTensorIter[
             idx=next_idx,
         )
 
-    @always_inline
+    @inline(.always)
     def next(self, rhs: Self.linear_uint_type = 1) -> Self:
         """Return an iterator pointing to a position ahead by rhs steps.
 
@@ -8540,7 +8540,7 @@ struct LayoutTensorIter[
         """
         return self.next(Int(rhs))
 
-    @always_inline
+    @inline(.always)
     def next_unsafe(self, rhs: Self.linear_uint_type = 1) -> Self:
         """Return an iterator pointing to a position ahead by rhs steps (unsafe
         version).
@@ -8595,7 +8595,7 @@ struct LayoutTensorIter[
         dst_layout: The target layout for the reshaped iterator.
     """
 
-    @always_inline
+    @inline(.always)
     def reshape[dst_layout: Layout](self) -> Self.ReshapeType[dst_layout]:
         """Reshape the iterator to a new layout.
 
@@ -8661,7 +8661,7 @@ struct LayoutTensorIter[
         alignment: The target memory alignment.
     """
 
-    @always_inline
+    @inline(.always)
     def bitcast[
         new_type: DType,
         *,

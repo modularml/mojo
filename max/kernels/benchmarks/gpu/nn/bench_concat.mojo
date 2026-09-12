@@ -130,11 +130,11 @@ def bench_concat[
         input1_host.as_unsafe_any_origin(),
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher, shape: IndexList[rank]
     ) raises {mut output_device, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {mut output_device, imm}:
             _concat_gpu_elementwise[epilogue_fn=None](
                 output_device.as_unsafe_any_origin(), axis, inputs, ctx
@@ -211,9 +211,9 @@ def bench_concat_inner_most_single_dim[
     var out_dev = ctx.enqueue_create_buffer[dtype](n_out)
     ctx.synchronize()
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {mut out_dev, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {mut out_dev, imm}:
             comptime if static_shape:
                 # Fully static layouts -> the row -> n-D divisors fold.

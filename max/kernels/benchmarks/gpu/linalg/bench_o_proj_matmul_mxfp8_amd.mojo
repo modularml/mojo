@@ -78,7 +78,7 @@ def bench_shape(ctx: DeviceContext, mut m: Bench, M: Int) raises:
         RuntimeLayout[C_LAYOUT].row_major(IndexList[2](M, N)),
     )
 
-    @always_inline
+    @inline(.always)
     def launch(
         ctx: DeviceContext, iteration: Int
     ) raises {mut cb_a, mut cb_b, mut cb_asf, mut cb_bsf, mut c, imm}:
@@ -108,7 +108,7 @@ def bench_shape(ctx: DeviceContext, mut m: Bench, M: Int) raises:
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def o_proj_bench(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, launch, ctx)
 

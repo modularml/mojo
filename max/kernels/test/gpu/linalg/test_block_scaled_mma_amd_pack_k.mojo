@@ -46,7 +46,7 @@ from linalg.arch.amd.block_scaled_mma import (
 )
 
 
-@always_inline
+@inline(.always)
 def _broadcast_scale_word(value: Float32) -> Int32:
     """Pack one E8M0 scale across all 4 bytes of an Int32."""
     var scale_byte = bitcast[.uint8](
@@ -60,7 +60,7 @@ def _broadcast_scale_word(value: Float32) -> Int32:
     )
 
 
-@always_inline
+@inline(.always)
 def _packed_scale_word(
     b0: Float32, b1: Float32, b2: Float32, b3: Float32
 ) -> Int32:

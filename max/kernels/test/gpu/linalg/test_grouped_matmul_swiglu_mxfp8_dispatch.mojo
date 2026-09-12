@@ -70,7 +70,7 @@ from linalg.fp4_utils import (
 from shmem.ep_comm import fused_silu_mxfp8_interleaved_kernel
 
 
-@always_inline
+@inline(.always)
 def e8m0(x: Float32) -> Float8_e8m0fnu:
     """Construct an E8M0 scalar from a Float32 via cast."""
     return x.cast[.float8_e8m0fnu]()

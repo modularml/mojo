@@ -46,14 +46,14 @@ def run_row_mean_of_squares_gpu[
 
     ctx.enqueue_copy(data_d, data_h)
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int
     ](coords: Coord) {var data_buf} -> SIMD[in_dtype, width]:
         var idx = data_buf.layout(coords)
         return data_buf.raw_load[width=width](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength
     ](coords: Coord, val: SIMD[out_dtype, width]) {var out_buf} -> None:

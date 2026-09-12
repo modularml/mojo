@@ -479,7 +479,7 @@ struct Deque[ElementType: Movable](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         """Checks whether the deque has any elements or not.
 
@@ -488,7 +488,7 @@ struct Deque[ElementType: Movable](
         """
         return self._head != self._tail
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Gets the number of elements in the deque.
 
@@ -498,7 +498,7 @@ struct Deque[ElementType: Movable](
         return (self._tail - self._head) & (self._capacity - 1)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, idx: IntLiteral
     ) -> ref[self._unchecked_get(idx)] Self.ElementType:
@@ -517,7 +517,7 @@ struct Deque[ElementType: Movable](
         return self._unchecked_get(idx)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def __getitem__(
         ref self, idx: Int
     ) -> ref[self._unchecked_get(idx)] Self.ElementType:
@@ -533,7 +533,7 @@ struct Deque[ElementType: Movable](
         return self._unchecked_get(idx)
 
     @__unsafe_nested_origins_read_only
-    @always_inline
+    @inline(.always)
     def _unchecked_get(
         ref self, idx: Int
     ) -> ref[origin_of(self)._get_owned_interior["element"]] Self.ElementType:
@@ -555,7 +555,7 @@ struct Deque[ElementType: Movable](
         fmt.write_sequence_to(writer, iterate)
         _ = iterator^
 
-    @no_inline
+    @inline(.never)
     def write_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.ElementType, Writable):
@@ -566,7 +566,7 @@ struct Deque[ElementType: Movable](
         """
         self._write_self_to[f=fmt.write_to[Self.ElementType]](writer)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(
         self, mut writer: Some[Writer]
     ) where conforms_to(Self.ElementType, Writable):
@@ -796,7 +796,7 @@ struct Deque[ElementType: Movable](
                 return idx
         raise "ValueError: Given element is not in deque"
 
-    @always_inline
+    @inline(.always)
     def insert(
         mut self, idx: Int, var value: Self.ElementType
     ) raises where conforms_to(Self.ElementType, Deinitable):
@@ -1046,7 +1046,7 @@ struct Deque[ElementType: Movable](
             n_pop_values,
         )
 
-    @always_inline
+    @inline(.always)
     def _physical_index(self, logical_index: Int) -> Int:
         """Calculates the physical index in the circular buffer.
 
@@ -1192,7 +1192,7 @@ struct _DequeIter[
             )
             return self.src[]._data[unsafe_offset=offset]
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
@@ -1220,7 +1220,7 @@ struct _DequeIterOwned[T: Movable & Deinitable](
     var _deque: Deque[Self.T]
     var _index: Int
 
-    @always_inline
+    @inline(.always)
     def __deinit__(deinit self):
         # Destroy remaining unconsumed elements at their physical positions.
         # Note: `_index` tracks how many elements __next__ has consumed;
@@ -1232,7 +1232,7 @@ struct _DequeIterOwned[T: Movable & Deinitable](
         self._deque._head = 0
         self._deque._tail = 0
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -1243,7 +1243,7 @@ struct _DequeIterOwned[T: Movable & Deinitable](
         self._index += 1
         return (self._deque._data.unsafe_offset(phys)).unsafe_take_pointee()
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         var remaining = len(self._deque) - self._index
         return (remaining, {remaining})

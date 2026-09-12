@@ -641,7 +641,7 @@ struct NoMaskFlashAttentionCPU:
         comptime assert is_cpu[target](), "only valid on CPUs"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def k_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[k.dtype, width]:
@@ -650,7 +650,7 @@ struct NoMaskFlashAttentionCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def v_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[v.dtype, width]:
@@ -659,7 +659,7 @@ struct NoMaskFlashAttentionCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def mask_input_fn[
             width: Int, _rank: Int
         ](idx: IndexList[_rank]) -> SIMD[dtype, width]:
@@ -700,7 +700,7 @@ struct WithMaskFlashAttentionSplitKVCPU:
         comptime assert is_cpu[target](), "only valid on CPUs"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def k_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[k.dtype, width]:
@@ -709,7 +709,7 @@ struct WithMaskFlashAttentionSplitKVCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def v_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[v.dtype, width]:
@@ -718,7 +718,7 @@ struct WithMaskFlashAttentionSplitKVCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def k_cache_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[k_cache.dtype, width]:
@@ -727,7 +727,7 @@ struct WithMaskFlashAttentionSplitKVCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def v_cache_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[v_cache.dtype, width]:
@@ -736,7 +736,7 @@ struct WithMaskFlashAttentionSplitKVCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def mask_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[mask.dtype, width]:
@@ -829,7 +829,7 @@ struct WithMaskFlashAttentionCPU:
         comptime assert is_cpu[target](), "only valid on CPUs"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def k_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[k.dtype, width]:
@@ -838,7 +838,7 @@ struct WithMaskFlashAttentionCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def v_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[v.dtype, width]:
@@ -847,7 +847,7 @@ struct WithMaskFlashAttentionCPU:
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def mask_input_fn[
             width: Int, rank: Int
         ](coords: IndexList[rank]) -> SIMD[mask.dtype, width]:
@@ -871,7 +871,7 @@ struct Struct_fused_qkv_matmul_padded_paged:
     """Registers the `mo.fused_qkv_matmul.padded.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -924,7 +924,7 @@ struct Struct_fused_qkv_matmul_padded_ragged:
     """Registers the `mo.fused_qkv_matmul.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -970,7 +970,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_quantized:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.quantized` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1025,7 +1025,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_bias:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.bias` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1073,7 +1073,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.scale` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1141,7 +1141,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_float4:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.scale.float4` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1202,7 +1202,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_mxfp8:
     # MXFP8 from its data dtype, scale dtype, and SF_VECTOR_SIZE parameters. The
     # "float4" in the callee name is intentional. Do not split off a separate
     # MXFP8 path.
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1264,7 +1264,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_mxfp8_amd:
     # differs by vendor: SM100 wants the rank-5 SF-atom interleave, CDNA4
     # consumes the checkpoint's plain rank-2 [N, K // 32] E8M0 scales.
     # Everything below the entry point is shared.
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1321,7 +1321,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_mxfp6_amd:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.scale.mxfp6.amd` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1401,7 +1401,7 @@ struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp8:
     # `IQ_DIM` is the IndexQ output-band width (num_index_heads * idx_head_dim).
     # It is a parameter because, for the MLA index cache, it cannot be recovered
     # from the index cache's `num_heads` (== 1 for the single latent head).
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1496,7 +1496,7 @@ struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp8_amd:
     # `IQ_DIM` is the IndexQ output-band width (num_index_heads * idx_head_dim).
     # It is a parameter because, for the MLA index cache, it cannot be recovered
     # from the index cache's `num_heads` (== 1 for the single latent head).
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1577,7 +1577,7 @@ struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp6_amd:
     """Registers the `mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp6.amd` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1676,7 +1676,7 @@ struct Struct_fused_qkv_index_matmul_padded_ragged:
     # `IQ_DIM` is the IndexQ output-band width (num_index_heads * idx_head_dim).
     # It is a parameter because, for the MLA index cache, it cannot be recovered
     # from the index cache's `num_heads` (== 1 for the single latent head).
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1741,7 +1741,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_bias:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.scale.bias` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1811,7 +1811,7 @@ struct Struct_fused_qkv_matmul_padded_ragged_bias_quantized:
     """Registers the `mo.fused_qkv_matmul.ragged.paged.bias.quantized` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1868,7 +1868,7 @@ struct Struct_fused_qk_rope_ragged_paged_with_position_id[interleaved: Bool]:
     """Registers the `mo.fused_qk_rope.ragged.paged.with_position_id` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1924,7 +1924,7 @@ struct Struct_fused_qk_rope_ragged_paged[interleaved: Bool]:
     """Registers the `mo.fused_qk_rope.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -1980,7 +1980,7 @@ struct Struct_fused_qk_rope_padded_paged[interleaved: Bool]:
     """Registers the `mo.fused_qk_rope.padded.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2026,7 +2026,7 @@ struct Struct_fused_qk_rope_padded_paged[interleaved: Bool]:
 struct Struct_mha_padded_paged:
     """Registers the `mo.mha.padded.paged` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2085,7 +2085,7 @@ struct Struct_mha_decode_num_partitions:
     """Registers the `mo.mha.decode.get_num_partitions` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         *, n_kv_heads: Int
@@ -2131,7 +2131,7 @@ struct Struct_mha_decode_num_partitions:
 struct Struct_mha_ragged_paged_scalar_args:
     """Registers the `mo.mha.ragged.paged` graph op with the graph compiler."""
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -2186,7 +2186,7 @@ struct Struct_mha_ragged_paged_sink_weights_scalar_args:
     """Registers the `mo.mha.ragged.paged.sink_weights` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2252,7 +2252,7 @@ struct Struct_mha_ragged_paged_rel_logits:
     materializing a dense `(q, k)` mask.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,
@@ -2307,7 +2307,7 @@ struct Struct_mla_decode_ragged_paged:
     """Registers the `mo.mla.decode.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2362,7 +2362,7 @@ struct Struct_mla_decode_ragged_paged_scaled:
     """Registers the `mo.mla.decode.ragged.paged.scaled` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2492,7 +2492,7 @@ struct Struct_mla_prefill_ragged_paged:
     """Registers the `mo.mla.prefill.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2549,7 +2549,7 @@ struct Struct_mla_prefill_ragged_plan:
     """Registers the `mo.mla.prefill.ragged.plan` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2599,7 +2599,7 @@ struct Struct_mla_decompress_k_cache_ragged_paged:
     """Registers the `mo.mla.decompress.k.cache.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -2647,7 +2647,7 @@ struct Struct_mla_prefill_graph_paged:
     """Registers the `mo.mla.graph.prefill.paged.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2701,7 +2701,7 @@ struct Struct_mla_prefill_graph_paged:
         ](), "mo.mla.graph.prefill.paged.fp8 is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -2740,7 +2740,7 @@ struct Struct_mla_compute_dispatch_args_scalar:
     """Registers the `mo.mla.compute_dispatch_args.scalar` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         num_heads: Int,
@@ -2797,7 +2797,7 @@ struct Struct_mla_decode_graph_paged_fp8:
     """Registers the `mo.mla.graph.decode.paged.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2850,7 +2850,7 @@ struct Struct_mla_decode_graph_paged_fp8:
         ](), "mo.mla.graph.decode.paged.fp8 is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -2894,7 +2894,7 @@ struct Struct_mla_decode_graph_paged_fp8_sparse:
     """Registers the `mo.mla.graph.decode.paged.fp8.sparse` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -2957,7 +2957,7 @@ struct Struct_mla_decode_graph_paged_fp8_sparse:
         ](), "mo.mla.graph.decode.paged.fp8.sparse is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3037,7 +3037,7 @@ struct Struct_mla_prefill_graph_bf16_paged:
     """Registers the `mo.mla.graph.prefill.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3084,7 +3084,7 @@ struct Struct_mla_prefill_graph_bf16_paged:
         ](), "mo.mla.graph.prefill.paged is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3118,7 +3118,7 @@ struct Struct_mla_decode_graph_bf16_paged:
     """Registers the `mo.mla.graph.decode.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3164,7 +3164,7 @@ struct Struct_mla_decode_graph_bf16_paged:
         ](), "mo.mla.graph.decode.paged is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3203,7 +3203,7 @@ struct Struct_mla_decode_graph_bf16_paged_sparse:
     """Registers the `mo.mla.graph.decode.paged.sparse` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3253,7 +3253,7 @@ struct Struct_mla_decode_graph_bf16_paged_sparse:
         ](), "mo.mla.graph.decode.paged.sparse is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3317,7 +3317,7 @@ struct Struct_mla_prefill_graph_decode_paged_fp8:
     """Registers the `mo.mla.graph.prefill.decode.paged.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3376,7 +3376,7 @@ struct Struct_mla_prefill_graph_decode_paged_fp8:
         ](), "mo.mla.graph.prefill.decode.paged.fp8 is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3426,7 +3426,7 @@ struct Struct_mla_prefill_graph_decode_paged_fp8_sparse:
     """Registers the `mo.mla.graph.prefill.decode.paged.fp8.sparse` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3495,7 +3495,7 @@ struct Struct_mla_prefill_graph_decode_paged_fp8_sparse:
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3574,7 +3574,7 @@ struct Struct_mla_prefill_sparse_paged:
     """Registers the `mo.mla.prefill.sparse.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3689,7 +3689,7 @@ struct Struct_mla_prefill_sparse_paged_fp8:
     """Registers the `mo.mla.prefill.sparse.paged.fp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3797,7 +3797,7 @@ struct Struct_mla_prefill_graph_decode_bf16_paged:
     """Registers the `mo.mla.graph.prefill.decode.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3847,7 +3847,7 @@ struct Struct_mla_prefill_graph_decode_bf16_paged:
         ](), "mo.mla.graph.prefill.decode.paged is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -3888,7 +3888,7 @@ struct Struct_mla_prefill_graph_decode_bf16_paged:
 
 @extensibility.register("mo.mla.graph.prefill.decode.paged.sparse")
 struct Struct_mla_prefill_graph_decode_paged_sparse:
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -3942,7 +3942,7 @@ struct Struct_mla_prefill_graph_decode_paged_sparse:
         ](), "mo.mla.graph.prefill.decode.paged.sparse is only supported on GPU"
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -4014,7 +4014,7 @@ struct Struct_mla_prefill_graph_decode_bf16_paged_quantized:
     """Registers the `mo.mla.graph.prefill.decode.paged.quantized` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     @__parameter
     def execute[
@@ -4067,7 +4067,7 @@ struct Struct_mla_prefill_graph_decode_bf16_paged_quantized:
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def kv_input_fn[
             width: Int
         ](coords: IndexList[2]) -> SIMD[.bfloat16, width]:
@@ -4111,7 +4111,7 @@ struct Struct_cross_attention_ragged_paged:
     """Registers the `mo.cross_attention.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         out_dtype: DType,

@@ -48,9 +48,9 @@ def bench_pad_gpu[
     var out_device = ctx.enqueue_create_buffer[dtype](output_size)
     var constant = Scalar[dtype](0)
 
-    @always_inline
+    @inline(.always)
     def bench_fn(mut b: Bencher) raises {mut out_device, imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {mut out_device, imm}:
             pad_constant(
                 out_device.unsafe_ptr(),

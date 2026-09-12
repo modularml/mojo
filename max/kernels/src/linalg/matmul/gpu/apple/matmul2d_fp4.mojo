@@ -114,7 +114,7 @@ def _require_apple_m5(ctx: DeviceContext) raises:
         )
 
 
-@always_inline
+@inline(.always)
 def frag_row_base(lane: Int) -> Int:
     """Base MMA-tile row for `lane` (before the per-element row jump).
 
@@ -126,7 +126,7 @@ def frag_row_base(lane: Int) -> Int:
     return (qid & 4) | ((lane >> 1) & 3)
 
 
-@always_inline
+@inline(.always)
 def frag_col_base(lane: Int) -> Int:
     """Base MMA-tile column for `lane` (before the per-element col offset).
 
@@ -138,7 +138,7 @@ def frag_col_base(lane: Int) -> Int:
     return ((qid & 2) | (lane & 1)) * 4
 
 
-@always_inline
+@inline(.always)
 def a_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     """(row, col) in the 16x16 A tile for this lane's A element `i` (0..7).
 
@@ -153,7 +153,7 @@ def a_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     )
 
 
-@always_inline
+@inline(.always)
 def bc_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     """(row, col) in the 16x32 B/C tile for this lane's element `i` (0..15).
 
@@ -171,7 +171,7 @@ def bc_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     )
 
 
-@always_inline
+@inline(.always)
 def bt_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     """(n, k) in the 16x32 right operand for element `i` under `transpose_right=1`.
 
@@ -199,7 +199,7 @@ def bt_frag_coord(lane: Int, i: Int) -> IndexList[2]:
     )
 
 
-@always_inline
+@inline(.always)
 def matmul2d_mma_regc_bt_native(
     a_frag: SIMD[.bfloat16, 8],
     b_frag: SIMD[.bfloat16, 16],
@@ -337,7 +337,7 @@ struct Fp4WeightLoader[
     var N: Int
     var K: Int
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def from_kernel_args(
         a: TileTensor[
@@ -377,7 +377,7 @@ struct Fp4WeightLoader[
         """
         return Self(a, packed, scales, M, N, K)
 
-    @always_inline
+    @inline(.always)
     def load_a_frag[
         bounded: Bool
     ](
@@ -417,7 +417,7 @@ struct Fp4WeightLoader[
                 v[i] = self.a[gm, gk][0].cast[Self.in_type]()
         return v
 
-    @always_inline
+    @inline(.always)
     def decode_b_frag_regc(
         self,
         bcol0: Int,
@@ -467,7 +467,7 @@ struct Fp4WeightLoader[
                 v[blk * 4 + e] = dec[e]
         return v
 
-    @always_inline
+    @inline(.always)
     def decode_strip_to_smem[
         b_view_origin: Origin[mut=True],
         b_view_layout: TensorLayout,
@@ -890,7 +890,7 @@ struct Matmul2dFp4[
         var tg_m_end = (Int(block_idx.y) + 1) * Self.TG_M
         var is_m_edge = tg_m_end > M
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _kloop[bounded: Bool]():
             var k0 = 0
@@ -956,7 +956,7 @@ struct Matmul2dFp4[
                         )
 
 
-@always_inline
+@inline(.always)
 def enqueue_matmul2d_fp4[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1065,7 +1065,7 @@ def enqueue_matmul2d_fp4[
     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_matmul2d_fp4_smem[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,

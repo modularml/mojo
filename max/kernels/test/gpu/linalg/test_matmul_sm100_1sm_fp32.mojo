@@ -173,7 +173,7 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
     # Normal epilogue: store the matmul result unchanged (exercises the lambda
     # store path; reference is plain vendor BLAS).
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def epilogue_fn[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1
@@ -184,7 +184,7 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
 
     # Compute epilogue: out = matmul * C_initial (also checks the coordinate).
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_tensor_lt)
     def compute_fn[
         _dtype: DType, width: SIMDLength, *, alignment: Int = 1

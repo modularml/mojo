@@ -346,7 +346,7 @@ def run_fused_qk_rms_norm_rope[
         context=ctx,
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(q_in_tt)
     def q_input_fn[
@@ -849,7 +849,7 @@ def run_fused_dual_qk_rms_norm_rope[
         UInt32(max_cache_length),
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(q_main_in_tt)
     def main_q_input_fn[
@@ -857,7 +857,7 @@ def run_fused_dual_qk_rms_norm_rope[
     ](token: Int, head: Int, col: Int) -> SIMD[dtype, width]:
         return q_main_in_tt.load[width=width](Coord(Index(token, head, col)))
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(q_index_in_tt)
     def index_q_input_fn[

@@ -103,31 +103,31 @@ struct GEMVAlgorithm(Equatable, Hashable, TrivialRegisterPassable, Writable):
     comptime MATMUL_NAIVE = Self(5)
     comptime GEMM_MMA_CPASYNC = Self(6)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         return self._value
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
-    @always_inline
+    @inline(.always)
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @always_inline
+    @inline(.always)
     def __isnot__(self, other: Self) -> Bool:
         return self != other
 
-    @always_inline
+    @inline(.always)
     def __hash__(self) -> Int:
         return self._value
 
-    @always_inline
+    @inline(.always)
     def write_to(self, mut writer: Some[Writer]):
         if self == Self.GEMV_KERNEL:
             writer.write("GEMV")
@@ -147,7 +147,7 @@ struct GEMVAlgorithm(Equatable, Hashable, TrivialRegisterPassable, Writable):
             writer.write("UNKNOWN")
 
 
-@always_inline
+@inline(.always)
 def reverse_idx[transpose: Bool](x: Int, y: Int) -> IndexList[2]:
     """Returns an index pair (x, y) or (y, x) depending on the transpose parameter.
     """
@@ -428,7 +428,7 @@ def gemv_kernel_vector_multirow[
         launch_dependent_grids()
 
 
-@always_inline
+@inline(.always)
 def _dot_accum[
     a_type: DType,
     b_type: DType,
@@ -611,7 +611,7 @@ def gemv_split_k[
 
     # Each thread sums local data in K.
     @__parameter
-    @always_inline
+    @inline(.always)
     def _k_iter_body():
         """Single K-iteration: load weights, load activations, accumulate."""
         var weight_tile = weight.tile[tile_n, tile_k](block_idx.y, iteration)
@@ -1101,7 +1101,7 @@ comptime _GEMV_MULTIROW_ROWS = 4
 comptime _GEMV_MULTIROW_MAX_K_ITERS = 2
 
 
-@always_inline
+@inline(.always)
 def is_minimax_router_gemm[
     c_type: DType,
     a_type: DType,
@@ -1119,7 +1119,7 @@ def is_minimax_router_gemm[
     )
 
 
-@always_inline
+@inline(.always)
 def gemv_gpu_dispatch[
     transpose_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1547,7 +1547,7 @@ def log_shape[
     )
 
 
-@always_inline
+@inline(.always)
 def gemv_gpu[
     transpose_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1658,7 +1658,7 @@ def gemv_gpu[
 # Parallelized version of Gemv
 
 
-@always_inline
+@inline(.always)
 def gemv[
     parallelize: Bool,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -1687,7 +1687,7 @@ def gemv[
     var M = Int(a_buf.dim[0]())
     var K = Int(a_buf.dim[1]())
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[
         dtype: DType, width: Int, rank: Int
@@ -1697,7 +1697,7 @@ def gemv[
             * b_buf.load_linear[width=width](IndexList[1](idx[1])).cast[dtype]()
         ).cast[dtype]()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def output_fn[
         out_type: DType, width: SIMDLength, rank: Int
@@ -1712,7 +1712,7 @@ def gemv[
                 IndexList[1](idx[0]), value.cast[c_type]()
             )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_impl[
         ty: DType, width: SIMDLength
@@ -1785,7 +1785,7 @@ struct _MmaCpAsyncGmemLoaderA[
     comptime ActTensor = TileTensor[Self.a_type, Self.a_layout, Self.origin]
     comptime swizzle = make_swizzle[8, Self.tile_k, 8]()
 
-    @always_inline
+    @inline(.always)
     def _k_project(
         self,
         tile_k_idx: Int,
@@ -1925,7 +1925,7 @@ struct _MmaCpAsyncGmemLoaderB[
     ]
     comptime swizzle = make_swizzle[8, Self.tile_k, 8]()
 
-    @always_inline
+    @inline(.always)
     def _k_project(
         self,
         tile_k_idx: Int,
@@ -2232,15 +2232,15 @@ struct _MmaCpAsyncSmem[
     var b_engine: Array[Scalar[Self.a_type], Self.SmemB.num_elements]
     var barrier_storage: Self.Barriers.Storage
 
-    @always_inline
+    @inline(.always)
     def a_tiles(ref[AddressSpace.SHARED] self) -> Self.SmemA:
         return Self.SmemA(self.a_engine.unsafe_ptr())
 
-    @always_inline
+    @inline(.always)
     def b_tiles(ref[AddressSpace.SHARED] self) -> Self.SmemB:
         return Self.SmemB(self.b_engine.unsafe_ptr())
 
-    @always_inline
+    @inline(.always)
     def barriers(ref[AddressSpace.SHARED] self) -> Self.Barriers:
         return Self.Barriers(self.barrier_storage)
 

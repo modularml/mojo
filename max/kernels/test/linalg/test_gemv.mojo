@@ -104,7 +104,7 @@ def test_gemv() raises:
     comptime gigabyte = 1024 * 1024 * 1024
 
     # Serial Gemv
-    @always_inline
+    @inline(.always)
     def bench_fn_serial() raises {var}:
         gemv[parallelize=False](out, lhs, rhs)
 
@@ -123,7 +123,7 @@ def test_gemv() raises:
     print("Serial GEMV GFLOP/s", 1e-9 * ((2 * m * k) / serial_perf.mean()))
 
     # Parallel Gemv
-    @always_inline
+    @inline(.always)
     def bench_fn_parallel() raises {var}:
         gemv[parallelize=True](out, lhs, rhs)
 
@@ -156,7 +156,7 @@ def test_gemv() raises:
     var speedup = serial_perf.mean() / par_perf.mean()
     print("--> Mean Runtime Speedup: ", speedup)
 
-    @always_inline
+    @inline(.always)
     def bench_fn_matmul() raises {var}:
         matmul(out_mat, lhs, rhs_mat)
 

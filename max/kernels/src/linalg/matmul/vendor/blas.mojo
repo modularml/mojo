@@ -248,11 +248,11 @@ struct Handle[backend: Backend = _resolve_backend[Backend.AUTOMATIC]()](
                 "' is not currently supported",
             )
 
-    @always_inline
+    @inline(.always)
     def __enter__(self) -> Self:
         return self
 
-    @always_inline
+    @inline(.always)
     def __exit__(mut self) raises:
         comptime if Self.resolved_backend in (Backend.CUBLAS, Backend.CUBLASLT):
             check_cublas_error(cublasDestroy(self._get_cublas()))
@@ -312,7 +312,7 @@ struct Handle[backend: Backend = _resolve_backend[Backend.AUTOMATIC]()](
 comptime _DEBUG_VENDOR_BLAS = False
 
 
-@always_inline
+@inline(.always)
 def _ffi_void_ptr[
     T: AnyType, origin: Origin, addr: AddressSpace
 ](ptr: UnsafePointer[T, origin, address_space=addr]) -> OpaquePointer[
@@ -322,7 +322,7 @@ def _ffi_void_ptr[
     return rebind[OpaquePointer[MutAnyOrigin]](ptr)
 
 
-@always_inline
+@inline(.always)
 def _ffi_void_ptr[
     T: AnyType, origin: Origin, addr: AddressSpace
 ](
@@ -605,7 +605,7 @@ def matmul[
     beta: Float32 = 0.0,
     batch_size: Int = 1,
 ) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(
             trace_arg(
@@ -1529,7 +1529,7 @@ def _hipblasLt_matmul[
 
     comptime assert a_type == b_type, "A and B must have the same type"
 
-    @always_inline
+    @inline(.always)
     def create_hipblas_matrix_layout[
         buf_type: DType,
     ](rows: Int, cols: Int) raises -> hipblasLtMatrixLayout_t:
@@ -1545,7 +1545,7 @@ def _hipblasLt_matmul[
         )
         return _desc
 
-    @always_inline
+    @inline(.always)
     def set_matrix_layout_batch_size(
         mat_layout: hipblasLtMatrixLayout_t,
         batch_size: Int,

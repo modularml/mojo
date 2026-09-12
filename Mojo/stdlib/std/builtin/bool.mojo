@@ -136,7 +136,7 @@ struct Bool(
         """
         self._mlir_value = mlir_value
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[T: Boolable, //](out self, value: T):
         """Set the bool representation of the object.
 
@@ -157,7 +157,7 @@ struct Bool(
         """
         self = False
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @implicit
     def __init__(out self, value: Scalar[.bool]):
         """Convert a scalar SIMD value to a Bool.
@@ -203,7 +203,7 @@ struct Bool(
             self._mlir_value
         )
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """
         Formats this boolean to the provided Writer.
@@ -220,7 +220,7 @@ struct Bool(
             StaticString("True") if self else StaticString("False")
         )
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this boolean to a writer.
 
@@ -241,7 +241,7 @@ struct Bool(
         """
         return select[Int](self, 1, 0)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __float__(self) -> Float64:
         """Convert this Bool to a float.
 
@@ -364,7 +364,7 @@ struct Bool(
         """
         return __mlir_op.`pop.simd.and`(self._mlir_value, rhs._mlir_value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __iand__(mut self, rhs: Bool):
         """Computes `self & rhs` and store the result in `self`.
 
@@ -400,7 +400,7 @@ struct Bool(
         """
         return __mlir_op.`pop.simd.or`(self._mlir_value, rhs._mlir_value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ior__(mut self, rhs: Bool):
         """Computes `self | rhs` and store the result in `self`.
 
@@ -436,7 +436,7 @@ struct Bool(
         """
         return __mlir_op.`pop.simd.xor`(self._mlir_value, rhs._mlir_value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ixor__(mut self, rhs: Bool):
         """Computes `self ^ rhs` and stores the result in `self`.
 

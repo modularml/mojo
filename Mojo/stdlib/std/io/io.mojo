@@ -180,7 +180,7 @@ struct _fdopen[mode: StaticString = "a"](ImplicitlyCopyable, RegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
         _ = fflush(fd.handle)
@@ -205,7 +205,7 @@ def _printf_cpu[
         )
 
 
-@no_inline
+@inline(.never)
 def _printf[
     fmt: StaticString, *types: AnyType
 ](*args: *types, file: FileDescriptor = stdout):
@@ -319,7 +319,7 @@ def _printf[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def _snprintf[
     fmt: StaticString, *types: AnyType
 ](str: MutPointer[UInt8, _], size: Int, *args: *types) -> Int:
@@ -356,7 +356,7 @@ def _snprintf[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
+@inline(.never)
 def print[
     *Ts: Writable
 ](

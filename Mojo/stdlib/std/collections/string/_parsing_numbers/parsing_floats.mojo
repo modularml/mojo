@@ -308,7 +308,7 @@ def lemire_algorithm(var w: UInt64, var q: Int64) -> Float64:
 comptime _ascii_lower: Byte = Byte(ord("A") ^ ord("a"))
 
 
-@always_inline
+@inline(.always)
 def _is_nan(stripped: StringSlice) -> Bool:
     comptime `n` = Byte(ord("n"))
     comptime `a` = Byte(ord("a"))
@@ -320,7 +320,7 @@ def _is_nan(stripped: StringSlice) -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _is_inf(stripped: StringSlice) -> Bool:
     comptime `i` = Byte(ord("i"))
     comptime `n` = Byte(ord("n"))

@@ -68,7 +68,7 @@ def initialize_runtime():
     _ensure_runtime_init()
 
 
-@always_inline
+@inline(.always)
 def parallelism_level() -> Int:
     """Gets the parallelism level of the Runtime.
 

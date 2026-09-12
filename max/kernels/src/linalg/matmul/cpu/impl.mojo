@@ -138,7 +138,7 @@ def elementwise_epilogue_c_tile[
         c: Read-only view of the C output tile.
     """
 
-    @always_inline
+    @inline(.always)
     def activation_on_col_chunk[col_chunk_size: Int](idx_n: Int) {imm}:
         var n_coord = idx_n + offset.N
         for idx_m in range(tile_len.M):
@@ -366,7 +366,7 @@ struct TiledMatmul[
             min(sub_tile_n, knm_bounds.N), min(sub_tile_k, knm_bounds.K)
         )
 
-        @always_inline
+        @inline(.always)
         def row_iteration[
             tile_kernel_rows: Int
         ](row_offset: Int) {var sub_tile_n_k, var b_packed_tile, imm}:
@@ -424,7 +424,7 @@ struct TiledMatmul[
         )
         var tile_n: Int = self.tile_n_k[0]
 
-        @always_inline
+        @inline(.always)
         def m_loop[
             secondary_tile_size: Int
         ](col_idx: Int, tile_size_n: Int) {imm}:
@@ -474,7 +474,7 @@ struct TiledMatmul[
         """Iterate on the K dimension of the whole problem space."""
 
         # Each tiled iteration on the k dimension.
-        @always_inline
+        @inline(.always)
         def k_iteration(k_offset: Int, k_tile_size: Int) {imm}:
             var last_k_tile = (
                 k_offset + k_tile_size + self.global_tile_offset.K
@@ -494,7 +494,7 @@ struct TiledMatmul[
         )
 
 
-@always_inline
+@inline(.always)
 def _matmul_cpu_impl[
     config: KernelConfig,
     transpose_b: Bool,
@@ -575,7 +575,7 @@ def _matmul_cpu_impl[
                 AllocLayout[Scalar[a.dtype], alignment=alignment](count=mh * kh)
             )
 
-        @always_inline
+        @inline(.always)
         def pack_task_func(
             task_id: Int,
         ) {mut a_packed_alloc, var m, var k, var num_tasks, imm}:
@@ -597,7 +597,7 @@ def _matmul_cpu_impl[
                 t0, t1, k, a.ptr, a_packed_alloc.unsafe_value().unsafe_ptr()
             )
 
-        @always_inline
+        @inline(.always)
         def task_func(
             task_id: Int,
         ) {var m, var k, var num_tasks, var n, var mh, var kh, imm}:
@@ -667,7 +667,7 @@ def _matmul_cpu_impl[
         a_packed_alloc^.deinit_with(_dealloc_packed)
 
 
-@always_inline
+@inline(.always)
 def matmul[
     *,
     transpose_b: Bool = False,
@@ -741,7 +741,7 @@ def matmul[
         )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def cast_epilogue[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](coord: IndexList[2], val: SIMD[dtype, width]):
@@ -765,7 +765,7 @@ def matmul[
 
     comptime kernel_id = select_inner_kernel[a.dtype, b.dtype, c.dtype]()
 
-    @always_inline
+    @inline(.always)
     def dispatch_on_kernel_type[
         kernel_type: Bool
     ]() raises {c, a, b, num_threads, ctx}:

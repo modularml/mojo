@@ -53,7 +53,7 @@ from std.testing import assert_almost_equal, assert_true
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def host_cast_fp8_to_bf16[
     fp8_t: DType,
     bf16_t: DType,

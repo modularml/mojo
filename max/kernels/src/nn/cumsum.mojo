@@ -17,7 +17,7 @@ from layout import Coord, Idx, TileTensor, coord_to_index_list, row_major
 from std.utils.numerics import get_accum_type
 
 
-@always_inline
+@inline(.always)
 def cumsum[
     dtype: DType,
     exclusive: Bool,

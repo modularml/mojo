@@ -29,7 +29,7 @@ from std.benchmark import (
 def bench_parsing_all_floats_in_file[
     origin: ImmOrigin
 ](mut b: Bencher, items_to_parse: List[StringSlice[origin]]) raises:
-    @always_inline
+    @inline(.always)
     def call_fn() raises {imm items_to_parse}:
         for item in items_to_parse:
             var res = atof(item)

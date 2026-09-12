@@ -37,7 +37,7 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-@always_inline
+@inline(.always)
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
     var x_f32 = x.cast[.float32]()

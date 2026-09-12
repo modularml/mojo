@@ -98,7 +98,7 @@ struct TypeDict[
             Self.values
         ), "TypeDict requires one type per key"
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Gets the number of entries in the map.
 

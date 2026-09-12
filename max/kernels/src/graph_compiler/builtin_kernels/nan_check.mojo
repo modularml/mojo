@@ -113,7 +113,7 @@ def nan_check_count[
         nan_acc_ptr[] = Int32(0)
         inf_acc_ptr[] = Int32(0)
 
-        @always_inline
+        @inline(.always)
         def scan[width: Int, alignment: Int = 1](idx: Coord) {var}:
             var flat = idx[0].value()
             var ptr = input.unsafe_ptr()

@@ -124,7 +124,7 @@ def reduce_add_simd[
         vector += rebind[SIMD[dtype, simd_width]](val)
 
 
-@always_inline
+@inline(.always)
 def sub(x: SIMD, y: type_of(x)) -> type_of(x):
     """Returns the element-wise difference `x - y`.
 
@@ -138,7 +138,7 @@ def sub(x: SIMD, y: type_of(x)) -> type_of(x):
     return x - y
 
 
-@always_inline
+@inline(.always)
 def mul(x: SIMD, y: type_of(x)) -> type_of(x):
     """Returns the element-wise product `x * y`.
 
@@ -152,7 +152,7 @@ def mul(x: SIMD, y: type_of(x)) -> type_of(x):
     return x * y
 
 
-@always_inline
+@inline(.always)
 def identity(x: SIMD) -> type_of(x):
     """Returns the input SIMD vector unchanged.
 
@@ -165,7 +165,7 @@ def identity(x: SIMD) -> type_of(x):
     return x
 
 
-@always_inline
+@inline(.always)
 def reciprocal(x: SIMD) -> type_of(x):
     """Returns the element-wise reciprocal `1 / x`.
 
@@ -178,7 +178,7 @@ def reciprocal(x: SIMD) -> type_of(x):
     return 1 / x
 
 
-@always_inline
+@inline(.always)
 def _exp_concrete(x: SIMD) -> type_of(x):
     """The concrete implementation of the exp function.
 
@@ -190,14 +190,14 @@ def _exp_concrete(x: SIMD) -> type_of(x):
     return exp(x)
 
 
-@always_inline
+@inline(.always)
 def _exp2_concrete(x: SIMD) -> type_of(x):
     """The concrete implementation of the exp2 function."""
     comptime assert x.dtype.is_floating_point(), "dtype must be floating point"
     return exp2(x)
 
 
-@always_inline
+@inline(.always)
 def _log_concrete(x: SIMD) -> type_of(x):
     """The concrete implementation of the log function."""
     comptime assert x.dtype.is_floating_point(), "dtype must be floating point"
@@ -209,7 +209,7 @@ def _log_concrete(x: SIMD) -> type_of(x):
 # scale and pairs the row-sum via these explicit PTX ops -- same idiom the dense
 # FA4 path uses (sm100/attention_utils.mojo). Gated comptime-OFF for the
 # generic helpers below; only the MSA single-tile path opts in.
-@always_inline
+@inline(.always)
 def _fma_f32x2(
     a: SIMD[.float32, 2],
     b: SIMD[.float32, 2],
@@ -223,7 +223,7 @@ def _fma_f32x2(
     ](a, b, c)
 
 
-@always_inline
+@inline(.always)
 def _add_f32x2(a: SIMD[.float32, 2], b: SIMD[.float32, 2]) -> SIMD[.float32, 2]:
     return inlined_assembly[
         "add.ftz.f32x2 $0, $1, $2;",
@@ -306,7 +306,7 @@ def _softmax_2_pass_step2[
     #     Output[i] = exp(Input[i] - runningMax) / runningSum
     #   end for
 
-    @always_inline
+    @inline(.always)
     def _step_2[
         simd_width: Int
     ](idx: Int) {running_max, running_sum, input, output, mut}:
@@ -412,7 +412,7 @@ def _softmax_3_pass_step_2[
     var accum_scalar: Scalar[dtype] = 0
     var accum_simd: SIMD[dtype, outer_simd_width] = 0
 
-    @always_inline
+    @inline(.always)
     def step_2[simd_width: Int](idx: Int) {max_val, output, mut}:
         var vin = input_fn_1d[simd_width](idx)
         var elem = vin - SIMD[dtype, simd_width](max_val)
@@ -452,7 +452,7 @@ def _softmax_3_pass_step_3[
     # end for
     var accum_proc = accum_proc_func[dtype, 1](accum)
 
-    @always_inline
+    @inline(.always)
     def step_3[simd_width: Int](idx: Int) {var accum_proc, output}:
         var accum_simd = SIMD[dtype, simd_width](accum_proc)
         var elem = output.load_linear[width=simd_width, alignment=1](
@@ -509,7 +509,7 @@ def _softmax_3_pass_base[
 
     # Use _reduce_generator to fuse input lambda with max-reduction
     # Reduce function
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_impl[
         ty: DType, width: SIMDLength
@@ -520,7 +520,7 @@ def _softmax_3_pass_base[
     # Translate the given input lambda from 1D to n-D because _reduce_generator
     # needs n-D.
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn[
         _dtype: DType, _width: Int, _rank: Int
     ](coords: IndexList[_rank]) -> SIMD[_dtype, _width]:
@@ -529,7 +529,7 @@ def _softmax_3_pass_base[
 
     # Output function
     @__parameter
-    @always_inline
+    @inline(.always)
     def output_fn[
         _dtype: DType, _width: SIMDLength, _rank: Int
     ](coords: IndexList[_rank], val: SIMD[_dtype, _width]):
@@ -716,7 +716,7 @@ def logsoftmax_inline[
     """
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn[_simd_width: Int](coords: Coord) -> SIMD[dtype, _simd_width]:
         return input.load[width=_simd_width, alignment=1](coords)
 
@@ -763,7 +763,7 @@ def _softmax_cpu[
     var num_workers = min(parallelism_level(ctx), outer_dim)
     var chunk_size = ceildiv(outer_dim, num_workers)
 
-    @always_inline
+    @inline(.always)
     def task_func(
         task_id: Int,
     ) raises {var chunk_size, var inner_dim, var outer_dim, imm}:
@@ -778,7 +778,7 @@ def _softmax_cpu[
             var indices = _get_nd_indices_from_flat_index(i, shape_il, rank - 1)
 
             @__parameter
-            @always_inline
+            @inline(.always)
             # Given input lambda accepts N-dimensional coordinates, but the
             # softmax base routines operate on 1D buffers. Here we wrap the
             # given input lambda with some 1D-to-n-D translation logic.
@@ -825,7 +825,7 @@ def softmax_inline[
     """
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def input_fn[_simd_width: Int](coords: Coord) -> SIMD[dtype, _simd_width]:
         return input.load[width=_simd_width, alignment=1](coords)
 
@@ -902,14 +902,14 @@ def softmax_kernel[
     ](row_major[1]())
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _max[
         dtype: DType, width: SIMDLength
     ](x: SIMD[dtype, width], y: SIMD[dtype, width]) -> SIMD[dtype, width]:
         return max(x, y)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _sum[
         dtype: DType, width: SIMDLength
     ](x: SIMD[dtype, width], y: SIMD[dtype, width]) -> SIMD[dtype, width]:
@@ -1118,7 +1118,7 @@ def _softmax_gpu[
     if axis != rank - 1:
         raise Error("softmax not supported on non-inner axis yet")
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn_wrapper[
         _dtype: DType, width: Int, rank: Int
@@ -1480,7 +1480,7 @@ def _softmax_temperature_kernel[
                 if lane_base < row_size:
                     var lane_count = min(row_size - lane_base, simd_width)
 
-                    @always_inline
+                    @inline(.always)
                     def online_max_sum[
                         width: Int
                     ](offset: Int) {row_coords, lane_base, mut}:
@@ -1519,7 +1519,7 @@ def _softmax_temperature_kernel[
                 if lane_base < row_size:
                     var lane_count = min(row_size - lane_base, simd_width)
 
-                    @always_inline
+                    @inline(.always)
                     def normalize[
                         width: Int
                     ](offset: Int) {row_coords, lane_base, output, mut}:
@@ -1620,7 +1620,7 @@ def _softmax_split_partial_kernel[
             if lane_base < row_size:
                 var lane_count = min(row_size - lane_base, simd_width)
 
-                @always_inline
+                @inline(.always)
                 def online_max_sum[
                     width: Int
                 ](offset: Int) {row_coords, lane_base, mut}:
@@ -1733,7 +1733,7 @@ def _softmax_split_combine_kernel[
             if lane_base < row_size:
                 var lane_count = min(row_size - lane_base, simd_width)
 
-                @always_inline
+                @inline(.always)
                 def normalize[
                     width: Int
                 ](offset: Int) {row_coords, lane_base, output, mut}:
@@ -1810,7 +1810,7 @@ def softmax_with_temperature[
 
     var input_immut = input.as_immut()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(input_immut)
     def input_load_fn[
@@ -2045,7 +2045,7 @@ def _online_softmax_kernel[
         ](lane_id).copy_from(p.vectorize[1, 4]())
 
 
-@always_inline
+@inline(.always)
 def _online_softmax_iter_for_mma_output[
     dtype: DType,
     score_layout_by_mma_unit: Layout,
@@ -2381,7 +2381,7 @@ def _online_softmax_iter_for_mma_output[
 #
 # Note that the `for k` loops are across warps (k is the index into
 # the `num_warps_n` rowwise warps).
-@always_inline
+@inline(.always)
 def _online_softmax_iter_for_mma_output_split_warp_reduce[
     output_layout: Layout,
     //,
@@ -2691,7 +2691,7 @@ def _online_softmax_iter_for_mma_output_split_warp_reduce[
             out_reg_tile[i] += rebind[SIMD[dtype, frag_size]](o_smem_reduce[i])
 
 
-@always_inline
+@inline(.always)
 def _rowmax_online_softmax[
     dtype: DType,
     reg_tile_layout: Layout,
@@ -2815,7 +2815,7 @@ def _rowmax_online_softmax[
                 )
 
 
-@always_inline
+@inline(.always)
 def _rowsum[
     dtype: DType,
     reg_tile_layout: Layout,
@@ -2894,7 +2894,7 @@ def _rowsum[
         ](score_frag_rowsum[col_tile])
 
 
-@always_inline
+@inline(.always)
 def _online_softmax_correction[
     dtype: DType,
     row_accum_layout: Layout,
@@ -2976,7 +2976,7 @@ def softmax[
         ReduceSum[accum, 1], target, 64, dtype, accum
     ]()
 
-    @always_inline
+    @inline(.always)
     def body[
         params: rowwise.ContextParams
     ](row_coords: Coord, mut ctx_p: rowwise.Context[params]) {
@@ -2985,7 +2985,7 @@ def softmax[
         comptime row_rank = row_coords.rank
 
         # Load: fuses the caller's input closure into the row's primary load.
-        @always_inline
+        @inline(.always)
         def load[
             width: Int, alignment: Int
         ](idx: RowCoord[row_rank]) {var input_fn} -> SIMD[dtype, width]:
@@ -2996,7 +2996,7 @@ def softmax[
         ](row_coords, axis_size, ctx_p, load)
 
         # Reduce (phase 1): row max.
-        @always_inline
+        @inline(.always)
         def vmax[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {} -> SIMD[
@@ -3012,7 +3012,7 @@ def softmax[
         ).acc
 
         # Reduce (phase 2): sum of exp(tile - row_max).
-        @always_inline
+        @inline(.always)
         def vexp[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {
@@ -3027,7 +3027,7 @@ def softmax[
         var log_denom = log(denom)
 
         # Emit: per-element normalize + store.
-        @always_inline
+        @inline(.always)
         def write[
             width: Int
         ](tile: SIMD[dtype, width], idx: RowCoord[row_rank]) {

@@ -130,7 +130,7 @@ struct Matmul2dFp8[
         b_type=Self.b_type,
     ]
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _gemm_body[
         c_layout: TensorLayout,
@@ -276,7 +276,7 @@ struct Matmul2dFp8[
         # needs a base-pointer rebind to fp32 (as the dense `_fast_path_store`
         # does), which the TileTensor-idioms-only rule forbids here. `_write4`
         # reaches the same 2-vector-store result.
-        @always_inline
+        @inline(.always)
         @__parameter
         def _apply_epilogue[bounded: Bool]():
             var c_sub = c.tile[SG_M, SG_N](Int(sg_row_idx), Int(sg_col_idx))
@@ -285,7 +285,7 @@ struct Matmul2dFp8[
             comptime elem_align = align_of[Scalar[Self.c_type]]()
             var c_vec = c_sub.vectorize[1, 4]()
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _write4(lrow: Int, lcol: Int, acol: Int, v: SIMD[.float32, 4]):
                 var y = v.cast[Self.c_type]()
@@ -403,7 +403,7 @@ struct Matmul2dFp8[
         Self._gemm_body(c_group, a_group, w_group, M, N, K, active)
 
 
-@always_inline
+@inline(.always)
 def enqueue_matmul2d_fp8[
     c_type: DType = .float32,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
@@ -504,7 +504,7 @@ def enqueue_matmul2d_fp8[
     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_grouped_matmul2d_fp8[
     c_type: DType = .float32,
     block_m: Int = 64,

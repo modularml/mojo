@@ -250,7 +250,7 @@ def execute_mla_indexer_paged[
     )
     var o_tile = TileTensor(o_device, row_major(total_seq_len, top_k))
 
-    @always_inline
+    @inline(.always)
     def kernel_launch(
         launch_ctx: DeviceContext,
     ) raises {mut o_tile, imm}:
@@ -272,7 +272,7 @@ def execute_mla_indexer_paged[
             launch_ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

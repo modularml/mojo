@@ -590,7 +590,7 @@ struct NamedTemporaryFile(Movable):
 
         buffer.flush()
 
-    @always_inline
+    @inline(.always)
     def write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a span of bytes to the file.

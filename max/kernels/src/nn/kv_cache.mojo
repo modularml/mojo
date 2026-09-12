@@ -74,7 +74,7 @@ from extensibility import (
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qkv_matmul_kv_cache_bshd_paged[
     dtype: DType,
     target: StaticString = "cpu",
@@ -108,7 +108,7 @@ def generic_fused_qkv_matmul_kv_cache_bshd_paged[
         ctx: The call context pointer, passed by the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -150,7 +150,7 @@ def generic_fused_qkv_matmul_kv_cache_bshd_paged[
         )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache[
     dtype: DType,
     collection_t: KVCollectionT,
@@ -203,7 +203,7 @@ def _fused_qkv_matmul_kv_cache[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_qkv_matmul_kv_cache_impl[
     dtype: DType,
     collection_t: KVCollectionT,
@@ -265,7 +265,7 @@ def _fused_qkv_matmul_kv_cache_impl[
 
     @__parameter
     @__copy_capture(q_dim, qk_offset, SEQ_LEN, k_cache, v_cache, valid_lengths)
-    @always_inline
+    @inline(.always)
     def write_to_cache[
         dtype_: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[dtype_, width]):
@@ -311,7 +311,7 @@ def _fused_qkv_matmul_kv_cache_impl[
     )
 
 
-@always_inline
+@inline(.always)
 def _matmul_common[
     dtype: DType,
     //,
@@ -387,7 +387,7 @@ def _matmul_common[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_fused_qk_rope_bshd_paged[
     dtype: DType,
     //,
@@ -419,7 +419,7 @@ def generic_fused_qk_rope_bshd_paged[
         context: Device context pointer for execution.
     """
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -474,7 +474,7 @@ def generic_fused_qk_rope_bshd_paged[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def generic_flash_attention_kv_cache_padded[
     collection_t: KVCollectionT,
     dtype: DType,
@@ -498,7 +498,7 @@ def generic_flash_attention_kv_cache_padded[
         LayoutTensor[dtype, Layout.row_major(UNKNOWN_VALUE), ImmutAnyOrigin]
     ] = None,
 ) raises:
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return String(";").join(
             Span(
@@ -799,7 +799,7 @@ def fused_qk_rms_norm_ragged_paged[
     var k_rows = Int(total_seq_len) * params.num_heads
     var rows = q_rows + k_rows
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return (
             trace_arg(
@@ -880,7 +880,7 @@ def fused_qk_rms_norm_ragged_paged[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _fused_qk_rms_norm_rope_process_row[
     cache_t: KVCacheT,
     q_out_layout: TensorLayout,
@@ -1209,7 +1209,7 @@ def _fused_qk_rms_norm_rope_ragged_paged_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def fused_qk_rms_norm_rope_ragged_paged[
     dtype: DType,
     q_out_dtype: DType,
@@ -1308,7 +1308,7 @@ def fused_qk_rms_norm_rope_ragged_paged[
     var k_rows = Int(total_seq_len) * params.num_heads
     var rows = q_rows + k_rows
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return (
             trace_arg(
@@ -1584,7 +1584,7 @@ def _fused_dual_qk_rms_norm_rope_ragged_paged_gpu[
         )
 
 
-@always_inline
+@inline(.always)
 def fused_dual_qk_rms_norm_rope_ragged_paged[
     dtype: DType,
     q_main_out_dtype: DType,
@@ -1736,7 +1736,7 @@ def fused_dual_qk_rms_norm_rope_ragged_paged[
     var k_index_rows = Int(total_seq_len) * index_params.num_heads
     var rows = q_main_rows + k_main_rows + q_index_rows + k_index_rows
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return (
             trace_arg(
@@ -1921,7 +1921,7 @@ def rms_norm_kv_cache_ragged_paged[
     else:
         shape[1] = rms_norm_cols
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(k_cache, input_row_offsets)
     def key_cache_input_fn[
@@ -1961,7 +1961,7 @@ def rms_norm_kv_cache_ragged_paged[
             head_dim_idx=head_dim_idx,
         ).cast[dtype]()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(k_cache)
     def key_cache_output_fn[
@@ -2008,7 +2008,7 @@ def rms_norm_kv_cache_ragged_paged[
         # `Coord` interface here (`coord_to_index_list` recovers the runtime
         # IndexList the cache logic subscripts) and pass `Coord(shape)`.
         @__parameter
-        @always_inline
+        @inline(.always)
         def key_cache_input_fn_coord[
             width: Int, alignment: Int
         ](coords: Coord) -> SIMD[dtype, width]:
@@ -2017,7 +2017,7 @@ def rms_norm_kv_cache_ragged_paged[
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def key_cache_output_fn_coord[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) -> None:
@@ -2094,7 +2094,7 @@ def rms_norm_value_cache_ragged_paged[
     else:
         shape[1] = rms_norm_cols
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(v_cache, input_row_offsets)
     def value_cache_input_fn[
@@ -2133,7 +2133,7 @@ def rms_norm_value_cache_ragged_paged[
             head_dim_idx=head_dim_idx,
         ).cast[dtype]()
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(v_cache)
     def value_cache_output_fn[
@@ -2178,7 +2178,7 @@ def rms_norm_value_cache_ragged_paged[
         # IndexList-form (runtime index subscripts) and are wrapped to the
         # `Coord` boundary `_rms_norm_impl` now expects.
         @__parameter
-        @always_inline
+        @inline(.always)
         def value_cache_input_fn_coord[
             width: Int, alignment: Int
         ](coords: Coord) -> SIMD[dtype, width]:
@@ -2187,7 +2187,7 @@ def rms_norm_value_cache_ragged_paged[
             )
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def value_cache_output_fn_coord[
             width: SIMDLength, alignment: Int
         ](coords: Coord, val: SIMD[dtype, width]) -> None:

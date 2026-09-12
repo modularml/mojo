@@ -132,7 +132,7 @@ comptime MAX_SPEC_DRAFT = 8
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _require_score_scratch[
     num_index_heads: Int
 ](
@@ -190,7 +190,7 @@ struct Struct_msa_indexer_ragged_paged:
     """Registers the `mo.msa.indexer.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         k_type: DType,
@@ -564,7 +564,7 @@ struct Struct_msa_attention_ragged_paged:
     """Registers the `mo.msa.attention.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         kv_type: DType,
@@ -978,7 +978,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
     """Registers the `mo.msa.attention.ragged.paged.mxfp8` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         kv_type: DType,
@@ -1295,7 +1295,7 @@ struct Struct_msa_attention_ragged_paged_mxfp6:
     """Registers the `mo.msa.attention.ragged.paged.mxfp6` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         kv_type: DType,

@@ -89,7 +89,7 @@ def run_reduce[
 
     ctx.enqueue_copy(cb_in.device_buffer(), in_host)
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def reduce_wrapper[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -139,7 +139,7 @@ def run_reduce[
             reduce_dim=axis,
         ](shape, StaticTuple[_, num_reductions](init), ctx)
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

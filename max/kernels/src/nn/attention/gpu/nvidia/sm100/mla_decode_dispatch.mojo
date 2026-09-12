@@ -64,7 +64,7 @@ comptime MAX_FOLD_Q = 8
 # The stdlib 2-predicate unswitch uses SwitchedFunction2 which is
 # `def[sw0: Bool, sw1: Bool]() -> None` (no raises). Sparse dispatch needs
 # raises, so this local helper takes a raising unified closure value.
-@always_inline
+@inline(.always)
 def _unswitch_raises[
     FuncType: def[sw0: Bool, sw1: Bool]() raises -> None
 ](
@@ -74,21 +74,21 @@ def _unswitch_raises[
 ) raises:
     if dynamic_switch_a:
 
-        @always_inline
+        @inline(.always)
         def switched_a_true[static_switch: Bool]() raises {imm}:
             switched_func[True, static_switch]()
 
         unswitch(dynamic_switch_b, switched_a_true)
     else:
 
-        @always_inline
+        @inline(.always)
         def switched_a_false[static_switch: Bool]() raises {imm}:
             switched_func[False, static_switch]()
 
         unswitch(dynamic_switch_b, switched_a_false)
 
 
-@always_inline
+@inline(.always)
 def _get_partition_bucket[half_sms: Int, i: Int]() -> Int:
     """Return the i-th partition bucket value.
 
@@ -1075,7 +1075,7 @@ def mla_decode_sm100_dispatch[
     # allowing np=2 with 2-3 pages per split instead of 1-2.
     # =========================================================================
     @__parameter
-    @always_inline
+    @inline(.always)
     def launch_impl[split_page_size_param: Int]() raises:
         _mla_decode_sm100_dispatch_impl[
             q_type=q_type,
@@ -1784,7 +1784,7 @@ def mla_decode_sm100_sink_split_k[
                     depth=mla_config.input_q_depth,
                 ](ctx, q_ptr, num_rows_q)
 
-                @always_inline
+                @inline(.always)
                 def _launch_sparse_kv_bf16[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
                 ]() raises {imm}:
@@ -1920,7 +1920,7 @@ def mla_decode_sm100_sink_split_k[
                 # so no separate SW64/FP8 gather4 descriptor is needed here.
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def _launch_sparse_qkv_fp8[
                     _has_extra_kv: Bool,
                     _has_variable_topk: Bool,
@@ -2022,7 +2022,7 @@ def mla_decode_sm100_sink_split_k[
                             logical_indices=logical_indices,
                         )
 
-                @always_inline
+                @inline(.always)
                 def _launch_sparse_qkv_fp8_fold_sel[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
                 ]() raises {imm}:
@@ -2066,7 +2066,7 @@ def mla_decode_sm100_sink_split_k[
                 ](ctx, q_ptr, num_rows_q)
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def _launch_sparse_kv_fp8[
                     _has_extra_kv: Bool,
                     _has_variable_topk: Bool,
@@ -2166,7 +2166,7 @@ def mla_decode_sm100_sink_split_k[
                             ctx,
                         )
 
-                @always_inline
+                @inline(.always)
                 def _launch_sparse_kv_fp8_fold_sel[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
                 ]() raises {imm}:
@@ -2255,7 +2255,7 @@ def mla_decode_sm100_sink_split_k[
                 depth=mla_config.input_q_depth,
             ](ctx, q_ptr, num_rows_q)
 
-            @always_inline
+            @inline(.always)
             def _launch_sparse[
                 _has_extra_kv: Bool, _has_variable_topk: Bool
             ]() raises {imm}:
@@ -2548,7 +2548,7 @@ def mla_decode_sm100_sink_split_k[
             }
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_r[
                 _fold_q: Bool,
                 _q_len_fold: Int,
@@ -2646,7 +2646,7 @@ def mla_decode_sm100_sink_split_k[
             var valid_len: ValidLengthType = {}
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_n[
                 _fold_q: Bool,
                 _q_len_fold: Int,
@@ -2815,7 +2815,7 @@ def mla_decode_sm100_sink_split_k[
             )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_enqueue_kernel[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -2983,7 +2983,7 @@ def launch_mla_sm100_decode_enqueue_kernel[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_native_fp8[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3093,7 +3093,7 @@ def launch_mla_sm100_decode_native_fp8[
 # 5-stage). Takes two configs because k_tma / o_tma are identical between
 # Layout E and Layout G — `config_e` types those, while `config_g`
 # (`decode_layout_g=True`) types the kernel struct and BM=32 Q TMA tile.
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_native_fp8_layout_g[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3204,7 +3204,7 @@ def launch_mla_sm100_decode_native_fp8_layout_g[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_fp8_per_token_scale_rope_aware[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3317,7 +3317,7 @@ def launch_mla_sm100_decode_fp8_per_token_scale_rope_aware[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_sparse[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3529,7 +3529,7 @@ def launch_mla_sm100_decode_sparse[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_sparse_kv_fp8[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3705,7 +3705,7 @@ def launch_mla_sm100_decode_sparse_kv_fp8[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_sparse_kv_bf16[
     q_type: DType,
     KVLUTType: MHAOperand,
@@ -3867,7 +3867,7 @@ def launch_mla_sm100_decode_sparse_kv_bf16[
     )
 
 
-@always_inline
+@inline(.always)
 def launch_mla_sm100_decode_sparse_qkv_fp8[
     q_type: DType,
     KVLUTType: MHAOperand,

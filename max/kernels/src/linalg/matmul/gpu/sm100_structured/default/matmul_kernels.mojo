@@ -273,19 +273,19 @@ struct B200MatmulSmem[
     var epilogue_load_tiles_storage: Self.EpilogueLoadTileArray.Storage
 
     # ========== Tile Accessors (Delegated) ==========
-    @always_inline
+    @inline(.always)
     def a_tiles(ref[AddressSpace.SHARED] self) -> Self.ATileArray:
         return self.input_tiles.a_tiles()
 
-    @always_inline
+    @inline(.always)
     def b_tiles(ref[AddressSpace.SHARED] self) -> Self.BTileArray:
         return self.input_tiles.b_tiles()
 
-    @always_inline
+    @inline(.always)
     def c_tiles(ref[AddressSpace.SHARED] self) -> Self.CTileArray:
         return self.output_tiles.c_tiles()
 
-    @always_inline
+    @inline(.always)
     def epilogue_load_tiles(
         ref[AddressSpace.SHARED] self,
     ) -> Self.EpilogueLoadTileArray:
@@ -312,26 +312,26 @@ struct B200MatmulSmem[
     # ========== Size Calculations ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def ab_pipeline_size() -> Int:
         """Total size of A+B tiles for all pipeline stages (in elements)."""
         return Self.ATileArray.num_elements + Self.BTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def c_output_size() -> Int:
         """Size of C tiles for all output stages (in elements)."""
         return Self.CTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def epilogue_load_tile_size() -> Int:
         """Size of epilogue load tiles for all stages (in elements). Zero when config.use_tma_epilogue_load=False.
         """
         return Self.EpilogueLoadTileArray.num_elements
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def total_tile_size() -> Int:
         """Total tile storage size (A+B+C+epilogue load) in elements."""
         return (
@@ -787,7 +787,7 @@ struct BlackwellMatmulSM100Kernel[
     comptime num_c_tma_descriptors = Self.output_writer_type.num_peers
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def write_output_tile[
         tma_origin: ImmOrigin
     ](
@@ -851,7 +851,7 @@ struct BlackwellMatmulSM100Kernel[
     # ========== Compile-Time Validation ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def validate_constraints():
         """Validate parameter constraints at compile time."""
         comptime assert Self.c_type in (
@@ -879,7 +879,7 @@ struct BlackwellMatmulSM100Kernel[
     # ========== Static Helper Methods ==========
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def init_barriers[
         use_tma_epilogue_load: Bool = False
     ](
@@ -959,7 +959,7 @@ struct BlackwellMatmulSM100Kernel[
         cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mma[
         tiles_origin: MutOrigin,
         //,
@@ -1028,7 +1028,7 @@ struct BlackwellMatmulSM100Kernel[
             mma_op.commit(tiles.mbar())
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -1124,7 +1124,7 @@ struct BlackwellMatmulSM100Kernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def prefetch_a_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -1194,7 +1194,7 @@ struct BlackwellMatmulSM100Kernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def complete_b_tiles(
         b_tma_op: Self.BTmaOp,
         stage: UInt32,
@@ -1251,7 +1251,7 @@ struct BlackwellMatmulSM100Kernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def prefetch_b_tiles[
         tiles_origin: MutOrigin,
         //,
@@ -1324,7 +1324,7 @@ struct BlackwellMatmulSM100Kernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def complete_a_tiles(
         a_tma_op: Self.ATmaOp,
         stage: UInt32,
@@ -1378,7 +1378,7 @@ struct BlackwellMatmulSM100Kernel[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_input_tiles_splitk[
         a_tma_origin: ImmOrigin,
         b_tma_origin: ImmOrigin,
@@ -1510,7 +1510,7 @@ struct BlackwellMatmulSM100Kernel[
     ]
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def epilogue_load_producer[
         _epi_pipeline_stages: Int,
     ](
@@ -1669,7 +1669,7 @@ struct BlackwellMatmulSM100Kernel[
                         epilogue_load_pipeline.producer_step()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)
@@ -2206,7 +2206,7 @@ struct BlackwellMatmulSM100Kernel[
             cluster_sync()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)
@@ -2614,7 +2614,7 @@ struct BlackwellMatmulSM100FallbackKernel[
 
     # ========== Validation ==========
     @staticmethod
-    @always_inline
+    @inline(.always)
     def validate_constraints():
         """Validate compile-time constraints for this kernel configuration."""
         comptime assert Self.num_threads == 128 or Self.num_threads == 256
@@ -2627,7 +2627,7 @@ struct BlackwellMatmulSM100FallbackKernel[
 
     # ========== Kernel Entry Point ==========
     @staticmethod
-    @always_inline
+    @inline(.always)
     @__llvm_metadata(`nvvm.cluster_dim`=Self.cluster_shape)
     @__llvm_arg_metadata(a_tma_op, `nvvm.grid_constant`)
     @__llvm_arg_metadata(b_tma_op, `nvvm.grid_constant`)

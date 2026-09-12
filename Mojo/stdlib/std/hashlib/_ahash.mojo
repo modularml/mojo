@@ -24,7 +24,7 @@ comptime MULTIPLE = 6364136223846793005
 comptime ROT = 23
 
 
-@always_inline
+@inline(.always)
 def _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
     """A fast function to emulate a folded multiply of two 64 bit uints.
 
@@ -42,7 +42,7 @@ def _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
     return res[0] ^ res[1]
 
 
-@always_inline
+@inline(.always)
 def _read_small(data: ImmPointer[UInt8, _], length: Int) -> U128:
     """Produce a `SIMD[DType.uint64, 2]` value from data which is smaller than or equal to `8` bytes.
 
@@ -127,7 +127,7 @@ struct AHasher[key: U256](Defaultable, Hasher):
         self.pad = pi_key[1]
         self.extra_keys = U128(pi_key[2], pi_key[3])
 
-    @always_inline
+    @inline(.always)
     def _update(mut self, new_data: UInt64):
         """Update the buffer value with new data.
 
@@ -136,7 +136,7 @@ struct AHasher[key: U256](Defaultable, Hasher):
         """
         self.buffer = _folded_multiply(new_data ^ self.buffer, MULTIPLE)
 
-    @always_inline
+    @inline(.always)
     def _large_update(mut self, new_data: U128):
         """Update the buffer value with new data.
 
@@ -222,7 +222,7 @@ struct AHasher[key: U256](Defaultable, Hasher):
                     ).cast[.uint64]()
                     self._large_update(U128(u64_1, u64_2))
 
-    @always_inline
+    @inline(.always)
     def finish(var self) -> UInt64:
         """Computes the hash value based on all the previously provided data.
 

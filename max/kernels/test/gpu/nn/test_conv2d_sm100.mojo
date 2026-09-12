@@ -559,7 +559,7 @@ def test_conv2d_epilogue_lambda[
     # Output shape is [M, N] where N = out_channels
     # Bias is [N], so we index by idx[1] (the column/channel index)
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(bias_tensor)
     def epilogue_add_bias[
         _dtype: DType,
@@ -758,7 +758,7 @@ def test_conv2d_bias_fusion[
 
     # Epilogue lambda: add bias (idx[1] = channel index in [M, N] output)
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(bias_tensor)
     def add_bias[
         _dtype: DType,
@@ -1190,7 +1190,7 @@ def test_conv_gpu_scale_epilogue[
     var out_ref_tt = TileTensor(out_ref_dev, output_tt_layout)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_epilogue_tt)
     def scale_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -1313,7 +1313,7 @@ def test_conv_gpu_additive_epilogue[
     var out_ref_tt = TileTensor(out_ref_dev, output_tt_layout)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_epilogue_tt)
     def add_bias_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1
@@ -1706,7 +1706,7 @@ def test_conv_gpu_residual_with_bias[
     var out_tt = TileTensor(out_dev, output_tt_layout)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_tt)
     def add_bias_epilogue[
         _dtype: DType, _rank: Int, _width: SIMDLength, _alignment: Int = 1

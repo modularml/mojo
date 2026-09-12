@@ -364,7 +364,7 @@ struct Naive2dConvolution[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _m_to_n_ho_wo_nhwc(m: Int, HO: Int, WO: Int) -> IndexList[3]:
     """Converts post-im2col m dimension index to pre-im2col coordinates on
     (N, Hout, Wout) dimensions.
@@ -383,7 +383,7 @@ def _m_to_n_ho_wo_nhwc(m: Int, HO: Int, WO: Int) -> IndexList[3]:
 
 
 # Reduce helper when the input channel dimension is partitioned.
-@always_inline
+@inline(.always)
 def _reduce_output[
     dtype: DType,
     //,
@@ -403,12 +403,12 @@ def _reduce_output[
     var buf_size = num_rows * F
 
     # Reduce from the output scratch buffer to the actual output.
-    @always_inline
+    @inline(.always)
     def reduce_task(tid: Int) {imm}:
         # Use all threads in reduction.
         var reduce_range = partition_work(tid, num_threads, num_rows, 1)
 
-        @always_inline
+        @inline(.always)
         def sum[
             width: Int
         ](offset: Int) {F, scratch, num_partitions, output, imm buf_size, mut}:
@@ -594,7 +594,7 @@ struct ConvDirectNHWC[
             ),
         )
 
-        @always_inline
+        @inline(.always)
         def task_func(
             task_id: Int,
         ) {
@@ -682,7 +682,7 @@ struct ConvDirectNHWC[
         """Loop over the batch and group dimensions. The two dimension are
         merged and partitioned for parallelism."""
 
-        @always_inline
+        @inline(.always)
         def body[padded: Bool]() {imm}:
             for ng in range(
                 self.partition.ng_offset,
@@ -707,7 +707,7 @@ struct ConvDirectNHWC[
             and Self.input_layout.rank() == 4
         # fmt: on
 
-        @always_inline
+        @inline(.always)
         def c_tile_iteration(c_tile_offset: Int, c_tile_size: Int) {imm}:
             # Only apply static shape optimizations to shapes with padding since
             # there is a fast path for pointwise (no padding) conv with strides.
@@ -774,7 +774,7 @@ struct ConvDirectNHWC[
             not padded
         ) and Self.input_layout.rank() == 4
 
-        @always_inline
+        @inline(.always)
         def f_tile_iteration[
             size: Int
         ](f_tile_offset: Int, f_tile_size: Int) {imm}:
@@ -841,7 +841,7 @@ struct ConvDirectNHWC[
                     c_tile_size,
                 )
 
-    @always_inline
+    @inline(.always)
     def is_new_c_accum(self, c_idx: Int) -> Bool:
         # returns true when processing first C in a group or first C in a C partition
         if self.conv_shape.num_groups > 1:
@@ -1010,7 +1010,7 @@ struct ConvDirectNHWC[
                     f_tile_size_bounded,
                 )
 
-    @always_inline
+    @inline(.always)
     def _init_output_micro_tile[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1040,7 +1040,7 @@ struct ConvDirectNHWC[
                     SIMD[Self.output_type, simd_size](0.0),
                 )
 
-    @always_inline
+    @inline(.always)
     def _load_output_micro_tile[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1098,7 +1098,7 @@ struct ConvDirectNHWC[
             else:
                 output_ptr = output_ptr + self.conv_shape.f
 
-    @always_inline
+    @inline(.always)
     def _store_output_micro_tile[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1157,7 +1157,7 @@ struct ConvDirectNHWC[
             else:
                 output_ptr = output_ptr + self.conv_shape.f
 
-    @always_inline
+    @inline(.always)
     def _accumulate[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1196,7 +1196,7 @@ struct ConvDirectNHWC[
             F % simd_size,
         )
 
-    @always_inline
+    @inline(.always)
     def _accumulate[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1258,9 +1258,9 @@ struct ConvDirectNHWC[
         comptime micro_kernel_height = get_direct_conv_micro_kernel_height()
         comptime micro_kernel_width = micro_kernel_f_size // simd_size
 
-        @always_inline
+        @inline(.always)
         def iteration[tile_size: Int](output_flat_coord: Int) {imm}:
-            @always_inline
+            @inline(.always)
             def body[c_fully_cached: Bool]() {imm}:
                 self.update_output_tile_no_padding[
                     tile_size,  # micro kernel height
@@ -1454,7 +1454,7 @@ struct ConvDirectNHWC[
 
         # The bases can't be captured mutably, so derive the per-tile
         # pointers from wo instead of incrementing across calls.
-        @always_inline
+        @inline(.always)
         def work_fn[height: Int, effected_by_padding: Bool](wo: Int) {imm}:
             conv1d_update_wo_tile[
                 height,
@@ -1536,7 +1536,7 @@ struct ConvDirectNHWC[
             # pointers from wo instead of incrementing across calls.
             # TODO(MOCO-4664): `var ho` copy-captures the loop variable to work
             # around wrong debug-info scopes on implicit nested-scope captures.
-            @always_inline
+            @inline(.always)
             def work_fn[
                 height: Int, effected_by_padding: Bool
             ](wo: Int) {var ho, imm}:
@@ -1631,7 +1631,7 @@ struct ConvDirectNHWC[
 
                 # The bases can't be captured mutably, so derive the per-tile
                 # pointers from wo instead of incrementing across calls.
-                @always_inline
+                @inline(.always)
                 def work_fn[
                     height: Int, effected_by_padding: Bool
                 ](wo: Int) {
@@ -1696,7 +1696,7 @@ struct ConvDirectNHWC[
             (self.partition.f_offset + self.partition.f_size) // simd_size
         ) * simd_size
 
-        @always_inline
+        @inline(.always)
         def f_tile_iteration[
             size: Int
         ](f_tile_offset: Int, f_tile_size: Int) {imm}:
@@ -1731,7 +1731,7 @@ struct ConvDirectNHWC[
                 last_c_tile,
             ](n, f_round_by_simd, simd_size, c_tile_offset, c_tile_size)
 
-    @always_inline
+    @inline(.always)
     def _h_loop_static[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -1858,7 +1858,7 @@ struct ConvDirectNHWC[
                 var conv = self
                 var stride_w = conv_attr_dyn.strides()[1]
 
-                @always_inline
+                @inline(.always)
                 def update_middle[
                     height: Int
                 ](wo: Int) {
@@ -1929,7 +1929,7 @@ struct ConvDirectNHWC[
                     WO - micro_kernel_height_rbound,  # offset in wo dimension
                 )
 
-    @always_inline
+    @inline(.always)
     def _inner_loops_static[
         micro_kernel_height: Int,
         micro_kernel_width: Int,
@@ -2097,7 +2097,7 @@ struct ConvDirectNHWC[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def accumulate_wo_tile_1d[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -2326,7 +2326,7 @@ def conv1d_update_wo_tile[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def accumulate_wo_tile_2d[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -2596,7 +2596,7 @@ def conv2d_update_wo_tile[
 
 
 # TODO: Simplify this with a rank parameter + recursion.
-@always_inline
+@inline(.always)
 def accumulate_wo_tile_3d[
     micro_kernel_height: Int,
     micro_kernel_width: Int,
@@ -2862,7 +2862,7 @@ def conv3d_update_wo_tile[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def pack_filter_shape_impl[
     filter_type: DType
 ](Q: Int, R: Int, S: Int, C: Int, F: Int, num_groups: Int) -> IndexList[6]:
@@ -2905,7 +2905,7 @@ def pack_filter_shape_impl[
     return output_shape
 
 
-@always_inline
+@inline(.always)
 def pack_conv_filter_shape(
     filter: TileTensor, num_groups: Int
 ) -> IndexList[filter.flat_rank + 1]:
@@ -2943,7 +2943,7 @@ def pack_conv_filter_shape(
     return packed_shape
 
 
-@always_inline
+@inline(.always)
 def pack_filter_shape[
     filter_type: DType,
     input_shape: IntTuple,
@@ -3029,7 +3029,7 @@ def pack_filter_shape[
     return packed_shape
 
 
-@always_inline
+@inline(.always)
 def _get_group_filter_base(
     packed_filter: LayoutTensor, group_idx: Int, f_per_group: Int
 ) -> UnsafePointer[
@@ -3065,7 +3065,7 @@ def _get_group_filter_base(
     return packed_filter.ptr + group_idx * group_size
 
 
-@always_inline
+@inline(.always)
 def pack_filter(
     filter: TileTensor,
     packed_filter: TileTensor[mut=True, ...],
@@ -3107,7 +3107,7 @@ def pack_filter(
         )
 
 
-@always_inline
+@inline(.always)
 def pack_filter_lt[
     simd_size: Int,
     micro_kernel_f_size: Int,  # 64
@@ -3175,7 +3175,7 @@ def pack_filter_lt[
 
         # TODO(MOCO-4664): `var g` copy-captures the loop variable to work
         # around wrong debug-info scopes on implicit nested-scope captures.
-        @always_inline
+        @inline(.always)
         def pack[
             f_tile_size: Int
         ](f_tile_start: Int) {
@@ -3231,7 +3231,7 @@ def pack_filter_lt[
                 packed_filter_ptr = packed_filter_ptr + simd_size
 
 
-@always_inline
+@inline(.always)
 def pack_filter_from_fcrs(
     filter: TileTensor,
     packed_filter: TileTensor[mut=True, ...],
@@ -3332,7 +3332,7 @@ def pack_filter_from_fcrs(
     dealloc(rscf_buf_alloc^)
 
 
-@always_inline
+@inline(.always)
 def conv_shape[
     input_type: DType,
     filter_type: DType,
@@ -3569,7 +3569,7 @@ def conv_nhwc_direct[
         not filter_packed and filter_lt.rank == input_lt.rank
     ), "Filter and input ranks mismatch."
 
-    @always_inline
+    @inline(.always)
     def description_fn() {imm} -> String:
         return ";".join(
             [
@@ -3600,14 +3600,14 @@ def conv_nhwc_direct[
         )
 
         # The closure updates a row segment of the output.
-        @always_inline
+        @inline(.always)
         @__parameter
         def elementwise_epilogue[
             rank: Int
         ](coords: IndexList[rank], f_size: Int):
             comptime simd_size = simd_width_of[output_type]()
 
-            @always_inline
+            @inline(.always)
             def body[width: Int](idx: Int) {coords, output_lt, mut}:
                 # Coordinates of the current index.
                 var curr_coords = rebind[IndexList[input_lt.rank]](coords)
@@ -3759,7 +3759,7 @@ def conv2d_gpu_naive_nhwc_rscf[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def check_cudnn_error(stat: cudnnStatus_t) raises:
     """Raises an error if a cuDNN call returns a non-success status.
 
@@ -4440,7 +4440,7 @@ def _conv_miopen[
         var R_dim = Int(filter.dim[2]())
         var S_dim = Int(filter.dim[3]())
 
-        @always_inline
+        @inline(.always)
         def transpose_fcrs_to_frsc[
             _width: Int, alignment: Int = 1
         ](coords: Coord) {
@@ -4475,7 +4475,7 @@ def _conv_miopen[
         var C_dim = Int(filter.dim[2]())
         var F_dim = Int(filter.dim[3]())
 
-        @always_inline
+        @inline(.always)
         def transpose_rscf_to_frsc[
             _width: Int, alignment: Int = 1
         ](coords: Coord) {
@@ -4514,7 +4514,7 @@ def _conv_miopen[
         var C_dim = Int(filter.dim[3]())
         var F_dim = Int(filter.dim[4]())
 
-        @always_inline
+        @inline(.always)
         def transpose_qrscf_to_fqrsc[
             _width: Int, alignment: Int = 1
         ](coords: Coord) {
@@ -4550,7 +4550,7 @@ def _conv_miopen[
         filter_shape[3] = UInt64(R_dim)
         filter_shape[4] = UInt64(S_dim)
 
-    @always_inline
+    @inline(.always)
     def image_shape_from_tensor(
         tensor: TileTensor,
     ) -> Array[UInt64, tensor_rank]:
@@ -4565,7 +4565,7 @@ def _conv_miopen[
     var input_shape = image_shape_from_tensor(input)
     var output_shape = image_shape_from_tensor(output)
 
-    @always_inline
+    @inline(.always)
     def int32_array_from_list[
         name: StaticString
     ](list: IndexList[conv_rank],) raises -> Array[Int32, conv_rank]:
@@ -4593,7 +4593,7 @@ def _conv_miopen[
         or ptr_meta[].dilation != dilation
     ):
 
-        @always_inline
+        @inline(.always)
         def strides_from_shape(
             shape: Array[UInt64, tensor_rank]
         ) -> Array[UInt64, tensor_rank]:
@@ -4786,7 +4786,7 @@ def _conv_miopen[
             ctx,
         )
 
-        @always_inline
+        @inline(.always)
         def miopen_epilogue[
             _width: Int, alignment: Int = 1
         ](coords: Coord) {var output_tmp}:
@@ -5108,7 +5108,7 @@ def conv_gpu[
             ):
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def _sm100_dispatch[
                     _epilogue: Optional[elementwise_epilogue_type] = None,
                 ]() raises:
@@ -5137,7 +5137,7 @@ def conv_gpu[
                     var hw = out_h * out_w
 
                     @__parameter
-                    @always_inline
+                    @inline(.always)
                     @__copy_capture(hw, out_w)
                     def sm100_void_epilogue[
                         _dtype: DType,
@@ -5278,7 +5278,7 @@ def conv_gpu[
             from linalg.utils import elementwise_epilogue_type as _ew_2d_t
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _amd_4wave_dispatch[
                 _epilogue_2d: Optional[_ew_2d_t] = None,
             ]() raises -> Bool:
@@ -5325,7 +5325,7 @@ def conv_gpu[
             # in-kernel. We pull `source_ptr`'s contents to host along
             # with the other two buffers and combine them in the loop.
             @__parameter
-            @always_inline
+            @inline(.always)
             def _audit_amd_4wave_vs_miopen() raises:
                 if getenv("MODULAR_CONV_AUDIT_MIOPEN", "0") != "1":
                     return
@@ -5475,7 +5475,7 @@ def conv_gpu[
                 var _amd_4wave_hw = _amd_4wave_out_h * _amd_4wave_out_w
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 @__copy_capture(_amd_4wave_hw, _amd_4wave_out_w)
                 def _amd_4wave_void_epilogue[
                     _dtype: DType,
@@ -5601,7 +5601,7 @@ def conv_gpu[
                     ctx,
                 )
 
-                @always_inline
+                @inline(.always)
                 def epilogue_wrapper[
                     _width: Int, alignment: Int = 1
                 ](coords: Coord) {var output_tmp_lt}:
@@ -5741,7 +5741,7 @@ def conv_gpu[
                     var _amd_3d_DHW = _amd_3d_D_out * _amd_3d_HW
 
                     @__parameter
-                    @always_inline
+                    @inline(.always)
                     @__copy_capture(_amd_3d_DHW, _amd_3d_HW, _amd_3d_W_out)
                     def amd_3d_void_epilogue[
                         _dtype: DType,

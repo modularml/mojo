@@ -278,7 +278,7 @@ struct AMDMatmul[
         # === Helpers ===
         var k_counter = 0
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def load_tiles_from_dram():
             var a_block = a_blockrow.tile[BM, BK](0, k_counter)
@@ -287,7 +287,7 @@ struct AMDMatmul[
             b_loader.load(b_load_reg, b_block.vectorize[1, simd_width]())
             k_counter += 1
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def copy_tiles_to_smem():
             comptime thread_layout = row_major[
@@ -328,7 +328,7 @@ struct AMDMatmul[
         ]()
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _bind[entry: ScheduleEntry]():
             comptime if entry.op.tag == LOAD_DRAM:
                 load_tiles_from_dram()

@@ -147,7 +147,7 @@ struct CacheEviction(Equatable, TrivialRegisterPassable):
         """
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def mnemonic(self) -> StaticString:
         """Returns the string mnemonic for this cache eviction policy.
 
@@ -206,7 +206,7 @@ struct Fill(Equatable, TrivialRegisterPassable, Writable):
         """
         return self._value == other._value
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes a string representation of the fill pattern.
 
@@ -292,7 +292,7 @@ struct Consistency(Equatable, TrivialRegisterPassable, Writable):
         """
         t"Consistency({self})".write_to(writer)
 
-    @always_inline
+    @inline(.always)
     def mnemonic(self) -> StaticString:
         """Returns the mnemonic string for the consistency level.
 
@@ -379,7 +379,7 @@ struct ReduceOp(Equatable, TrivialRegisterPassable, Writable):
         """
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes a string representation of the reduction operation.
 
@@ -388,7 +388,7 @@ struct ReduceOp(Equatable, TrivialRegisterPassable, Writable):
         """
         writer.write_string(self.mnemonic())
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes a string representation of the reduction operation.
 
@@ -397,7 +397,7 @@ struct ReduceOp(Equatable, TrivialRegisterPassable, Writable):
         """
         t"ReduceOp({self})".write_to(writer)
 
-    @always_inline
+    @inline(.always)
     def mnemonic(self) -> StaticString:
         """Returns the mnemonic string for the reduction operation.
 
@@ -419,7 +419,7 @@ struct ReduceOp(Equatable, TrivialRegisterPassable, Writable):
 
         return "unknown reduce operation"
 
-    @always_inline
+    @inline(.always)
     def _nvvm_reduction_code(self) -> Int:
         """Returns the llvm.nvvm TMA reduction-op immediate for this operation.
 
@@ -448,7 +448,7 @@ struct ReduceOp(Equatable, TrivialRegisterPassable, Writable):
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _mark_eviction[
     eviction_policy: CacheEviction = CacheEviction.EVICT_NORMAL
 ]() -> UInt64:
@@ -482,7 +482,7 @@ def _mark_eviction[
         ]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def async_copy[
     dtype: DType,
     //,
@@ -589,7 +589,7 @@ def async_copy[
 
         # Pack filling values into 4B registers.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _i32_repr[fill: Scalar[dtype]]() -> Int32:
             comptime if size_of[dtype]() == 1:
                 return bitcast[.int32, 1](
@@ -658,7 +658,7 @@ def async_copy[
             )
 
 
-@always_inline
+@inline(.always)
 def async_copy_commit_group():
     """Commits all prior initiated but uncommitted cp.async instructions into a cp.async-group.
 
@@ -684,7 +684,7 @@ def async_copy_commit_group():
         ]()
 
 
-@always_inline
+@inline(.always)
 def async_copy_wait_group(n: Int32):
     """Waits for the completion of `n` most recently committed cp.async-groups.
 
@@ -713,7 +713,7 @@ def async_copy_wait_group(n: Int32):
         ]()
 
 
-@always_inline
+@inline(.always)
 def async_copy_wait_all():
     """Waits for completion of all committed cp.async-groups.
 
@@ -740,7 +740,7 @@ def async_copy_wait_all():
         ]()
 
 
-@always_inline
+@inline(.always)
 def external_memory[
     dtype: TrivialRegisterPassable,
     *,
@@ -790,7 +790,7 @@ def external_memory[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def fence_proxy_tensormap_generic_sys_acquire[
     dtype: AnyType,
 ](ptr: Pointer[mut=True, dtype, _, address_space=.GENERIC], size: Int32,):
@@ -817,7 +817,7 @@ def fence_proxy_tensormap_generic_sys_acquire[
     ](ptr, size)
 
 
-@always_inline
+@inline(.always)
 def fence_proxy_tensormap_generic_sys_release():
     """Releases the system-wide memory fence for tensor map operations.
 
@@ -835,7 +835,7 @@ def fence_proxy_tensormap_generic_sys_release():
     ]()
 
 
-@always_inline
+@inline(.always)
 def fence_async_view_proxy():
     """Establishes a memory fence for shared memory view operations.
 
@@ -853,7 +853,7 @@ def fence_async_view_proxy():
     ]()
 
 
-@always_inline
+@inline(.always)
 def fence_mbarrier_init():
     """Creates a memory fence after mbarrier initialization.
 
@@ -875,7 +875,7 @@ def fence_mbarrier_init():
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_shared_cluster_global[
     dst_type: AnyType,
     src_type: AnyType,
@@ -945,7 +945,7 @@ def cp_async_bulk_shared_cluster_global[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_global_shared_cta[
     dst_type: AnyType,
     src_type: AnyType,
@@ -1010,7 +1010,7 @@ def cp_async_bulk_global_shared_cta[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_prefetch[
     src_type: AnyType,
     /,
@@ -1059,7 +1059,7 @@ def cp_async_bulk_prefetch[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_reduce_global_shared_cta[
     dtype: DType,
     /,
@@ -1149,7 +1149,7 @@ def cp_async_bulk_reduce_global_shared_cta[
         ](Int64(Int(dst_global)), Int32(Int(src_mem)), size)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_tensor_shared_cluster_global[
     dst_type: AnyType,  # Type of the destination memory
     mbr_type: AnyType,  # Type of the memory barrier
@@ -1352,7 +1352,7 @@ def cp_async_bulk_tensor_shared_cluster_global[
             )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_tensor_shared_cluster_global_elect[
     dst_type: AnyType,
     mbr_type: AnyType,
@@ -1579,7 +1579,7 @@ def cp_async_bulk_tensor_shared_cluster_global_elect[
             )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_tensor_2d_gather4[
     dst_type: AnyType,
     mbr_type: AnyType,
@@ -1673,7 +1673,7 @@ def cp_async_bulk_tensor_2d_gather4[
         )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_tensor_shared_cluster_global_im2col[
     dst_type: AnyType,
     mbr_type: AnyType,
@@ -1853,7 +1853,7 @@ def cp_async_bulk_tensor_shared_cluster_global_im2col[
             )
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def cp_async_bulk_tensor_shared_cluster_global_im2col_multicast[
     dst_type: AnyType,
     mbr_type: AnyType,
@@ -2042,7 +2042,7 @@ def cp_async_bulk_tensor_shared_cluster_global_im2col_multicast[
             )
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_tensor_shared_cluster_global_multicast[
     dst_type: AnyType,
     mbr_type: AnyType,
@@ -2229,7 +2229,7 @@ def cp_async_bulk_tensor_shared_cluster_global_multicast[
             )
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_tensor_global_shared_cta[
     src_type: AnyType,
     rank: Int,
@@ -2333,7 +2333,7 @@ def cp_async_bulk_tensor_global_shared_cta[
         )
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_tensor_global_shared_cta_elect[
     src_type: AnyType,
     rank: Int,
@@ -2538,7 +2538,7 @@ def cp_async_bulk_tensor_global_shared_cta_elect[
             )
 
 
-@always_inline
+@inline(.always)
 def cp_async_bulk_tensor_reduce_global_shared_cta[
     src_type: AnyType,
     rank: Int,
@@ -2638,7 +2638,7 @@ def cp_async_bulk_tensor_reduce_global_shared_cta[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _load_impl[
     dtype: DType,
     //,
@@ -2820,7 +2820,7 @@ def _load_impl[
         return lhs.join(rhs)._refine[new_size=width]()
 
 
-@always_inline
+@inline(.always)
 def load[
     dtype: DType,
     //,
@@ -2862,7 +2862,7 @@ def load[
     ](ptr)
 
 
-@always_inline
+@inline(.always)
 def load[
     OffsetType: Indexer,
     dtype: DType,
@@ -2914,7 +2914,7 @@ def load[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_multimem_ld_reduce_asm[
     dtype: DType,
     *,
@@ -2983,7 +2983,7 @@ def _get_multimem_ld_reduce_asm[
     return asm
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def multimem_ld_reduce[
     dtype: DType,
     *,
@@ -3103,7 +3103,7 @@ def multimem_ld_reduce[
     return StaticTuple[SIMD[dtype, output_width], count]()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def multimem_ld_reduce[
     dtype: DType,
     *,
@@ -3181,7 +3181,7 @@ def multimem_ld_reduce[
     return result
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _get_multimem_st_asm[
     dtype: DType,
     *,
@@ -3220,7 +3220,7 @@ def _get_multimem_st_asm[
     return asm
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def multimem_st[
     dtype: DType,
     *,

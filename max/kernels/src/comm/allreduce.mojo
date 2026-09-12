@@ -183,11 +183,11 @@ struct AllReduceAlgorithm(TrivialRegisterPassable, Writable):
     comptime LAMPORT = Self(2)
     """Barrier-free negative-zero sentinel path (small messages only)."""
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._value == other._value
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._value != other._value
 
@@ -543,7 +543,7 @@ def _naive_reduce_kernel_with_lambda[
             )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_naive_single[
     dtype: DType,
     ngpus: Int,
@@ -782,7 +782,7 @@ def _allreduce_2stage_kernel[
             tmp_out, row_major(rs_config.rank_part(_my_rank))
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         @__copy_capture(tmp_buff)
         def rs_output_lambda[
@@ -869,7 +869,7 @@ def _allreduce_2stage_kernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_1stage_reduce_store_one[
     dtype: DType,
     in_layout: TensorLayout,
@@ -1044,7 +1044,7 @@ def _allreduce_1stage_kernel[
         )
 
 
-@always_inline
+@inline(.always)
 def _lamport_supported() -> Bool:
     """Whether the current GPU target is cleared for the Lamport protocol.
 
@@ -1283,7 +1283,7 @@ def _allreduce_lamport_kernel[
                 state.store[volatile=True](Lamport.STATE_ARRIVAL, UInt32(0))
 
 
-@always_inline
+@inline(.always)
 def _allreduce_lamport_p2p[
     dtype: DType,
     ngpus: Int,
@@ -1372,7 +1372,7 @@ def _allreduce_lamport_p2p[
     )
 
 
-@always_inline
+@inline(.always)
 def _allreduce_p2p[
     dtype: DType,
     ngpus: Int,
@@ -1730,7 +1730,7 @@ def allreduce[
     if num_elements == 0:
         return
 
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(output_tensor)
     def default_output_lambda[

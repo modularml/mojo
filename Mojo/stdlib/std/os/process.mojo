@@ -159,21 +159,21 @@ struct Pipe:
             == 0
         )
 
-    @always_inline
+    @inline(.always)
     def set_input_only(mut self):
         """Close the output descriptor/ channel for this side of the pipe."""
         if self.fd_out:
             _ = close(Int32(rebind[Int](self.fd_out.value())))
             self.fd_out = None
 
-    @always_inline
+    @inline(.always)
     def set_output_only(mut self):
         """Close the input descriptor/ channel for this side of the pipe."""
         if self.fd_in:
             _ = close(Int32(rebind[Int](self.fd_in.value())))
             self.fd_in = None
 
-    @always_inline
+    @inline(.always)
     def write_bytes(mut self, bytes: Span[Byte, _]) raises:
         """Writes a span of bytes to the pipe.
 
@@ -188,7 +188,7 @@ struct Pipe:
         else:
             raise Error("Can not write from read only side of pipe")
 
-    @always_inline
+    @inline(.always)
     def read_bytes(mut self, buffer: MutSpan[Byte, _]) raises -> Int:
         """Read a number of bytes from this pipe.
 

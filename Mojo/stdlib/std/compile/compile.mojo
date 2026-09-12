@@ -132,7 +132,7 @@ struct CompiledFunctionInfo[
     """Function pointer to populate captured variables in the function closure.
     """
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """Writes the assembly/IR to a writer.
 
@@ -141,7 +141,7 @@ struct CompiledFunctionInfo[
         """
         return writer.write(self.asm)
 
-    @no_inline
+    @inline(.never)
     def write_text[path_like: PathLike](self, path: path_like) raises:
         """Writes the assembly/IR to a file.
 
@@ -157,7 +157,7 @@ struct CompiledFunctionInfo[
         """
         Path(path.__fspath__()).write_text(String(self))
 
-    @no_inline
+    @inline(.never)
     def __contains__(self, content: String) -> Bool:
         """Checks if content exists in the assembly/IR.
 
@@ -206,7 +206,7 @@ def _get_emission_kind_id[emission_kind: StaticString]() -> Int:
         return _EMISSION_KIND_ASM
 
 
-@always_inline
+@inline(.always)
 def compile_info[
     func_type: TrivialRegisterPassable,
     //,

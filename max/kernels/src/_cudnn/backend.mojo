@@ -58,7 +58,7 @@ def _init_dylib() -> OwnedDLHandle:
     )
 
 
-@always_inline
+@inline(.always)
 def _get_dylib_function[
     func_name: StaticString, result_type: TrivialRegisterPassable
 ]() raises -> result_type:
@@ -134,7 +134,7 @@ struct cudnnBackendKnobType_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_KNOB_TYPE_SPLIT_K:
             return writer.write_string("CUDNN_KNOB_TYPE_SPLIT_K")
@@ -214,7 +214,7 @@ struct cudnnBackendKnobType_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_KNOB_TYPE_COUNTS")
         abort("invalid cudnnBackendKnobType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendKnobType_t({self})".write_to(writer)
 
@@ -285,7 +285,7 @@ struct cudnnPointwiseMode_t(Equatable, TrivialRegisterPassable, Writable):
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_POINTWISE_ADD:
             return writer.write_string("CUDNN_POINTWISE_ADD")
@@ -389,7 +389,7 @@ struct cudnnPointwiseMode_t(Equatable, TrivialRegisterPassable, Writable):
             return writer.write_string("CUDNN_POINTWISE_BINARY_SELECT")
         abort("invalid cudnnPointwiseMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnPointwiseMode_t({self})".write_to(writer)
 
@@ -452,7 +452,7 @@ struct cudnnBackendDescriptorType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_BACKEND_POINTWISE_DESCRIPTOR:
             return writer.write_string("CUDNN_BACKEND_POINTWISE_DESCRIPTOR")
@@ -571,7 +571,7 @@ struct cudnnBackendDescriptorType_t(
             return writer.write_string("CUDNN_BACKEND_OPERATION_RNG_DESCRIPTOR")
         abort("invalid cudnnBackendDescriptorType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendDescriptorType_t({self})".write_to(writer)
 
@@ -623,7 +623,7 @@ struct cudnnBackendBehaviorNote_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_BEHAVIOR_NOTE_RUNTIME_COMPILATION:
             return writer.write_string(
@@ -641,7 +641,7 @@ struct cudnnBackendBehaviorNote_t(
             return writer.write_string("CUDNN_BEHAVIOR_NOTE_TYPE_COUNT")
         abort("invalid cudnnBackendBehaviorNote_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendBehaviorNote_t({self})".write_to(writer)
 
@@ -669,7 +669,7 @@ struct cudnnBackendLayoutType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_LAYOUT_TYPE_PREFERRED_NCHW:
             return writer.write_string("CUDNN_LAYOUT_TYPE_PREFERRED_NCHW")
@@ -683,7 +683,7 @@ struct cudnnBackendLayoutType_t(
             return writer.write_string("CUDNN_LAYOUT_TYPE_COUNT")
         abort("invalid cudnnBackendLayoutType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendLayoutType_t({self})".write_to(writer)
 
@@ -708,7 +708,7 @@ struct cudnnBackendNormFwdPhase_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NORM_FWD_INFERENCE:
             return writer.write_string("CUDNN_NORM_FWD_INFERENCE")
@@ -716,7 +716,7 @@ struct cudnnBackendNormFwdPhase_t(
             return writer.write_string("CUDNN_NORM_FWD_TRAINING")
         abort("invalid cudnnBackendNormFwdPhase_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendNormFwdPhase_t({self})".write_to(writer)
 
@@ -744,7 +744,7 @@ struct cudnnBackendHeurMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_HEUR_MODE_INSTANT:
             return writer.write_string("CUDNN_HEUR_MODE_INSTANT")
@@ -758,7 +758,7 @@ struct cudnnBackendHeurMode_t(
             return writer.write_string("CUDNN_HEUR_MODES_COUNT")
         abort("invalid cudnnBackendHeurMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendHeurMode_t({self})".write_to(writer)
 
@@ -796,7 +796,7 @@ struct cudnnBackendNumericalNote_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_NUMERICAL_NOTE_TENSOR_CORE:
             return writer.write_string("CUDNN_NUMERICAL_NOTE_TENSOR_CORE")
@@ -826,7 +826,7 @@ struct cudnnBackendNumericalNote_t(
             return writer.write_string("CUDNN_NUMERICAL_NOTE_TYPE_COUNT")
         abort("invalid cudnnBackendNumericalNote_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendNumericalNote_t({self})".write_to(writer)
 
@@ -891,7 +891,7 @@ struct cudnnBackendAttributeType_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_TYPE_HANDLE:
             return writer.write_string("CUDNN_TYPE_HANDLE")
@@ -955,7 +955,7 @@ struct cudnnBackendAttributeType_t(
             return writer.write_string("CUDNN_TYPE_RNG_DISTRIBUTION")
         abort("invalid cudnnBackendAttributeType_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendAttributeType_t({self})".write_to(writer)
 
@@ -981,7 +981,7 @@ struct cudnnRngDistribution_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_RNG_DISTRIBUTION_BERNOULLI:
             return writer.write_string("CUDNN_RNG_DISTRIBUTION_BERNOULLI")
@@ -991,7 +991,7 @@ struct cudnnRngDistribution_t(
             return writer.write_string("CUDNN_RNG_DISTRIBUTION_NORMAL")
         abort("invalid cudnnRngDistribution_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnRngDistribution_t({self})".write_to(writer)
 
@@ -1023,7 +1023,7 @@ struct cudnnBackendTensorReordering_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_TENSOR_REORDERING_NONE:
             return writer.write_string("CUDNN_TENSOR_REORDERING_NONE")
@@ -1033,7 +1033,7 @@ struct cudnnBackendTensorReordering_t(
             return writer.write_string("CUDNN_TENSOR_REORDERING_F16x16")
         abort("invalid cudnnBackendTensorReordering_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendTensorReordering_t({self})".write_to(writer)
 
@@ -1274,7 +1274,7 @@ struct cudnnBackendAttributeName_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_ATTR_POINTWISE_MODE:
             return writer.write_string("CUDNN_ATTR_POINTWISE_MODE")
@@ -1904,7 +1904,7 @@ struct cudnnBackendAttributeName_t(
             return writer.write_string("CUDNN_ATTR_OPERATION_RNG_OFFSET_DESC")
         abort("invalid cudnnBackendAttributeName_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendAttributeName_t({self})".write_to(writer)
 
@@ -1932,7 +1932,7 @@ struct cudnnBackendNormMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_LAYER_NORM:
             return writer.write_string("CUDNN_LAYER_NORM")
@@ -1946,7 +1946,7 @@ struct cudnnBackendNormMode_t(
             return writer.write_string("CUDNN_RMS_NORM")
         abort("invalid cudnnBackendNormMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBackendNormMode_t({self})".write_to(writer)
 
@@ -1971,7 +1971,7 @@ struct cudnnSignalMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_SIGNAL_SET:
             return writer.write_string("CUDNN_SIGNAL_SET")
@@ -1979,7 +1979,7 @@ struct cudnnSignalMode_t(
             return writer.write_string("CUDNN_SIGNAL_WAIT")
         abort("invalid cudnnSignalMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnSignalMode_t({self})".write_to(writer)
 
@@ -2007,7 +2007,7 @@ struct cudnnBnFinalizeStatsMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_BN_FINALIZE_STATISTICS_TRAINING:
             return writer.write_string("CUDNN_BN_FINALIZE_STATISTICS_TRAINING")
@@ -2015,7 +2015,7 @@ struct cudnnBnFinalizeStatsMode_t(
             return writer.write_string("CUDNN_BN_FINALIZE_STATISTICS_INFERENCE")
         abort("invalid cudnnBnFinalizeStatsMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnBnFinalizeStatsMode_t({self})".write_to(writer)
 
@@ -2039,13 +2039,13 @@ struct cudnnGenStatsMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_GENSTATS_SUM_SQSUM:
             return writer.write_string("CUDNN_GENSTATS_SUM_SQSUM")
         abort("invalid cudnnGenStatsMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnGenStatsMode_t({self})".write_to(writer)
 
@@ -2098,7 +2098,7 @@ struct cudnnResampleMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_RESAMPLE_NEAREST:
             return writer.write_string("CUDNN_RESAMPLE_NEAREST")
@@ -2114,7 +2114,7 @@ struct cudnnResampleMode_t(
             return writer.write_string("CUDNN_RESAMPLE_MAXPOOL")
         abort("invalid cudnnResampleMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnResampleMode_t({self})".write_to(writer)
 
@@ -2171,7 +2171,7 @@ struct cudnnPaddingMode_t(
     def __is__(self, other: Self) -> Bool:
         return self == other
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         if self is Self.CUDNN_ZERO_PAD:
             return writer.write_string("CUDNN_ZERO_PAD")
@@ -2181,7 +2181,7 @@ struct cudnnPaddingMode_t(
             return writer.write_string("CUDNN_EDGE_VAL_PAD")
         abort("invalid cudnnPaddingMode_t entry")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         t"cudnnPaddingMode_t({self})".write_to(writer)
 

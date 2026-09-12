@@ -171,7 +171,7 @@ struct MLASparseConfig[
     comptime k_swizzle_mode = TensorMapSwizzle.SWIZZLE_128B
     comptime output_swizzle_mode = TensorMapSwizzle.SWIZZLE_128B
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -317,7 +317,7 @@ struct QKMMAOp[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
     comptime NUM_TS_STAGES = 3
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def smem_descriptor_q(
         q_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -329,7 +329,7 @@ struct QKMMAOp[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
         ](q_smem)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def tmem_descriptor_q(
         q_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -341,7 +341,7 @@ struct QKMMAOp[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
         ](q_smem)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def descriptor_k_p0(
         k_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -353,7 +353,7 @@ struct QKMMAOp[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
         ](k_smem)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def descriptor_k_p1(
         k_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -413,7 +413,7 @@ struct SVMMAType[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
     # the MMA was reading cols permuted by the swizzle XOR and producing
     # wrong O values.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def descriptor_s(
         s_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -431,7 +431,7 @@ struct SVMMAType[dtype: DType, accum_dtype: DType, config: MLASparseConfig]:
     # one SV atom's per-CTA b_bmn (atom1 reads smem cols 0..127, atom2
     # reads cols 128..255 with a shifted base pointer).
     @staticmethod
-    @always_inline
+    @inline(.always)
     def descriptor_v(
         v_smem: UnsafePointer[Scalar[Self.dtype], address_space=.SHARED, ...],
     ) -> MMASmemDescriptorPair:
@@ -579,7 +579,7 @@ struct MLAPrefillSparseCommon[
     # CTAs in the pair (0b11) at cta_group=2, only self (0b1) at cta_group=1.
     comptime CTA_MASK: UInt16 = 0b11 if Self.config.cta_group == 2 else 0b1
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _load_q_prologue(
         full_q_ptr: UnsafePointer[
@@ -692,7 +692,7 @@ struct MLAPrefillSparseCommon[
                         ),
                     )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def mma[
         # Under FP8 the K/V producer warpgroups credit k_p*_ready /
@@ -945,7 +945,7 @@ struct MLAPrefillSparseCommon[
                 Self.CTA_MASK,
             )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def cp_q_from_smem_to_tmem(
         smem_desc: MMASmemDescriptorPair,
@@ -985,7 +985,7 @@ struct MLAPrefillSparseCommon[
                     sub_tile_desc.descriptor(),
                 )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _raw_indices_to_tma_rows(
         kv_lut: Self.KVLUTType, raw: SIMD[.int32, 4]
@@ -1012,7 +1012,7 @@ struct MLAPrefillSparseCommon[
             )
         return rows
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def kv_valid_producer(
         indices: TileTensor[.uint32, address_space=.GENERIC, ...],

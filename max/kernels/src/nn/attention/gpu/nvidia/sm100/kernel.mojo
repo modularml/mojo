@@ -348,7 +348,7 @@ struct SM100MHA2Q[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _entry_body(
         q_tma_op: Self.QTMAOpType,
         k_tma_op: Self.KTMAOpType,
@@ -434,7 +434,7 @@ struct SM100MHA2Q[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _kernel_impl(
         q_tma_op: Self.QTMAOpType,
         k_tma_op: Self.KTMAOpType,
@@ -878,7 +878,7 @@ struct SM100MHA2Q[
                 )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mask_status(
         mask: Self.MaskType,
         seq_id: UInt32,
@@ -895,7 +895,7 @@ struct SM100MHA2Q[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def descriptor_q(
         q_smem: SharedMemPointer[Scalar[Self.qkv_type]],
     ) -> MMASmemDescriptorPair:

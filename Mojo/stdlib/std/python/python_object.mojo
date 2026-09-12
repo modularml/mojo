@@ -80,7 +80,7 @@ struct _PyIter(ImplicitlyCopyable, Iterable, Iterator):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> PythonObject:
         """Return the next item and update to point to subsequent item.
 
@@ -177,7 +177,7 @@ struct PythonObject(
         """
         self = source^.to_python_object()
 
-    @always_inline
+    @inline(.always)
     def __init__[T: Movable & Deinitable](out self, *, var alloc: T) raises:
         """Allocate a new `PythonObject` and store a Mojo value in it.
 
@@ -318,7 +318,7 @@ struct PythonObject(
         """
         self = Self(from_owned=_slice_to_py_object_ptr(slice))
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, var *values: PythonObject, __list_literal__: NoneType
     ) raises:
@@ -336,7 +336,7 @@ struct PythonObject(
         """
         self = Python.list(*values^)
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self, var *values: PythonObject, __set_literal__: NoneType
     ) raises:
@@ -1360,7 +1360,7 @@ struct PythonObject(
         """
         return Python.float(self)
 
-    @no_inline
+    @inline(.never)
     def __str__(self) raises -> PythonObject:
         """Convert the PythonObject to a Python `str`.
 
@@ -1387,7 +1387,7 @@ struct PythonObject(
             # TODO: make this method raising when we can raise parametrically.
             abort(t"failed to write PythonObject to writer: {e}")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PythonObject` to a writer.
 
@@ -1635,7 +1635,7 @@ def _unsafe_alloc_init[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _unary_op[
     op: def(CPython, PyObjectPtr) thin -> PyObjectPtr
 ](obj: PythonObject) raises -> PythonObject:
@@ -1660,7 +1660,7 @@ def _unary_op[
     return PythonObject(from_owned=result)
 
 
-@always_inline
+@inline(.always)
 def _binary_op[
     op: def(CPython, PyObjectPtr, PyObjectPtr) thin -> PyObjectPtr
 ](lhs: PythonObject, rhs: PythonObject) raises -> PythonObject:
@@ -1686,7 +1686,7 @@ def _binary_op[
     return PythonObject(from_owned=result)
 
 
-@always_inline
+@inline(.always)
 def _power_op[
     op: def(CPython, PyObjectPtr, PyObjectPtr, PyObjectPtr) thin -> PyObjectPtr
 ](base: PythonObject, exp: PythonObject) raises -> PythonObject:
@@ -1712,7 +1712,7 @@ def _power_op[
     return PythonObject(from_owned=result)
 
 
-@always_inline
+@inline(.always)
 def _rich_compare[
     opid: c_int
 ](lhs: PythonObject, rhs: PythonObject) raises -> PythonObject:

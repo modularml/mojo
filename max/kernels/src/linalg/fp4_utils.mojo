@@ -111,7 +111,7 @@ comptime E2M1_TO_FLOAT32 = SIMD[.float32, 16](
 )
 
 
-@always_inline
+@inline(.always)
 def decode_e2m1_to_bf16[
     width: SIMDLength, //
 ](nibble: SIMD[.uint16, width]) -> SIMD[.bfloat16, width]:
@@ -158,7 +158,7 @@ def decode_e2m1_to_bf16[
     return bitcast[.bfloat16](sign | mag)
 
 
-@always_inline
+@inline(.always)
 def decode_e2m1_to_f16[
     width: SIMDLength, //
 ](nibble: SIMD[.uint16, width]) -> SIMD[.float16, width]:
@@ -205,7 +205,7 @@ def decode_e2m1_to_f16[
     return bitcast[.float16](sign | mag) * c2_14
 
 
-@always_inline
+@inline(.always)
 def decode_e2m1_to_f32[
     width: SIMDLength, //
 ](nibble: SIMD[.uint16, width]) -> SIMD[.float32, width]:
@@ -252,7 +252,7 @@ def decode_e2m1_to_f32[
     return bitcast[.float32](sign | mag)
 
 
-@always_inline
+@inline(.always)
 def decode_e2m1_to_f32_inject[
     width: SIMDLength, //
 ](nibble: SIMD[.uint16, width]) -> SIMD[.float32, width]:
@@ -312,7 +312,7 @@ def decode_e2m1_to_f32_inject[
     return bitcast[.float32](inj) * c2_126
 
 
-@always_inline
+@inline(.always)
 def compute_mxfp4_even_scale(max_val: Float32) -> Float8_e8m0fnu:
     """Computes the OCP MXFP4 E8M0 scale using even-mode rounding.
 
@@ -542,7 +542,7 @@ cvt.rn.f16x2.e2m1x2 $0, byte0;
     return bitcast[.float16, 2](result)
 
 
-@always_inline
+@inline(.always)
 def cast_float_to_fp4e2m1_amd[
     dtype: DType, width: SIMDLength, //
 ](input: SIMD[dtype, width], scale: Float32) -> UInt32:

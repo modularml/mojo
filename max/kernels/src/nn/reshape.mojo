@@ -21,7 +21,7 @@ from std.utils.index import IndexList
 
 # Reshape assumes inputs are contiguous. It should always be fused last and
 # a non-contiguous tensor cannot be fused *into* this as input.
-@always_inline
+@inline(.always)
 def reshape[
     dtype: DType,
     //,
@@ -77,7 +77,7 @@ def reshape[
     }
 
 
-@always_inline
+@inline(.always)
 def reshape_shape[
     output_rank: Int,
     input_type: DType,

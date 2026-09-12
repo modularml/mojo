@@ -372,7 +372,7 @@ def dispatch_im2col_matmul_conv2d[
             comptime epilogue_4d = maybe_epilogue_func.value()
 
             @__parameter
-            @always_inline
+            @inline(.always)
             @__copy_capture(HW_out, _W_out, m_offset)
             def _gemm_epilogue[
                 _dtype: DType,
@@ -595,7 +595,7 @@ def dispatch_fused_im2col_conv2d_apple[
         var HW_out = _H_out * _W_out
 
         @__parameter
-        @always_inline
+        @inline(.always)
         @__copy_capture(HW_out, _W_out)
         def _gemm_epilogue[
             _dtype: DType,

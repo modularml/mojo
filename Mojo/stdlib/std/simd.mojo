@@ -293,12 +293,12 @@ def _simd_construction_checks[dtype: DType, size: SIMDLength]():
     # ), "simd size is too large and must be less than 2^15"
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _has_native_bf16_support() -> Bool:
     return is_gpu()
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _has_native_f8_support() -> Bool:
     return _is_sm_9x_or_newer() or is_nvidia_gpu["sm_89"]() or is_amd_gpu()
 
@@ -307,7 +307,7 @@ def _has_native_f8_support() -> Bool:
 # `SIMD.{rotate,shift}_{left,right}` use `shufflevector` masks instead.
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _apple_rotate_mask[size: Int, shift: Int]() -> IndexList[size]:
     """Mask for `SIMD.rotate_left[shift]()` on Apple GPU; any sign of `shift`.
     """
@@ -317,7 +317,7 @@ def _apple_rotate_mask[size: Int, shift: Int]() -> IndexList[size]:
     return res
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _apple_shift_mask[size: Int, shift: Int]() -> IndexList[size]:
     """Mask for `SIMD.shift_{left,right}[shift]()` on Apple GPU.
 
@@ -669,7 +669,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # this overload stays out of the way of the `Floatable` constructor below:
     # spelled with `Self.dtype`, `Float64(x)` for an `Intable` and `Floatable`
     # `x` becomes ambiguous.
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[
         T: Intable, target_dtype: DType = DType.int
     ](out self: Scalar[target_dtype], value: T):
@@ -698,7 +698,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ), "constructing from an `Intable` value requires an integral dtype"
         self = Scalar[target_dtype](value.__int__())
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[T: IntableRaising](out self: Int, value: T) raises:
         """Initialize from a raising intable value.
 
@@ -713,7 +713,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         self = value.__int__()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__[
         other_dtype: DType, //
     ](out self, value: SIMD[other_dtype, Self.length], /):
@@ -791,7 +791,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         _simd_construction_checks[Self.dtype, Self.length]()
         self = Self(from_int)
 
-    @always_inline
+    @inline(.always)
     def __init__[T: Floatable, //](out self: Float64, value: T, /):
         """Initialize a Float64 from a type conforming to Floatable.
 
@@ -803,7 +803,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         self = value.__float__()
 
-    @always_inline
+    @inline(.always)
     def __init__[
         T: FloatableRaising, //
     ](out self: Float64, value: T, /) raises:
@@ -839,7 +839,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             Self._mlir_type,
         ]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @implicit
     def __init__(out self: SIMD[.bool, Self.length], value: Bool, /):
         """Initializes a Scalar with a bool value.
@@ -863,7 +863,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         _simd_construction_checks[Self.dtype, Self.length]()
         self._mlir_value = rebind[Self._Mask._mlir_type](value._mlir_value)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(out self: SIMD[.bool, Self.length], *, fill: Bool):
         """Initializes the SIMD vector with a bool value.
 
@@ -910,7 +910,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             value._mlir_value
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __init__(
         out self, *elems: Scalar[Self.dtype], __list_literal__: NoneType = None
     ):
@@ -940,7 +940,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             self[i] = elems[i]
 
     # TODO: should be "builtin" when constrained is replaced with 'requires'.
-    @always_inline("nodebug")
+    @inline(.nodebug)
     @implicit
     def __init__(out self, value: FloatLiteral, /):
         """Initializes the SIMD vector with a float.
@@ -984,7 +984,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         else:
             self = bitcast[Self.dtype, Self.length](from_bits)
 
-    @always_inline
+    @inline(.always)
     def __init__(out self: Self, *, py: PythonObject) raises:
         """Initialize a SIMD value from a PythonObject.
 
@@ -1027,7 +1027,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __getitem__(self, idx: Int) -> Scalar[Self.dtype]:
         """Gets an element from the vector.
 
@@ -1043,7 +1043,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             )
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __setitem__(mut self, idx: Int, val: Scalar[Self.dtype]):
         """Sets an element in the vector.
 
@@ -1130,7 +1130,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             mlir_value=__mlir_op.`pop.div`(self._mlir_value, rhs._mlir_value)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __floordiv__(self, rhs: Self) -> Self:
         """Returns the division of self and rhs rounded down to the nearest
         integer.
@@ -1158,7 +1158,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         )
         return is_zero_mask.select(Self(), floordiv)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __mod__(self, rhs: Self) -> Self:
         """Returns the remainder of self divided by rhs.
 
@@ -1193,7 +1193,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             var mod_result = mod + mask.select(rhs, Self(0))
             return is_zero_mask.select(Self(), mod_result)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __divmod__(self, denominator: Self) -> Tuple[Self, Self]:
         """Computes both the quotient and remainder using floor division.
 
@@ -1229,7 +1229,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         var mod_res = mod + mask.select(denominator, Self(0))
         return div_res, is_zero_mask.select(Self(0), mod_res)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __pow__(self, exp: SIMD[_, _]) -> Self:
         """Computes the vector raised to the power of the input integer value.
 
@@ -1255,7 +1255,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
                 SIMD[exp.dtype, self.length](rebind[Scalar[exp.dtype]](exp)),
             )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __pow__(self, exp: FloatLiteral) -> Self:
         """Computes the vector raised to the power of a float literal.
 
@@ -1278,7 +1278,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         return _pow(self, Self(exp))
 
     # TODO(#22771): remove this overload.
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __pow__(self, exp: Self) -> Self:
         """Computes the vector raised elementwise to the right hand side power.
 
@@ -1639,7 +1639,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # In place operations.
     # ===------------------------------------------------------------------=== #
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __iadd__(mut self, rhs: Self):
         """Performs in-place addition.
 
@@ -1652,7 +1652,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self + rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __isub__(mut self, rhs: Self):
         """Performs in-place subtraction.
 
@@ -1665,7 +1665,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self - rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __imul__(mut self, rhs: Self):
         """Performs in-place multiplication.
 
@@ -1678,7 +1678,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self * rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __itruediv__(mut self, rhs: Self):
         """In-place true divide operator.
 
@@ -1691,7 +1691,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self / rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ifloordiv__(mut self, rhs: Self):
         """In-place flood div operator.
 
@@ -1704,7 +1704,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self // rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __imod__(mut self, rhs: Self):
         """In-place mod operator.
 
@@ -1717,7 +1717,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self.__mod__(rhs)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ipow__(mut self, rhs: Int):
         """In-place pow operator.
 
@@ -1730,7 +1730,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         self = self.__pow__(rhs)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __iand__(mut self, rhs: Self):
         """Computes `self & rhs` and save the result in `self`.
 
@@ -1745,7 +1745,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ), "must be an integral or bool type"
         self = self & rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ixor__(mut self, rhs: Self):
         """Computes `self ^ rhs` and save the result in `self`.
 
@@ -1760,7 +1760,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ), "must be an integral or bool type"
         self = self ^ rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ior__(mut self, rhs: Self):
         """Computes `self | rhs` and save the result in `self`.
 
@@ -1775,7 +1775,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ), "must be an integral or bool type"
         self = self | rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __ilshift__(mut self, rhs: Self):
         """Computes `self << rhs` and save the result in `self`.
 
@@ -1788,7 +1788,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_integral(), "must be an integral type"
         self = self << rhs
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __irshift__(mut self, rhs: Self):
         """Computes `self >> rhs` and save the result in `self`.
 
@@ -1844,7 +1844,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         return value * self
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __rfloordiv__(self, rhs: Self) -> Self:
         """Returns the division of rhs and self rounded down to the nearest
         integer.
@@ -1861,7 +1861,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the type must be numeric"
         return rhs // self
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __rtruediv__(self, value: Self) -> Self:
         """Returns `value / self`.
 
@@ -1874,7 +1874,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the SIMD type must be numeric"
         return value / self
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __rmod__(self, value: Self) -> Self:
         """Returns `value mod self`.
 
@@ -1887,7 +1887,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.dtype.is_numeric(), "the type must be numeric"
         return value % self
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __rpow__(self, base: Self) -> Self:
         """Returns `base ** self`.
 
@@ -1991,7 +1991,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # ===------------------------------------------------------------------=== #
 
     @stable(since="1.1")
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__(self) -> Int:
         """Gets the length of the SIMD vector.
 
@@ -2014,7 +2014,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ](self._mlir_value, Self(0)._mlir_value)
         return Bool(mlir_value=__mlir_op.`pop.simd.reduce_or`(ne_zero))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
         then the fractional part is truncated.
@@ -2059,7 +2059,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             ](rebind[SIMD[Self.dtype, SIMDLength(1)]](self)._mlir_value)
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __float__(self) -> Float64:
         """Casts the value to a float.
 
@@ -2125,7 +2125,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return Self(mlir_value=__mlir_op.`pop.round`(self._mlir_value))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __round__(self, ndigits: Int) -> Self:
         """Performs elementwise rounding on the elements of a SIMD vector.
 
@@ -2189,7 +2189,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         hasher._update_with_simd(self)
 
-    @always_inline
+    @inline(.always)
     def __ceildiv__(self, denominator: Self) -> Self:
         """Return the rounded-up result of dividing self by denominator.
 
@@ -2244,7 +2244,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         return _calc_initial_buffer_size_int64(UInt64(n))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _refine[
         new_dtype: DType = Self.dtype, new_size: SIMDLength = Self.length
     ](self) -> SIMD[new_dtype, new_size]:
@@ -2259,7 +2259,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return rebind[SIMD[new_dtype, new_size]](self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def cast[target: DType](self) -> SIMD[target, Self.length]:
         """Casts the elements of the SIMD vector to the target element type.
 
@@ -2392,7 +2392,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         return self.gt(0) & (self & (self - 1)).eq(0)
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         """
         Formats this SIMD value to the provided Writer.
@@ -2420,7 +2420,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime if Self.length > 1:
             writer.write_string("]")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the string representation of the SIMD value.
 
@@ -2491,7 +2491,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime if Self.length > 1:
             writer.write_string("]")
 
-    @always_inline
+    @inline(.always)
     def to_bits[
         _dtype: DType = _uint_type_of_width[bit_width_of[Self.dtype]()]()
     ](self) -> SIMD[_dtype, Self.length]:
@@ -2516,7 +2516,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             comptime uint = _unsigned_integral_type_of[Self.dtype]()
             return bitcast[uint, Self.length](self).cast[_dtype]()
 
-    @always_inline
+    @inline(.always)
     def _to_bits_signed(
         self,
     ) -> SIMD[_integral_type_of[Self.dtype](), Self.length]:
@@ -2591,7 +2591,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         return max(min(self, upper_bound), lower_bound)
 
     # TODO: Move to global function.
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def fma[
         flag: FastMathFlag = FastMathFlag.CONTRACT
     ](self, multiplier: Self, accumulator: Self) -> Self:
@@ -2619,7 +2619,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             )
         )
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _shuffle_variadic[
         *mask: SIMDLength, output_size: Int = Self.length
     ](self, other: Self) -> SIMD[Self.dtype, output_size]:
@@ -2647,7 +2647,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime tup = StaticTuple[SIMDLength, output_size].__init__[*mask]()
         return self._shuffle_list[output_size, tup](other)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def _shuffle_list[
         output_size: SIMDLength, mask: StaticTuple[SIMDLength, output_size]
     ](self, other: Self) -> SIMD[Self.dtype, output_size]:
@@ -2678,7 +2678,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         ](self._mlir_value, other._mlir_value)
         return SIMD[Self.dtype, output_size](mlir_value=res)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shuffle[*mask: SIMDLength](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
@@ -2693,7 +2693,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return self._shuffle_variadic[*mask](self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shuffle[*mask: SIMDLength](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
@@ -2711,7 +2711,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return self._shuffle_variadic[*mask](other)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shuffle[mask: IndexList[Self.length, element_type=_]](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
@@ -2726,7 +2726,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return self._shuffle_list[Self.length, mask.as_index_tuple()](self)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def shuffle[
         mask: IndexList[Self.length, element_type=_]
     ](self, other: Self) -> Self:
@@ -2749,7 +2749,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Not an overload of shuffle because there is ambiguity
     # with def shuffle[*mask: Int](self, other: Self) -> Self:
     # TODO: move to the utils directory - see https://github.com/modular/modular/issues/3477
-    @always_inline
+    @inline(.always)
     def _dynamic_shuffle[
         mask_size: SIMDLength
     ](self, mask: SIMD[.uint8, mask_size]) -> SIMD[Self.dtype, mask_size]:
@@ -2820,7 +2820,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             res[i] = self[Int(mask[i])]
         return res
 
-    @always_inline
+    @inline(.always)
     def slice[
         output_width: Int, /, *, offset: Int = 0
     ](self) -> SIMD[Self.dtype, output_width]:
@@ -2843,7 +2843,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             0 <= offset < output_width + offset <= Self.length
         ), "output width must be a positive integer less than simd size"
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def slice_body() -> SIMD[Self.dtype, output_width]:
             var tmp = SIMD[Self.dtype, output_width]()
@@ -2869,7 +2869,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             has_side_effect=False,
         ](self, Int64(offset))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def insert[*, offset: Int = 0](self, value: SIMD[Self.dtype, _]) -> Self:
         """Returns a new vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
@@ -2904,7 +2904,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             "llvm.vector.insert", Self, has_side_effect=False
         ](self, value, Int64(offset))
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def join(self, other: Self) -> SIMD[Self.dtype, 2 * Int(Self.length)]:
         """Concatenates the two vectors together.
 
@@ -2923,7 +2923,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         return self._shuffle_list[2 * Self.length, indices()](other)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def interleave(self, other: Self) -> SIMD[Self.dtype, Int(Self.length) * 2]:
         """Constructs a vector by interleaving two input vectors.
 
@@ -2943,7 +2943,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             has_side_effect=False,
         ](self, other)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def split(
         self,
     ) -> Tuple[
@@ -2960,7 +2960,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         var lf = self.slice[half_size, offset=half_size]()
         return se, lf
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def deinterleave(
         self,
     ) -> Tuple[
@@ -3000,7 +3000,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
     comptime _T = SIMD[Self.dtype, _]
 
-    @always_inline
+    @inline(.always)
     def reduce[
         func: def[width: Int](Self._T[width], Self._T[width]) thin -> Self._T[
             width
@@ -3020,7 +3020,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             A new scalar which is the reduction of all vector elements.
         """
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def body[
             width: SIMDLength
@@ -3030,7 +3030,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         return self.reduce[body, size_out]()
 
     # TODO: remove when non-capturing can be converted to capturing.
-    @always_inline
+    @inline(.always)
     def reduce[
         func: def[width: SIMDLength](
             Self._T[width], Self._T[width]
@@ -3050,14 +3050,14 @@ struct SIMD[dtype: DType, length: SIMDLength](
             A new scalar which is the reduction of all vector elements.
         """
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def body[w: Int](lhs: Self._T[w], rhs: Self._T[w]) -> Self._T[w]:
             return func(lhs, rhs)
 
         return self.reduce[body, size_out]()
 
-    @always_inline
+    @inline(.always)
     def reduce[
         func: def[width: Int](
             Self._T[width], Self._T[width]
@@ -3077,7 +3077,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             A new scalar which is the reduction of all vector elements.
         """
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def body[
             width: SIMDLength
@@ -3086,7 +3086,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         return self.reduce[body, size_out]()
 
-    @always_inline
+    @inline(.always)
     def reduce[
         func: def[width: SIMDLength](
             Self._T[width], Self._T[width]
@@ -3115,7 +3115,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             var lhs, rhs = self.split()
             return func(lhs, rhs).reduce[func, size_out]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reduce_max[size_out: Int = 1](self) -> Self._T[size_out]:
         """Reduces the vector using the `max` operator.
 
@@ -3155,7 +3155,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
                 has_side_effect=False,
             ](self)._refine[new_size=size_out]()
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def reduce_min[size_out: Int = 1](self) -> SIMD[Self.dtype, size_out]:
         """Reduces the vector using the `min` operator.
 
@@ -3195,7 +3195,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
                 has_side_effect=False,
             ](self)._refine[new_size=size_out]()
 
-    @always_inline
+    @inline(.always)
     def reduce_add[size_out: Int = 1](self) -> SIMD[Self.dtype, size_out]:
         """Reduces the vector using the `add` operator.
 
@@ -3211,7 +3211,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return self.reduce[Self._T.__add__, size_out]()
 
-    @always_inline
+    @inline(.always)
     def reduce_mul[size_out: Int = 1](self) -> SIMD[Self.dtype, size_out]:
         """Reduces the vector using the `mul` operator.
 
@@ -3227,7 +3227,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
         return self.reduce[Self._T.__mul__, size_out]()
 
-    @always_inline
+    @inline(.always)
     def reduce_and[size_out: Int = 1](self) -> SIMD[Self.dtype, size_out]:
         """Reduces the vector using the bitwise `&` operator.
 
@@ -3260,7 +3260,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             has_side_effect=False,
         ](self)
 
-    @always_inline
+    @inline(.always)
     def reduce_or[size_out: Int = 1](self) -> SIMD[Self.dtype, size_out]:
         """Reduces the vector using the bitwise `|` operator.
 
@@ -3293,7 +3293,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             has_side_effect=False,
         ](self)
 
-    @always_inline
+    @inline(.always)
     def reduce_bit_count(self) -> Int:
         """Returns the total number of bits set in the SIMD vector.
 
@@ -3324,7 +3324,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # ===------------------------------------------------------------------=== #
 
     # TODO (7748): always_inline required to WAR LLVM codegen bug
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def select[
         _dtype: DType
     ](
@@ -3361,7 +3361,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Rotation operations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @inline(.always)
     def rotate_left[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the left by `shift`
         elements (with wrap-around).
@@ -3398,7 +3398,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
                 "llvm.vector.splice.right", Self, has_side_effect=False
             ](self, self, Int32(-shift))
 
-    @always_inline
+    @inline(.always)
     def rotate_right[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the right by `shift`
         elements (with wrap-around).
@@ -3428,7 +3428,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Shift operations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @inline(.always)
     def shift_left[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the left by `shift`
         elements (no wrap-around, fill with zero).
@@ -3464,7 +3464,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             "llvm.vector.splice.left", Self, has_side_effect=False
         ](self, Self(), Int32(shift))
 
-    @always_inline
+    @inline(.always)
     def shift_right[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the right by `shift`
         elements (no wrap-around, fill with zero).
@@ -3540,7 +3540,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     """The data type for the runtime integer value."""
 
     @staticmethod
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def __len__() -> Int:
         """Get the length (always 1 for scalar types).
 
@@ -3553,7 +3553,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.length == 1, "CoordLike requires length == 1"
         return 1
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def product(self) -> Scalar[Self.dtype]:
         """Calculate the product (returns the value for scalar types).
 
@@ -3566,7 +3566,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.length == 1, "CoordLike requires length == 1"
         return self[0]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def sum(self) -> Scalar[Self.dtype]:
         """Calculate the sum (returns the value for scalar types).
 
@@ -3579,7 +3579,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         comptime assert Self.length == 1, "CoordLike requires length == 1"
         return self[0]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def value(self) -> Scalar[Self.dtype]:
         """Get the scalar value.
 
@@ -3593,7 +3593,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
 
         return self[0]
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def tuple(var self) -> Coord[*Self.ParamListType]:
         """Get as a tuple (not valid for `Scalar` CoordLike).
 
@@ -3642,7 +3642,7 @@ def _tbl1(lookup_table: U8x16, indices: U8x16) -> U8x16:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _pow[
     width: SIMDLength
 ](base: SIMD[_, width], exp: SIMD[_, width], out result: type_of(base)):
@@ -3692,7 +3692,7 @@ def _pow[
         comptime assert False, "unsupported type combination"
 
 
-@always_inline
+@inline(.always)
 def _powf_scalar(
     base: Scalar, exponent: Scalar
 ) -> type_of(base) where base.dtype.is_floating_point():
@@ -3711,7 +3711,7 @@ def _powf_scalar(
     return std.math.exp(exponent.cast[base.dtype]() * std.math.log(base))
 
 
-@always_inline
+@inline(.always)
 def _powf[
     width: SIMDLength
 ](base: SIMD[_, width], exp: SIMD[_, width], out result: type_of(base)):
@@ -3727,7 +3727,7 @@ def _powf[
         result[i] = _powf_scalar(base[i], exp[i])
 
 
-@always_inline
+@inline(.always)
 def _powi(base: Scalar, exp: Int32) -> type_of(base):
     if base.dtype.is_integral() and exp < 0:
         if base == 1:
@@ -3760,7 +3760,7 @@ def _powi(base: Scalar, exp: Int32) -> type_of(base):
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _convert_float8_to_f32_scalar[
     dtype: DType,
     //,
@@ -3821,7 +3821,7 @@ def _convert_float8_to_f32_scalar[
     return result
 
 
-@always_inline
+@inline(.always)
 def _convert_float8_to_f32[
     dtype: DType,
     size: SIMDLength,
@@ -3854,7 +3854,7 @@ def _convert_float8_to_f32[
 
     else:
 
-        @always_inline
+        @inline(.always)
         def wrapper_fn[
             input_dtype: DType, result_dtype: DType
         ](val: Scalar[input_dtype]) -> Scalar[result_dtype]:
@@ -3863,7 +3863,7 @@ def _convert_float8_to_f32[
         return _simd_apply[wrapper_fn, result_dtype=DType.float32](val)
 
 
-@always_inline
+@inline(.always)
 def _convert_float8_to_f16[
     dtype: DType,
     size: SIMDLength,
@@ -3881,7 +3881,7 @@ def _convert_float8_to_f16[
         return _convert_float8_to_f32(val).cast[DType.float16]()
 
 
-@always_inline
+@inline(.always)
 def _convert_f32_to_float8[
     dtype: DType,
     size: SIMDLength,
@@ -3909,7 +3909,7 @@ def _convert_f32_to_float8[
         return SIMD(mlir_value=res)
     else:
 
-        @always_inline
+        @inline(.always)
         def wrapper_fn[
             input_dtype: DType, result_dtype: DType
         ](val: Scalar[input_dtype]) -> Scalar[result_dtype]:
@@ -3918,7 +3918,7 @@ def _convert_f32_to_float8[
         return _simd_apply[wrapper_fn, result_dtype=target](val)
 
 
-@always_inline
+@inline(.always)
 def _convert_f32_to_float8_scalar[
     dtype: DType,
     //,
@@ -4026,7 +4026,7 @@ def _convert_f32_to_float8_scalar[
     return bitcast[target](sign | u)
 
 
-@always_inline
+@inline(.always)
 def _convert_f32_to_float8_ue8m0_scalar[
     dtype: DType,
     //,
@@ -4065,7 +4065,7 @@ def _convert_f32_to_float8_ue8m0_scalar[
     return bitcast[target, 1](exp)
 
 
-@always_inline
+@inline(.always)
 def _convert_f32_to_float8_ue8m0[
     dtype: DType,
     size: SIMDLength,
@@ -4113,7 +4113,7 @@ def _convert_f32_to_float8_ue8m0[
             return ui8x2[0]
     else:
 
-        @always_inline
+        @inline(.always)
         def wrapper_fn[
             input_dtype: DType, result_dtype: DType
         ](val: Scalar[input_dtype]) -> Scalar[result_dtype]:
@@ -4124,7 +4124,7 @@ def _convert_f32_to_float8_ue8m0[
         return _simd_apply[wrapper_fn, result_dtype=target](val)
 
 
-@always_inline
+@inline(.always)
 def _convert_float8_ue8m0_to_f32[
     dtype: DType,
     size: SIMDLength,
@@ -4196,7 +4196,7 @@ def _convert_float8_ue8m0_to_f32[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _bfloat16_to_f32_scalar(
     val: BFloat16,
 ) -> Float32:
@@ -4213,11 +4213,11 @@ def _bfloat16_to_f32_scalar(
     return bitcast[DType.float32, 1](SIMD[.bfloat16, 2](0, val))
 
 
-@always_inline
+@inline(.always)
 def _bfloat16_to_f32[
     size: SIMDLength
 ](val: SIMD[.bfloat16, size]) -> SIMD[.float32, size]:
-    @always_inline
+    @inline(.always)
     def wrapper_fn[
         input_dtype: DType, result_dtype: DType
     ](val: Scalar[input_dtype]) -> Scalar[result_dtype]:
@@ -4233,7 +4233,7 @@ def _bfloat16_to_f32[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _simd_apply[
     input_dtype: DType,
     simd_width: SIMDLength,
@@ -4267,7 +4267,7 @@ def _simd_apply[
     return result
 
 
-@always_inline
+@inline(.always)
 def _simd_apply[
     simd_width: SIMDLength,
     //,

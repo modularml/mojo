@@ -128,7 +128,7 @@ comptime IndexCollection = PagedKVCacheCollection[
 ]
 
 
-@always_inline
+@inline(.always)
 def _any(
     ptr: MutPointer[Scalar[OUT_DTYPE], ...],
 ) -> MutPointer[Scalar[OUT_DTYPE], MutAnyOrigin]:
@@ -315,7 +315,7 @@ def bench_shape[
     )
 
     # ============ FUSED: one GEMM, scatter from the epilogue ============
-    @always_inline
+    @inline(.always)
     def fused_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {
@@ -393,7 +393,7 @@ def bench_shape[
                 ctx,
             )
 
-    @always_inline
+    @inline(.always)
     def fused_bench(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, fused_launch, ctx)
 
@@ -414,7 +414,7 @@ def bench_shape[
     )
 
     # ============ UNFUSED: one dense GEMM per output band ============
-    @always_inline
+    @inline(.always)
     def unfused_launch(
         ctx: DeviceContext, iteration: Int
     ) raises {
@@ -447,7 +447,7 @@ def bench_shape[
 
         # Q band: the only wide one (N=2048); the rest are N=128.
         @__parameter
-        @always_inline
+        @inline(.always)
         def band[
             band_n: Int
         ](
@@ -498,7 +498,7 @@ def bench_shape[
         # Placing K/V (and IndexK) is the other half of what the fused epilogue
         # does, so the unfused path pays for those paged-store launches on top
         # of its band GEMMs.
-        @always_inline
+        @inline(.always)
         @__copy_capture(kv_out_ptr)
         def k_in[
             width: Int, alignment: Int
@@ -507,7 +507,7 @@ def bench_shape[
                 width=width
             ]()
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(kv_out_ptr, total_seq)
         def v_in[
             width: Int, alignment: Int
@@ -516,7 +516,7 @@ def bench_shape[
                 _any(kv_out_ptr) + total_seq * kv_dim + idx[0] * kv_dim + idx[2]
             ).load[width=width]()
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(kv_out_ptr, total_seq)
         def ik_in[
             width: Int, alignment: Int
@@ -548,7 +548,7 @@ def bench_shape[
                 ctx,
             )
 
-    @always_inline
+    @inline(.always)
     def unfused_bench(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, unfused_launch, ctx)
 

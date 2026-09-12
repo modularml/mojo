@@ -82,7 +82,7 @@ struct Struct_kv_cache_store_paged:
     """Registers the `mo.kv_cache.store.paged.ragged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -118,7 +118,7 @@ struct Struct_kv_cache_store_paged:
             cache = paged_kv_collection.get_value_cache(Int(layer_idx))
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](idx: IndexList[3]) capturing -> SIMD[kv_type, width]:
@@ -144,7 +144,7 @@ struct Struct_kv_cache_store_k_scales_paged:
     """Registers the `mo.kv_cache.store_k_scales.paged.ragged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         cache_dtype: DType,
@@ -300,7 +300,7 @@ struct Struct_kv_cache_store_padded:
     """Registers the `mo.kv_cache.store.paged.padded` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType, target: StaticString, key_or_value: Int
@@ -333,7 +333,7 @@ struct Struct_kv_cache_store_padded:
             cache = paged_kv_collection.get_value_cache(Int(layer_idx))
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def input_fn[
             width: Int, alignment: Int
         ](idx: IndexList[4]) capturing -> SIMD[dtype, width]:
@@ -356,7 +356,7 @@ struct Struct_rms_norm_kv_cache_ragged_paged:
     """Registers the `mo.rms_norm_kv_cache.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -409,7 +409,7 @@ struct Struct_fused_qk_rms_norm_ragged_paged:
     """Registers the `mo.fused_qk_rms_norm.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -468,7 +468,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged[interleaved: Bool]:
             false, rotates pairs separated by half the head dimension.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -511,7 +511,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged[interleaved: Bool]:
             max_cache_length,
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def q_input_fn[
             width: Int, alignment: Int
@@ -556,7 +556,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
             both bands (they use the same rope table).
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -619,7 +619,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
             index_max_cache_length,
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def main_q_input_fn[
             width: Int, alignment: Int
@@ -628,7 +628,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
                 width=width, element_alignment=alignment
             ](IndexList[3](token, head, col))
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def index_q_input_fn[
             width: Int, alignment: Int
@@ -667,7 +667,7 @@ struct Struct_rms_norm_value_cache_ragged_paged:
     """Registers the `mo.rms_norm_value_cache.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -720,7 +720,7 @@ struct Struct_print_kv_cache_paged:
     """Registers the `mo.print_kv_cache.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -760,7 +760,7 @@ struct Struct_kv_matmul_ragged_paged:
     """Registers the `mo.kv_matmul.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -802,7 +802,7 @@ struct Struct_k_matmul_ragged_paged:
     """Registers the `mo.k_matmul.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -844,7 +844,7 @@ struct Struct_k_matmul_ragged_paged_scale:
     """Registers the `mo.k_matmul.ragged.paged.scale` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -900,7 +900,7 @@ struct Struct_kv_cache_row_offsets_ragged_paged:
     """Registers the `mo.kv_cache.row_offsets.ragged.paged` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         target: StaticString,
@@ -923,7 +923,7 @@ struct Struct_kv_cache_ragged_paged_radd:
     """Registers the `mo.kv_cache.ragged.paged.radd` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,
@@ -966,7 +966,7 @@ struct Struct_kv_cache_ragged_paged_2m_iadd:
     """Registers the `mo.kv_cache.ragged.paged.2m_iadd` graph op with the graph compiler.
     """
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def execute[
         dtype: DType,

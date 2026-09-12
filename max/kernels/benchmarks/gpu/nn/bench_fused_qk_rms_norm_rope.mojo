@@ -251,7 +251,7 @@ def bench_fused_qk_rms_norm_rope[
         kv_blocks_fused_d, kv_block_rt
     )
 
-    @always_inline
+    @inline(.always)
     def bench_two_step(
         mut b: Bencher,
     ) {
@@ -268,7 +268,7 @@ def bench_fused_qk_rms_norm_rope[
         var max_cache_len,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             var kv_ref = PagedKVCacheCollection[dtype, kv_params, page_size](
                 kv_blocks_ref_lt,
@@ -317,7 +317,7 @@ def bench_fused_qk_rms_norm_rope[
         ),
     )
 
-    @always_inline
+    @inline(.always)
     def bench_fused(
         mut b: Bencher,
     ) {
@@ -334,7 +334,7 @@ def bench_fused_qk_rms_norm_rope[
         var max_cache_len,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             var kv_fused = PagedKVCacheCollection[dtype, kv_params, page_size](
                 kv_blocks_fused_lt,
@@ -345,7 +345,7 @@ def bench_fused_qk_rms_norm_rope[
             )
             var q_src = q_fused_tile.as_immut()
 
-            @always_inline
+            @inline(.always)
             @__parameter
             @__copy_capture(q_src)
             def q_input_fn[

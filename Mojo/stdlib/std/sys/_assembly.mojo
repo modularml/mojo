@@ -22,7 +22,7 @@ from std.sys import inlined_assembly
 from std.collections.string.string_span import _get_kgen_string
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def inlined_assembly[
     asm: StaticString,
     result_type: TrivialRegisterPassable,

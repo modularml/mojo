@@ -106,11 +106,11 @@ def bench_decode[
     ](batch_size, num_keys, 1, ctx)
     var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {var cb_q, var cb_k, var cb_o, var scalar_args_buf_lt, imm,}:
-        @always_inline
+        @inline(.always)
         def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var q_device = TileTensor(
                 cb_q.offset_ptr(iteration),
@@ -280,7 +280,7 @@ def bench_prefill[
         row_major(Coord(batch_size + 1)),
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {
@@ -293,7 +293,7 @@ def bench_prefill[
         var cache_row_offsets_device,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var q_device = TileTensor(
                 cb_q.offset_ptr(iteration),
@@ -541,7 +541,7 @@ def bench_prefill_sparse[
         group=num_heads,
     )
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {
@@ -553,7 +553,7 @@ def bench_prefill_sparse[
         var scale,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def _kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var q_tt = TileTensor(
                 cb_q.offset_ptr(iteration),

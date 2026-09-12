@@ -507,7 +507,7 @@ def _log2_floor(n: Int) -> Int:
     return Int(floor(log2(Float64(n))))
 
 
-@always_inline
+@inline(.always)
 def _log2_ceil(n: Scalar) -> type_of(n):
     return {ceil(log2(Float64(n)))}
 

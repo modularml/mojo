@@ -25,7 +25,7 @@ from max.gpu.host import DeviceAttribute, DeviceContext
 from max.gpu.sync import barrier
 
 
-@always_inline
+@inline(.always)
 def _device_scope() -> StaticString:
     comptime if is_amd_gpu():
         return "agent"
@@ -105,14 +105,14 @@ struct CoopRow[group_size: Int](TrivialRegisterPassable):
     var _round: Int
     var _phase: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, row: Int, rank: Int):
         self.rank = rank
         self._row = row
         self._round = 0
         self._phase = 0
 
-    @always_inline
+    @inline(.always)
     def _counter(
         self, workspace: UnsafePointer[Int32, MutAnyOrigin]
     ) -> UnsafePointer[Int32, MutAnyOrigin]:
@@ -120,7 +120,7 @@ struct CoopRow[group_size: Int](TrivialRegisterPassable):
             _COOP_CONTROL_WORDS + 2 * Self.group_size * COOP_SLOT_FLOATS
         )
 
-    @always_inline
+    @inline(.always)
     def _slots(
         self, workspace: UnsafePointer[Int32, MutAnyOrigin]
     ) -> UnsafePointer[Float32, MutAnyOrigin]:
@@ -128,7 +128,7 @@ struct CoopRow[group_size: Int](TrivialRegisterPassable):
             Float32
         ]()
 
-    @always_inline
+    @inline(.always)
     def _arrive_and_wait(
         mut self, workspace: UnsafePointer[Int32, MutAnyOrigin]
     ):
@@ -163,12 +163,12 @@ struct CoopRow[group_size: Int](TrivialRegisterPassable):
             fence[ordering=Ordering.ACQUIRE, scope=_DEVICE_SCOPE]()
         barrier()
 
-    @always_inline
+    @inline(.always)
     def sync(mut self, workspace: UnsafePointer[Int32, MutAnyOrigin]):
         """Makes each block's preceding global writes visible to its peers."""
         self._arrive_and_wait(workspace)
 
-    @always_inline
+    @inline(.always)
     def gather[
         width: Int
     ](
@@ -203,7 +203,7 @@ struct CoopRow[group_size: Int](TrivialRegisterPassable):
             )
         barrier()
 
-    @always_inline
+    @inline(.always)
     def combine[
         width: Int, combine_fn: _ReduceFn
     ](

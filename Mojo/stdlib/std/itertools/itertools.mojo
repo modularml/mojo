@@ -46,22 +46,22 @@ struct _CountIterator(
     var start: Int
     var step: Int
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Int:
         var result = self.start
         self.start += self.step
         return result
 
 
-@always_inline
+@inline(.always)
 def count(start: Int = 0, step: Int = 1) -> _CountIterator:
     """Constructs an iterator that starts at the value `start` with a stride of
     `step`.
@@ -128,7 +128,7 @@ struct _Product2[IteratorTypeA: Iterator, IteratorTypeB: Copyable & Iterator](
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -175,7 +175,7 @@ struct _Product2[IteratorTypeA: Iterator, IteratorTypeB: Copyable & Iterator](
         return (lower_bound, upper_bound)
 
 
-@always_inline
+@inline(.always)
 def product[
     IterableTypeA: Iterable, IterableTypeB: Iterable
 ](ref iterable_a: IterableTypeA, ref iterable_b: IterableTypeB) -> _Product2[
@@ -312,7 +312,7 @@ struct _Product3[
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -324,7 +324,7 @@ struct _Product3[
         return self._inner.bounds()
 
 
-@always_inline
+@inline(.always)
 def product[
     IterableTypeA: Iterable, IterableTypeB: Iterable, IterableTypeC: Iterable
 ](
@@ -443,7 +443,7 @@ struct _Product4[
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
@@ -455,7 +455,7 @@ struct _Product4[
         return self._inner.bounds()
 
 
-@always_inline
+@inline(.always)
 def product[
     IterableTypeA: Iterable,
     IterableTypeB: Iterable,
@@ -534,7 +534,7 @@ def product[
     }
 
 
-@always_inline
+@inline(.always)
 def product(
     var iterable_a: Some[IterableOwned],
     var iterable_b: Some[IterableOwned],
@@ -563,7 +563,7 @@ def product(
     }
 
 
-@always_inline
+@inline(.always)
 def product(
     var iterable_a: Some[IterableOwned],
     var iterable_b: Some[IterableOwned],
@@ -603,7 +603,7 @@ def product(
     }
 
 
-@always_inline
+@inline(.always)
 def product(
     var iterable_a: Some[IterableOwned],
     var iterable_b: Some[IterableOwned],
@@ -689,15 +689,15 @@ struct _CycleIterator[InnerIteratorType: Iterator & Copyable](
         self._orig = iterator.copy()
         self._iter = iterator^
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         try:
             return next(self._iter)
@@ -708,7 +708,7 @@ struct _CycleIterator[InnerIteratorType: Iterator & Copyable](
             return next(self._iter)
 
 
-@always_inline
+@inline(.always)
 def cycle[
     IterableType: Iterable
 ](ref iterable: IterableType) -> _CycleIterator[
@@ -755,7 +755,7 @@ def cycle[
     return _CycleIterator(iter(iterable))
 
 
-@always_inline
+@inline(.always)
 def cycle(
     var iterable: Some[IterableOwned],
 ) -> _CycleIterator[type_of(iterable).IteratorOwnedType] where conforms_to(
@@ -821,7 +821,7 @@ struct _TakeWhileIterator[
         self._inner = copy._inner.copy()
         self._exhausted = copy._exhausted
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where conforms_to(
@@ -829,11 +829,11 @@ struct _TakeWhileIterator[
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         comptime assert conforms_to(Self.Element, Deinitable)
 
@@ -848,7 +848,7 @@ struct _TakeWhileIterator[
         return elem^
 
 
-@always_inline
+@inline(.always)
 def take_while[
     origin: ImmOrigin,
     IterableType: Iterable,
@@ -894,7 +894,7 @@ def take_while[
     )
 
 
-@always_inline
+@inline(.always)
 def take_while[
     IterableType: IterableOwned,
     //,
@@ -968,7 +968,7 @@ struct _DropWhileIterator[
         self._inner = copy._inner.copy()
         self._dropping = copy._dropping
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where conforms_to(
@@ -976,11 +976,11 @@ struct _DropWhileIterator[
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         comptime assert conforms_to(Self.Element, Deinitable)
 
@@ -996,7 +996,7 @@ struct _DropWhileIterator[
         return next(self._inner)
 
 
-@always_inline
+@inline(.always)
 def drop_while[
     origin: ImmOrigin,
     IterableType: Iterable,
@@ -1043,7 +1043,7 @@ def drop_while[
     )
 
 
-@always_inline
+@inline(.always)
 def drop_while[
     IterableType: IterableOwned,
     //,
@@ -1094,15 +1094,15 @@ struct _RepeatIterator[ElementType: Copyable & Deinitable](
     var element: Self.ElementType
     var remaining: Int
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.ElementType:
         if self.remaining <= 0:
             raise StopIteration()
@@ -1110,7 +1110,7 @@ struct _RepeatIterator[ElementType: Copyable & Deinitable](
         return self.element.copy()
 
 
-@always_inline
+@inline(.always)
 def repeat[
     ElementType: Copyable & Deinitable
 ](element: ElementType, *, times: Int) -> _RepeatIterator[ElementType]:
@@ -1191,7 +1191,7 @@ struct _TakeIterator[InnerIteratorType: Iterator](
         self._inner = copy._inner.copy()
         self._remaining = copy._remaining
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where conforms_to(
@@ -1199,11 +1199,11 @@ struct _TakeIterator[InnerIteratorType: Iterator](
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         if self._remaining <= 0:
             raise StopIteration()
@@ -1220,7 +1220,7 @@ struct _TakeIterator[InnerIteratorType: Iterator](
         return (lower, remaining)
 
 
-@always_inline
+@inline(.always)
 def take[
     origin: ImmOrigin,
     IterableType: Iterable,
@@ -1266,7 +1266,7 @@ def take[
     )
 
 
-@always_inline
+@inline(.always)
 def take[
     IterableType: IterableOwned, //
 ](var iterable: IterableType, count: Int) -> _TakeIterator[
@@ -1331,7 +1331,7 @@ struct _DropIterator[InnerIteratorType: Iterator](
         self._inner = copy._inner.copy()
         self._to_drop = copy._to_drop
 
-    @always_inline
+    @inline(.always)
     def __iter__(
         ref self,
     ) -> Self.IteratorType[origin_of(self)] where conforms_to(
@@ -1339,11 +1339,11 @@ struct _DropIterator[InnerIteratorType: Iterator](
     ):
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __iter__(var self) -> Self.IteratorOwnedType:
         return self^
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Self.Element:
         comptime assert conforms_to(Self.Element, Deinitable)
 
@@ -1365,7 +1365,7 @@ struct _DropIterator[InnerIteratorType: Iterator](
         return (lower, None)
 
 
-@always_inline
+@inline(.always)
 def drop[
     origin: ImmOrigin,
     IterableType: Iterable,
@@ -1408,7 +1408,7 @@ def drop[
     )
 
 
-@always_inline
+@inline(.always)
 def drop[
     IterableType: IterableOwned, //
 ](var iterable: IterableType, count: Int) -> _DropIterator[

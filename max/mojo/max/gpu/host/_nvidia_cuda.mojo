@@ -48,7 +48,7 @@ comptime CUevent = OptionalPointer[_CUevent_st, UntrackedOrigin[mut=True]]
 
 # Accessor function to get access to the underlying CUcontext from a abstract DeviceContext.
 # Use `var cuda_ctx: CUcontext = CUDA(ctx)` where ctx is a `DeviceContext` to get access to the underlying CUcontext.
-@always_inline
+@inline(.always)
 def CUDA(ctx: DeviceContext) raises -> CUcontext:
     var result = CUcontext()
     # const char *AsyncRT_DeviceContext_cuda_context(CUcontext *result, const DeviceContext *ctx)
@@ -66,7 +66,7 @@ def CUDA(ctx: DeviceContext) raises -> CUcontext:
 
 # Accessor function to get access to the underlying CUstream from a abstract DeviceStream.
 # Use `var cuda_stream: CUstream = CUDA(ctx.stream())` where ctx is a `DeviceContext` to get access to the underlying CUstream.
-@always_inline
+@inline(.always)
 def CUDA(stream: DeviceStream) raises -> CUstream:
     var result = CUstream()
     # const char *AsyncRT_DeviceStream_cuda_stream(CUstream *result, const DeviceStream *stream)
@@ -83,7 +83,7 @@ def CUDA(stream: DeviceStream) raises -> CUstream:
 
 
 # Accessor function to get access to the underlying CUmodule from a DeviceFunction.
-@always_inline
+@inline(.always)
 def CUDA_MODULE(func: DeviceFunction) raises -> CUmodule:
     var result = CUmodule()
     # const char *AsyncRT_DeviceFunction_cuda_module(CUmodule *result, const DeviceFunction *func)

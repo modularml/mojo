@@ -355,7 +355,7 @@ def topk_row_bounds_kernel[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def mla_indexer_ragged_float8_paged[
     dtype: DType,
     KCollectionT: KVCollectionT,
@@ -668,7 +668,7 @@ def mla_indexer_ragged_float8_paged[
         comptime if mask_str != MaskName.NULL.name and not use_sm100_scorer:
             if max_new_tokens > 1:
 
-                @always_inline
+                @inline(.always)
                 def apply_mask_dispatch[
                     mask_t: MHAMask
                 ](mask: mask_t) raises {imm}:

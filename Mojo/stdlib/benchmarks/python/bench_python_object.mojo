@@ -45,7 +45,7 @@ def bench_getattr(mut b: Bencher) raises:
     with GILAcquired(py):
         var obj = PythonObject(42)
 
-        @always_inline
+        @inline(.always)
         def call_fn() raises {var obj}:
             for _ in range(LOOP_SIZE):
                 var r = obj.__getattr__("numerator")
@@ -60,7 +60,7 @@ def bench_op_add(mut b: Bencher) raises:
         var a = PythonObject(42)
         var c = PythonObject(10)
 
-        @always_inline
+        @inline(.always)
         def call_fn() raises {var a, var c}:
             for _ in range(LOOP_SIZE):
                 var r = a + c
@@ -78,7 +78,7 @@ def bench_op_iadd(mut b: Bencher) raises:
         # `int` allocation as the value grows.
         var c = PythonObject(0)
 
-        @always_inline
+        @inline(.always)
         def call_fn() raises {mut a, var c}:
             for _ in range(LOOP_SIZE):
                 a += c
@@ -92,7 +92,7 @@ def bench_op_lt(mut b: Bencher) raises:
         var a = PythonObject(42)
         var c = PythonObject(10)
 
-        @always_inline
+        @inline(.always)
         def call_fn() raises {var a, var c}:
             for _ in range(LOOP_SIZE):
                 var r = a < c
@@ -107,7 +107,7 @@ def bench_op_in(mut b: Bencher) raises:
         var lst = Python.list(1, 2, 3, 4, 5)
         var needle = PythonObject(5)
 
-        @always_inline
+        @inline(.always)
         def call_fn() raises {var lst, var needle}:
             for _ in range(LOOP_SIZE):
                 var r = needle in lst

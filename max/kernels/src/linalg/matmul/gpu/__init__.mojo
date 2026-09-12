@@ -190,7 +190,7 @@ def matmul_kernel[
     # Can't use 0 as tile size so set to 1 when the remainder is 0.
     var K_remainder = k - K_roundbytile if k - K_roundbytile > 0 else 1
 
-    @always_inline
+    @inline(.always)
     def update_tile[
         full_tile: Bool
     ](offset: Int, end: Int, tile_size: Int) {
@@ -421,7 +421,7 @@ def _amdgpu_matmul_build_block_shape_list[N: Int]() -> List[IndexList[2]]:
         fill=False
     )
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def process_m(m: Int):
         var best_score = Int.MAX
@@ -466,7 +466,7 @@ def _amdgpu_matmul_build_block_shape_list[N: Int]() -> List[IndexList[2]]:
     return block_shape_list^
 
 
-@always_inline
+@inline(.always)
 def _matmul_gpu[
     *,
     use_tensor_core: Bool = False,
@@ -557,7 +557,7 @@ def _matmul_gpu[
     # Only the H100 version of gemm supports the compute lambda.
     # For the other kernels we wrap it around an epilogue lambda instead.
     @__parameter
-    @always_inline
+    @inline(.always)
     @__copy_capture(c_epilogue)
     def compute_lambda_wrapper[
         _dtype: DType, _width: SIMDLength, *, alignment: Int = 1
@@ -577,7 +577,7 @@ def _matmul_gpu[
     ) if elementwise_compute_lambda_fn else elementwise_lambda_fn
 
     # Helper for gemv_gpu dispatch — passes TileTensor directly.
-    @always_inline
+    @inline(.always)
     @__parameter
     def _gemv_dispatch() raises:
         gemv_gpu[
@@ -745,7 +745,7 @@ def _matmul_gpu[
     ):
         if multi_gemm_cond:
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _multistage_gemm[
                 config: MatmulConfig[a_type, b_type, c_type, transpose_b]
@@ -760,7 +760,7 @@ def _matmul_gpu[
                     elementwise_lambda_fn=elementwise_lambda_wrapper,
                 ](c, a, b, runtime_config, ctx)
 
-            @always_inline
+            @inline(.always)
             @__parameter
             def _multistage_gemm[
                 config: MatmulConfig[a_type, b_type, c_type, transpose_b]
@@ -779,7 +779,7 @@ def _matmul_gpu[
 
             comptime if has_amd_gpu_accelerator():
 
-                @always_inline
+                @inline(.always)
                 @__parameter
                 def kernel_helper[
                     block_m: Int,
@@ -1206,7 +1206,7 @@ def _matmul_gpu[
                 comptime if a_type.is_float8() and transpose_b:
                     if m >= 128 and m <= 256:
 
-                        @always_inline
+                        @inline(.always)
                         @__parameter
                         def _small_m_gemm[
                             _bm: Int, _bn: Int, _bk: Int
@@ -1403,7 +1403,7 @@ def _matmul_gpu[
     ):
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _enqueue_rdna_kernel[
             BLOCK_K: Int,
             BLOCK_M: Int,
@@ -1534,7 +1534,7 @@ def _matmul_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def split_k_reduce[
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
@@ -1565,7 +1565,7 @@ def split_k_reduce[
     var M = Int(c.dim[0]())
     var N = Int(c.dim[1]())
 
-    @always_inline
+    @inline(.always)
     def _reduce[simd_width: Int, alignment: Int = 1](c_coord: Coord) {var}:
         var idx = Coord(Idx[0], c_coord[0], c_coord[1])
         var vec = work_space.load[width=simd_width](idx)
@@ -1660,7 +1660,7 @@ def multistage_gemm[
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_pingpong() raises:
                 var pp_grid = (
                     ceildiv(N, pingpong_config.block_shape[1]),
@@ -1691,7 +1691,7 @@ def multistage_gemm[
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_skinny() raises:
                 var sk_grid = (
                     ceildiv(N, skinny_config.block_shape[1]),
@@ -1722,7 +1722,7 @@ def multistage_gemm[
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_standard() raises:
                 comptime std_config = MatmulConfig[
                     a_type, b_type, c_type, True
@@ -1980,7 +1980,7 @@ def multistage_gemm[
             )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_pingpong() raises:
                 var pp_grid = (
                     ceildiv(N, pingpong_config.block_shape[1]),
@@ -2011,7 +2011,7 @@ def multistage_gemm[
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_skinny() raises:
                 var sk_grid = (
                     ceildiv(N, skinny_config.block_shape[1]),
@@ -2042,7 +2042,7 @@ def multistage_gemm[
                 )
 
             @__parameter
-            @always_inline
+            @inline(.always)
             def _launch_standard() raises:
                 comptime std_config = MatmulConfig[
                     a_type, b_type, c_type, True

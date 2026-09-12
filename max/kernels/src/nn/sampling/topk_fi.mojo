@@ -85,7 +85,7 @@ comptime _APPLE_STATIC_SHMEM_CACHE_COUNT = (
 )
 
 
-@always_inline
+@inline(.always)
 def _block_minmax[
     dtype: DType, //, *, block_size: Int, broadcast: Bool = True
 ](min_val: Scalar[dtype], max_val: Scalar[dtype]) -> Tuple[
@@ -103,7 +103,7 @@ def _block_minmax[
         Tuple of (block_min, block_max).
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -126,7 +126,7 @@ def _block_minmax[
     return (results[0], results[1])
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_pivot_bounds[
     block_size: Int, broadcast: Bool = True
 ](
@@ -141,7 +141,7 @@ def _block_reduce_pivot_bounds[
     the Int32 counts to Float32 (exact for counts up to 2^23).
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -173,7 +173,7 @@ def _block_reduce_pivot_bounds[
     )
 
 
-@always_inline
+@inline(.always)
 def get_min_max_value[
     vec_size: Int,
     block_size: Int,
@@ -485,7 +485,7 @@ def topk_mask_logits[
                 return launch_kernel[param_vec_size]()
 
 
-@always_inline
+@inline(.always)
 def device_sampling_from_prob[
     vec_size: Int,
     block_size: Int,
@@ -628,7 +628,7 @@ struct ValueCount[T: DType](Defaultable, TrivialRegisterPassable):
         self.count += other.count
 
 
-@always_inline
+@inline(.always)
 def _warp_reduce_value_count[T: DType](val: ValueCount[T]) -> ValueCount[T]:
     """Warp-level reduction for ValueCount using shuffle operations.
 
@@ -655,7 +655,7 @@ def _warp_reduce_value_count[T: DType](val: ValueCount[T]) -> ValueCount[T]:
     return result
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_value_count[
     T: DType,
     broadcast: Bool = False,
@@ -1306,19 +1306,19 @@ comptime _CUTOFF_SEARCH_MAX_ITERS = 64
 comptime _COOP_STATS_WIDTH = 8
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _coop_max(x: SIMD, y: type_of(x)) -> type_of(x):
     return max(x, y)
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _coop_sum(x: SIMD, y: type_of(x)) -> type_of(x):
     return x + y
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def _coop_cutoff_stats(x: SIMD, y: type_of(x)) -> type_of(x):
     """Combines cutoff statistics.
@@ -1331,7 +1331,7 @@ def _coop_cutoff_stats(x: SIMD, y: type_of(x)) -> type_of(x):
     return r
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_cutoff_stats[
     block_size: Int, broadcast: Bool = True
 ](
@@ -1348,7 +1348,7 @@ def _block_reduce_cutoff_stats[
     Int32 counts to Float32 (exact for counts up to 2^23).
     """
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -1387,7 +1387,7 @@ def _block_reduce_cutoff_stats[
     )
 
 
-@always_inline
+@inline(.always)
 def _block_reduce_topp_stats[
     block_size: Int, broadcast: Bool = True
 ](
@@ -1398,7 +1398,7 @@ def _block_reduce_topp_stats[
 ) -> Tuple[Float32, Float32, Float32, Float32]:
     """Reduces two masses and the cutoff bounds for a top-p-only search."""
 
-    @always_inline
+    @inline(.always)
     @__parameter
     def _reduce_fn[
         dtype: DType, width: SIMDLength, reduction_idx: Int
@@ -1428,7 +1428,7 @@ def _block_reduce_topp_stats[
     return (results[0], results[1], results[2], results[3])
 
 
-@always_inline
+@inline(.always)
 def _sampling_rejection_loop_coop[
     vec_size: Int,
     block_size: Int,
@@ -1612,7 +1612,7 @@ def _topp_budget(p: Float32, z: Float32) -> Float32:
     return Float32.MAX if p >= 1.0 else p * z
 
 
-@always_inline
+@inline(.always)
 def _topk_topp_cutoff_search[
     vec_size: Int,
     block_size: Int,
@@ -2068,7 +2068,7 @@ def TopKTopPSamplingFromProbKernel[
                     )[0]
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def load_dist[width: Int](offset: Int) -> SIMD[.float32, width]:
             # Load `width` elements of the sampling distribution at `offset`.
             # In from-logits mode this is the unnormalized softmax value with
@@ -2204,12 +2204,12 @@ def TopKTopPSamplingFromProbKernel[
             comptime if coop_size > 1:
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def load_slice(offset: Int) -> SIMD[.float32, vec_size]:
                     return load_dist[vec_size](offset)
 
                 @__parameter
-                @always_inline
+                @inline(.always)
                 def load_scalar(offset: Int) -> Float32:
                     return load_dist[1](offset)[0]
 
@@ -2398,7 +2398,7 @@ def TopKTopPSamplingFromProbKernel[
                     else:
 
                         @__parameter
-                        @always_inline
+                        @inline(.always)
                         def load_dist_vec(
                             offset: Int,
                         ) -> SIMD[.float32, vec_size]:
@@ -3276,7 +3276,7 @@ def TopKTopPMaskedProbsKernel[
         )[0]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def compute_e(offset: Int) -> SIMD[.float32, vec_size]:
         var v = logits_row.load[width=vec_size]((Idx[0], offset)).cast[
             .float32
@@ -3323,7 +3323,7 @@ def TopKTopPMaskedProbsKernel[
     var p_eff = _topp_budget(p, z)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def load_e(offset: Int) -> SIMD[.float32, vec_size]:
         comptime if is_amd_gpu():
             return probs_row.load[width=vec_size]((Idx[0], offset))

@@ -18,7 +18,7 @@ This is a Mojo built-in, so you don't need to import it.
 from std.builtin.rebind import downcast
 
 
-@always_inline
+@inline(.always)
 def deinit[T: Deinitable](var value: T, /):
     """Extends a value's lifetime up to this call, then deinitializes it.
 

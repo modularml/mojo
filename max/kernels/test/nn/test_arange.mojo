@@ -30,7 +30,7 @@ def print_elements(tensor: TileTensor) raises:
     print("New shape:", tensor.layout.shape_coord())
     print("New strides:", tensor.layout.stride_coord())
 
-    @always_inline
+    @inline(.always)
     def print_elements_lambda[
         simd_width: Int, alignment: Int = 1
     ](idx: Coord) {var}:
@@ -65,7 +65,7 @@ def test_arange[
     var memory4 = Array[Scalar[dtype], max_output_size](fill={})
     var out_tensor = TileTensor(memory4, row_major(Coord(outshape)))
 
-    @always_inline
+    @inline(.always)
     def arange_lambda[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         var index = IndexList[1](Int(idx[0].value()))
         var range_val = arange[dtype, simd_width](start, stop, step, index)

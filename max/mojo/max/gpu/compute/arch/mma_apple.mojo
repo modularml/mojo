@@ -34,7 +34,7 @@ from std._gpu import lane_id
 from ..mma import _has_shape, _unsupported_mma_op
 
 
-@always_inline
+@inline(.always)
 def _apple_frag_layout(tid: Int) -> Tuple[Int, Int]:
     """Returns (row_lo, col_base) for the given simdgroup thread."""
     return (
@@ -43,7 +43,7 @@ def _apple_frag_layout(tid: Int) -> Tuple[Int, Int]:
     )
 
 
-@always_inline
+@inline(.always)
 def _apple_frag_layout_8x8(tid: Int) -> Tuple[Int, Int]:
     """Returns (row_lo, col_base) for the given simdgroup thread (8x8).
 
@@ -57,7 +57,7 @@ def _apple_frag_layout_8x8(tid: Int) -> Tuple[Int, Int]:
     )
 
 
-@always_inline
+@inline(.always)
 def apple_mma_load[
     dtype: DType,
 ](
@@ -101,7 +101,7 @@ def apple_mma_load[
         return frag
 
 
-@always_inline
+@inline(.always)
 def apple_mma_store[
     dtype: DType,
 ](
@@ -141,7 +141,7 @@ def apple_mma_store[
             ptr[unsafe_offset=row * row_stride + col * col_stride] = frag[el]
 
 
-@always_inline
+@inline(.always)
 def apple_mma_load_8x8[
     dtype: DType,
 ](
@@ -179,7 +179,7 @@ def apple_mma_load_8x8[
         return frag
 
 
-@always_inline
+@inline(.always)
 def apple_mma_store_8x8[
     dtype: DType,
 ](
@@ -212,12 +212,12 @@ def apple_mma_store_8x8[
             ptr[unsafe_offset=row_lo * row_stride + col * col_stride] = frag[el]
 
 
-@always_inline
+@inline(.always)
 def _mma_apple(mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     _mma_apple_transposable(d, a, b, c, False, False)
 
 
-@always_inline
+@inline(.always)
 def _mma_apple_transposable(
     mut d: SIMD,
     a: SIMD,
@@ -281,7 +281,7 @@ def _mma_apple_transposable(
         _unsupported_mma_op(d, a, b, c)
 
 
-@always_inline
+@inline(.always)
 def _mma_apple_8x8(mut d: SIMD, a: SIMD, b: SIMD, c: SIMD):
     """Performs an 8x8 simdgroup_matrix multiply-accumulate: D = A @ B + C.
 

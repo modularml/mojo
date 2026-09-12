@@ -214,7 +214,7 @@ struct MLA_SM100_Decode_QKV_FP8[
     #   tile_skip = local_lo // BN_QK
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def sliding_window_tile_skip(
         offset_position: OffsetPosition[
             Self.config,
@@ -641,7 +641,7 @@ struct MLA_SM100_Decode_QKV_FP8[
     # Load: TMA Q (FP8) directly, TMA KV (FP8) directly
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(
         q_tma: QOTMATile[
             dtype=Self.kv_type,
@@ -800,7 +800,7 @@ struct MLA_SM100_Decode_QKV_FP8[
     # MMA QK: Q(FP8) x K(FP8) -> S(TMEM)
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaQK(
         tmem_addr: UInt32,
         q_smem: SharedMemPointer[Scalar[Self.fp8_type]],
@@ -890,7 +890,7 @@ struct MLA_SM100_Decode_QKV_FP8[
     # MMA PV: P(FP8) x V(FP8) -> O(TMEM)
     # --------------------------------------------------------------------------
     @staticmethod
-    @always_inline
+    @inline(.always)
     def mmaPV(
         tmem_addr: UInt32,
         kv_smem: SharedMemPointer[Scalar[Self.fp8_type]],

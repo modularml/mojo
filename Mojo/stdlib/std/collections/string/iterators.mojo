@@ -79,7 +79,7 @@ struct CodepointSliceIter[
         """
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> StringSlice[Self.origin]:
         """Get the next codepoint in the underlying string slice.
 
@@ -109,7 +109,7 @@ struct CodepointSliceIter[
         else:
             return self.next_back().value()
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the remaining length of this iterator in `Codepoint`s.
 
@@ -338,7 +338,7 @@ struct CodepointsIter[origin: ImmOrigin](
             raise StopIteration()
         return self.next().value()
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the remaining length of this iterator in `Codepoint`s.
 
@@ -542,7 +542,7 @@ struct GraphemeSliceIter[
         """
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> StringSlice[Self.origin]:
         """Get the next grapheme cluster.
 
@@ -614,7 +614,7 @@ struct GraphemeSliceIter[
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def remaining_byte_length(self) -> Int:
         """Returns the number of bytes not yet consumed by the iterator.
 
@@ -856,7 +856,7 @@ struct GraphemeIndicesIter[origin: ImmOrigin](
         """
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(
         mut self,
     ) raises StopIteration -> Tuple[Int, StringSlice[Self.origin]]:
@@ -916,7 +916,7 @@ struct BytesIter[origin: ImmOrigin](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         """Iterator over the underlying string's bytes.
 
@@ -925,7 +925,7 @@ struct BytesIter[origin: ImmOrigin](
         """
         return self
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> Byte:
         """Get the next byte in the underlying string slice.
 
@@ -937,7 +937,7 @@ struct BytesIter[origin: ImmOrigin](
         """
         return next(self._iter)
 
-    @always_inline
+    @inline(.always)
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         """Returns bounds `[lower, upper]` for the remaining iterator length.
 
@@ -946,7 +946,7 @@ struct BytesIter[origin: ImmOrigin](
         """
         return self._iter.bounds()
 
-    @always_inline
+    @inline(.always)
     def __len__(self) -> Int:
         """Returns the remaining length of this iterator in bytes.
 

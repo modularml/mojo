@@ -396,7 +396,7 @@ struct MLAPrefillSparseQKVFP8[
     # writes one whole, independently-swizzled PV_BK-wide half-tile -- the
     # SAME physical layout `_mma`'s per-K-half BK=PV_BK descriptor reads.
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _write_p_fp8[
         n: Int
@@ -435,7 +435,7 @@ struct MLAPrefillSparseQKVFP8[
     # KV producer (WG1): compute physical gather rows, gather4 the FP8 SW64 KV
     # tile (K and V share it), signal kv_ready.  No dequant, no staging.
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _load_kv_fp8(
         kv_tma_op: TMATensorTile[
@@ -523,7 +523,7 @@ struct MLAPrefillSparseQKVFP8[
     # (it shares the KV buffer); at cg2 K@base0 and full-V@base0 collide, so V
     # is separate.  Cross-ref dequant `load_v_fp8_tma` for the depth-split math.
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _load_v_fp8(
         kv_tma_op: TMATensorTile[
@@ -629,7 +629,7 @@ struct MLAPrefillSparseQKVFP8[
     # sub-copy lands at the PADDED stride the BMN=64 QK descriptor reads.
     # Mirrors `MLAPrefillSparseCommon._load_q_prologue` at SW64/FP8.
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _load_q_fp8(
         q_smem: UnsafePointer[
@@ -1052,7 +1052,7 @@ struct MLAPrefillSparseQKVFP8[
     # ------------------------------------------------------------------
     # MMA warp (WG3 warp 12, single elected lane): QK^T(k) then PV(k-1).
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _mma(
         q_ptr: UnsafePointer[
@@ -1217,7 +1217,7 @@ struct MLAPrefillSparseQKVFP8[
     # ------------------------------------------------------------------
     # Softmax + FP8 P write + O rescale + epilogue (WG0, warps 0-3).
     # ------------------------------------------------------------------
-    @always_inline
+    @inline(.always)
     @staticmethod
     def _softmax_epilogue(
         p_ptr: UnsafePointer[
@@ -1569,7 +1569,7 @@ struct MLAPrefillSparseQKVFP8[
             )
 
 
-@always_inline
+@inline(.always)
 def mla_prefill_sparse_qkv_fp8[
     output_dtype: DType,
     q_type: DType,

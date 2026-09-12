@@ -94,7 +94,7 @@ struct GroupedWorkInfo1D1D(TrivialRegisterPassable, Writable):
     var terminate: Bool
     var m_start: UInt32  # Expert's start offset in contiguous token space
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         self.m = 0
         self.n = 0
@@ -105,22 +105,22 @@ struct GroupedWorkInfo1D1D(TrivialRegisterPassable, Writable):
         self.m_start = 0
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def terminal() -> Self:
         """Returns the end-of-work marker: no tile, no expert."""
         return Self(0, 0, 0, -1, False, True, 0)
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         """Returns True if this work tile has valid work to do."""
         return self.is_valid_tile
 
-    @always_inline
+    @inline(.always)
     def is_done(self) -> Bool:
         """Returns True if the scheduler has no more work."""
         return self.terminate
 
-    @no_inline
+    @inline(.never)
     def write_to(self, mut writer: Some[Writer]):
         writer.write(
             "GroupedWorkInfo1D1D(m=",
@@ -162,7 +162,7 @@ struct GroupedWorkContext1D1D(ImplicitlyCopyable, Movable):
     var is_valid_tile: Bool
     var terminate: Bool
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         info: GroupedWorkInfo1D1D,
@@ -179,7 +179,7 @@ struct GroupedWorkContext1D1D(ImplicitlyCopyable, Movable):
         self.is_valid_tile = info.is_valid_tile
         self.terminate = info.terminate
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         m: UInt32,
@@ -201,7 +201,7 @@ struct GroupedWorkContext1D1D(ImplicitlyCopyable, Movable):
         self.terminate = False
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def terminal() -> Self:
         """Returns the context that marks the end of the work.
 
@@ -210,37 +210,37 @@ struct GroupedWorkContext1D1D(ImplicitlyCopyable, Movable):
         """
         return Self(GroupedWorkInfo1D1D.terminal(), Float32(1.0), UInt32(0))
 
-    @always_inline
+    @inline(.always)
     def m(self) -> UInt32:
         """M coordinate in contiguous token space."""
         return self.m_coord
 
-    @always_inline
+    @inline(.always)
     def m_start(self) -> UInt32:
         """Expert's start token offset in contiguous token space."""
         return self.m_start_coord
 
-    @always_inline
+    @inline(.always)
     def n(self) -> UInt32:
         """N coordinate in output space."""
         return self.n_coord
 
-    @always_inline
+    @inline(.always)
     def group_idx(self) -> UInt32:
         """Index into active experts list."""
         return self.group_idx_val
 
-    @always_inline
+    @inline(.always)
     def expert_id(self) -> Int32:
         """Expert ID for B tensor indexing."""
         return self.expert_id_val
 
-    @always_inline
+    @inline(.always)
     def is_valid(self) -> Bool:
         """Whether this tile has valid work."""
         return self.is_valid_tile
 
-    @always_inline
+    @inline(.always)
     def is_done(self) -> Bool:
         """Whether the scheduler has no more work."""
         return self.terminate
@@ -351,7 +351,7 @@ struct GroupedWorkIterator1D1D[
     comptime ExpertIdsStoragePolicy = Self.ExpertIdsEngine
     comptime ExpertScalesStoragePolicy = Self.ExpertScalesEngine
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         num_active_experts: Int,
@@ -378,11 +378,11 @@ struct GroupedWorkIterator1D1D[
         self.current_dynamic_dim_cumsum = 0
         self.block_idx_start = 0
 
-    @always_inline
+    @inline(.always)
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self.copy()
 
-    @always_inline
+    @inline(.always)
     def __next__(mut self) raises StopIteration -> GroupedWorkContext1D1D:
         """Return next valid work tile, skipping invalid ones.
 
@@ -396,7 +396,7 @@ struct GroupedWorkIterator1D1D[
             if ctx.is_valid():
                 return ctx
 
-    @always_inline
+    @inline(.always)
     def next(mut self) -> GroupedWorkContext1D1D:
         """Fetch next work tile and return context with work info and scale."""
         var info, m_end = self._fetch_next_work()
@@ -405,7 +405,7 @@ struct GroupedWorkIterator1D1D[
             expert_scale = self.expert_scales[Int(info.expert_id)][0]
         return GroupedWorkContext1D1D(info, expert_scale, m_end)
 
-    @always_inline
+    @inline(.always)
     def _fetch_next_work(mut self) -> Tuple[GroupedWorkInfo1D1D, UInt32]:
         """Internal method to compute next work tile."""
         self.current_iter += 1
@@ -498,7 +498,7 @@ struct GroupedWorkIterator1D1D[
             end_idx,
         )
 
-    @always_inline
+    @inline(.always)
     def current_expert_id(self) -> Int32:
         """Get the expert ID for the current group."""
         return self.expert_ids[Int(self.current_group_idx)][0]
@@ -587,7 +587,7 @@ struct GroupedWorkLookup1D1D[
     """Expert scale of each group in this lane's segment (1.0 if unused)."""
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def needs_total_m(num_active_experts: Int, num_k_iters: Int) -> Bool:
         """Whether `can_handle` reads `total_m` for this launch.
 
@@ -607,7 +607,7 @@ struct GroupedWorkLookup1D1D[
         )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def can_handle(
         num_active_experts: Int, total_m: UInt32, num_k_iters: Int
     ) -> Bool:
@@ -647,7 +647,7 @@ struct GroupedWorkLookup1D1D[
             and (sparse or thin_tile)
         )
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         num_active_experts: Int,
@@ -718,7 +718,7 @@ struct GroupedWorkLookup1D1D[
         comptime for i in range(Self.GROUPS_PER_LANE + 1):
             self.cum[i] += base
 
-    @always_inline
+    @inline(.always)
     def lookup(self, nbi: UInt32) -> GroupedWorkContext1D1D:
         """Return the work context for linear block index `nbi`.
 

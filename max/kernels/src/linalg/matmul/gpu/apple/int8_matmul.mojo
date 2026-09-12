@@ -153,7 +153,7 @@ struct Int8DequantWriter[
     var M: Int
     var N: Int
 
-    @always_inline
+    @inline(.always)
     def write_frag(
         self,
         frag: SIMD[.int32, 8],
@@ -208,7 +208,7 @@ struct Int8DequantWriter[
                                 Coord(r, col), SIMD[Self.c_type, 1](y)
                             )
 
-    @always_inline
+    @inline(.always)
     def write_frag_full(
         self,
         frag: SIMD[.int32, 8],
@@ -323,7 +323,7 @@ struct AppleM5Int8MatMul[
     # why, and the align-16 gate, are in KB `kernels/apple-m5-int8-matmul`.
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_frag_x4_int8(
         strip: TileTensor[.int8, ...],
         row_stride: Int32,
@@ -352,7 +352,7 @@ struct AppleM5Int8MatMul[
         }
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _mma_width16(
         mut accum: Self.Mma.AccumType,
         a_strip: TileTensor[.int8, ...],
@@ -407,7 +407,7 @@ struct AppleM5Int8MatMul[
     # Default global-tensor TileTensor indexing lowers to i64; folding the
     # absolute A/B offset in int32 is the addressing win. See the `TTI32` param.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_frag_x4_int8_abs(
         t32: TileTensor[.int8, ...],
         abs_row: Int,
@@ -431,7 +431,7 @@ struct AppleM5Int8MatMul[
         return out^
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _mma_width16_abs(
         mut accum: Self.Mma.AccumType,
         a32: TileTensor[.int8, ...],
@@ -484,7 +484,7 @@ struct AppleM5Int8MatMul[
     # An edge tool, not the interior: masking every strip lost ~22%. See KB
     # kernels/apple-m5-int8-matmul.
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _masked_frag(
         sub: TileTensor[.int8, ...],
         row_stride: Int,
@@ -509,7 +509,7 @@ struct AppleM5Int8MatMul[
         return lo.join(hi)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _mma_masked(
         mut accum: Self.Mma.AccumType,
         a_strip: TileTensor[.int8, ...],
@@ -562,7 +562,7 @@ struct AppleM5Int8MatMul[
                     )
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _accumulate[
         bounded: Bool
     ](
@@ -872,7 +872,7 @@ struct AppleM5Int8MatMul[
                     )
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_int8_matmul[
     c_type: DType = .bfloat16,
     *,
@@ -1078,7 +1078,7 @@ struct AppleInt8ActQuant[in_type: DType = .bfloat16, *, THREADS: Int = 64]:
             j += Self.THREADS
 
 
-@always_inline
+@inline(.always)
 def _threadgroup_max[nthreads: Int](val: Float32) -> Float32:
     """Threadgroup all-reduce max over `nthreads` (one warp-multiple block).
 
@@ -1100,7 +1100,7 @@ def _threadgroup_max[nthreads: Int](val: Float32) -> Float32:
     return s[0]
 
 
-@always_inline
+@inline(.always)
 def enqueue_apple_int8_quantize_activation[
     in_type: DType = .bfloat16,
 ](

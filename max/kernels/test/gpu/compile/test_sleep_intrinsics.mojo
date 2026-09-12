@@ -22,12 +22,12 @@ def sleep_intrinsics():
     sleep(0.0000001)
 
 
-@always_inline
+@inline(.always)
 def _verify_sleep_intrinsics_nvidia(asm: StringSlice) raises -> None:
     assert_true("nanosleep.u32" in asm)
 
 
-@always_inline
+@inline(.always)
 def _verify_sleep_intrinsics_amd(asm: StringSlice) raises -> None:
     # AMD sleep uses s_memrealtime for timing and s_sleep for sleeping.
     assert_true("s_memrealtime" in asm)

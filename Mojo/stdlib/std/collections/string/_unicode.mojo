@@ -235,6 +235,6 @@ def to_uppercase(s: StringSlice[_]) -> String:
     return result^
 
 
-@always_inline
+@inline(.always)
 def _estimate_needed_size(byte_len: Int) -> Int:
     return 3 * (byte_len >> 1) + 1

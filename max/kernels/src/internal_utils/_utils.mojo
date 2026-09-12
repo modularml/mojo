@@ -90,9 +90,9 @@ def bench_compile_time[
     comptime assert emission_kind in ("asm", "llvm", "ptx")
 
     # TODO: add docstring, this function should be used on its own or at the end of measured benchmarks.
-    @always_inline
+    @inline(.always)
     def bench_call(mut b: Bencher) raises {}:
-        @always_inline
+        @inline(.always)
         def bench_iter() raises {}:
             comptime if emission_kind == "asm" or emission_kind == "llvm":
                 var s = compile_info[func, emission_kind=emission_kind]().asm

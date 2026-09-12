@@ -119,7 +119,7 @@ comptime _no_alias_scope_attr = __mlir_attr.`[#llvm.alias_scope<id= "amdgpu.Loca
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _load_to_lds[
     dtype: DType,
     //,
@@ -220,7 +220,7 @@ def _load_to_lds[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def ds_read_tr16_b64_row(
     tile: TileTensor[_, _, address_space=.SHARED, ...],
 ) -> SIMD[tile.dtype, 4]:
@@ -264,7 +264,7 @@ def ds_read_tr16_b64_row(
     )
 
 
-@always_inline
+@inline(.always)
 def ds_read_tr16_b64_warp[
     mma_shape: IndexList[3],
 ](tile: TileTensor[_, _, address_space=.SHARED, ...],) -> SIMD[tile.dtype, 4]:
@@ -339,7 +339,7 @@ struct TiledMmaLoader[
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_b[
         num_mmas: Int,
         simd_width: Int,
@@ -413,7 +413,7 @@ struct TiledMmaLoader[
         return result^
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_b_tr(
         tile: TileTensor[Self.in_type, _, address_space=.SHARED, ...],
     ) -> SIMD[Self.in_type, 8]:
@@ -448,7 +448,7 @@ struct TiledMmaLoader[
         return part_1.join(part_2)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_v_fp8_strip[
         BN: Int,
         BK: Int,
@@ -516,7 +516,7 @@ struct TiledMmaLoader[
         # required for the 8-byte `ds_read_tr8_b64` to land correctly.
         comptime simd_w = simd_width_of[Self.in_type]()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _load_keys[key_base: Int]() -> SIMD[Self.in_type, 8]:
             var key = row_offset + key_base + rel_key + hw_key_shift
@@ -539,7 +539,7 @@ struct TiledMmaLoader[
         return r0.join(r1).join(r2.join(r3))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load_v_fp8_strip_16[
         BN: Int,
         block_width: Int,
@@ -637,7 +637,7 @@ struct TiledMmaLoader[
         # depth bytes across the 16 lanes of the row.
         var depth_base = d_in_blk + is_odd * 8
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def _load_keys[key_base: Int]() -> SIMD[Self.in_type, 8]:
             var key = row_offset + key_group * 32 + key_base + pair_idx
@@ -657,7 +657,7 @@ struct TiledMmaLoader[
         return r0.join(r1).join(r2.join(r3))
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def _load_b_tile[
         tile_mma_shape: IndexList[3],
         k_tile_idx: Int,
@@ -726,7 +726,7 @@ struct TiledMmaLoader[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def _load_from_lds[
     dtype: DType,
     //,
@@ -917,7 +917,7 @@ def _load_from_lds[
 # layout); caller bitcasts.
 
 
-@always_inline
+@inline(.always)
 def ds_read_b128_imm_u32x4[
     offset_bytes: Int,
 ](
@@ -969,7 +969,7 @@ def ds_read_b128_imm_u32x4[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def load_lds_fragment[
     smem_layout: TensorLayout,
     reg_layout: TensorLayout,
@@ -1108,7 +1108,7 @@ def load_lds_fragment[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@inline(.always)
 def smem_subtile[
     tile_rows: Int,
     tile_cols: Int,
@@ -1160,7 +1160,7 @@ def smem_subtile[
     }
 
 
-@always_inline
+@inline(.always)
 def smem_mma_subtile_offset[
     mma_rows: Int,
     mma_cols: Int,
@@ -1189,7 +1189,7 @@ def smem_mma_subtile_offset[
     )
 
 
-@always_inline
+@inline(.always)
 def smem_mma_subtile[
     mma_rows: Int,
     mma_cols: Int,
@@ -1282,7 +1282,7 @@ trait TileLoader(TrivialRegisterPassable):
     comptime tile_rows: Int
     comptime tile_cols: Int
 
-    @always_inline
+    @inline(.always)
     def load_tile(
         self,
         dst: SMemTile[Self.dtype, _, _, ...],
@@ -1423,7 +1423,7 @@ struct TileLoaderLDS[
     var m_anchor: Int
     var k_anchor: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         src: TileTensor[Self.dtype, ...],
@@ -1520,7 +1520,7 @@ struct TileLoaderLDS[
         self.thread_row = warp_row * Self.thread_rows + subtile_row
         self.thread_col = warp_col * Self.subtile_cols + subtile_col
 
-    @always_inline
+    @inline(.always)
     def load_tile(
         self,
         dst: SMemTile[Self.dtype, _, _, ...],
@@ -1697,7 +1697,7 @@ struct SubTileLoaderLDS[
     var bc: AMDBufferResource
     """The 128-bit buffer resource descriptor for DRAM access."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[Self.dtype, ...],
@@ -1713,7 +1713,7 @@ struct SubTileLoaderLDS[
         """
         self.bc = make_amd_buffer_resource(gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load[
         hoist_scalar_offset: Bool = False,
     ](
@@ -2001,7 +2001,7 @@ struct SubTileLoaderLDS_st_8x32[
     bit-ops, so the hand path is the default. `-D v227_layout=true`
     selects the Layout spelling on both sides; the default is the hand path."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[Self.dtype, ...],
@@ -2014,7 +2014,7 @@ struct SubTileLoaderLDS_st_8x32[
         """
         self.bc = make_amd_buffer_resource(gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load(
         self,
         v_smem_slot: SMemTile[Self.dtype, ...],
@@ -2322,7 +2322,7 @@ struct RegTileLoader[
     address the correct rows.
     """
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[Self.dtype, ...],
@@ -2339,7 +2339,7 @@ struct RegTileLoader[
         self.bc = make_amd_buffer_resource(gmem_tile)
         self.base_ptr_as_int = Int(gmem_tile.ptr)
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         gmem_tile: TileTensor[Self.dtype, ...],
@@ -2371,7 +2371,7 @@ struct RegTileLoader[
         )
         self.base_ptr_as_int = Int(gmem_tile.ptr)
 
-    @always_inline
+    @inline(.always)
     def load(
         self,
         dst: TileTensor[mut=True, Self.dtype, _, _, address_space=.LOCAL, ...],
@@ -2456,7 +2456,7 @@ struct RegTileWriter[
     var base_ptr_as_int: Int
     """Integer address of the full DRAM tile base pointer."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, dst_base: TileTensor[...]):
         """Create a writer from the full DRAM output tile.
 
@@ -2470,7 +2470,7 @@ struct RegTileWriter[
         self.bc = make_amd_buffer_resource(dst_base)
         self.base_ptr_as_int = Int(dst_base.ptr)
 
-    @always_inline
+    @inline(.always)
     def store[
         mfma32: Bool = False
     ](
@@ -2618,7 +2618,7 @@ struct RegTileEpilogue[
     """N dimension of the output, used for the chunk-boundary
     detection and the per-element OOB gate."""
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, dst: TileTensor[mut=True, Self.c_type, ...]):
         """Build from the (mutable) destination DRAM tile.
 
@@ -2639,13 +2639,13 @@ struct RegTileEpilogue[
         self.row_stride = Int(dst.layout.stride[0]().value())
         self.n_total = Int(dst.dim[1]())
 
-    @always_inline
+    @inline(.always)
     def _ptr(self) -> UnsafePointer[Scalar[Self.c_type], MutAnyOrigin]:
         return UnsafePointer[Scalar[Self.c_type], MutAnyOrigin](
             unsafe_from_address=self.c_ptr_as_int
         )
 
-    @always_inline
+    @inline(.always)
     def store(
         self,
         v: SIMD[Self.c_type, Self.chunk_width],
@@ -2691,7 +2691,7 @@ struct RegTileEpilogue[
                         self._ptr()[m * self.row_stride + col] = v[e]
 
 
-@always_inline
+@inline(.always)
 def _buffer_load_impl[
     thread_layout: Layout,
     num_threads: Int = thread_layout.size(),
@@ -2800,7 +2800,7 @@ struct RegTileWriterLDS[
     """
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy(
         dst: TileTensor[mut=True, _, _, _, address_space=.SHARED, ...],
         src: TileTensor[_, _, _, address_space=.LOCAL, ...],
@@ -2876,7 +2876,7 @@ struct RegTileWriterLDS[
             ), "RegTileWriterLDS.copy: unsupported flat_rank"
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def copy_blocked[
         block_cols: Int,
     ](dst: SMemTile[mut=True, _, _, _, ...], src: RegTile[dst.dtype, _, _]):
@@ -3001,7 +3001,7 @@ comptime RegTile[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def reg_alloc[
     LayoutType: TensorLayout,
     //,
@@ -3017,7 +3017,7 @@ def reg_alloc[
     ](layout)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def smem_alloc[
     LayoutType: TensorLayout,
     //,

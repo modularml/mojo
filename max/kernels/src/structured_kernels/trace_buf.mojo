@@ -97,17 +97,17 @@ struct NullTrace(TraceBuf):
     comptime device_type: AnyType = Self
     """Device-side type alias. `NullTrace` is trivially device-passable."""
 
-    @always_inline
+    @inline(.always)
     def base_ptr(self) -> UnsafePointer[UInt64, MutUntrackedOrigin]:
         """Returns a dangling pointer; there is no buffer."""
         return UnsafePointer[UInt64, MutUntrackedOrigin].unsafe_dangling()
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Constructs a zero-sized no-op trace buffer."""
         pass
 
-    @always_inline
+    @inline(.always)
     def store(self, offset: Int, val: UInt64):
         """No-op store. The body compiles away entirely.
 
@@ -117,7 +117,7 @@ struct NullTrace(TraceBuf):
         """
         pass
 
-    @always_inline
+    @inline(.always)
     def load(self, offset: Int) -> UInt64:
         """No-op load. Always returns 0.
 
@@ -159,12 +159,12 @@ struct GmemTrace(TraceBuf):
     `num_blocks * events_per_block` slot count, zero-initialized on
     first use."""
 
-    @always_inline
+    @inline(.always)
     def base_ptr(self) -> UnsafePointer[UInt64, MutUntrackedOrigin]:
         """Returns the device buffer's base pointer."""
         return self.ptr
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, ptr: UnsafePointer[UInt64, MutUntrackedOrigin]):
         """Wraps a device pointer as a trace buffer.
 
@@ -175,7 +175,7 @@ struct GmemTrace(TraceBuf):
         """
         self.ptr = ptr
 
-    @always_inline
+    @inline(.always)
     def store(self, offset: Int, val: UInt64):
         """Writes a timestamp into the device-side trace buffer.
 
@@ -185,7 +185,7 @@ struct GmemTrace(TraceBuf):
         """
         self.ptr.store(offset, val)
 
-    @always_inline
+    @inline(.always)
     def load(self, offset: Int) -> UInt64:
         """Reads a `u64` slot from the device-side trace buffer.
 
@@ -237,7 +237,7 @@ struct GmemTrace(TraceBuf):
 #   word 1  `global_perf_counter_ns()` at the stamp.
 
 
-@always_inline
+@inline(.always)
 def _trace_smid() -> UInt32:
     """Physical SM id via the raw PTX `%smid` register.
 
@@ -261,7 +261,7 @@ def _trace_smid() -> UInt32:
         return 0
 
 
-@always_inline
+@inline(.always)
 def pack_payload2(hi: Int, lo: Int) -> Int:
     """Packs a two-field ring payload as `(hi:u12 << 12) | lo:u12`.
 
@@ -278,7 +278,7 @@ def pack_payload2(hi: Int, lo: Int) -> Int:
     return ((hi & 0xFFF) << 12) | (lo & 0xFFF)
 
 
-@always_inline
+@inline(.always)
 def ring_emit[
     TraceBufT: TraceBuf,
     //,

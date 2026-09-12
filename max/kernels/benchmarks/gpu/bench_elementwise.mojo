@@ -64,7 +64,7 @@ def float_fn[
     return func(x)
 
 
-@no_inline
+@inline(.never)
 def run_elementwise[
     rank: Int,
     //,
@@ -122,7 +122,7 @@ def run_elementwise[
             cb_out.offset_ptr(iteration), row_major(Coord(dims))
         )
 
-        @always_inline
+        @inline(.always)
         def func[simd_width: Int, alignment: Int = 1](coord: Coord) {var}:
             comptime assert out_tensor.flat_rank >= coord.flat_rank
             comptime assert in_tensor.flat_rank >= coord.flat_rank
@@ -140,7 +140,7 @@ def run_elementwise[
             ctx,
         )
 
-    @always_inline
+    @inline(.always)
     def bench_func(mut b: Bencher) raises {imm}:
         bencher_iter_custom(b, kernel_launch, ctx)
 

@@ -188,7 +188,7 @@ struct ScheduleConfig(ImplicitlyCopyable, Movable):
     """Whether to skip the framework prologue's `wait_vm(0)` drains and
     inter-stage barrier so prefetches stay in flight on entry to the kernel."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -433,7 +433,7 @@ struct PipelineConfig(ImplicitlyCopyable, Movable):
     False keeps the strict check active for ping-pong and other
     schedules that don't rotate."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,

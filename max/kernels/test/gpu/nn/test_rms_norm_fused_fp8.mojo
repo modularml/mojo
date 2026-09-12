@@ -196,7 +196,7 @@ def test_dynamic[
     var in_ptr = in_device.unsafe_ptr()
 
     @__copy_capture(in_ptr)
-    @always_inline
+    @inline(.always)
     @__parameter
     def input_fn[
         width: Int, _rank: Int

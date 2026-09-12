@@ -57,7 +57,7 @@ from .kv_buffer import KVBuffer, _get_k_swizzle
 
 
 __extension Attention:
-    @always_inline
+    @inline(.always)
     def mla_decode(
         mut self,
         exp_sum_ptr: UnsafePointer[
@@ -240,7 +240,7 @@ __extension Attention:
             transpose_b=True,
         ]
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_qk():
             self.zero_p_buffer[0]()
@@ -258,7 +258,7 @@ __extension Attention:
                         self.p_reg_buffer.stage_tile[0](),
                     )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def mma_pv():
             # Each warp's v_buffer holds only depth_per_warp tiles
@@ -280,7 +280,7 @@ __extension Attention:
             Self.mask_t.check_mask_during_decoding
         )
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def prefetch_next():
             """Prefetch next K after current LDS reads have drained.
@@ -293,7 +293,7 @@ __extension Attention:
             barrier()
             _ = k_buffer.load_from_dram[0]()
 
-        @always_inline
+        @inline(.always)
         @__parameter
         def process_tile[has_next: Bool]():
             """Process one KV tile.

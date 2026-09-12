@@ -57,9 +57,9 @@ struct TestCase[_dtype: DType, _out_idx_type: DType, _is_top_p: Bool](
 def time_kernel(
     mut m: Bench, kernel_name: String, func: Some[def() raises -> None]
 ) raises:
-    @always_inline
+    @inline(.always)
     def bench_func(mut m: Bencher) raises {imm}:
-        @always_inline
+        @inline(.always)
         def kernel_launch() raises {imm}:
             func()
 
@@ -197,7 +197,7 @@ def test_case_sampling[
 
     comptime if DEBUG_BENCH:
 
-        @always_inline
+        @inline(.always)
         def run_func() raises {var}:
             if is_top_p:
                 top_p_sampling(

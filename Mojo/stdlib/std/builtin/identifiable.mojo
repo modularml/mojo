@@ -35,7 +35,7 @@ trait Identifiable:
         """
         ...
 
-    @always_inline
+    @inline(.always)
     def __isnot__(self, rhs: Self) -> Bool:
         """Define whether `self` has a different identity than `rhs`.
 

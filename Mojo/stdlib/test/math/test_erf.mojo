@@ -58,7 +58,7 @@ def test_erf_libm() raises:
     ####################
     ## libm erf result
     ####################
-    @always_inline
+    @inline(.always)
     def erf_libm[
         dtype: DType, simd_width: SIMDLength
     ](arg: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:

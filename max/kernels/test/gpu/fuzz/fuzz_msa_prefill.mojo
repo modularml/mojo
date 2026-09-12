@@ -94,7 +94,7 @@ comptime dtype = DType.float8_e4m3fn if use_fp8 else DType.bfloat16  # Q/K/V
 comptime out_dtype = DType.bfloat16 if dtype.is_float8() else dtype
 
 
-@always_inline
+@inline(.always)
 def _rel_l2_tol() -> Float64:
     """Aggregate rel-L2 gate, and the primary correctness gate for fp8.
 

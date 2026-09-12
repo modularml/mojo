@@ -142,7 +142,7 @@ struct Alignment(TrivialRegisterPassable, Writable):
     def __init__(out self, *, _unsafe_alignment: Int):
         self._value = _unsafe_alignment
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def of[T: AnyType, /]() -> Self:
         """Returns the natural alignment of `T`.
@@ -155,7 +155,7 @@ struct Alignment(TrivialRegisterPassable, Writable):
         """
         return {_unsafe_alignment = align_of[T]()}
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def of_bytes[n: Int, /]() -> Self:
         """Returns an alignment of exactly `n` bytes.
@@ -172,7 +172,7 @@ struct Alignment(TrivialRegisterPassable, Writable):
         comptime assert n.is_power_of_two(), "alignment must be a power of two"
         return {_unsafe_alignment = n}
 
-    @always_inline
+    @inline(.always)
     def bytes(self) -> Int:
         """Returns the byte alignment.
 
@@ -742,7 +742,7 @@ def _alloc_bytes(
     "`alloc` without a `Layout` is deprecated, use the `Layout`-based `alloc`"
     " instead; as a temporary migration step, use `unsafe_alloc`"
 )
-@always_inline
+@inline(.always)
 def alloc[
     type: AnyType, /
 ](count: Int, *, alignment: Int = align_of[type]()) -> Pointer[
@@ -764,7 +764,7 @@ def alloc[
     return unsafe_alloc[type](count, alignment=alignment)
 
 
-@always_inline
+@inline(.always)
 def unsafe_alloc[
     type: AnyType, /
 ](count: Int, *, alignment: Int = align_of[type]()) -> Pointer[
@@ -942,7 +942,7 @@ struct Layout[T: AnyType, *, alignment: Alignment = .of[T]()](
 
     var _count: Int
 
-    @always_inline
+    @inline(.always)
     def __init__(out self, *, count: Int):
         """Initializes a `Layout` describing `count` elements of type `T`.
 
@@ -958,7 +958,7 @@ struct Layout[T: AnyType, *, alignment: Alignment = .of[T]()](
         ), "`Layout` alignment must be at least `align_of[T]()`"
         self._count = count
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def single() -> Self:
         """Creates a `Layout` for exactly one element of type `T`.
@@ -979,7 +979,7 @@ struct Layout[T: AnyType, *, alignment: Alignment = .of[T]()](
         """
         return Self(count=1)
 
-    @always_inline
+    @inline(.always)
     def as_byte_layout(self) -> Layout[Byte, alignment=Self.alignment]:
         """Converts this layout to an equivalent byte-level layout.
 
@@ -992,7 +992,7 @@ struct Layout[T: AnyType, *, alignment: Alignment = .of[T]()](
         """
         return {count = self._count * size_of[Self.T]()}
 
-    @always_inline
+    @inline(.always)
     def count(self) -> Int:
         """Returns the number of elements described by this layout.
 

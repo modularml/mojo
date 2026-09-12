@@ -116,7 +116,7 @@ comptime SHAPE_ALL = 3
 comptime SHAPE_SINGLE = 4
 
 
-@always_inline
+@inline(.always)
 def _launch_default[
     dtype: DType,
     c_dtype: DType,
@@ -166,7 +166,7 @@ def _launch_default[
     )
 
 
-@always_inline
+@inline(.always)
 def _kernel_name[kernel_id: Int]() -> String:
     comptime if kernel_id == KERNEL_DEFAULT:
         return "default"
@@ -181,7 +181,7 @@ def _kernel_name[kernel_id: Int]() -> String:
     return "unknown"
 
 
-@always_inline
+@inline(.always)
 def _shape_set_label[shape_set_id: Int]() -> String:
     comptime if shape_set_id == SHAPE_LARGE:
         return "large"
@@ -274,7 +274,7 @@ def _bench_one_kernel[
         # Dummy 1-element workspace for non-split-K kernels — never read.
         split_k_workspace = SplitKWorkspace[num_splits](ctx, 1)
 
-    @always_inline
+    @inline(.always)
     def bench_func(
         mut b: Bencher,
     ) {
@@ -287,7 +287,7 @@ def _bench_one_kernel[
         var split_k_workspace,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var tensor_a = TileTensor(
                 cb_a.offset_ptr(iteration), row_major(shape_a)
@@ -406,7 +406,7 @@ def bench_shape[
         Idx[K_static if transpose_b else N_static],
     )
 
-    @always_inline
+    @inline(.always)
     def get_size(shape: Coord) -> Int:
         return Int(shape[0].value()) * Int(shape[1].value())
 

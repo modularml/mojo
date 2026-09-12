@@ -103,7 +103,7 @@ def fold[
     comptime stride_w = stride[1]
     comptime stride_h = stride[0]
 
-    @always_inline
+    @inline(.always)
     def fold_fn[width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert idx.rank == 4, "fold_fn: rank must be 4"
 

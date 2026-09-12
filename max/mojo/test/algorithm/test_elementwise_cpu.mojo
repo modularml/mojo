@@ -60,7 +60,7 @@ def test_elementwise() raises:
             out_buffer.unsafe_ptr()[unsafe_offset=i] = 0.0
             x += 1.0
 
-        @always_inline
+        @inline(.always)
         @__copy_capture(buffer1, buffer2, out_buffer, shape)
         @__parameter
         def func[simd_width: Int, alignment: Int = 1](idx: Coord):
@@ -103,7 +103,7 @@ def test_elementwise_implicit_runtime() raises:
     for i in range(len(vector)):
         vector.unsafe_ptr()[unsafe_offset=i] = Int(i)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(vector)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx: Coord):

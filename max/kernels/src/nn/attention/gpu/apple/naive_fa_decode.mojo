@@ -79,7 +79,7 @@ comptime NEG_INF = Float32(-3.0e38)
 comptime NAIVE_FA_DECODE_APPLE_MAX_HEAD_DIM = 256
 
 
-@always_inline
+@inline(.always)
 def naive_fa_decode_apple_supports_depth(depth: Int) -> Bool:
     """Whether this kernel has a `Depth` specialization for `depth`.
 
@@ -103,7 +103,7 @@ def naive_fa_decode_apple_supports_depth(depth: Int) -> Bool:
     )
 
 
-@always_inline
+@inline(.always)
 def _apple_simd_sum(val: Float32) -> Float32:
     """Sum `val` across the simdgroup (broadcast to all lanes).
 
@@ -112,7 +112,7 @@ def _apple_simd_sum(val: Float32) -> Float32:
     return llvm_intrinsic["llvm.air.simd_sum", Float32](val)
 
 
-@always_inline
+@inline(.always)
 def _ml_idx(
     b: Int, head: Int, split: Int, num_heads: Int, num_partitions: Int
 ) -> Int:
@@ -120,7 +120,7 @@ def _ml_idx(
     return (b * num_heads + head) * num_partitions + split
 
 
-@always_inline
+@inline(.always)
 def _o_idx(
     b: Int,
     head: Int,

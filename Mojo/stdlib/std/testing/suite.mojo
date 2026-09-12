@@ -119,7 +119,7 @@ struct TestResult(Equatable, ImplicitlyCopyable, Writable):
         elif self == Self.SKIP:
             writer.write(Text[Color.YELLOW]("SKIP"))
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the repr of this test result to a writer.
 
@@ -240,7 +240,7 @@ struct TestReport(Copyable, Writable):
                 ),
             )
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the repr of this test report to a writer.
 
@@ -347,7 +347,7 @@ struct TestSuiteReport(Copyable, Writable):
                 sep=" ",
             )
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Write the repr of this test suite report to a writer.
 
@@ -424,7 +424,7 @@ struct TestSuite(Deinitable where False, Movable):
     var cli_args: List[StaticString]
     """The raw command line arguments passed to the test suite."""
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         *,
@@ -461,7 +461,7 @@ struct TestSuite(Deinitable where False, Movable):
                         "' has nonconforming signature",
                     )
 
-    @always_inline
+    @inline(.always)
     @staticmethod
     def discover_tests[
         test_funcs: Tuple, /

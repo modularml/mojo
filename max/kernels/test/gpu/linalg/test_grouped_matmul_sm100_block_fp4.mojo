@@ -718,7 +718,7 @@ def run_grouped_matmul_sm100_block_fp4_suite[
         # Wrapper which forwards suite-level scales_dtype, SF_VECTOR_SIZE,
         # and scaling_kind, so call sites don't have to pass them explicitly.
         @__parameter
-        @always_inline
+        @inline(.always)
         def _test_kernel_impl[
             kernel_type: String,
             a_type: DType,

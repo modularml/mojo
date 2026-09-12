@@ -479,7 +479,7 @@ def run_one_case(
         latent_device, row_major((max(1, total_q_tokens), Idx[HEAD_SIZE]))
     )
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(latent)
     @__parameter
     def kv_input_fn[width: Int](coords: IndexList[2]) -> SIMD[kv_type, width]:

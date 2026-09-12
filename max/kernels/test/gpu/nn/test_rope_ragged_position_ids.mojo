@@ -90,7 +90,7 @@ def test_rope_ragged_position_ids[
     # tensor on the GPU (memory access fault). Same rule the kernel itself
     # follows for its captured tensors; mirrors `test_rope_ragged.mojo`'s
     # `output_fn`.
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](idx: IndexList[3], val: SIMD[dtype, width]) {var out_t} -> None:

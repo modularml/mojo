@@ -55,7 +55,7 @@ comptime elementwise_epilogue_type = def[
 ](IndexList[rank], SIMD[c_type, width]) capturing -> None
 
 
-@always_inline
+@inline(.always)
 @__parameter
 def preferred_simd_width[dtype: DType]() -> Int:
     """SIMD scalar count for fused GPU concat vectorization.
@@ -79,7 +79,7 @@ def preferred_simd_width[dtype: DType]() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def memcpy_or_fuse[
     rank: Int,
     dtype: DType,
@@ -137,7 +137,7 @@ def memcpy_or_fuse[
             row_major(Coord(shape_1d)),
         )
 
-        @always_inline
+        @inline(.always)
         def epilogue_wrapper[
             simd_width: Int, alignment: Int = 1
         ](index: Coord) {var}:
@@ -167,11 +167,11 @@ struct _Span(TrivialRegisterPassable):
     var start: Int
     var end: Int
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def empty(self) -> Bool:
         return not (self.start < self.end)
 
-    @always_inline("nodebug")
+    @inline(.nodebug)
     def intersect(self, other: Self) -> Self:
         return Self(max(self.start, other.start), min(self.end, other.end))
 
@@ -371,7 +371,7 @@ def _concat_parallel[
     sync_parallelize(do_chunk, num_chunks, ctx)
 
 
-@always_inline
+@inline(.always)
 def _concat[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -433,7 +433,7 @@ def _concat[
         w_offset += w
 
 
-@always_inline
+@inline(.always)
 def _concat_inner[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -459,7 +459,7 @@ def _concat_inner[
         num_elems_copied += buffer_len
 
 
-@always_inline
+@inline(.always)
 def _check_input_consistency[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -477,7 +477,7 @@ def _check_input_consistency[
             )
 
 
-@always_inline
+@inline(.always)
 def _concat_serial[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -506,7 +506,7 @@ def _concat_serial[
     _concat[dtype, epilogue_fn](output, axis, inputs)
 
 
-@always_inline
+@inline(.always)
 def _concat_cpu[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -521,7 +521,7 @@ def _concat_cpu[
 ) raises:
     _check_input_consistency[dtype](axis, inputs)
 
-    @always_inline
+    @inline(.always)
     def dispatch_serial(unused_thread_idx: Int) raises {imm}:
         _concat_serial[dtype, epilogue_fn](output, axis, inputs)
 
@@ -538,7 +538,7 @@ def _concat_cpu[
         _concat_parallel[epilogue_fn=epilogue_fn](output, axis, inputs, ctx=ctx)
 
 
-@always_inline
+@inline(.always)
 def concat_shape[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -569,7 +569,7 @@ def concat_shape[
     var normalized_axis = normalize_neg_index(axis, InputLayoutType.rank)
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def shape_equal_ignore_axis(
         s1: IndexList[InputLayoutType.rank],
         s2: IndexList[InputLayoutType.rank],
@@ -603,7 +603,7 @@ def concat_shape[
     return output_shape
 
 
-@always_inline
+@inline(.always)
 def concat[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -801,7 +801,7 @@ def _concat_inner_most_single_dim[
             output.store(out_coord, inputs[i].load[width=1](in_coord))
 
 
-@always_inline
+@inline(.always)
 def _concat_gpu_elementwise[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -827,7 +827,7 @@ def _concat_gpu_elementwise[
             )
 
 
-@always_inline
+@inline(.always)
 def _concat_gpu_elementwise[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -861,7 +861,7 @@ def _concat_gpu_elementwise[
         comptime _block_size = 256
 
         @__parameter
-        @always_inline
+        @inline(.always)
         def _launch_flat[_vw: Int]() raises:
             comptime kernel_fn = _concat_gpu_flat_kernel[
                 OutputLayoutType=output.LayoutType,
@@ -919,7 +919,7 @@ def _concat_gpu_elementwise[
     # Metal a by-reference capture leaves the GPU kernel holding host-side
     # pointers, so it reads garbage/zeros. Copy-capture brings the device
     # pointers into the closure.
-    @always_inline
+    @inline(.always)
     def per_output_elem[
         simd_width: Int, alignment: Int = 1
     ](out_index: Coord) {var}:
@@ -960,7 +960,7 @@ def _concat_gpu_elementwise[
         )
 
 
-@always_inline
+@inline(.always)
 def _concat_gpu[
     input_origin: ImmOrigin,
     InputLayoutType: TensorLayout,
@@ -985,7 +985,7 @@ def _concat_gpu[
         outer_dims *= Int(inputs[0].dim(i))
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def _concat_buffers_contiguously() raises:
         var input_size = 0
 
@@ -1050,7 +1050,7 @@ def _concat_gpu[
     _concat_gpu_elementwise[epilogue_fn=epilogue_fn](output, axis, inputs, ctx)
 
 
-@always_inline
+@inline(.always)
 def _fused_concat_cpu[
     rank: Int,
     dtype: DType,
@@ -1070,7 +1070,7 @@ def _fused_concat_cpu[
     comptime for i in range(input_shapes.size):
         var input_shape = input_shapes[i]
 
-        @always_inline
+        @inline(.always)
         def elementwise_wrapper[
             _width: Int, alignment: Int = 1
         ](indices: Coord) {var}:
@@ -1094,7 +1094,7 @@ def _fused_concat_cpu[
         offset = offset + input_shape[axis]
 
 
-@always_inline
+@inline(.always)
 @__name(t"fused_concat_inner_most_single_dim_{dtype}")
 def _fused_concat_inner_most_single_dim[
     OutputLayoutType: TensorLayout,
@@ -1141,7 +1141,7 @@ def _fused_concat_inner_most_single_dim[
         )
 
 
-@always_inline
+@inline(.always)
 @__name(t"fused_dual_concat_inner_most_single_dim_{dtype}")
 def _fused_dual_concat_inner_most_single_dim[
     OutputLayoutType0: TensorLayout,
@@ -1217,7 +1217,7 @@ def _fused_dual_concat_inner_most_single_dim[
             )
 
 
-@always_inline
+@inline(.always)
 def _fused_dual_concat_gpu[
     rank: Int,
     dtype: DType,
@@ -1279,7 +1279,7 @@ def _fused_dual_concat_gpu[
     )
 
 
-@always_inline
+@inline(.always)
 def _fused_concat_gpu_elementwise[
     axis: Int,
     rank: Int,
@@ -1296,7 +1296,7 @@ def _fused_concat_gpu_elementwise[
 ) raises:
     comptime num_inputs = input_shapes.size
 
-    @always_inline
+    @inline(.always)
     def per_output_elem[
         simd_width: Int, alignment: Int = 1
     ](out_index: Coord) {var}:
@@ -1363,7 +1363,7 @@ def _fused_concat_gpu_elementwise[
             ](per_output_elem, output.layout.shape_coord(), ctx)
 
 
-@always_inline
+@inline(.always)
 def _fused_dual_concat_gpu_elementwise[
     axis: Int,
     rank: Int,
@@ -1395,7 +1395,7 @@ def _fused_dual_concat_gpu_elementwise[
     """
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def per_output_elem_0[
         simd_width: Int, alignment: Int = 1
     ](out_index: Coord):
@@ -1416,7 +1416,7 @@ def _fused_dual_concat_gpu_elementwise[
             in_index[axis] -= input_shape[axis]
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def per_output_elem_1[
         simd_width: Int, alignment: Int = 1
     ](out_index: Coord):
@@ -1505,7 +1505,7 @@ def _fused_dual_concat_gpu_elementwise[
             ](Coord(output_shape_0), Coord(output_shape_1), ctx)
 
 
-@always_inline
+@inline(.always)
 def _fused_concat_gpu[
     rank: Int,
     dtype: DType,
@@ -1572,7 +1572,7 @@ def _fused_concat_gpu[
             ](input_shapes, output, ctx)
 
 
-@always_inline
+@inline(.always)
 def _fused_dual_concat_gpu[
     rank: Int,
     dtype: DType,
@@ -1655,7 +1655,7 @@ def _fused_dual_concat_gpu[
             )
 
 
-@always_inline
+@inline(.always)
 def fused_concat[
     dtype: DType,
     rank: Int,

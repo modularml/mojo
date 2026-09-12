@@ -37,7 +37,7 @@ from nn._ragged_utils import get_batch_from_row_offsets
 from std.utils import IndexList
 
 
-@always_inline
+@inline(.always)
 def rope_value[
     dtype: DType,
     freq_dtype: DType,
@@ -70,7 +70,7 @@ def rope_value[
 # In GGUF, weights are organized as real, imag, real, imag, real, imag, …,
 # while in safetensors, the data is stored as real, …, real, imag, …, imag.
 # This function return the indices for the real and imaginary part.
-@always_inline
+@inline(.always)
 def get_safetensors_idx(head_dim_idx: Int, head_size: Int) -> Tuple[Int, Int]:
     """Returns the real and imaginary element indices for a safetensors layout.
 
@@ -88,7 +88,7 @@ def get_safetensors_idx(head_dim_idx: Int, head_size: Int) -> Tuple[Int, Int]:
     return (head_dim_idx // 2, head_dim_idx // 2 + head_size // 2)
 
 
-@always_inline
+@inline(.always)
 def get_identity_rope_coeff[width: Int, dtype: DType]() -> SIMD[dtype, width]:
     """Returns a SIMD vector representing an identity RoPE coefficient.
 
@@ -109,7 +109,7 @@ def get_identity_rope_coeff[width: Int, dtype: DType]() -> SIMD[dtype, width]:
     )
 
 
-@always_inline
+@inline(.always)
 def rope_q_proj[
     dtype: DType,
     freq_dtype: DType,
@@ -217,7 +217,7 @@ def rope_q_proj[
         output.store[alignment=half_alignment](coord_im, output_im)
 
 
-@always_inline
+@inline(.always)
 def rope_k_cache[
     freq_dtype: DType,
     cache_t: KVCacheT,
@@ -302,7 +302,7 @@ def rope_k_cache[
         k_cache.store(b_idx, h_idx, s_idx, h_im, output_im)
 
 
-@always_inline
+@inline(.always)
 def fused_qk_rope[
     dtype: DType,
     collection_t: KVCollectionT,
@@ -362,7 +362,7 @@ def fused_qk_rope[
     # pointer element-type verification). Keep using the deprecated
     # parameter-closure overload until cache captures in unified closures are
     # supported.
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(k_cache, valid_lengths)
     def rope_fn[width: Int, alignment: Int = 1](idx: Coord):
@@ -437,7 +437,7 @@ def fused_qk_rope[
     ](launch_shape, context)
 
 
-@always_inline
+@inline(.always)
 def fused_qk_rope_ragged[
     dtype: DType,
     freq_dtype: DType,
@@ -546,7 +546,7 @@ def fused_qk_rope_ragged[
     # pointer element-type verification). Keep using the deprecated
     # parameter-closure overload until cache captures in unified closures are
     # supported.
-    @always_inline
+    @inline(.always)
     @__parameter
     @__copy_capture(k_cache, batch_size, input_row_offsets, position_ids)
     def rope_fn[width: Int, alignment: Int = 1](idx: Coord):

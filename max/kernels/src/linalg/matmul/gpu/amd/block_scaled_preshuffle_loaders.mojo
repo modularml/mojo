@@ -67,7 +67,7 @@ struct PreshuffledBLoader[
 
     var bc: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         b_gmem_tile: TileTensor[.uint8, ...],
@@ -81,7 +81,7 @@ struct PreshuffledBLoader[
         """
         self.bc = make_amd_buffer_resource(b_gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load_fragment(
         self, n: Int, k_byte: Int
     ) -> SIMD[.uint8, Self.reg_bytes]:
@@ -117,7 +117,7 @@ struct PreshuffledBLoader[
             )
         return frag
 
-    @always_inline
+    @inline(.always)
     def lane_plane_off[plane: Int = 0](self, n: Int, lane_k_byte: Int) -> Int32:
         """Returns the K-invariant per-lane part of one plane's address.
 
@@ -149,7 +149,7 @@ struct PreshuffledBLoader[
             ](0, n, lane_k_byte)
         )
 
-    @always_inline
+    @inline(.always)
     def load_at[
         plane: Int = 0
     ](self, lane_off: Int32, k_byte_uniform: Int) -> SIMD[
@@ -196,7 +196,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
 
     var bc: AMDBufferResource
 
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         scale_gmem_tile: TileTensor[.uint8, ...],
@@ -210,7 +210,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
         """
         self.bc = make_amd_buffer_resource(scale_gmem_tile)
 
-    @always_inline
+    @inline(.always)
     def load_packed(self, mn: Int, k_scale: Int) -> Int32:
         """Loads the packed Int32 scale word containing logical `(mn, k_scale)`.
 
@@ -235,7 +235,7 @@ struct PreshuffledScaleLoader[MN_padded: Int, K_SCALES: Int](
         var v = self.bc.load[.uint8, 4](byte_off)
         return bitcast[.int32, 1](v)[0]
 
-    @always_inline
+    @inline(.always)
     def load_group[
         GROUP: Int
     ](self, mn_base: Int, k_pair_base: Int) -> SIMD[.uint8, GROUP * 4]:

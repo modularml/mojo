@@ -460,7 +460,7 @@ def test_issue_30237() raises:
         -2.76076847742355e-16,
     ]
 
-    @always_inline
+    @inline(.always)
     def eval1(x: SIMD[dtype, simd_width]) {imm} -> SIMD[dtype, simd_width]:
         var c_last = coefficients[coefficients_len - 1]
         var c_second_from_last = coefficients[coefficients_len - 2]
@@ -473,7 +473,7 @@ def test_issue_30237() raises:
 
         return result
 
-    @always_inline
+    @inline(.always)
     def eval2(x: SIMD[dtype, simd_width]) {imm} -> SIMD[dtype, simd_width]:
         var c_last = coefficients[coefficients_len - 1]
         var c_second_from_last = coefficients[coefficients_len - 2]

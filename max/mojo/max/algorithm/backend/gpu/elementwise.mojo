@@ -63,7 +63,7 @@ comptime _USE_CLC_WORK_STEALING = get_defined_bool[
 comptime _PDL_LEVEL = PDLLevel.ON
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _mbarrier_wait_acquire_cta(
     mbar: Pointer[mut=True, Int64, _, address_space=.SHARED],
     phase: UInt32,
@@ -85,7 +85,7 @@ def _mbarrier_wait_acquire_cta(
     ](Int32(Int(mbar)), phase)
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _advance_indices[
     rank: Int
 ](
@@ -100,7 +100,7 @@ def _advance_indices[
             idx[d - 1] += 1
 
 
-@always_inline("nodebug")
+@inline(.nodebug)
 def _start_indices_of_nth_element[
     rank: Int, //, shape_types: TypeList[Trait=CoordLike, ...]
 ](n: Int, shape: IndexList[rank, element_type=_], out res: type_of(shape)):
@@ -302,7 +302,7 @@ struct _ClcKernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_gpu_clc[
     rank: Int,
     //,
@@ -359,7 +359,7 @@ def _elementwise_impl_gpu_clc[
     if num_tiles == 0:
         num_tiles = 1
 
-    @always_inline
+    @inline(.always)
     def launch[handle_uneven_simd: Bool]() raises {imm}:
         var k = _ClcKernel[
             shape_types=shape_types,
@@ -480,7 +480,7 @@ struct _GridStrideKernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_gpu_grid_stride[
     rank: Int,
     //,
@@ -544,7 +544,7 @@ def _elementwise_impl_gpu_grid_stride[
         * num_waves,
     )
 
-    @always_inline
+    @inline(.always)
     def launch[handle_uneven_simd: Bool]() raises {imm}:
         var k = _GridStrideKernel[
             shape_types=shape_types,
@@ -709,7 +709,7 @@ struct _DualGridStrideKernel[
                 )
 
 
-@always_inline
+@inline(.always)
 def _dual_elementwise_impl_gpu_grid_stride[
     simd_width: Int,
     block_size: Int,
@@ -790,7 +790,7 @@ def _dual_elementwise_impl_gpu_grid_stride[
         or Int(shape_1[rank - 1].value()) % simd_width != 0
     )
 
-    @always_inline
+    @inline(.always)
     def launch[handle_uneven_simd: Bool]() raises {imm}:
         var k = _DualGridStrideKernel[
             handle_uneven_simd=handle_uneven_simd,
@@ -826,7 +826,7 @@ def _dual_elementwise_impl_gpu_grid_stride[
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline
+@inline(.always)
 def _elementwise_impl_gpu[
     simd_width: Int,
     FuncType: ImplicitlyCopyable
@@ -974,7 +974,7 @@ def _elementwise_impl_gpu[
             ](func=func, shape=shape_idx.cast[.uint64](), ctx=ctx)
 
 
-@always_inline
+@inline(.always)
 def _dual_elementwise_impl_gpu[
     simd_width: Int,
     Func0Type: ImplicitlyCopyable

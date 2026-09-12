@@ -40,7 +40,7 @@ def run_exp_approx_test[
     var in_buffer = Span(unsafe_ptr=in_device.unsafe_ptr(), length=length)
     var out_buffer = Span(unsafe_ptr=out_device.unsafe_ptr(), length=length)
 
-    @always_inline
+    @inline(.always)
     @__copy_capture(out_buffer, in_buffer)
     @__parameter
     def func[simd_width: Int, alignment: Int = 1](idx0: Coord):

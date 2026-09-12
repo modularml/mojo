@@ -33,7 +33,7 @@ comptime MMA8_DIM = 8
 comptime FRAG8 = 2  # 8x8 = 64 elems / 32 lanes = 2 per lane
 
 
-@always_inline
+@inline(.always)
 def _frag8_layout(lane: Int) -> Tuple[Int, Int]:
     """Apple 8x8 simdgroup-matrix per-lane layout (ground-truthed via Metal
     `thread_elements()`). Lane owns (row, col_base) and (row, col_base+1)."""
@@ -43,7 +43,7 @@ def _frag8_layout(lane: Int) -> Tuple[Int, Int]:
     )
 
 
-@always_inline
+@inline(.always)
 def _simdgroup8x8_matmul_kernel[
     c_type: DType,
     a_type: DType,

@@ -178,12 +178,12 @@ struct PyObjectPtr(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __init__(out self):
         """Initialize a null PyObjectPtr."""
         self._unsized_obj_ptr = {}
 
-    @always_inline
+    @inline(.always)
     def __init__[
         T: AnyType, //
     ](out self, *, upcast_from: OptionalPointer[T, MutUntrackedOrigin]):
@@ -193,7 +193,7 @@ struct PyObjectPtr(
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, rhs: Self) -> Bool:
         """Compare two PyObjectPtr for equality.
 
@@ -209,11 +209,11 @@ struct PyObjectPtr(
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
+    @inline(.always)
     def __bool__(self) -> Bool:
         return Bool(self._unsized_obj_ptr)
 
-    @always_inline
+    @inline(.always)
     def __int__(self) -> Int:
         if self._unsized_obj_ptr:
             return Int(self._unsized_obj_ptr.unsafe_value())
@@ -243,7 +243,7 @@ struct PyObjectPtr(
         """
         writer.write(self._unsized_obj_ptr)
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyObjectPtr` to a writer.
 
@@ -583,7 +583,7 @@ struct PyObject(
         writer.write("object_type=", self.object_type)
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyObject` to a writer.
 
@@ -651,7 +651,7 @@ struct PyModuleDef_Base(Defaultable, Movable, Writable):
         writer.write("dict_copy=", self.dict_copy)
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyModuleDef_Base` to a writer.
 
@@ -765,7 +765,7 @@ struct PyModuleDef(Movable, Writable):
         writer.write("free_fn=<unprintable>")
         writer.write(")")
 
-    @no_inline
+    @inline(.never)
     def write_repr_to(self, mut writer: Some[Writer]):
         """Writes the repr of this `PyModuleDef` to a writer.
 
@@ -790,7 +790,7 @@ struct ExternalFunction[
     type: TrivialRegisterPassable,
 ]:
     @staticmethod
-    @always_inline
+    @inline(.always)
     def load(lib: _DLHandle) -> Self.type:
         """Loads this external function from an opened dynamic library."""
         return lib._get_function[Self.name, Self.type]()

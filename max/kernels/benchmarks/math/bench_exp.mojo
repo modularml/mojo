@@ -174,7 +174,7 @@ def ldexp2kf[
 
 # `bench_unary` takes an unconstrained function, so the stdlib `exp` reaches it
 # through a wrapper that states no obligation of its own.
-@always_inline
+@inline(.always)
 def exp_mojo[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -182,7 +182,7 @@ def exp_mojo[
     return exp(x)
 
 
-@always_inline
+@inline(.always)
 def exp_libm[
     dtype: DType, simd_width: SIMDLength
 ](arg: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -193,7 +193,7 @@ def exp_libm[
     return res
 
 
-@always_inline
+@inline(.always)
 def ldexp_libm[
     dtype: DType, simd_width: SIMDLength
 ](arg: SIMD[dtype, simd_width], e: SIMD[.int32, simd_width]) -> SIMD[
@@ -232,7 +232,7 @@ def exp_sleef[
     return q.eq(0).select(u, ldexp2kf(u + 1, q.cast[.int32]()) - 1)
 
 
-@always_inline
+@inline(.always)
 def _exp_taylor0[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -249,7 +249,7 @@ def _exp_taylor0[
     return polynomial_evaluate[coefficients](x)
 
 
-@always_inline
+@inline(.always)
 def exp_mojo_opt[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -277,7 +277,7 @@ def exp_mojo_opt[
     # return (val1 < max_val).select(val1, SIMD[dtype,simd_width](inf[dtype]()))
 
 
-@always_inline
+@inline(.always)
 def exp_mojo_opt2[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -302,7 +302,7 @@ def exp_mojo_opt2[
     return expr
 
 
-@always_inline
+@inline(.always)
 def _exp_taylor3[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -317,7 +317,7 @@ def _exp_taylor3[
     return polynomial_evaluate[coefficients](x)
 
 
-@always_inline
+@inline(.always)
 def exp_mojo_opt3[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -341,7 +341,7 @@ def exp_mojo_opt3[
     return expr
 
 
-@always_inline
+@inline(.always)
 def _exp_taylor_mlas[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -358,7 +358,7 @@ def _exp_taylor_mlas[
     ](x)
 
 
-@always_inline
+@inline(.always)
 def exp_mlas[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
@@ -379,7 +379,7 @@ def exp_mlas[
     return max(ldexp(_exp_taylor_mlas(rr), k.cast[.int32]()), xc)
 
 
-@always_inline
+@inline(.always)
 def llvm_ldexp[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width], exp: SIMD[.int32, simd_width]) -> SIMD[
@@ -388,7 +388,7 @@ def llvm_ldexp[
     return llvm_intrinsic["llvm.ldexp", type_of(x)](x, exp)
 
 
-@always_inline
+@inline(.always)
 def mlas_llvm_ldexp[
     dtype: DType, simd_width: SIMDLength
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:

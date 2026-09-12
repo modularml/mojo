@@ -27,9 +27,9 @@ from std.utils.index import IndexList
 def bench_elementwise[n: Int](mut b: Bencher) raises:
     var vector = Array[Int, n](fill=-1)
 
-    @always_inline
+    @inline(.always)
     def call_fn() raises {mut vector}:
-        @always_inline
+        @inline(.always)
         @__parameter
         def func[simd_width: Int, alignment: Int = 1](idx: Coord):
             vector[Int(idx[0].value())] = 42

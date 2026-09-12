@@ -443,19 +443,19 @@ def test_sort_stress() raises:
         for i in range(length - 1):
             assert_true(check_fn(list[i], list[i + 1]))
 
-    @always_inline
+    @inline(.always)
     def _gt(lhs: Int, rhs: Int) -> Bool:
         return lhs > rhs
 
-    @always_inline
+    @inline(.always)
     def _geq(lhs: Int, rhs: Int) -> Bool:
         return lhs >= rhs
 
-    @always_inline
+    @inline(.always)
     def _lt(lhs: Int, rhs: Int) -> Bool:
         return lhs < rhs
 
-    @always_inline
+    @inline(.always)
     def _leq(lhs: Int, rhs: Int) -> Bool:
         return lhs <= rhs
 
@@ -588,11 +588,11 @@ def test_stable_sort_stress() raises:
 
     # sort by only comparing the x value of the IntPair, then check the sort is
     # stable by making sure that for the same x value, the idx field is sorted.
-    @always_inline
+    @inline(.always)
     def _lt(lhs: IntPair, rhs: IntPair) -> Bool:
         return lhs.x < rhs.x
 
-    @always_inline
+    @inline(.always)
     def _lt_check(lhs: IntPair, rhs: IntPair) -> Bool:
         return lhs.idx < rhs.idx if lhs.x == rhs.x else lhs.x < rhs.x
 

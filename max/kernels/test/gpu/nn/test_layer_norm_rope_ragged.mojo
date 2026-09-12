@@ -192,7 +192,7 @@ def run_layer_norm_rope_ragged_gpu[
     var start_pos_buf = TileTensor(start_pos_d, row_major(num_batches))
     var freqs_buf = TileTensor(freqs_d, row_major[max_seq_len, rope_dim]())
 
-    @always_inline
+    @inline(.always)
     def input_fn[
         width: Int, alignment: Int
     ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
@@ -201,7 +201,7 @@ def run_layer_norm_rope_ragged_gpu[
             width=width, alignment=alignment * align_of[dtype]()
         ](idx)
 
-    @always_inline
+    @inline(.always)
     def output_fn[
         width: SIMDLength, alignment: Int
     ](coords: Coord, val: SIMD[output_dtype, width]) {var output_buf} -> None:

@@ -54,7 +54,7 @@ struct TMADescriptor[
     def get_type_name() -> String:
         return "TMADescriptor"
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(out self, tensormap: TensorMap):
         """
@@ -151,7 +151,7 @@ struct TMALoad[
             "]",
         )
 
-    @always_inline
+    @inline(.always)
     @implicit
     def __init__(
         out self,

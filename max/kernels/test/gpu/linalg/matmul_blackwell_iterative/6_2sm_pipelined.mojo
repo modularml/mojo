@@ -90,39 +90,39 @@ struct WarpRole(TrivialRegisterPassable):
     comptime Mma = Self(5)
     comptime Epilogue = Self(3)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Int) -> Bool:
         return self._role == Int32(other)
 
-    @always_inline
+    @inline(.always)
     def __eq__(self, other: Self) -> Bool:
         return self._role == other._role
 
-    @always_inline
+    @inline(.always)
     def __ne__(self, other: Self) -> Bool:
         return self._role != other._role
 
-    @always_inline
+    @inline(.always)
     def __ge__(self, other: Int) -> Bool:
         return self._role >= Int32(other)
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_main_load() -> Bool:
         return Self.MainLoad == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_mma() -> Bool:
         return Self.Mma == get_warp_id()
 
     @staticmethod
-    @always_inline
+    @inline(.always)
     def is_epilogue() -> Bool:
         return Self.Epilogue >= get_warp_id()
 
 
-@always_inline
+@inline(.always)
 def load_AB[
     a_type: DType,
     b_type: DType,
@@ -227,7 +227,7 @@ def load_AB[
     )
 
 
-@always_inline
+@inline(.always)
 def consumer_main_loop[
     accum_type: DType,
     c_type: DType,
@@ -305,7 +305,7 @@ def consumer_main_loop[
         mma_op.commit(mma_mbar + stage)
 
 
-@always_inline
+@inline(.always)
 def store_C[
     c_type: DType,
     c_smem_layout: Layout,
@@ -1112,7 +1112,7 @@ def test_blackwell_kernel_6[
         comptime num_runs = 50
         comptime num_warmup = 20
 
-        @always_inline
+        @inline(.always)
         def run_kernel(ctx: DeviceContext) raises {imm}:
             blackwell_kernel_6[
                 transpose_b=transpose_b,

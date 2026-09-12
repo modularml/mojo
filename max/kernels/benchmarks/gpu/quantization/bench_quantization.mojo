@@ -127,11 +127,11 @@ def bench_1d1d_quantization[
         )
         random(in_host_tensor)
 
-    @always_inline
+    @inline(.always)
     def bench_fn(
         mut b: Bencher,
     ) raises {var input_tensor, var output_tensor, var scales_tensor, imm,}:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             # Run the quantization kernel
             comptime if use_async:
@@ -291,7 +291,7 @@ def bench_grouped_quantization[
     )
     var sf_t = TileTensor(dev_sf, row_major(Coord(Idx[num_experts])))
 
-    @always_inline
+    @inline(.always)
     def bench_fn(
         mut b: Bencher,
     ) raises {
@@ -304,7 +304,7 @@ def bench_grouped_quantization[
         var sf_t,
         imm,
     }:
-        @always_inline
+        @inline(.always)
         def kernel_launch(ctx: DeviceContext) raises {imm}:
             grouped_quantize_dynamic_scaled_fp4_async(
                 out_tensor,

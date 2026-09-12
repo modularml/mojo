@@ -60,7 +60,7 @@ comptime BAND_MS = [25, 27, 29, 31, 8, 16, 64, 128]
 
 
 @__parameter
-@always_inline
+@inline(.always)
 def scaled_compute_fn[
     dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](idx: IndexList[2], val: SIMD[dtype, width]) capturing -> SIMD[dtype, width]:

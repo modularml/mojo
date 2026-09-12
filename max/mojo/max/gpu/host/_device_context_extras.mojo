@@ -122,7 +122,7 @@ __extension DeviceBuffer:
 
 __extension DeviceFunction:
     @doc_hidden
-    @always_inline
+    @inline(.always)
     def __init__(
         out self,
         ctx: DeviceContext,
@@ -197,7 +197,7 @@ __extension DeviceFunction:
 
 
 __extension DeviceExternalFunction:
-    @always_inline
+    @inline(.always)
     @__parameter
     def _call_with_pack[
         *Ts: AnyType,
@@ -332,7 +332,7 @@ __extension DeviceContext:
         pass
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def enqueue_function[
         declared_arg_types: TypeList[Trait=AnyType, ...],
         //,
@@ -460,7 +460,7 @@ __extension DeviceContext:
         )
 
     @__parameter
-    @always_inline
+    @inline(.always)
     def enqueue_function[
         *Ts: DevicePassable
     ](

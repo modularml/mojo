@@ -419,13 +419,13 @@ def bench_rs_norm_gemm_pdl[
             == 4 else "consumer_only"
         )
 
-        @always_inline
+        @inline(.always)
         def bench_pair_iter(
             mut bench: Bencher, ctx: DeviceContext, ctx_idx: Int
         ) raises {mut in_bufs, imm}:
             var local_rows = config.rank_units(ctx_idx)
 
-            @always_inline
+            @inline(.always)
             def call_fn(
                 ctx_inner: DeviceContext, cache_iter: Int
             ) raises {mut in_bufs, imm}:
