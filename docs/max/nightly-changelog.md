@@ -56,7 +56,7 @@ This version is still a work in progress.
 
 ### C API
 
-## MAX kernels
+## Kernels and GPU programming
 
 ## Breaking changes
 

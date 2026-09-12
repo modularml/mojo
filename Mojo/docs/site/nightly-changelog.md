@@ -69,8 +69,6 @@ This version is still a work in progress.
   pay the cost of holding an extra `Int` field. Dynamic (runtime) alignment will
   eventually be supported after some more design considerations.
 
-## GPU programming
-
 ## Tooling changes
 
 ## Removed
