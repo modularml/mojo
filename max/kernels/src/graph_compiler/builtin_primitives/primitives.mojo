@@ -15,6 +15,7 @@ from std.logger import Logger
 from std.math import fma, gcd
 from std.ffi import external_call, c_size_t
 from std.sys import size_of, align_of
+from std.sys.intrinsics import strided_load, strided_store
 
 from max.algorithm.functional import elementwise
 
@@ -79,6 +80,7 @@ from extensibility import (
     get_kernel_simd_width,
     simd_load_from_managed_tensor_slice,
 )
+from extensibility.managed_tensor_slice import _gcd_pow2
 
 from std.utils import Index, IndexList, StaticTuple
 
@@ -2803,6 +2805,209 @@ def mogg_tensor_create_transpose[
             new_shape[i] = input.dim_size[src]()
             new_strides[i] = input.stride_length[src]()
     return {input.unsafe_ptr(), new_shape, new_strides}
+
+
+@register_internal("mogg._tensor.load")
+@always_inline
+def tile_tensor_strided_load[
+    dtype: DType,
+    simd_width: Int,
+    //,
+    tensor_alignment: Int,
+    element_alignment: Int = 1,
+](tile: TileTensor[dtype=dtype, ...], idx: Coord,) -> SIMD[dtype, simd_width]:
+    """Loads `simd_width` elements from a `TileTensor`, honoring its innermost
+    stride.
+
+    This mirrors `managed_tensor_slice.simd_load_from_managed_tensor_slice`
+    branch-for-branch, reading through a `TileTensor` instead of a
+    `ManagedTensorSlice`: a unit-stride inner axis keeps the plain contiguous
+    vector load, a zero stride splats one value, and any other stride gathers.
+    Every advanced-fusion load -- the foreach closure and the prologue/epilogue
+    functor alike -- captures each source as a bare pointer + layout and
+    rebuilds a `TileTensor` (see `TensorLoadOp::emitMojo`), so a strided fused
+    view -- a transpose, a non-unit slice, a broadcast -- must load through here
+    rather than `TileTensor.load`, whose `raw_load` assumes a contiguous inner
+    axis and would read the wrong elements.
+
+    TODO(GEX-3701): fold this into `TileTensor.load` once advanced fusion is the
+    only fusion system, so every `TileTensor` load is stride-correct.
+
+    Parameters:
+        dtype: The element type (inferred from `tile`).
+        simd_width: The vector width to load.
+        tensor_alignment: The source's own static byte alignment, threaded from
+            the originating `ManagedTensorSlice`'s `alignment` so this matches
+            `simd_load_from_managed_tensor_slice` exactly (`TileTensor` carries
+            no static alignment of its own).
+        element_alignment: The caller's element-alignment promise for the
+            contiguous fast path.
+
+    Args:
+        tile: The tensor to load from.
+        idx: The element coordinate to load at.
+    """
+    comptime TileT = type_of(tile)
+    comptime rank = TileT.rank
+    comptime invariant = not TileT.mut
+    # Load alignment cannot exceed the data type's alignment; the exact
+    # `_gcd_pow2` `simd_load_from_managed_tensor_slice` uses, so the fused load
+    # promises exactly the alignment the legacy `ManagedTensorSlice` path did.
+    comptime max_alignment = _gcd_pow2[
+        tensor_alignment, element_alignment * align_of[dtype]()
+    ]()
+    comptime _last_stride_is_static = TileT.LayoutType._stride_types[
+        rank - 1
+    ].is_static_value
+    comptime _last_stride_value = TileT.LayoutType._stride_types[
+        rank - 1
+    ].static_value
+
+    # The pointer at `idx`. Computed the same way `TileTensor.ptr_at_offset`
+    # does -- offset the base storage by `layout(idx)` -- but inlined here to
+    # avoid its `where coords.flat_rank == Self.flat_rank` clause, which the
+    # caller's bare `Coord` can't prove.
+    var ptr = rebind[
+        Pointer[Scalar[dtype], TileT.origin, address_space=TileT.address_space]
+    ](tile._storage).unsafe_offset(
+        tile.layout[linear_idx_type=TileT.linear_idx_type](idx)
+    )
+
+    @__parameter
+    @always_inline
+    def load_stride1() -> SIMD[dtype, simd_width]:
+        comptime if dtype == .bool:
+            var v = ptr.unsafe_bitcast[UInt8]().unsafe_load[
+                width=simd_width, invariant=invariant
+            ](0)
+            return v.cast[dtype]()
+        else:
+            return ptr.unsafe_load[
+                width=simd_width, alignment=max_alignment, invariant=invariant
+            ](0)
+
+    @__parameter
+    @always_inline
+    def load_strided(stride: Int) -> SIMD[dtype, simd_width]:
+        comptime if dtype == .bool:
+            var v = strided_load[simd_width, invariant=invariant](
+                ptr.unsafe_bitcast[UInt8](), stride
+            )
+            return v.cast[dtype]()
+        else:
+            return strided_load[simd_width, invariant=invariant](ptr, stride)
+
+    comptime if not _last_stride_is_static:
+        var stride = Int(tile.layout.stride_coord()[rank - 1].value())
+        if stride == 0:
+            return SIMD[dtype, simd_width](
+                ptr.unsafe_load[invariant=invariant](0)
+            )
+        elif stride == 1:
+            return load_stride1()
+        else:
+            return load_strided(stride)
+    else:
+        comptime if _last_stride_value == 0:
+            return SIMD[dtype, simd_width](
+                ptr.unsafe_load[invariant=invariant](0)
+            )
+        elif _last_stride_value == 1:
+            return load_stride1()
+        else:
+            return load_strided(_last_stride_value)
+
+
+@register_internal("mogg._tensor.store")
+@always_inline
+def tile_tensor_strided_store[
+    dtype: DType,
+    simd_width: Int,
+    //,
+    tensor_alignment: Int,
+    element_alignment: Int = 1,
+](
+    tile: TileTensor[mut=True, dtype=dtype, ...],
+    idx: Coord,
+    value: SIMD[dtype, simd_width],
+):
+    """Stores `simd_width` elements into a `TileTensor`, honoring its innermost
+    stride.
+
+    Store-side counterpart of `tile_tensor_strided_load`, mirroring
+    `managed_tensor_slice.simd_store_into_managed_tensor_slice`: a strided fused
+    output view (a transpose or non-unit slice on the store side) must scatter
+    through here rather than `TileTensor.store`'s contiguous `raw_store`.
+
+    Parameters:
+        dtype: The element type (inferred from `tile`).
+        simd_width: The vector width to store.
+        tensor_alignment: The target's own static byte alignment, threaded from
+            the originating `ManagedTensorSlice`'s `alignment` so this matches
+            `simd_store_into_managed_tensor_slice` exactly (`TileTensor` carries
+            no static alignment of its own).
+        element_alignment: The caller's element-alignment promise for the
+            contiguous fast path.
+
+    Args:
+        tile: The tensor to store into.
+        idx: The element coordinate to store at.
+        value: The values to store.
+    """
+    comptime TileT = type_of(tile)
+    comptime rank = TileT.rank
+    # Mirrors `simd_store_into_managed_tensor_slice`; see
+    # `tile_tensor_strided_load` for the alignment rationale.
+    comptime max_alignment = _gcd_pow2[
+        tensor_alignment, element_alignment * align_of[dtype]()
+    ]()
+    comptime _last_stride_is_static = TileT.LayoutType._stride_types[
+        rank - 1
+    ].is_static_value
+    comptime _last_stride_value = TileT.LayoutType._stride_types[
+        rank - 1
+    ].static_value
+
+    # See `tile_tensor_strided_load` for why `ptr_at_offset` is inlined here.
+    var ptr = rebind[
+        Pointer[Scalar[dtype], TileT.origin, address_space=TileT.address_space]
+    ](tile._storage).unsafe_offset(
+        tile.layout[linear_idx_type=TileT.linear_idx_type](idx)
+    )
+
+    @__parameter
+    @always_inline
+    def store_stride1():
+        comptime if dtype == .bool:
+            ptr.unsafe_bitcast[UInt8]().unsafe_store(0, value.cast[.uint8]())
+        else:
+            ptr.unsafe_store[alignment=max_alignment](0, value)
+
+    @__parameter
+    @always_inline
+    def store_strided(stride: Int):
+        comptime if dtype == .bool:
+            strided_store(
+                value.cast[.uint8](), ptr.unsafe_bitcast[UInt8](), stride
+            )
+        else:
+            strided_store(value, ptr, stride)
+
+    comptime if not _last_stride_is_static:
+        var stride = Int(tile.layout.stride_coord()[rank - 1].value())
+        if stride == 0:
+            ptr.unsafe_store(0, value)
+        elif stride == 1:
+            store_stride1()
+        else:
+            store_strided(stride)
+    else:
+        comptime if _last_stride_value == 0:
+            ptr.unsafe_store(0, value)
+        elif _last_stride_value == 1:
+            store_stride1()
+        else:
+            store_strided(_last_stride_value)
 
 
 @fieldwise_init
