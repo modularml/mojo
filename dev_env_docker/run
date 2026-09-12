@@ -1,0 +1,2 @@
+docker exec mojo-nightly-dev-env pixi run $@
+

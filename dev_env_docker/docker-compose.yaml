@@ -1,0 +1,11 @@
+services:
+  ubuntu-mojo:
+    # image: ubuntu:noble 
+    build: .
+    container_name: mojo-nightly-dev-env
+    volumes:
+      - ../:/mojo-nightly-env/mojo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t

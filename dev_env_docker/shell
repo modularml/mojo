@@ -1,0 +1,2 @@
+docker exec -it mojo-nightly-dev-env /bin/bash -c "pixi shell"
+
