@@ -58,10 +58,6 @@ _SEPARATE_TARGET_TESTS = [
 # grep that marker for the full list. Removing an entry should say which fix
 # covers it, not just "now passes".
 _ADV_FUSION_EXCLUDED_TESTS = [
-    "test_kda_ops.py",  # compile-time: hangs (>800s) under the new system
-    "test_mojo_analysis.py",  # crash: SIGABRT, bad cast<BufferType> in emit
-    "test_mtp_eh_norm.py",  # crash: SIGABRT, null dyn_cast to ParamListAttr
-    "test_mutable_load_fusion.py",  # crash: SIGABRT, bad cast<TensorType> on slice
 ]
 
 _GRAPH_COMMON_DATA = [
