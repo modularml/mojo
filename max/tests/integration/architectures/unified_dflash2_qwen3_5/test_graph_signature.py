@@ -18,6 +18,9 @@ mismatch (or, worse, cannot report at all when the count happens to match).
 The MTP graph is asserted from Mach's side at 223 slots; this asserts the
 DFlash2 graph from MAX's side, and asserts that the two agree slot for slot
 apart from the draft leaf's geometry, which is the one thing that differs.
+
+The KV group is seven slots here since MXSERV-527 added ``page_stride``.
+Mach's executors still pin six, so the two disagree until they are updated.
 """
 
 from __future__ import annotations
@@ -161,17 +164,17 @@ def _signature(
 
 
 def test_slot_count_matches_the_declared_formula() -> None:
-    """``15 + 21D`` at ``D = 1``.
+    """``15 + 23D`` at ``D = 1``.
 
     The same formula the Qwen3.5 MTP graph satisfies: five ragged/host inputs,
-    signals, two 6-slot KV leaves, batch_context_lengths, the eight-entry
+    signals, two 7-slot KV leaves, batch_context_lengths, the eight-entry
     sampling tail, the bitmask triple, then three slots for each of the two
     state leaves -- its pool, the rows addressing it, and its shadow pool.
     The layer count no longer enters: a leaf is one pool however many layers
     index it.
     """
     types = _signature()
-    assert len(types) == 15 + 21 * 1
+    assert len(types) == 15 + 23 * 1
 
 
 def test_the_prefix_and_sampling_tail_are_the_canonical_ones() -> None:
@@ -189,7 +192,7 @@ def test_the_prefix_and_sampling_tail_are_the_canonical_ones() -> None:
     assert types[2].device == cpu and types[3].device == cpu
 
     # draft_tokens .. in_thinking_phase, then the bitmask triple.
-    tail = [(t.dtype, tuple(str(d) for d in t.shape)) for t in types[19:30]]
+    tail = [(t.dtype, tuple(str(d) for d in t.shape)) for t in types[21:32]]
     assert tail == [
         (DType.int64, ("batch_size", "num_steps")),
         (DType.uint64, ("batch_size",)),
@@ -212,7 +215,7 @@ def test_the_prefix_and_sampling_tail_are_the_canonical_ones() -> None:
 
 
 def test_the_draft_leaf_is_the_drafters_own_windowed_geometry() -> None:
-    """Slots 12-17: five drafter layers, bf16, bounded at the drafter's window.
+    """Slots 13-19: five drafter layers, bf16, bounded at the drafter's window.
 
     Every one of these is a silent-wrong-answer if it drifts from the Mach
     registry's draft group: a wrong layer count reads another layer's K/V, a
@@ -235,9 +238,9 @@ def test_the_draft_leaf_is_the_drafters_own_windowed_geometry() -> None:
     assert isinstance(target, MHAKVCacheParams)
     assert draft.page_size == target.page_size
 
-    # Slot 12: the draft leaf's blocks, right after the target leaf's six.
+    # Slot 13: the draft leaf's blocks, right after the target leaf's seven.
     types = _signature()
-    blocks = types[12]
+    blocks = types[13]
     assert isinstance(blocks, BufferType)
     assert blocks.dtype == DType.bfloat16
     assert [str(d) for d in blocks.shape[1:]] == [

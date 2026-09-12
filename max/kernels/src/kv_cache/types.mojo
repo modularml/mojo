@@ -218,13 +218,35 @@ def _kv_cache_out_slot[
 @always_inline
 def _compute_kv_cache_dynamic_shape_strides[
     dtype: DType, //, kv_cache_rank: Int, drop_list: Tuple
-](blocks: TileTensor[dtype, ...]) -> Tuple[
+](blocks: TileTensor[dtype, ...], page_stride: Int = -1) -> Tuple[
     DynamicCoord[.int64, kv_cache_rank],
     DynamicCoord[.int64, kv_cache_rank],
 ]:
+    """Collapses `blocks` to the shape and strides one cache view addresses.
+
+    The dropped dimensions (`kv_idx` and `layer_idx`) are folded into the
+    pointer offset instead, so they must not appear in the result.
+
+    Parameters:
+        dtype: Element type of `blocks`.
+        kv_cache_rank: Rank of the cache view being addressed.
+        drop_list: Source dimensions folded into the pointer offset.
+
+    Args:
+        blocks: The whole block tensor, before any dimension is dropped.
+        page_stride: Distance in elements from one page to the next, or -1 for
+            the packed distance implied by the dimensions inside a page.
+
+    Returns:
+        The shape and strides of the cache view.
+    """
     var kv_cache_shape = DynamicCoord[.int64, kv_cache_rank]()
     var kv_cache_strides = DynamicCoord[.int64, kv_cache_rank]()
     var stride = 1
+    # Plain `Int`s: a `DynamicCoord` element is not `Intable`, so the asserts
+    # below cannot read them back.
+    var packed_page_stride = 0
+    var row_stride = 0
 
     comptime for i in reversed(range(blocks.flat_rank)):
         var dim = Int(blocks.dim[i]())
@@ -240,8 +262,29 @@ def _compute_kv_cache_dynamic_shape_strides[
             kv_cache_strides[out_index] = rebind[
                 kv_cache_strides.element_types[out_index]
             ](Int64(stride))
+            comptime if out_index == 0:
+                packed_page_stride = stride
+            comptime if out_index == 1:
+                row_stride = stride
 
         stride *= dim
+
+    # Padding lands in the page stride and nowhere else: no stride within a
+    # page moves.
+    if page_stride >= 0:
+        # `PagedKVCache._stride()` divides this by the row, so it must divide
+        # exactly.
+        debug_assert(
+            row_stride > 0 and page_stride % row_stride == 0,
+            "page_stride must be a whole number of rows",
+        )
+        debug_assert(
+            page_stride >= packed_page_stride,
+            "page_stride below the packed distance would overlap pages",
+        )
+        kv_cache_strides[0] = rebind[kv_cache_strides.element_types[0]](
+            Int64(page_stride)
+        )
 
     return (kv_cache_shape, kv_cache_strides)
 
@@ -3636,6 +3679,16 @@ struct PagedKVCacheCollection[
     per-request cache lengths and a lookup table mapping logical batches to
     physical blocks. Supports optional quantization scales stored in a parallel
     tensor with `head_dim_granularity` as the inner dimension.
+
+    ## Padded pages and `page_stride`
+
+    `page_stride` is the distance in elements from one page to the next; -1
+    means the pages are packed and the product of the dimensions inside a page
+    is already right. Padding lands entirely in that one stride.
+
+    The tensor passed in still describes packed pages, so a padded
+    `page_stride` addresses beyond the extent it declares. The allocator owes
+    `total_num_blocks * page_stride` elements behind it.
     """
 
     comptime name_str = "paged"
@@ -3790,6 +3843,12 @@ struct PagedKVCacheCollection[
                 .uint32, Layout.row_major[2](), Self.lookup_table_origin
             ]
         ] = None,
+        # Distance in elements from one page to the next, or -1 for the packed
+        # distance implied by `blocks`. See the field of the same name.
+        page_stride: Int = -1,
+        # The same distance for `scales`, which is its own pool leaf and so
+        # pads independently of the values.
+        scales_page_stride: Int = -1,
     ):
         """Construct from LayoutTensor params (MOGG boundary)."""
         comptime assert blocks.rank == 6
@@ -3814,7 +3873,9 @@ struct PagedKVCacheCollection[
         self.max_seq_length = max_seq_length
         self.max_cache_length = max_cache_length
         self.kv_cache_dynamic_shape, self.kv_cache_dynamic_strides = (
-            _compute_kv_cache_dynamic_shape_strides[4, (1, 2)](self.blocks)
+            _compute_kv_cache_dynamic_shape_strides[4, (1, 2)](
+                self.blocks, page_stride
+            )
         )
         if scales is not None:
             # `scales_dtype == Self.scale_dtype` (asserted above); rebind the
@@ -3831,7 +3892,7 @@ struct PagedKVCacheCollection[
             self.kv_cache_scales_dynamic_shape, self.kv_cache_scales_dynamic_strides = _compute_kv_cache_dynamic_shape_strides[
                 4, (1, 2)
             ](
-                self.scales.value()
+                self.scales.value(), scales_page_stride
             )
         else:
             self.scales = None
@@ -3852,6 +3913,11 @@ struct PagedKVCacheCollection[
         scales_lookup_table: OptionalReg[
             Self.CacheType.lookup_table_tt_type
         ] = None,
+        # Distance in elements from one page to the next, or -1 for the packed
+        # distance implied by `blocks`.
+        page_stride: Int = -1,
+        # The same distance for `scales`, which pads independently.
+        scales_page_stride: Int = -1,
     ):
         """Construct from TileTensor fields directly."""
         self.blocks = blocks
@@ -3864,14 +3930,16 @@ struct PagedKVCacheCollection[
         self.max_seq_length = max_seq_length
         self.max_cache_length = max_cache_length
         self.kv_cache_dynamic_shape, self.kv_cache_dynamic_strides = (
-            _compute_kv_cache_dynamic_shape_strides[4, (1, 2)](self.blocks)
+            _compute_kv_cache_dynamic_shape_strides[4, (1, 2)](
+                self.blocks, page_stride
+            )
         )
         if scales is not None:
             self.scales = scales.value()
             self.kv_cache_scales_dynamic_shape, self.kv_cache_scales_dynamic_strides = _compute_kv_cache_dynamic_shape_strides[
                 4, (1, 2)
             ](
-                self.scales.value()
+                self.scales.value(), scales_page_stride
             )
         else:
             self.scales = None

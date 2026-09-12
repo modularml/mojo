@@ -208,6 +208,7 @@ struct Struct_msa_indexer_ragged_paged:
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         prefix_lens: InputTensor[dtype=.uint32, rank=1, ...],
         k_blocks: MutableInputTensor[dtype=k_type, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         k_cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         k_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         k_max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -243,6 +244,7 @@ struct Struct_msa_indexer_ragged_paged:
                 index-K `cache_lengths`); used as the decode `seq_lens`.
             k_blocks: Index-K paged blocks `[num_blocks, 1, num_layers,
                 page_size, 1, idx_head_dim]`, BF16 or scale-free e4m3.
+            page_stride: Page-to-page distance in elements; -1 when packed.
             k_cache_lengths: Index-K cache lengths `[batch]` uint32.
             k_lookup_table: Index-K page table `[batch, max_pages]` uint32.
             k_max_prompt_length: Index-K max prompt (query) length `[1]` uint32.
@@ -268,6 +270,7 @@ struct Struct_msa_indexer_ragged_paged:
         ), "index-K cache must be bf16 or scale-free e4m3"
         var k_collection = generic_get_paged_cache(
             k_blocks,
+            page_stride,
             k_cache_lengths,
             k_lookup_table,
             k_max_prompt_length,
@@ -576,6 +579,7 @@ struct Struct_msa_attention_ragged_paged:
         cache_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         total_context_length: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -638,6 +642,7 @@ struct Struct_msa_attention_ragged_paged:
             kv_blocks: Main-KV paged blocks `[num_blocks, 2, num_layers,
                 page_size, n_kv_heads, head_dim]`, dtype `kv_type` (BF16 or
                 FP8 e4m3, scale-free).
+            page_stride: Page-to-page distance in elements; -1 when packed.
             cache_lengths: Main-KV cache lengths `[batch]` uint32.
             kv_lookup_table: Main-KV page table `[batch, max_pages]` uint32.
             max_prompt_length: Main-KV max prompt (query) length `[1]` uint32.
@@ -652,6 +657,7 @@ struct Struct_msa_attention_ragged_paged:
         """
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -988,6 +994,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
         cache_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         total_context_length: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1038,6 +1045,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
             total_context_length: Total context length of the current batch.
             kv_blocks: Main-KV paged blocks `[num_blocks, 2, num_layers,
                 page_size, n_kv_heads, head_dim]`, dtype `kv_type`.
+            page_stride: Page-to-page distance in elements; -1 when packed.
             cache_lengths: Main-KV cache lengths `[batch]` uint32.
             kv_lookup_table: Main-KV page table `[batch, max_pages]` uint32.
             max_prompt_length: Main-KV max prompt (query) length `[1]` uint32.
@@ -1057,6 +1065,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
         else:
             var kv_collection = generic_get_paged_cache(
                 kv_blocks,
+                page_stride,
                 cache_lengths,
                 kv_lookup_table,
                 max_prompt_length,
@@ -1302,6 +1311,7 @@ struct Struct_msa_attention_ragged_paged_mxfp6:
         cache_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         total_context_length: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1352,6 +1362,7 @@ struct Struct_msa_attention_ragged_paged_mxfp6:
             total_context_length: Total context length of the current batch.
             kv_blocks: Main-KV paged blocks `[num_blocks, 2, num_layers,
                 page_size, n_kv_heads, head_dim]`, dtype `kv_type`.
+            page_stride: Page-to-page distance in elements; -1 when packed.
             cache_lengths: Main-KV cache lengths `[batch]` uint32.
             kv_lookup_table: Main-KV page table `[batch, max_pages]` uint32.
             max_prompt_length: Main-KV max prompt (query) length `[1]` uint32.
@@ -1371,6 +1382,7 @@ struct Struct_msa_attention_ragged_paged_mxfp6:
         else:
             var kv_collection = generic_get_paged_cache(
                 kv_blocks,
+                page_stride,
                 cache_lengths,
                 kv_lookup_table,
                 max_prompt_length,

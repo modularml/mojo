@@ -42,6 +42,10 @@ class PagedCacheValues(KVCacheInputsPerDevice[Tensor, Tensor]):
     max_prompt_length: Tensor
     max_cache_length: Tensor
     kv_scales: Tensor | None = None
+    # Page-to-page distances; mirror upstream PagedCacheValues, where they are
+    # rank-0 int64 scalars and ``None`` means the pages are packed.
+    page_stride_input: Tensor | None = None
+    scales_page_stride_input: Tensor | None = None
     attention_dispatch_metadata: Tensor | None = None
     # MLA capturable-graph scalar; mirrors upstream PagedCacheValues.
     mla_num_partitions: Tensor | None = None
@@ -85,6 +89,23 @@ class PagedCacheValues(KVCacheInputsPerDevice[Tensor, Tensor]):
                 )
             )
 
+        page_stride: Tensor | None = None
+        if per_device[0].page_stride_input is not None:
+            page_stride = _wrap(
+                cast(
+                    list[TensorValue], [d.page_stride_input for d in per_device]
+                )
+            )
+
+        scales_page_stride: Tensor | None = None
+        if per_device[0].scales_page_stride_input is not None:
+            scales_page_stride = _wrap(
+                cast(
+                    list[TensorValue],
+                    [d.scales_page_stride_input for d in per_device],
+                )
+            )
+
         return cls(
             kv_blocks=_wrap([d.kv_blocks for d in per_device]),
             cache_lengths=_wrap([d.cache_lengths for d in per_device]),
@@ -92,6 +113,8 @@ class PagedCacheValues(KVCacheInputsPerDevice[Tensor, Tensor]):
             max_prompt_length=_wrap([d.max_prompt_length for d in per_device]),
             max_cache_length=_wrap([d.max_cache_length for d in per_device]),
             kv_scales=kv_scales,
+            page_stride_input=page_stride,
+            scales_page_stride_input=scales_page_stride,
             attention_dispatch_metadata=attention_dispatch_metadata,
             mla_num_partitions=mla_num_partitions,
         )
@@ -138,6 +161,16 @@ class PagedCacheValues(KVCacheInputsPerDevice[Tensor, Tensor]):
             max_cache_length=TensorValue(self.max_cache_length.local_shards[i]),
             kv_scales=BufferValue(self.kv_scales.local_shards[i])
             if self.kv_scales is not None
+            else None,
+            page_stride_input=TensorValue(
+                self.page_stride_input.local_shards[i]
+            )
+            if self.page_stride_input is not None
+            else None,
+            scales_page_stride_input=TensorValue(
+                self.scales_page_stride_input.local_shards[i]
+            )
+            if self.scales_page_stride_input is not None
             else None,
             attention_dispatch_metadata=TensorValue(
                 self.attention_dispatch_metadata.local_shards[i]

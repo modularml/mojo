@@ -18,7 +18,7 @@ from max.driver import CPU
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, TensorValue, ops
-from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 
 
 @dataclass(frozen=True)
@@ -41,13 +41,9 @@ class PrintKVCacheModel:
         This contains both the print KV cache op and a "fetch" op to get a
         KVCacheCollection.
         """
-        kv_collection = PagedCacheValues(
-            kv_blocks=kv_inputs[0].buffer,
-            cache_lengths=kv_inputs[1].tensor,
-            lookup_table=kv_inputs[2].tensor,
-            max_prompt_length=kv_inputs[3].tensor,
-            max_cache_length=kv_inputs[4].tensor,
-        )
+        kv_collection = self.kv_params.unflatten_kv_inputs(
+            iter(kv_inputs)
+        ).inputs[0]
         page_size = self.kv_params.page_size
         if page_size is None:
             raise ValueError(
@@ -58,7 +54,7 @@ class PrintKVCacheModel:
             device=valid_lengths.device,
             values=[
                 valid_lengths,
-                *kv_collection.flatten(),
+                *kv_collection.flatten_without_attention_dispatch_metadata(),
                 ops.constant(
                     self.layer_idx, DType.uint32, device=DeviceRef.CPU()
                 ),

@@ -24,7 +24,6 @@ from max.nn.kv_cache import (
     KVCacheInputsPerDevice,
     KVCacheParams,
     MHAKVCacheParams,
-    PagedCacheValues,
 )
 from test_common.simple_kv_cache import paged_kv_cache_inputs
 
@@ -45,13 +44,9 @@ class FusedQKRMSNormModel:
         input_row_offsets: TensorValue,
         *graph_inputs: TensorValue,
     ) -> tuple[TensorValue, TensorValue]:
-        kv_collection = PagedCacheValues(
-            kv_blocks=graph_inputs[0].buffer,
-            cache_lengths=graph_inputs[1].tensor,
-            lookup_table=graph_inputs[2].tensor,
-            max_prompt_length=graph_inputs[3].tensor,
-            max_cache_length=graph_inputs[4].tensor,
-        )
+        kv_collection = self.kv_params.unflatten_kv_inputs(
+            iter(graph_inputs)
+        ).inputs[0]
         layer_idx = ops.constant(
             self.layer_idx, DType.uint32, device=DeviceRef.CPU()
         )
@@ -94,13 +89,7 @@ class UnfusedKeyRMSNormModel:
     ) -> None:
         rms_norm_key_cache(
             self.kv_params,
-            PagedCacheValues(
-                kv_blocks=graph_inputs[0].buffer,
-                cache_lengths=graph_inputs[1].tensor,
-                lookup_table=graph_inputs[2].tensor,
-                max_prompt_length=graph_inputs[3].tensor,
-                max_cache_length=graph_inputs[4].tensor,
-            ),
+            self.kv_params.unflatten_kv_inputs(iter(graph_inputs)).inputs[0],
             gamma=k_gamma,
             epsilon=self.epsilon,
             layer_idx=ops.constant(

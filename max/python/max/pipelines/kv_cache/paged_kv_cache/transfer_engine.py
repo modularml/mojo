@@ -217,6 +217,15 @@ def _validate_tensor_shape(tensors: Sequence[Buffer]) -> int:
     """
     first_tensor = tensors[0]
     first_shape = tuple(first_tensor.shape)
+    # TODO(MXSERV-502): `_build_group_descriptors` uses one number as both the
+    # page stride and the copy length, which a padded leaf needs separated.
+    for i, tensor in enumerate(tensors):
+        if not tensor.is_contiguous:
+            raise ValueError(
+                f"NIXL group tensor {i} is not contiguous (shape "
+                f"{tuple(tensor.shape)}, strides {tuple(tensor.strides)}): "
+                "padded KV pages cannot be transferred yet (MXSERV-502)."
+            )
     for i, tensor in enumerate(tensors[1:], 1):
         if tuple(tensor.shape) != first_shape:
             raise ValueError(

@@ -20,7 +20,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, TensorValue
 from max.graph.buffer_utils import cast_tensor_to
 from max.nn.kernels import kv_cache_ragged_radd
-from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
@@ -42,24 +42,12 @@ class KVCacheRaddModel:
         *kv_inputs: TensorValue,
     ) -> None:
         """Apply the radd operation to the KV cache."""
-        (
-            kv_blocks,
-            cache_lengths,
-            lookup_table,
-            max_prompt_length,
-            max_cache_length,
-            *_,
-        ) = kv_inputs
         kv_cache_ragged_radd(
             kv_params=self.kv_params,
             a=a,
-            kv_collection=PagedCacheValues(
-                kv_blocks=kv_blocks.buffer,
-                cache_lengths=cache_lengths.tensor,
-                lookup_table=lookup_table.tensor,
-                max_prompt_length=max_prompt_length.tensor,
-                max_cache_length=max_cache_length.tensor,
-            ),
+            kv_collection=self.kv_params.unflatten_kv_inputs(
+                iter(kv_inputs)
+            ).inputs[0],
             input_row_offsets=input_row_offsets,
             batch_offset=batch_offset,
             layer_idx=self.layer_idx,

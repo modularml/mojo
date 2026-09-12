@@ -2452,6 +2452,7 @@ def generic_get_paged_cache[
     dtype: DType,
 ](
     blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+    page_stride: InputTensor[dtype=.int64, rank=1, ...],
     cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
     lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
     max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -2486,6 +2487,10 @@ def generic_get_paged_cache[
         LayoutTensor[blocks.dtype, Layout.row_major[6](), MutAnyOrigin](
             blocks.unsafe_ptr(),
             RuntimeLayout[Layout.row_major[6]()].row_major(blocks.shape()),
+        ),
+        LayoutTensor[page_stride.dtype, Layout.row_major[1](), ImmutAnyOrigin](
+            page_stride.unsafe_ptr(),
+            RuntimeLayout[Layout.row_major[1]()].row_major(page_stride.shape()),
         ),
         LayoutTensor[
             cache_lengths.dtype, Layout(UNKNOWN_VALUE), ImmutAnyOrigin
@@ -2526,6 +2531,7 @@ def generic_get_paged_cache[
     page_size: Int,
 ](
     blocks: LayoutTensor[mut=True, dtype, Layout.row_major[6](), _],
+    page_stride: LayoutTensor[mut=False, .int64, Layout.row_major[1](), _],
     cache_lengths: LayoutTensor[mut=False, .uint32, Layout(UNKNOWN_VALUE), _],
     lookup_table: LayoutTensor[mut=False, .uint32, Layout.row_major[2](), _],
     max_prompt_length: LayoutTensor[
@@ -2554,6 +2560,7 @@ def generic_get_paged_cache[
         lookup_table = lookup_table,
         max_seq_length = max_prompt_length[0][0],
         max_cache_length = max_cache_length[0][0],
+        page_stride = Int(page_stride[0][0]),
     }
 
 
@@ -2565,6 +2572,7 @@ def generic_get_paged_cache_with_scales[
     quantization_granularity: Int,
 ](
     blocks: LayoutTensor[mut=True, dtype, Layout.row_major[6](), _],
+    page_stride: LayoutTensor[mut=False, .int64, Layout.row_major[1](), _],
     cache_lengths: LayoutTensor[mut=False, .uint32, Layout(UNKNOWN_VALUE), _],
     lookup_table: LayoutTensor[mut=False, .uint32, Layout.row_major[2](), _],
     max_prompt_length: LayoutTensor[
@@ -2574,6 +2582,9 @@ def generic_get_paged_cache_with_scales[
         mut=False, .uint32, Layout.row_major[1](), _
     ],
     scales: LayoutTensor[mut=True, scale_dtype, Layout.row_major[6](), _],
+    scales_page_stride: LayoutTensor[
+        mut=False, .int64, Layout.row_major[1](), _
+    ],
     scales_lookup_table: OptionalReg[
         LayoutTensor[
             mut=False, .uint32, Layout.row_major[2](), lookup_table.origin
@@ -2595,11 +2606,15 @@ def generic_get_paged_cache_with_scales[
 
     Args:
         blocks: KV cache blocks tensor [num_blocks, kv_dim, num_layers, page_size, num_heads, head_dim].
+        page_stride: Page-to-page distance for `blocks`, in elements; -1 when
+            packed.
         cache_lengths: Cache lengths per batch [batch_size].
         lookup_table: Page lookup table [batch_size, max_pages].
         max_prompt_length: Max prompt (query) length scalar tensor [1].
         max_cache_length: Max cache length scalar tensor [1].
         scales: Scales tensor [num_blocks, kv_dim, num_layers, page_size, num_heads, head_dim_granularity].
+        scales_page_stride: The same distance for `scales`, which is its own
+            pool leaf and pads independently of the values.
         scales_lookup_table: Page lookup table for the scales [batch_size, max_pages].
             Pass this when the scales are paged independently of the values, so
             a request's scale pages carry their own ids. When absent the scales
@@ -2616,6 +2631,8 @@ def generic_get_paged_cache_with_scales[
         max_cache_length = max_cache_length[0][0],
         scales = scales,
         scales_lookup_table = scales_lookup_table,
+        page_stride = Int(page_stride[0][0]),
+        scales_page_stride = Int(scales_page_stride[0][0]),
     }
 
 

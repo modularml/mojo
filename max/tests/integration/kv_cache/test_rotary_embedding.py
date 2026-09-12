@@ -37,7 +37,7 @@ from max.nn.kernels import (
     rope_ragged_with_position_ids,
     rope_split_store_ragged,
 )
-from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MHAKVCacheParams
 from test_common.modular_graph_test import (
     are_all_tensor_values,
     modular_graph_test,
@@ -619,24 +619,11 @@ def test_kv_cache_ragged_rope(
             freqs_cis = g.inputs[2]
 
             kv_start = 4 if use_position_ids else 3
-            (
-                blocks,
-                cache_lengths,
-                lookup_table,
-                max_prompt_length,
-                max_cache_length,
-                _attention_dispatch_metadata,
-            ) = g.inputs[kv_start:]
-
             layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
 
-            kv_collection = PagedCacheValues(
-                blocks.buffer,
-                cache_lengths.tensor,
-                lookup_table.tensor,
-                max_prompt_length.tensor,
-                max_cache_length.tensor,
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(g.inputs[kv_start:])
+            ).inputs[0]
 
             position_ids = g.inputs[3].tensor if use_position_ids else None
 
@@ -674,12 +661,11 @@ def test_kv_cache_ragged_rope(
     assert kv_runtime_inputs.attention_dispatch_metadata is not None
     provided_inputs = {
         1: input_row_offsets,
-        3 + offset: kv_runtime_inputs.kv_blocks,
-        4 + offset: kv_runtime_inputs.cache_lengths,
-        5 + offset: kv_runtime_inputs.lookup_table,
-        6 + offset: kv_runtime_inputs.max_prompt_length,
-        7 + offset: kv_runtime_inputs.max_cache_length,
-        8 + offset: kv_runtime_inputs.attention_dispatch_metadata,
+        # The KV inputs follow, in the order `flatten` emits them.
+        **{
+            3 + offset + i: buf
+            for i, buf in enumerate(kv_runtime_inputs.flatten())
+        },
     }
 
     if use_position_ids:
@@ -776,24 +762,11 @@ def test_rope_split_store_ragged(
             freqs_cis = g.inputs[2]
 
             kv_start = 4 if use_position_ids else 3
-            (
-                blocks,
-                cache_lengths,
-                lookup_table,
-                max_prompt_length,
-                max_cache_length,
-                _attention_dispatch_metadata,
-            ) = g.inputs[kv_start:]
-
             layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
 
-            kv_collection = PagedCacheValues(
-                blocks.buffer,
-                cache_lengths.tensor,
-                lookup_table.tensor,
-                max_prompt_length.tensor,
-                max_cache_length.tensor,
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(g.inputs[kv_start:])
+            ).inputs[0]
 
             position_ids = g.inputs[3].tensor if use_position_ids else None
 
@@ -831,12 +804,11 @@ def test_rope_split_store_ragged(
     assert kv_runtime_inputs.attention_dispatch_metadata is not None
     provided_inputs = {
         1: input_row_offsets,
-        3 + offset: kv_runtime_inputs.kv_blocks,
-        4 + offset: kv_runtime_inputs.cache_lengths,
-        5 + offset: kv_runtime_inputs.lookup_table,
-        6 + offset: kv_runtime_inputs.max_prompt_length,
-        7 + offset: kv_runtime_inputs.max_cache_length,
-        8 + offset: kv_runtime_inputs.attention_dispatch_metadata,
+        # The KV inputs follow, in the order `flatten` emits them.
+        **{
+            3 + offset + i: buf
+            for i, buf in enumerate(kv_runtime_inputs.flatten())
+        },
     }
 
     if use_position_ids:

@@ -24,7 +24,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.attention import MHAMaskVariant
 from max.nn.kernels import flash_attention_ragged
-from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MHAKVCacheParams
 from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
@@ -113,14 +113,9 @@ def max_flash_attention_with_sinks(
             sink_weights = inputs[2].tensor
 
             # Fetch KV cache
-            kv_collection = PagedCacheValues(
-                kv_blocks=inputs[3].buffer,
-                cache_lengths=inputs[4].tensor,
-                lookup_table=inputs[5].tensor,
-                max_prompt_length=inputs[6].tensor,
-                max_cache_length=inputs[7].tensor,
-                attention_dispatch_metadata=inputs[8].tensor,
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(inputs[3:])
+            ).inputs[0]
 
             # Layer index
             layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())

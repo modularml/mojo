@@ -85,10 +85,14 @@ struct Struct_kv_cache_store_paged:
     @always_inline
     @staticmethod
     def execute[
-        dtype: DType, kv_type: DType, target: StaticString, key_or_value: Int
+        dtype: DType,
+        kv_type: DType,
+        target: StaticString,
+        key_or_value: Int,
     ](
         inputs: FusedInputTensor[dtype=dtype, rank=3, ...],
         kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
@@ -99,6 +103,7 @@ struct Struct_kv_cache_store_paged:
     ) capturing raises:
         var paged_kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -150,12 +155,14 @@ struct Struct_kv_cache_store_k_scales_paged:
     ](
         input_k_scales: FusedInputTensor[dtype=scale_dtype, rank=3, ...],
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
         max_cache_length: InputTensor[dtype=.uint32, rank=1, ...],
         k_scales_blocks: MutableInputTensor[dtype=scale_dtype, rank=6, ...],
+        scales_page_stride: InputTensor[dtype=.int64, rank=1, ...],
         # Resolves a request's scale pages. Pass `kv_lookup_table` itself when
         # the scales share the values' block-id space; pass a distinct table
         # when they are paged independently.
@@ -180,6 +187,12 @@ struct Struct_kv_cache_store_k_scales_paged:
                 kv_blocks.to_layout_tensor().ptr,
                 RuntimeLayout[Layout.row_major[6]()].row_major(
                     kv_blocks.to_layout_tensor().runtime_layout.shape.value
+                ),
+            ),
+            LayoutTensor[.int64, Layout.row_major[1](), ImmutAnyOrigin](
+                page_stride.to_layout_tensor().ptr,
+                RuntimeLayout[Layout.row_major[1]()].row_major(
+                    page_stride.to_layout_tensor().runtime_layout.shape.value
                 ),
             ),
             LayoutTensor[.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin](
@@ -211,6 +224,12 @@ struct Struct_kv_cache_store_k_scales_paged:
                 k_scales_blocks.to_layout_tensor().ptr,
                 RuntimeLayout[Layout.row_major[6]()].row_major(
                     k_scales_blocks.to_layout_tensor().runtime_layout.shape.value
+                ),
+            ),
+            LayoutTensor[.int64, Layout.row_major[1](), ImmutAnyOrigin](
+                scales_page_stride.to_layout_tensor().ptr,
+                RuntimeLayout[Layout.row_major[1]()].row_major(
+                    scales_page_stride.to_layout_tensor().runtime_layout.shape.value
                 ),
             ),
             LayoutTensor[.uint32, Layout.row_major[2](), ImmutAnyOrigin](
@@ -288,6 +307,7 @@ struct Struct_kv_cache_store_padded:
     ](
         inputs: FusedInputTensor[dtype=dtype, rank=4, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         valid_lengths: InputTensor[dtype=.uint32, rank=1, ...],
@@ -298,6 +318,7 @@ struct Struct_kv_cache_store_padded:
     ) capturing raises:
         var paged_kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -346,6 +367,7 @@ struct Struct_rms_norm_kv_cache_ragged_paged:
         target: StaticString,
     ](
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -360,6 +382,7 @@ struct Struct_rms_norm_kv_cache_ragged_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -399,6 +422,7 @@ struct Struct_fused_qk_rms_norm_ragged_paged:
         q_proj: InputTensor[dtype=dtype, rank=3, ...],
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -412,6 +436,7 @@ struct Struct_fused_qk_rms_norm_ragged_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -458,6 +483,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged[interleaved: Bool]:
         q_proj: FusedInputTensor[dtype=dtype, rank=3, ...],
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -478,6 +504,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged[interleaved: Bool]:
         # rank-3 Q-projection path is unchanged.
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -548,6 +575,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
         q_index_proj: FusedInputTensor[dtype=dtype, rank=3, ...],
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         main_kv_blocks: MutableInputTensor[dtype=main_cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         main_cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         main_kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         main_max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -555,6 +583,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
         index_kv_blocks: MutableInputTensor[
             dtype=index_cache_dtype, rank=6, ...
         ],
+        index_page_stride: InputTensor[dtype=.int64, rank=1, ...],
         index_cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         index_kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         index_max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -575,6 +604,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
         # `[Q | IndexQ]` matmul output folds into that band's read lambda.
         var main_kv_collection = generic_get_paged_cache(
             main_kv_blocks,
+            page_stride,
             main_cache_lengths,
             main_kv_lookup_table,
             main_max_prompt_length,
@@ -582,6 +612,7 @@ struct Struct_fused_qk_rms_norm_rope_ragged_paged_dual[interleaved: Bool]:
         )
         var index_kv_collection = generic_get_paged_cache(
             index_kv_blocks,
+            index_page_stride,
             index_cache_lengths,
             index_kv_lookup_table,
             index_max_prompt_length,
@@ -647,6 +678,7 @@ struct Struct_rms_norm_value_cache_ragged_paged:
         target: StaticString,
     ](
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -661,6 +693,7 @@ struct Struct_rms_norm_value_cache_ragged_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -696,6 +729,7 @@ struct Struct_print_kv_cache_paged:
     ](
         valid_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -706,6 +740,7 @@ struct Struct_print_kv_cache_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -736,6 +771,7 @@ struct Struct_kv_matmul_ragged_paged:
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         weight: InputTensor[dtype=dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -745,6 +781,7 @@ struct Struct_kv_matmul_ragged_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -776,6 +813,7 @@ struct Struct_k_matmul_ragged_paged:
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         weight: InputTensor[dtype=dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -785,6 +823,7 @@ struct Struct_k_matmul_ragged_paged:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -823,6 +862,7 @@ struct Struct_k_matmul_ragged_paged_scale:
         input_scale: InputTensor[dtype=scale_dtype, rank=2, ...],
         weight_scale: InputTensor[dtype=scale_dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=kv_cache_t, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -832,6 +872,7 @@ struct Struct_k_matmul_ragged_paged_scale:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -891,6 +932,7 @@ struct Struct_kv_cache_ragged_paged_radd:
     ](
         a: InputTensor[dtype=dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -902,6 +944,7 @@ struct Struct_kv_cache_ragged_paged_radd:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -932,6 +975,7 @@ struct Struct_kv_cache_ragged_paged_2m_iadd:
     ](
         kv: InputTensor[dtype=dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -944,6 +988,7 @@ struct Struct_kv_cache_ragged_paged_2m_iadd:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,

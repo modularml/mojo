@@ -42,6 +42,7 @@ from .cache_params import (
     spec_decode_cache_slack,
 )
 from .input_types import (
+    PACKED_PAGE_STRIDE,
     KVCacheInputs,
     KVCacheInputsInterface,
     KVCacheInputsPerDevice,
@@ -64,6 +65,7 @@ from .utils import (
 )
 
 __all__ = [
+    "PACKED_PAGE_STRIDE",
     "AttnKey",
     "AttnKeyInterface",
     "BatchCharacteristics",

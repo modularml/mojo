@@ -144,6 +144,7 @@ struct QSASparseAttentionRaggedPaged:
         q: InputTensor[dtype=dtype, rank=3, ...],
         input_row_offsets: InputTensor[dtype=DType.uint32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=DType.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=DType.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=DType.uint32, rank=1, ...],
@@ -170,6 +171,7 @@ struct QSASparseAttentionRaggedPaged:
             q: Queries.
             input_row_offsets: Ragged query offsets.
             kv_blocks: Paged KV blocks.
+            page_stride: Page-to-page distance in elements; -1 when packed.
             cache_lengths: Per-sequence cached-key count.
             kv_lookup_table: Per-sequence page table.
             max_prompt_length: Max new query tokens this step.
@@ -203,6 +205,7 @@ struct QSASparseAttentionRaggedPaged:
 
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -292,6 +295,7 @@ struct QSACompressKeysPaged:
         freqs_cis: InputTensor[dtype=freq_dtype, rank=2, ...],
         key_counts: InputTensor[dtype=DType.int32, rank=1, ...],
         kv_blocks: MutableInputTensor[dtype=dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=DType.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=DType.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=DType.uint32, rank=1, ...],
@@ -317,6 +321,7 @@ struct QSACompressKeysPaged:
             freqs_cis: Rotary cos/sin-pair table, indexed by position.
             key_counts: Raw keys held per sequence, this step included.
             kv_blocks: Paged blocks of the indexer cache group.
+            page_stride: Page-to-page distance in elements; -1 when packed.
             cache_lengths: Per-sequence cached-key count.
             kv_lookup_table: Per-sequence page table.
             max_prompt_length: Max new query tokens this step.
@@ -339,6 +344,7 @@ struct QSACompressKeysPaged:
 
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,

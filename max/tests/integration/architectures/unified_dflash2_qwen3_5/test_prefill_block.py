@@ -44,6 +44,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph
 from max.nn.comm.allreduce import Signals
 from max.nn.kv_cache import (
+    PACKED_PAGE_STRIDE,
     KVCacheInputs,
     MHAKVCacheParams,
     MultiKVCacheInputs,
@@ -301,12 +302,14 @@ def _build() -> Step:
             h(np.array([0, 1], np.int64)),
             *sig,
             tblocks,
+            h(np.array([PACKED_PAGE_STRIDE], np.int64)),
             b(np.array([cached] * batch, np.uint32)),
             b(lut),
             h(np.array([target_width], np.uint32)),
             h(np.array([abs_max_cache], np.uint32)),
             h(np.array([batch, target_width, 1, abs_max_cache], np.int64)),
             dblocks,
+            h(np.array([PACKED_PAGE_STRIDE], np.int64)),
             b(np.array([cached] * batch, np.uint32)),
             b(lut),
             h(np.array([target_width], np.uint32)),

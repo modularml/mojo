@@ -241,6 +241,131 @@ def _validate_is_2d_uint8_buffer(buffer: Buffer) -> None:
         raise ValueError("KVCacheMemory buffer must have 2 dimensions")
     if buffer.dtype != DType.uint8:
         raise ValueError("KVCacheMemory buffer must have dtype uint8")
+    # TODO(MXSERV-502): the offload path addresses a page as
+    # `base + idx * bytes_per_page`, so a padded leaf needs the stride and the
+    # copy length separated before it can be offloaded.
+    if not buffer.is_contiguous:
+        raise ValueError(
+            "KVCacheMemory buffer must be contiguous, but this one has "
+            f"shape {tuple(buffer.shape)} with strides "
+            f"{tuple(buffer.strides)}: its pages are padded, and the offload "
+            "and transfer paths cannot yet stride by a distance that differs "
+            "from the page they copy. Serve without a KVConnector, or without "
+            "disaggregation, until MXSERV-502 lands."
+        )
+
+
+# The flat scale TMA starts a copy at a key index, so the scale pool's
+# page-to-page stride has to stay 16-byte aligned; see `scale_align_elems` and
+# the `create_index_scale_tma_tile` assert in `kv_cache/types.mojo`.
+_SCALE_TMA_ALIGN_BYTES = 16
+
+PACKED_PAGE_STRIDE = -1
+"""``page_stride`` sentinel meaning the pages are packed."""
+
+
+def _page_stride_buffer(pages: Buffer) -> Buffer:
+    """Wraps a page view's stride as the rank-1 int64 tensor the ops take."""
+    return Buffer.from_numpy(np.array([page_stride_of(pages)], dtype=np.int64))
+
+
+def page_view(
+    slab: Buffer,
+    shape: Sequence[int],
+    dtype: DType,
+    padded_page_bytes: int | None = None,
+) -> Buffer:
+    """Views ``slab`` as ``[num_pages, *shape]`` pages.
+
+    A padded leaf gets a strided view sliced out of the padded grid, so its
+    dim-0 stride is the padded distance while its extent is only the data.
+
+    Args:
+        slab: The backing allocation, typically the raw ``uint8`` arena.
+        shape: One page's data shape, without the leading page dimension.
+        dtype: Element type of the page data.
+        padded_page_bytes: The pool's padded page size, or ``None`` if packed.
+
+    Returns:
+        The page view, strided iff the leaf was padded.
+    """
+    data_bytes = math.prod(shape) * dtype.size_in_bytes
+    total_bytes = slab.num_elements * slab.dtype.size_in_bytes
+
+    if padded_page_bytes is None or padded_page_bytes == data_bytes:
+        num_pages = total_bytes // data_bytes
+        if num_pages * data_bytes != total_bytes:
+            raise ValueError(
+                f"Packed pages must tile the slab exactly, but {total_bytes} "
+                f"bytes does not divide into pages of {data_bytes}."
+            )
+        return slab.view(shape=(num_pages, *shape), dtype=dtype)
+
+    if padded_page_bytes < data_bytes:
+        raise ValueError(
+            f"A padded page cannot be smaller than the data it holds: "
+            f"{padded_page_bytes} < {data_bytes}."
+        )
+    if padded_page_bytes % dtype.size_in_bytes:
+        raise ValueError(
+            f"Padded page of {padded_page_bytes} bytes is not a whole number "
+            f"of {dtype} elements, so it has no stride in elements."
+        )
+
+    num_pages = total_bytes // padded_page_bytes
+    # Slicing keeps the grid's dim-0 stride, which is exactly the page-to-page
+    # distance this view needs to carry.
+    grid = slab.view(
+        dtype=dtype,
+        shape=(num_pages, padded_page_bytes // dtype.size_in_bytes),
+    )
+    return grid[:, : data_bytes // dtype.size_in_bytes].view(
+        dtype=dtype, shape=(num_pages, *shape)
+    )
+
+
+def page_stride_of(pages: Buffer) -> int:
+    """Returns the page-to-page distance a page view carries, in elements.
+
+    ``PACKED_PAGE_STRIDE`` when the view is contiguous.
+    """
+    return PACKED_PAGE_STRIDE if pages.is_contiguous else pages.strides[0]
+
+
+def contiguous_page_view_and_stride(
+    slab: Buffer,
+    shape: Sequence[int],
+    dtype: DType,
+    padded_page_bytes: int | None = None,
+) -> tuple[Buffer, int]:
+    """Builds a contiguous page view for model execution, plus its stride.
+
+    Model execution rejects non-contiguous buffers, so a padded leaf is bound
+    as a packed view with the stride passed beside it. That view is shorter
+    than the span the stride reaches; the memory past it belongs to the arena.
+
+    Args:
+        slab: The backing allocation, typically the raw ``uint8`` arena.
+        shape: One page's data shape, without the leading page dimension.
+        dtype: Element type of the page data.
+        padded_page_bytes: The pool's padded page size, or ``None`` if packed.
+
+    Returns:
+        A contiguous ``[num_pages, *shape]`` buffer, and the page stride in
+        elements -- ``PACKED_PAGE_STRIDE`` when the leaf was never padded.
+    """
+    data_bytes = math.prod(shape) * dtype.size_in_bytes
+    if padded_page_bytes is None or padded_page_bytes == data_bytes:
+        return page_view(slab, shape, dtype), PACKED_PAGE_STRIDE
+
+    total_bytes = slab.num_elements * slab.dtype.size_in_bytes
+    num_pages = total_bytes // padded_page_bytes
+    flat = slab.view(dtype=dtype, shape=(total_bytes // dtype.size_in_bytes,))
+    packed = math.prod(shape)
+    return (
+        flat[: num_pages * packed].view(dtype=dtype, shape=(num_pages, *shape)),
+        padded_page_bytes // dtype.size_in_bytes,
+    )
 
 
 def _view_as_uint8_pages(buffer: Buffer) -> Buffer:
@@ -389,7 +514,19 @@ class KVCacheBuffer(KVCacheBufferInterface):
 
     replicates_kv_across_tp: bool
     values: list[Buffer]
+    """Page views, strided when the pool padded this leaf. The canonical form:
+    the page stride is read off these."""
+    values_packed: list[Buffer] | None = None
+    """Contiguous aliases of :attr:`values`, for binding as graph inputs.
+
+    Model execution rejects a non-contiguous buffer, so a padded leaf cannot be
+    bound as its strided view. These cover the same allocation packed, and are
+    deliberately *shorter* than the span their stride reaches -- see
+    :func:`contiguous_page_view_and_stride`. ``None`` when nothing was padded,
+    in which case :attr:`values` is already contiguous."""
     scales: list[Buffer] | None = None
+    scales_packed: list[Buffer] | None = None
+    """Contiguous aliases of :attr:`scales`; see :attr:`values_packed`."""
     values_per_layer: list[list[Buffer]] | None = None
     """Per-TP-shard, per-layer value buffers when the pool uses
     :attr:`~max.nn.kv_cache.KVCacheParams.per_layer_buffers`.
@@ -613,6 +750,12 @@ class KVLeafRegion:
     leaf_id: str
     group_id: KVCacheGroupId
     bytes_per_page: int
+    row_bytes: int = field(default=1, kw_only=True)
+    """The granularity a padded page of this leaf must be a multiple of.
+
+    One row, ``num_heads * head_size * dtype_size``, widened where a kernel
+    needs more alignment than a row gives. Defaults to 1 for leaves not
+    addressed by row."""
 
     def blocks_to_reserve(self, num_blocks: int) -> int:
         """Returns how many blocks one request draws to fill ``num_blocks`` slots.
@@ -940,7 +1083,10 @@ class KVCacheParamInterface(CacheLeafParamInterface, Protocol):
         ...
 
     def slab_to_buffer_views(
-        self, buffers: Sequence[Buffer]
+        self,
+        buffers: Sequence[Buffer],
+        padded_page_bytes: Mapping[str, int] | None = None,
+        _prefix: str = "",
     ) -> KVCacheBufferInterface:
         """Converts a slab of memory into a buffer view."""
         ...
@@ -1280,6 +1426,29 @@ class KVCacheParams(KVCacheParamInterface):
         )
 
     @property
+    def row_bytes(self) -> int:
+        """Returns one value row, ``num_heads * head_size * dtype_size``."""
+        return (
+            self.n_kv_heads_per_device
+            * self.head_dim
+            * self.dtype.size_in_bytes
+        )
+
+    @property
+    def scale_row_bytes(self) -> int:
+        """Returns one scale row; see :attr:`row_bytes`."""
+        if not (
+            self.quantized_kv_cache and self.kvcache_quant_config is not None
+        ):
+            return 1
+        *_, n_kv_heads, granular_dim = self.shape_per_scale_block
+        return (
+            n_kv_heads
+            * granular_dim
+            * self.kvcache_quant_config.scale_dtype.size_in_bytes
+        )
+
+    @property
     def bytes_per_scale_block(self) -> int:
         """Returns the number of bytes per scale block."""
         if not (
@@ -1458,6 +1627,9 @@ class KVCacheParams(KVCacheParamInterface):
         max_cache_valid_length: int,
         blocks_per_layer: list[Buffer] | None = None,
         scales_per_layer: list[Buffer] | None = None,
+        *,
+        page_stride: Buffer,
+        scales_page_stride: Buffer | None = None,
     ) -> KVCacheInputsPerDevice[Buffer, Buffer]:
         raise NotImplementedError
 
@@ -1533,6 +1705,15 @@ class KVCacheParams(KVCacheParamInterface):
                         target_key,
                         draft_key,
                         max_cl,
+                        # Read off the buffers rather than recomputed, so the
+                        # distance the kernel addresses with is the one the
+                        # allocation was built with.
+                        page_stride=_page_stride_buffer(blocks),
+                        scales_page_stride=(
+                            _page_stride_buffer(kv_scales)
+                            if kv_scales is not None
+                            else None
+                        ),
                         blocks_per_layer=blocks_per_layer,
                         scales_per_layer=scales_per_layer,
                     )
@@ -1567,6 +1748,7 @@ class KVCacheParams(KVCacheParamInterface):
                 leaf_id=_prefix + str(self.group_id),
                 group_id=self.group_id,
                 bytes_per_page=self.bytes_per_value_block,
+                row_bytes=self.row_bytes,
                 page_size=self.page_size,
             )
         }
@@ -1577,6 +1759,9 @@ class KVCacheParams(KVCacheParamInterface):
                     leaf_id=_prefix + str(self.group_id) + "/scales",
                     group_id=self.group_id,
                     bytes_per_page=self.bytes_per_scale_block,
+                    row_bytes=math.lcm(
+                        self.scale_row_bytes, _SCALE_TMA_ALIGN_BYTES
+                    ),
                     page_size=self.page_size,
                 )
             )
@@ -1590,32 +1775,63 @@ class KVCacheParams(KVCacheParamInterface):
         return {}
 
     def slab_to_buffer_views(
-        self, buffers: Sequence[Buffer]
+        self,
+        buffers: Sequence[Buffer],
+        padded_page_bytes: Mapping[str, int] | None = None,
+        _prefix: str = "",
     ) -> KVCacheBufferInterface:
-        """Converts a slab of memory into a buffer view.
+        """Converts a slab of memory into per-leaf page views.
 
-        This is used by the Jenga KV cache manager.
+        Each view carries its own page-to-page distance in its dim-0 stride,
+        so nothing downstream -- the pool, the connector, the transfer engine
+        -- has to be told whether this pool padded its pages.
+
+        Args:
+            buffers: One raw arena slab per TP shard.
+            padded_page_bytes: The pool's padded page size per leaf, keyed as
+                :meth:`leaves` keys it. ``None`` means nothing was padded.
+            _prefix: Leaf-id prefix identifying this node in a params tree.
+
+        Returns:
+            The buffer views for this cache.
         """
-
-        def _view(b: Buffer, shape: Sequence[int], dtype: DType) -> Buffer:
-            total_bytes = b.num_elements * b.dtype.size_in_bytes
-            bytes_per_page = math.prod(shape) * dtype.size_in_bytes
-            num_little_pages = total_bytes // bytes_per_page
-            assert num_little_pages * bytes_per_page == total_bytes
-            return b.view(shape=(num_little_pages, *shape), dtype=dtype)
-
+        padded = padded_page_bytes or {}
         quant_config = self.kvcache_quant_config
-        return KVCacheBuffer(
-            replicates_kv_across_tp=self.replicates_kv_across_tp,
-            values=[
-                _view(b, self.shape_per_block, self.dtype) for b in buffers
-            ],
-            scales=[
-                _view(b, self.shape_per_scale_block, quant_config.scale_dtype)
+        values_id = _prefix + str(self.group_id)
+        scales_id = values_id + "/scales"
+        quantized = self.quantized_kv_cache and quant_config is not None
+
+        def views(
+            shape: Sequence[int], dtype: DType, leaf_id: str
+        ) -> tuple[list[Buffer], list[Buffer] | None]:
+            page_bytes = padded.get(leaf_id)
+            strided = [page_view(b, shape, dtype, page_bytes) for b in buffers]
+            if page_bytes is None:
+                return strided, None
+            packed = [
+                contiguous_page_view_and_stride(b, shape, dtype, page_bytes)[0]
                 for b in buffers
             ]
-            if self.quantized_kv_cache and quant_config is not None
-            else None,
+            return strided, packed
+
+        values, values_packed = views(
+            self.shape_per_block, self.dtype, values_id
+        )
+        scales, scales_packed = (
+            views(
+                self.shape_per_scale_block,
+                quant_config.scale_dtype,
+                scales_id,
+            )
+            if quantized and quant_config is not None
+            else (None, None)
+        )
+        return KVCacheBuffer(
+            replicates_kv_across_tp=self.replicates_kv_across_tp,
+            values=values,
+            values_packed=values_packed,
+            scales=scales,
+            scales_packed=scales_packed,
             is_jenga=True,
         )
 
@@ -1771,6 +1987,10 @@ class MHAKVCacheParams(KVCacheParams):
         return [
             KVCacheInputsPerDevice(
                 kv_blocks=_kv_blocks(device),
+                # Read off the buffer's stride when the inputs are bound.
+                page_stride_input=TensorType(
+                    DType.int64, shape=[1], device=DeviceRef.CPU()
+                ),
                 cache_lengths=TensorType(
                     DType.uint32,
                     shape=[prefix + "batch_size"],
@@ -1810,6 +2030,12 @@ class MHAKVCacheParams(KVCacheParams):
                 )
                 if self.quantized_kv_cache
                 else None,
+                # Present exactly when the scales are.
+                scales_page_stride_input=TensorType(
+                    DType.int64, shape=[1], device=DeviceRef.CPU()
+                )
+                if self.quantized_kv_cache
+                else None,
                 attention_dispatch_metadata=self._attn_metadata_buffer(device),
                 draft_attention_dispatch_metadata=self._attn_metadata_buffer(
                     device
@@ -1837,14 +2063,19 @@ class MHAKVCacheParams(KVCacheParams):
         max_cache_valid_length: int,
         blocks_per_layer: list[Buffer] | None = None,
         scales_per_layer: list[Buffer] | None = None,
+        *,
+        page_stride: Buffer,
+        scales_page_stride: Buffer | None = None,
     ) -> KVCacheInputsPerDevice[Buffer, Buffer]:
         return KVCacheInputsPerDevice(
             kv_blocks=blocks,
+            page_stride_input=page_stride,
             cache_lengths=cache_lengths,
             lookup_table=lookup_table,
             max_prompt_length=max_prompt_length,
             max_cache_length=max_cache_length,
             kv_scales=kv_scales,
+            scales_page_stride_input=scales_page_stride,
             scales_lookup_table=scales_lookup_table,
             attention_dispatch_metadata=target_key.pack_into_buffer(
                 device, max_cache_valid_length
@@ -1962,6 +2193,10 @@ class MLAKVCacheParams(KVCacheParams):
                     shape=[page_dim, *self.shape_per_block],
                     device=device,
                 ),
+                # Read off the buffer's stride when the inputs are bound.
+                page_stride_input=TensorType(
+                    DType.int64, shape=[1], device=DeviceRef.CPU()
+                ),
                 cache_lengths=TensorType(
                     DType.uint32,
                     shape=[prefix + "batch_size"],
@@ -1989,6 +2224,12 @@ class MLAKVCacheParams(KVCacheParams):
                     self.kv_cache_scale_dtype,
                     shape=[page_dim, *self.shape_per_scale_block],
                     device=device,
+                )
+                if self.quantized_kv_cache
+                else None,
+                # Present exactly when the scales are.
+                scales_page_stride_input=TensorType(
+                    DType.int64, shape=[1], device=DeviceRef.CPU()
                 )
                 if self.quantized_kv_cache
                 else None,
@@ -2029,6 +2270,9 @@ class MLAKVCacheParams(KVCacheParams):
         max_cache_valid_length: int,
         blocks_per_layer: list[Buffer] | None = None,
         scales_per_layer: list[Buffer] | None = None,
+        *,
+        page_stride: Buffer,
+        scales_page_stride: Buffer | None = None,
     ) -> KVCacheInputsPerDevice[Buffer, Buffer]:
         # MLA never uses per-layer buffers; the parameters exist only to match
         # the base signature threaded by ``build_runtime_inputs``.
@@ -2038,11 +2282,13 @@ class MLAKVCacheParams(KVCacheParams):
         assert draft_key is None or isinstance(draft_key, MLAAttnKey)
         return KVCacheInputsPerDevice(
             kv_blocks=blocks,
+            page_stride_input=page_stride,
             cache_lengths=cache_lengths,
             lookup_table=lookup_table,
             max_prompt_length=max_prompt_length,
             max_cache_length=max_cache_length,
             kv_scales=kv_scales,
+            scales_page_stride_input=scales_page_stride,
             scales_lookup_table=scales_lookup_table,
             attention_dispatch_metadata=target_key.pack_into_buffer(
                 device, max_cache_valid_length
@@ -2678,7 +2924,10 @@ class MultiKVCacheParams(KVCacheParamInterface):
         return bound
 
     def slab_to_buffer_views(
-        self, buffers: Sequence[Buffer]
+        self,
+        buffers: Sequence[Buffer],
+        padded_page_bytes: Mapping[str, int] | None = None,
+        _prefix: str = "",
     ) -> KVCacheBufferInterface:
         """Converts a slab of memory into a buffer view.
 
@@ -2686,7 +2935,9 @@ class MultiKVCacheParams(KVCacheParamInterface):
         """
         return MultiKVCacheBuffer(
             children={
-                child_id: child.slab_to_buffer_views(buffers)
+                child_id: child.slab_to_buffer_views(
+                    buffers, padded_page_bytes, _prefix + child_id + "."
+                )
                 for child_id, child in self._attention_children.items()
             },
         )

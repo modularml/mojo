@@ -478,12 +478,14 @@ def store_k_scale_cache_ragged(
         values=[
             x_k_scale,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
             kv_collection.max_prompt_length,
             kv_collection.max_cache_length,
             kv_collection.kv_scales,
+            kv_collection.scales_page_stride(),
             kv_collection.scales_lookup_table or kv_collection.lookup_table,
             layer_idx,
         ],
@@ -540,6 +542,7 @@ def _rope_split_store_ragged_unfused(
 
     # Store K and V to cache individually.
     kv_blocks = kv_collection.kv_blocks
+    page_stride = kv_collection.values_page_stride()
     cache_lengths = kv_collection.cache_lengths
     lookup_table = kv_collection.lookup_table
     max_prompt_length = kv_collection.max_prompt_length
@@ -550,6 +553,7 @@ def _rope_split_store_ragged_unfused(
         values=[
             xk_rope,
             kv_blocks,
+            page_stride,
             cache_lengths,
             lookup_table,
             input_row_offsets,
@@ -565,6 +569,7 @@ def _rope_split_store_ragged_unfused(
         values=[
             x_v,
             kv_blocks,
+            page_stride,
             cache_lengths,
             lookup_table,
             input_row_offsets,
@@ -2388,7 +2393,15 @@ def kv_cache_store_paged_ragged(
     *,
     key_or_value: int,
 ) -> None:
-    """Stores key or value tensor into the paged KV cache (ragged inputs)."""
+    """Stores key or value tensor into the paged KV cache (ragged inputs).
+
+    Args:
+        kv_collection: The paged KV cache collection to write into.
+        x_cache: The rank-3 tensor of new projections to store.
+        input_row_offsets: Ragged row offsets of shape ``[batch + 1]``.
+        layer_idx: Scalar layer index identifying which layer's cache to write.
+        key_or_value: Whether to store into the key or the value cache.
+    """
     _check_dtype(DType.uint32, input_row_offsets=input_row_offsets)
     _check_rank(3, x_cache=x_cache)
     _check_rank(1, input_row_offsets=input_row_offsets)
@@ -2404,6 +2417,7 @@ def kv_cache_store_paged_ragged(
         values=[
             x_cache,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
@@ -2491,6 +2505,7 @@ def kv_cache_store_paged_padded(
         values=[
             x_cache,
             kv_collection.kv_blocks,
+            kv_collection.values_page_stride(),
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             valid_lengths,

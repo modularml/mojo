@@ -1226,6 +1226,7 @@ struct Struct_unfused_qkv_matmul_ragged_paged_gguf_quantized:
         k_weight: InputTensor[dtype=.uint8, rank=2, ...],
         v_weight: InputTensor[dtype=.uint8, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=.float32, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1235,6 +1236,7 @@ struct Struct_unfused_qkv_matmul_ragged_paged_gguf_quantized:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,

@@ -68,7 +68,7 @@ from .jenga_block_manager import (
     create_groups,
     create_pools,
 )
-from .jenga_block_pool import JengaBlockPool, compute_jenga_ratios
+from .jenga_block_pool import JengaBlockPool, plan_jenga_geometry
 from .kv_group_coordinator import KVGroupCoordinatorInterface
 
 logger = logging.getLogger("max.pipelines")
@@ -187,7 +187,11 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         # per-device.
         tp_degree = params.tensor_parallel_degree
         bytes_per_page: dict[str, int] = {}
+        row_bytes: dict[str, int] = {}
         for leaf_id, leaf in leaves.items():
+            # The planner wants an entry per cache; a row-addressed leaf
+            # reports 1 and so constrains nothing.
+            row_bytes[leaf_id] = leaf.row_bytes
             if leaf.group_id.is_recurrent():
                 bytes_per_page[leaf_id] = leaf.bytes_per_page
                 continue
@@ -217,9 +221,14 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             leaf_id: _pool_group(leaf, is_kv_connector_enabled)
             for leaf_id, leaf in leaves.items()
         }
-        num_huge_blocks, huge_page_bytes, ratios = compute_jenga_ratios(
-            per_device_available_bytes, bytes_per_page
+        # Pads each page up to a divisor of a searched huge block when exact
+        # tiling is too coarse to allocate.
+        geometry = plan_jenga_geometry(
+            per_device_available_bytes, bytes_per_page, row_bytes
         )
+        num_huge_blocks = geometry.num_huge_blocks
+        huge_page_bytes = geometry.huge_page_bytes
+        ratios = geometry.ratios
         if params.kv_connector_config.type.value == "dkv":
             raise ValueError(
                 "DKV KVConnector is not supported with Jenga KV cache. "
@@ -236,7 +245,13 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         max_leaf_id_len = max(len(leaf_id) for leaf_id in leaf_infos)
         for leaf_id, leaf_info in leaf_infos.items():
             logger.info(
-                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(bytes_per_page[leaf_id])}  ({leaf_info.ratio} per huge page)"
+                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(geometry.padded_sizes[leaf_id])}  ({leaf_info.ratio} per huge page)"
+                + (
+                    ""
+                    if geometry.padded_sizes[leaf_id] == bytes_per_page[leaf_id]
+                    else f", padded from {to_human_readable_bytes(bytes_per_page[leaf_id])}"
+                    f" (+{geometry.padding_fraction(leaf_id, bytes_per_page[leaf_id]):.2%})"
+                )
             )
 
         devices = [d.to_device() for d in params.devices]
@@ -249,8 +264,10 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             for d in devices
         ]
 
+        # The views carry their page stride, so nothing below here needs the
+        # padded sizes.
         kv_buffers = [
-            params.slab_to_buffer_views(bs)
+            params.slab_to_buffer_views(bs, geometry.padded_sizes)
             for bs in split_into_groups(slabs, params.data_parallel_degree)
         ]
 

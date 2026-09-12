@@ -278,8 +278,9 @@ def plan_jenga_geometry(
     Args:
         available_bytes: The per-device KV budget the pool may occupy.
         cache_sizes: Each cache's page size in bytes, before padding.
-        row_sizes: Each cache's row in bytes, ``num_heads * head_size *
-            dtype_size``. A padded page is always a whole number of these.
+        row_sizes: The granularity each cache's padded page must be a whole
+            number of -- a row, ``num_heads * head_size * dtype_size``, widened
+            where a kernel needs more alignment than a row gives.
         include_null_block: Whether to include the null block.
         max_padding_fraction: The most of a page any one cache may spend on
             padding. Caps the search rather than the result: a geometry needing

@@ -20,6 +20,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
+import numpy as np
 from max.driver import Buffer
 from max.dtype import DType
 from max.experimental.tensor import Tensor
@@ -29,7 +30,12 @@ from max.graph import (
     DeviceRef,
     TensorType,
     TensorValue,
+    ops,
 )
+
+PACKED_PAGE_STRIDE = -1
+"""``page_stride`` sentinel: the pages are packed, so the distance from one page
+to the next is the product of the dimensions inside a page."""
 
 _Tensor = TypeVar("_Tensor", TensorValue, TensorType, Buffer, Tensor)
 _Buffer = TypeVar("_Buffer", BufferValue, BufferType, Buffer, Tensor)
@@ -56,6 +62,11 @@ class KVCacheInputsPerDevice(Generic[_Tensor, _Buffer]):
     max_prompt_length: _Tensor
     max_cache_length: _Tensor
     kv_scales: _Buffer | None = None  # KV scales for FP8 quantization
+    # Page-to-page distance for ``kv_blocks``, as a rank-1 int64 tensor.
+    # ``None`` means packed; read it through :meth:`values_page_stride`.
+    page_stride_input: _Tensor | None = None
+    # The same, for ``kv_scales``.
+    scales_page_stride_input: _Tensor | None = None
     # Page lookup table for ``kv_scales``, present when the scales are paged
     # independently of the values so a request's scale pages carry their own
     # ids. ``None`` means the two share one block-id space and ``lookup_table``
@@ -97,15 +108,46 @@ class KVCacheInputsPerDevice(Generic[_Tensor, _Buffer]):
             "draft_mla_num_partitions", self.draft_mla_num_partitions
         )
 
+    def _packed_page_stride(self) -> Any:
+        """Returns the packed sentinel, typed like the rest of this collection.
+
+        ``flatten`` serves the symbolic, graph and runtime paths, so the
+        sentinel has to be a type, a graph value or a buffer to match.
+        """
+        if isinstance(self.kv_blocks, Buffer):
+            return Buffer.from_numpy(
+                np.array([PACKED_PAGE_STRIDE], dtype=np.int64)
+            )
+        if isinstance(self.kv_blocks, BufferType):
+            return TensorType(DType.int64, shape=[1], device=DeviceRef.CPU())
+        return ops.constant(
+            [PACKED_PAGE_STRIDE], DType.int64, device=DeviceRef.CPU()
+        )
+
+    def values_page_stride(self) -> Any:
+        """Returns the ``page_stride`` operand for ``kv_blocks``."""
+        if self.page_stride_input is not None:
+            return self.page_stride_input
+        return self._packed_page_stride()
+
+    def scales_page_stride(self) -> Any:
+        """Returns the ``page_stride`` operand for ``kv_scales``."""
+        if self.scales_page_stride_input is not None:
+            return self.scales_page_stride_input
+        return self._packed_page_stride()
+
     def flatten(self) -> list[_Tensor | _Buffer]:
         """Serialize fields into a flat list for graph input binding."""
         return [
             self.kv_blocks,
+            # Each stride follows the buffer it describes.
+            self.values_page_stride(),
             self.cache_lengths,
             self.lookup_table,
             self.max_prompt_length,
             self.max_cache_length,
             *((self.kv_scales,) if self.kv_scales else ()),
+            *((self.scales_page_stride(),) if self.kv_scales else ()),
             *(
                 (self.scales_lookup_table or self.lookup_table,)
                 if self.kv_scales
@@ -139,11 +181,13 @@ class KVCacheInputsPerDevice(Generic[_Tensor, _Buffer]):
     ) -> list[_Tensor | _Buffer]:
         return [
             self.kv_blocks,
+            self.values_page_stride(),
             self.cache_lengths,
             self.lookup_table,
             self.max_prompt_length,
             self.max_cache_length,
             *((self.kv_scales,) if self.kv_scales else ()),
+            *((self.scales_page_stride(),) if self.kv_scales else ()),
             *(
                 (self.scales_lookup_table or self.lookup_table,)
                 if self.kv_scales
@@ -165,11 +209,13 @@ class KVCacheInputsPerDevice(Generic[_Tensor, _Buffer]):
         """
         return KVCacheInputsPerDevice(
             kv_blocks=next(it),
+            page_stride_input=next(it),
             cache_lengths=next(it),
             lookup_table=next(it),
             max_prompt_length=next(it),
             max_cache_length=next(it),
             kv_scales=next(it) if self.kv_scales else None,
+            scales_page_stride_input=next(it) if self.kv_scales else None,
             scales_lookup_table=next(it) if self.kv_scales else None,
             attention_dispatch_metadata=next(it)
             if self.attention_dispatch_metadata

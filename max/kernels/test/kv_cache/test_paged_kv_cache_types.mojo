@@ -26,6 +26,7 @@ from layout import (
     Coord,
 )
 from std.memory import alloc
+from std.sys import size_of
 from std.testing import assert_true
 
 from std.utils.coord import dyn_coord
@@ -475,7 +476,137 @@ def test_scales_resolve_through_their_own_lookup_table() raises:
     )
 
 
+def _build_collection_and_page_stride[
+    page_size: Int, num_layers: Int
+](page_stride: Int) raises -> Int:
+    """Returns the byte distance between consecutive pages of a collection.
+
+    Builds a paged collection over `num_blocks` pages, then measures the page
+    stride the way a kernel experiences it: the distance between the pointers
+    two adjacent physical pages resolve to. `page_stride` is forwarded
+    verbatim, so -1 exercises the packed path.
+    """
+    comptime num_blocks = 8
+    comptime batch_size = 1
+    comptime shape = IndexList[6](
+        num_blocks,
+        2,
+        num_layers,
+        page_size,
+        kv_params.num_heads,
+        kv_params.head_size,
+    )
+
+    # The pool owes `num_blocks * page_stride` elements when a padded stride is
+    # supplied, since the tensor below still describes packed pages.
+    var packed_page = (
+        2 * num_layers * page_size * kv_params.num_heads * kv_params.head_size
+    )
+    var page = packed_page if page_stride < 0 else page_stride
+    var blocks_ptr = List(length=num_blocks * page, fill=Float32(0))
+    var blocks = LayoutTensor[.float32, Layout.row_major[6]()](
+        blocks_ptr, RuntimeLayout[Layout.row_major[6]()].row_major(shape)
+    )
+
+    comptime layout_1d = Layout(UNKNOWN_VALUE)
+    var cache_lengths_ptr = List(length=batch_size, fill=UInt32(0))
+    var cache_lengths = LayoutTensor[.uint32, layout_1d](
+        cache_lengths_ptr,
+        RuntimeLayout[layout_1d].row_major(IndexList[1](batch_size)),
+    )
+    comptime layout_2d = Layout.row_major[2]()
+    var lookup_table_ptr = List(length=batch_size * num_blocks, fill=UInt32(0))
+    var lookup_table = LayoutTensor[.uint32, layout_2d](
+        lookup_table_ptr,
+        RuntimeLayout[layout_2d].row_major(
+            IndexList[2](batch_size, num_blocks)
+        ),
+    )
+    for j in range(num_blocks):
+        lookup_table[0, j] = UInt32(j)
+
+    var collection = PagedKVCacheCollection[
+        DType.float32, kv_params, page_size
+    ](
+        LayoutTensor[blocks.dtype, Layout.row_major[6]()](
+            blocks.ptr,
+            RuntimeLayout[Layout.row_major[6]()](
+                blocks.runtime_layout.shape.value,
+                blocks.runtime_layout.stride.value,
+            ),
+        ),
+        LayoutTensor[mut=False, cache_lengths.dtype, Layout(UNKNOWN_VALUE)](
+            cache_lengths.ptr.as_imm().as_unsafe_any_origin(),
+            RuntimeLayout[Layout(UNKNOWN_VALUE)](
+                cache_lengths.runtime_layout.shape.value,
+                cache_lengths.runtime_layout.stride.value,
+            ),
+        ),
+        LayoutTensor[mut=False, lookup_table.dtype, Layout.row_major[2]()](
+            lookup_table.ptr,
+            RuntimeLayout[Layout.row_major[2]()](
+                lookup_table.runtime_layout.shape.value,
+                lookup_table.runtime_layout.stride.value,
+            ),
+        ),
+        UInt32(page_size * num_blocks),
+        UInt32(page_size * num_blocks),
+        page_stride=page_stride,
+    )
+
+    var cache = collection.get_key_cache(0)
+    var page0 = cache.block_paged_ptr[page_size](0, 0, 0)
+    var page1 = cache.block_paged_ptr[page_size](0, page_size, 0)
+    return Int(page1) - Int(page0)
+
+
+def test_page_stride_of_minus_one_keeps_pages_packed() raises:
+    """A -1 stride must reproduce the geometry callers already depend on."""
+    comptime page_size = 16
+    comptime num_layers = 3
+    var measured = _build_collection_and_page_stride[page_size, num_layers](-1)
+    comptime packed = (
+        2 * num_layers * page_size * kv_params.num_heads * kv_params.head_size
+    )
+    comptime element_size = size_of[Float32]()
+    assert_true(
+        measured == packed * element_size,
+        String("packed page stride should be ")
+        + String(packed * element_size)
+        + " bytes, got "
+        + String(measured),
+    )
+
+
+def test_page_stride_overrides_the_packed_distance() raises:
+    """A padded page is reached at the supplied stride, not the packed one."""
+    comptime page_size = 16
+    comptime num_layers = 3
+    comptime packed = (
+        2 * num_layers * page_size * kv_params.num_heads * kv_params.head_size
+    )
+    # A padded page: the pad is a whole number of rows, which the allocator
+    # so that the row division in `_stride()` stays exact.
+    comptime row = kv_params.num_heads * kv_params.head_size
+    comptime padded = packed + 16 * row
+    comptime assert padded % row == 0, "a padded page must be whole rows"
+
+    var measured = _build_collection_and_page_stride[page_size, num_layers](
+        padded
+    )
+    comptime element_size = size_of[Float32]()
+    assert_true(
+        measured == padded * element_size,
+        String("padded page stride should be ")
+        + String(padded * element_size)
+        + " bytes, got "
+        + String(measured),
+    )
+
+
 def main() raises:
+    test_page_stride_of_minus_one_keeps_pages_packed()
+    test_page_stride_overrides_the_packed_distance()
     test_paged_kv_cache_stride_is_unknown()
     test_paged_kv_cache_offset_correctness()
     test_paged_kv_cache_quantization()

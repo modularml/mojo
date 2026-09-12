@@ -1477,6 +1477,7 @@ struct Struct_rope_split_store_ragged_paged[interleaved: Bool]:
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         freqs_cis: InputTensor[dtype=freq_dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1486,6 +1487,7 @@ struct Struct_rope_split_store_ragged_paged[interleaved: Bool]:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -1533,6 +1535,7 @@ struct Struct_rope_split_store_ragged_paged_with_position_id[interleaved: Bool]:
         input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
         freqs_cis: InputTensor[dtype=freq_dtype, rank=2, ...],
         kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+        page_stride: InputTensor[dtype=.int64, rank=1, ...],
         cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
         kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
         max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1543,6 +1546,7 @@ struct Struct_rope_split_store_ragged_paged_with_position_id[interleaved: Bool]:
     ) raises:
         var kv_collection = generic_get_paged_cache(
             kv_blocks,
+            page_stride,
             cache_lengths,
             kv_lookup_table,
             max_prompt_length,
@@ -1867,6 +1871,7 @@ def _execute_mha_ragged_paged_scalar_args[
     q: InputTensor[dtype=q_dtype, rank=3, ...],
     input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
     kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+    page_stride: InputTensor[dtype=.int64, rank=1, ...],
     cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
     kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
     max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1884,6 +1889,7 @@ def _execute_mha_ragged_paged_scalar_args[
     )
     var kv_collection = generic_get_paged_cache(
         kv_blocks,
+        page_stride,
         cache_lengths,
         kv_lookup_table,
         max_prompt_length,
@@ -1941,6 +1947,7 @@ def _execute_mha_ragged_paged_rel_logits[
     q: InputTensor[dtype=q_dtype, rank=3, ...],
     input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
     kv_blocks: MutableInputTensor[dtype=cache_dtype, rank=6, ...],
+    page_stride: InputTensor[dtype=.int64, rank=1, ...],
     cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
     kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
     max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
@@ -1956,6 +1963,7 @@ def _execute_mha_ragged_paged_rel_logits[
     )
     var kv_collection = generic_get_paged_cache(
         kv_blocks,
+        page_stride,
         cache_lengths,
         kv_lookup_table,
         max_prompt_length,

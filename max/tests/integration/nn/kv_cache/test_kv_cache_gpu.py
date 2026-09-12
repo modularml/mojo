@@ -61,5 +61,5 @@ async def _test_kv_cache_gpu() -> None:
     assert isinstance(kv_inputs, KVCacheInputs)
     first_device_inputs = kv_inputs.inputs[0]
     assert isinstance(first_device_inputs, KVCacheInputsPerDevice)
-    assert len(first_device_inputs.flatten()) == 6
+    assert len(first_device_inputs.flatten()) == 7
     assert first_device_inputs.attention_dispatch_metadata is not None
