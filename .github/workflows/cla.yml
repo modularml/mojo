@@ -31,10 +31,9 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        id: app-token
         with:
-          app-id: ${{ vars.CLA_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.CLA_BOT_PRIVATE_KEY }}
+          client-id: ${{ vars.GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           owner: modular
           repositories: cla
           permission-contents: write
