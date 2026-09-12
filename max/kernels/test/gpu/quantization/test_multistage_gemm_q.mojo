@@ -832,3 +832,18 @@ def main() raises:
         test_quantized[.uint8](ctx, Int(482), Idx[28672], Idx[4096])
         test_quantized[.uint8](ctx, Int(482), Idx[4096], Idx[14336])
         test_quantized[.uint8](ctx, Int(482), Idx[128256], Idx[4096])
+
+        # Coverage for modular#7069: the A-tile copy is unmasked for M < BM.
+        # This test forces BM=128 (config ampere_128x128_4), so every case
+        # below has M < BM and drives the masked A copy. The over-read itself
+        # does not corrupt output (rows >= M are never stored) and only faults
+        # when it crosses an unmapped page, so these check that masking keeps
+        # the decode/partial-tile results correct against the fp32 dequant ref:
+        # M=1 decode shapes plus non-multiple-of-BM tails (M=3, M=7).
+        test_quantized[.uint8](ctx, Idx[1], Idx[4096], Idx[14336])
+        test_quantized[.uint8](ctx, Idx[1], Idx[4096], Idx[4096])
+        test_quantized[.uint8](ctx, Idx[1], Idx[6144], Idx[4096])
+        test_quantized[.uint8](ctx, Idx[3], Idx[4096], Idx[14336])
+        test_quantized[.uint8](ctx, Idx[7], Idx[28672], Idx[4096])
+        test_quantized[.uint8](ctx, Int(1), Idx[4096], Idx[14336])
+        test_quantized[.uint8](ctx, Int(3), Idx[4096], Idx[4096])
