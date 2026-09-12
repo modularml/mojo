@@ -157,7 +157,7 @@ auto mlirLoc = emitter.shared.translateLocation(getLoc());
 if (auto fileLineColLoc = dyn_cast<mlir::FileLineColLoc>(mlirLoc)) {
   if (fileLineColLoc.getFilename().str().find("zork.mojo") != std::string::npos &&
       fileLineColLoc.getLine() == 3) {
-    waitForDebuggerToAttach(); // Like a breakpoint, pauses the debugger
+    attachToNewRemoteDebugSession(); // Starts a VS Code remote debug session attaching to this process (set breakpoints beforehand; it may auto-resume)
   }
 }
 ```
@@ -167,13 +167,10 @@ by giving your breakpoint itself a condition:
 
 ![ExpressionBreakpoint.jpg](mdnb-data/manual-parser-debugging/ExpressionBreakpoint.jpg)
 
-There are two helpful debugging methods available:
+In Mojo/include/Mojo/Support/Debugging.h there is a helpful function:
 
-- `waitForDebuggerToAttach` (in `Support/include/Support/Debugger.h`) will make
-  the current process pause, giving you time to attach a debugger.
-- `attachToNewRemoteDebugSession` (in `Mojo/include/Mojo/Support/Debugging.h`)
-  will start a new debugging session, if there's a VS Code window open and the
-  Mojo extension is installed.
+- `attachToNewRemoteDebugSession` will start a new debugging session if there’s
+  a VS Code window open and the Mojo extension is installed.
 
 ## Waiter Breakpoints
 
