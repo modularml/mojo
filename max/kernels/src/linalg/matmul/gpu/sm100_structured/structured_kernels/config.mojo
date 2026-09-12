@@ -294,8 +294,17 @@ def _maximize_pipeline_stages[
     num_tma_epilogue_pipeline_stages: Int = 2,
     AB_swapped: Bool = False,
     epilogue_is_1d: Bool = False,
+    reserved_smem: Int = 0,
 ) -> Int:
-    """Calculate max pipeline stages based on shared memory budget."""
+    """Calculate max pipeline stages based on shared memory budget.
+
+    `reserved_smem` carves a fixed byte block out of the budget before the
+    per-stage division (unlike `extra_smem_per_stage`, which scales with the
+    stage count). A persistent megakernel that hosts an extra warp-class
+    needing its own fixed SMEM region (e.g. an EP-dispatch send buffer) passes
+    that region's size here so the FFN pipeline shrinks to leave room; 0
+    (default) is the standalone-matmul behavior.
+    """
     comptime b200_smem = B200.shared_memory_per_multiprocessor - 1024
 
     var c_smem_bytes = (
@@ -355,6 +364,7 @@ def _maximize_pipeline_stages[
 
     return (
         b200_smem
+        - reserved_smem
         - output_smem_bytes
         - clc_smem_bytes
         - mma_output_smem_bytes
@@ -1185,6 +1195,10 @@ struct BlockScaledMatmulConfig[
     var is_small_bn: Bool
     var gemm_kind: GEMMKind
     var prefetch_tiles_n: Int
+    # Epilogue warpgroups, each owning its own output band, staging buffer and
+    # barrier id. 1 (default) is the single-pipeline epilogue every existing
+    # caller has; 2 gives a second, independent store-block pipeline.
+    var num_epilogue_warpgroups: Int
 
     def __init__(
         out self,
@@ -1206,6 +1220,11 @@ struct BlockScaledMatmulConfig[
         register_based_epilogue: Bool = True,
         gemm_kind: GEMMKind = GEMMKind.GEMM,
         prefetch_tiles_n: Int = 0,
+        num_epilogue_warpgroups: Int = 1,
+        # Fixed SMEM (bytes) reserved out of the pipeline budget for a
+        # co-resident non-matmul warp-class (persistent megakernel). 0
+        # (default) = standalone matmul, auto-max stages unchanged.
+        reserved_smem: Int = 0,
     ):
         comptime assert block_scaled_operands_compatible[
             Self.a_type, Self.b_type
@@ -1229,6 +1248,7 @@ struct BlockScaledMatmulConfig[
         )
 
         self.gemm_kind = gemm_kind
+        self.num_epilogue_warpgroups = num_epilogue_warpgroups
         self.prefetch_tiles_n = prefetch_tiles_n
 
         # Scaling factors configuration (SFA, SFB)
@@ -1303,6 +1323,7 @@ struct BlockScaledMatmulConfig[
             self.num_clc_pipeline_stages,
             self.num_accum_pipeline_stages,
             sf_smem_per_stage,
+            reserved_smem=reserved_smem,
         )
 
         if num_pipeline_stages:

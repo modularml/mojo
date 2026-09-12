@@ -38,11 +38,11 @@ architecture.
 """
 
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
-from std.collections import Optional
+from std.collections import Array, Optional
 from std.math import align_up, ceildiv
 from std.memory import Pointer, UnsafePointer, bitcast
 from std.math.uutils import ufloordiv, umod
-from std.sys import align_of, size_of
+from std.sys import align_of, get_defined_bool, get_defined_int, size_of
 
 from max.gpu import (
     WARP_SIZE,
@@ -159,7 +159,12 @@ from .grouped_1d1d_tile_scheduler import (
     GroupedWorkIterator1D1D,
     GroupedWorkLookup1D1D,
 )
-from ..structured_kernels.output_writer import TileWriter
+from ..structured_kernels.output_writer import (
+    EpiloguePeerSink,
+    NullPeerSink,
+    P3PeerSendConfig,
+    TileWriter,
+)
 
 
 comptime SWIGLU_MAX_TRACED_TILES = 64
@@ -712,6 +717,17 @@ struct Grouped1D1DMatmulKernel[
     a_scale_offsets_engine: TensorEngine = DefaultEngine[element_width=1],
     expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
     expert_scales_engine: TensorEngine = DefaultEngine[element_width=1],
+    # When True, nothing reads the local C output (the epilogue's peer send
+    # is its only consumer), so the store is dead for the whole launch. The
+    # launcher then skips the C TMA encode and passes an empty descriptor,
+    # and the C tensor needs no backing allocation. Unlike `fuse_swiglu`
+    # this keeps the BF16 epilogue body -- only the GMEM store goes away.
+    c_store_dead: Bool = False,
+    p5_direct_scatter: Bool = False,
+    p5_row_cache: Bool = False,
+    # A second destination for the epilogue's output tile. Stateless, so it
+    # costs nothing to carry; the default keeps the local store.
+    SinkT: EpiloguePeerSink = NullPeerSink,
 ]:
     """Grouped 1D-1D block-scaled matmul kernel.
 
@@ -774,6 +790,19 @@ struct Grouped1D1DMatmulKernel[
         expert_ids_engine: Engine of the expert-IDs `TileTensor`.
         expert_scales_engine: Engine of the expert-scales
             `TileTensor`.
+        c_store_dead: When `True`, nothing reads the local C output, so
+            the C TMA descriptor is an empty placeholder and the C tensor
+            is unbacked; the epilogue keeps its BF16 body but issues no
+            GMEM store (defaults to `False`).
+        p5_direct_scatter: When `True`, compiles the in-epilogue EP-combine
+            peer scatter-send into the writer. Still gated at runtime by
+            `p3_control` (defaults to `False`).
+        p5_row_cache: When `True`, the peer send resolves each row's
+            destination once per launch instead of once per (row, tile)
+            (defaults to `False`).
+        SinkT: A second destination for the output tile, replacing the local
+            store when its `Enabled` is set. Defaults to `NullPeerSink`, which
+            keeps the local store.
     """
 
     # ========== Derived Constants ==========
@@ -798,12 +827,19 @@ struct Grouped1D1DMatmulKernel[
 
     # ========== Thread/Warp Organization ==========
 
-    comptime num_output_warps = 4
+    comptime num_output_warps = 4 * Self.config.num_epilogue_warpgroups
+    # `-D P5_SEND_WARPS=N`: extra warps above the scheduler that run the
+    # EP-combine peer send as a second consumer of the epilogue's SMEM output
+    # tile. See `output_writer.mojo`'s `p5_send_warps`. Default 0 leaves every
+    # role's thread range and the block size byte-identical.
+    comptime num_p5_send_warps = get_defined_int["P5_SEND_WARPS", 0]()
     # SFB warps are only launched on the decode (MMA_N < 64) path; on the
     # prefill / 2SM path (MMA_N >= 64) they are compile-time elided and the
     # scheduler warp takes warp 6 instead of warp 11, saving 160 idle threads.
     comptime WarpRole = WarpRole1D1D[
-        Self.MMA_N < 64, num_epi_warps=Self.num_output_warps
+        Self.MMA_N < 64,
+        num_epi_warps=Self.num_output_warps,
+        num_send_warps=Self.num_p5_send_warps,
     ]
     comptime NUM_THREADS = Self.WarpRole.TOTAL_THREADS
 
@@ -967,6 +1003,10 @@ struct Grouped1D1DMatmulKernel[
         num_output_warps=Self.num_output_warps,
         batched=False,  # 1D-1D uses 2D coordinates with bounds checking
         problem_n=Self.static_N,
+        c_store_dead=Self.c_store_dead,
+        p5_direct_scatter=Self.p5_direct_scatter,
+        p5_row_cache=Self.p5_row_cache,
+        SinkT=Self.SinkT,
     ]
 
     # ========== Work Iterator Type ==========
@@ -1164,6 +1204,17 @@ struct Grouped1D1DMatmulKernel[
             2,
         ), "Only support cta_group == 1 or 2"
         comptime assert Self.transpose_b, "Only support transposed B"
+        # The peer send writes a whole tile's N span from `n_abs` into a
+        # destination row slot sized for one hidden row, and unlike the local
+        # store it carries no per-column bound. A partial N tile would run past
+        # the row into the next payload, so require the span to divide N.
+        comptime assert (
+            not Self.p5_direct_scatter
+            or Self.static_N % Self.TileWriterType.stage_contiguous_size == 0
+        ), (
+            "the peer send has no per-column bound, so static_N must be a"
+            " whole number of output-stage spans"
+        )
         comptime if Self.MMA_N < 64:
             comptime assert (
                 Self.cta_group == 1
@@ -1214,9 +1265,10 @@ struct Grouped1D1DMatmulKernel[
             a_tma_op.prefetch_descriptor()
             b_tma_op.prefetch_descriptor()
             # On the fused path the C TMA op is an empty placeholder (results
-            # are written through `swiglu_out`), so there is no valid
-            # descriptor to prefetch.
-            comptime if not Self.fuse_swiglu:
+            # are written through `swiglu_out`), and `c_store_dead` makes it
+            # one for the same reason, so there is no valid descriptor to
+            # prefetch.
+            comptime if not (Self.fuse_swiglu or Self.c_store_dead):
                 c_tma_op.prefetch_descriptor()
             sfa_tma_op.prefetch_descriptor()
             sfb_tma_op.prefetch_descriptor()
@@ -4092,6 +4144,16 @@ struct Grouped1D1DMatmulKernel[
         swiglu_out: Self.SwiGLUOutputT,
         trace_buf: Self.TraceBufT,
         tile_idx_epi: Int = 0,
+        # Forwarded verbatim to
+        # `TileWriter.write_absolute_with_bounds_check`; see there and
+        # `P3PeerSendConfig`'s docstring. `p3_expert_id` is NOT a new param
+        # here -- `work_ctx.expert_id()` is already in scope below, and it is
+        # the right one: `work_ctx.group_idx()` indexes the compacted ACTIVE-
+        # experts list, which is shorter than `n_local_experts` whenever a
+        # local expert has zero tokens this batch, while the peer-send counters
+        # are addressed by the LOGICAL per-rank expert slot.
+        p3_control: Int = -1,
+        p3_cfg: P3PeerSendConfig = P3PeerSendConfig.disabled(),
     ):
         """Execute epilogue to store accumulated results with expert_scale.
 
@@ -4120,6 +4182,9 @@ struct Grouped1D1DMatmulKernel[
                 records; zero-sized when `swiglu_enable_trace=False`.
             tile_idx_epi: Per-tile epilogue counter for trace event
                 indexing (defaults to 0).
+            p3_control: Peer-send gate; `-1` disables the send.
+            p3_cfg: Bundled peer-send configuration (buffers, geometry and
+                the destination-resolve tables).
         """
 
         # For 1D-1D, pass absolute coordinates directly (not tile indices)
@@ -4164,4 +4229,7 @@ struct Grouped1D1DMatmulKernel[
                 work_ctx.m_end,  # Token dim end for bounds checking
                 work_ctx.expert_scale,
                 c_device,
+                p3_control=p3_control,
+                p3_expert_id=work_ctx.expert_id(),
+                p3_cfg=p3_cfg,
             )

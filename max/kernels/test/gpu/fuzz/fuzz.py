@@ -97,6 +97,26 @@ _TARGETS: dict[str, FuzzTarget] = {
         description="MHA NullMask (non-causal) boundary fuzz (memory-safety + ref)",
         default_oracle="memcheck",
     ),
+    # `megaffn`, not `mega_ffn`: the corpus subdirectory is named after the
+    # target, and `corpus/mega_ffn/` sits under the same directory as the
+    # sources, where it SHADOWS the `mega_ffn` Mojo package for a plain
+    # `mojo build max/kernels/test/gpu/fuzz/fuzz_mega_ffn.mojo` (the file's own
+    # directory is an implicit import root, `corpus/` has no `__init__.mojo`,
+    # so `corpus/mega_ffn/` is reachable as a top-level package with none of
+    # the kernel's submodules in it). Bazel is unaffected -- it passes explicit
+    # srcs -- but the documented fast dev loop breaks with "unable to locate
+    # module 'mega_ffn_kernel'". Do not rename this back without moving the
+    # corpus out of the source directory.
+    "megaffn": FuzzTarget(
+        name="megaffn",
+        bazel_target="//max/kernels/test/gpu/fuzz:fuzz_mega_ffn.mojo.test",
+        binary="bazel-bin/max/kernels/test/gpu/fuzz/fuzz_mega_ffn.mojo.test",
+        description=(
+            "fused MXFP8 MegaFFN + EP-combine send: edge-shape ragged fuzz,"
+            " three-way vs the unfused chain and a host FP64 reference"
+        ),
+        default_oracle="ref",
+    ),
     "moe_indices": FuzzTarget(
         name="moe_indices",
         bazel_target=("//max/kernels/test/gpu/fuzz:fuzz_moe_indices.mojo.test"),

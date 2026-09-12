@@ -20,13 +20,26 @@ Usage:
     writer.write(smem.c_tiles(), stage, coord, shape, elect)
 """
 
-from std.collections import Optional
+from std.collections import Array, Optional
+from std.utils.static_tuple import StaticTuple
 from std.memory import Pointer, UnsafePointer
-from std.sys import simd_width_of, size_of, align_of
+from std.sys import (
+    simd_width_of,
+    size_of,
+    align_of,
+    get_defined_bool,
+    get_defined_int,
+)
 
-from max.gpu import WARP_SIZE, thread_idx
+from max.gpu import WARP_SIZE, block_idx, thread_idx
 from max.gpu import lane_id, warp_id as get_warp_id
-from max.gpu.memory import fence_async_view_proxy
+from max.gpu.memory import (
+    cp_async_bulk_global_shared_cta,
+    fence_async_view_proxy,
+)
+from max.gpu.sync import cp_async_bulk_commit_group, cp_async_bulk_wait_group
+from std.memory import AddressSpace
+from std.time import global_perf_counter_ns
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import (
     Coord,
@@ -76,6 +89,288 @@ from .epilogue_components import (
 from structured_kernels.pipeline import ProducerConsumerPipeline
 from .tmem import TmemArrayType
 
+# Fixed upper bound on the P2P rank count, so `P3PeerSendConfig.recv_buf_ptrs`
+# can be a plain `Array` (`DevicePassable` across `enqueue_function`) instead of
+# a pointer-to-pointer needing its own device-passability story. 8 covers any
+# realistic P2P/NVLink domain size.
+comptime P3_MAX_RANKS = 8
+
+# SMEM mailbox slot count for the dedicated send warp class (`-D
+# P5_SEND_WARPS=N`). One 4-`Int32` entry per epilogue `loop_stage` (m_abs,
+# n_abs, m_end, expert_id); 32 Int32 covers `num_stages <= 8`, which
+# `TileWriter` asserts. The kernel owns the single allocation site -- both the
+# producing epilogue warps and the consuming send warps must see the SAME
+# storage, and an `@always_inline` helper that allocated it locally would give
+# each call site its own `.shared` object.
+comptime P5_SEND_MBX_INTS = 32
+comptime P5_SEND_MBX_STRIDE = 4
+
+comptime P5SendMailboxPtr = UnsafePointer[
+    Int32, MutUntrackedOrigin, address_space=AddressSpace.SHARED
+]
+
+
+@fieldwise_init
+struct P3PeerSendConfig(ImplicitlyCopyable, Movable):
+    """Runtime state for the in-epilogue EP-combine peer scatter-send.
+
+    Bundles everything needed to resolve and issue a per-row peer send
+    directly from the L2 epilogue's SMEM. One struct instead of ~8 separate
+    new params: `write_absolute_with_bounds_check` has 3 callers spanning 2
+    kernel families unrelated to EP-comm (`blockwise_fp8_1d2d`,
+    `blockwise_fp8_output_writer`) that must stay byte-identical, so this
+    adds exactly one new defaulted param to their call sites, not eight.
+
+    `recv_count_layout((e, rk)) = e*n_ranks + rk` and
+    `recv_buf_layout((src_idx, src_topk, byte_off)) =
+    (src_idx*top_k + src_topk)*msg_bytes + byte_off` are the row-major
+    linear-index formulas `EPCombineKernel` computes for those coordinate
+    tuples -- copied here as plain arithmetic rather than threading the full
+    `EPCombineKernel[...]` comptime specialization
+    (num_threads/n_sms/n_experts/max_tokens_per_rank/p2p_world_size), none of
+    which either formula depends on. Same precedent as this file's own
+    `_stage2_recv_offset_in_bounds`, a documented copy of
+    `EPCombineKernel._recv_offset_in_bounds` for the identical reason.
+
+    `disabled()` is the default: `.unsafe_dangling()` pointers (never
+    dereferenced -- gated behind `p3_control >= 0`) and 0-valued scalars.
+    """
+
+    var atomic_counter: UnsafePointer[Int32, MutUntrackedOrigin]
+    var src_info_ptr: UnsafePointer[Int32, ImmUntrackedOrigin]
+    # Per-ROW resolved destination cache, one UInt64 per absolute row, zeroed
+    # once per launch by the caller.
+    #
+    # A row's destination is a property of the ROW -- `(dst_rank, src_idx,
+    # src_topk)` -> peer base address -- and does NOT depend on which column
+    # block is being written. Without the cache the epilogue resolves it once
+    # per (row, TILE), and every row is touched by every n-block tile, so the
+    # resolve runs an n-block factor more often than it changes. That repeated
+    # resolve, not the stores, dominates the in-epilogue send: its cost is flat
+    # in bytes sent.
+    #
+    # Sentinels: 0 = not yet resolved, 1 = resolved to NO destination (row not
+    # owned by any rank, or `src_info` out of bounds), anything else = the peer
+    # base pointer. A real base pointer is never 0 or 1. Two tiles racing on
+    # the same row both compute the SAME value, so the store is idempotent and
+    # needs no ordering.
+    var row_base_ptr: UnsafePointer[UInt64, MutUntrackedOrigin]
+    var recv_buf_ptrs: StaticTuple[
+        UnsafePointer[UInt8, MutUntrackedOrigin], P3_MAX_RANKS
+    ]
+    var n_ranks: Int
+    var p2p_world_size: Int
+    var top_k: Int
+    var msg_bytes: Int
+    var max_tokens_per_rank: Int
+    # This rank's own index into `recv_buf_ptrs`, i.e. the one entry that is a
+    # LOCAL device allocation rather than a peer mapping.
+    var my_rank: Int
+    # SMEM mailbox through which the epilogue warps hand each finished output
+    # tile's coordinates to the send warp class. Only dereferenced when
+    # `P5_SEND_WARPS > 0` AND the send is runtime-enabled.
+    var send_mbx: P5SendMailboxPtr
+    # `-D P5_STAMP_WINDOW=true` (default OFF): the send's issue window, 2
+    # UInt64 per physical CTA -- [2*cta] = first peer store issued, [2*cta+1] =
+    # last. Zeroed once per launch by the caller; `first` is written only while
+    # still 0, `last` on every tile.
+    var send_stamp_ptr: UnsafePointer[UInt64, MutUntrackedOrigin]
+    # `send_stamp_ptr` is `unsafe_dangling()` in every arm that does not supply
+    # a buffer, and a dangling pointer is NOT a valid "uninitialized" sentinel,
+    # so the writes need their own runtime enable -- the same shape as
+    # `p3_control`. 0 = no stamp buffer; the send warps must not touch the
+    # pointer. Without this the stamp faults with CUDA_ERROR_ILLEGAL_ADDRESS in
+    # the arms that share this instantiation but pass no buffer.
+    var send_stamp_on: Int
+    # `-D P5_TRACE_EPI=true` (default OFF): per-CTA accumulator for the send
+    # warps' own busy time, which nothing outside this file can see.
+    var trace_ptr: UnsafePointer[UInt64, MutUntrackedOrigin]
+    # Own runtime enable, for the same reason `send_stamp_on` has one: a
+    # dangling pointer is not a valid "uninitialized" sentinel, and the arms
+    # that share this instantiation pass no buffer.
+    var trace_on: Int
+    # The send warp class runs OUTSIDE `_write_absolute_with_bounds_check`, so
+    # it cannot take a per-call slot argument the way the epilogue does. It
+    # accumulates into one per-CTA slot instead, set once per launch.
+    var send_trace_slot: Int
+
+    @staticmethod
+    def disabled() -> Self:
+        return Self(
+            UnsafePointer[Int32, MutUntrackedOrigin].unsafe_dangling(),
+            UnsafePointer[Int32, ImmUntrackedOrigin].unsafe_dangling(),
+            UnsafePointer[UInt64, MutUntrackedOrigin].unsafe_dangling(),
+            StaticTuple[UnsafePointer[UInt8, MutUntrackedOrigin], P3_MAX_RANKS](
+                UnsafePointer[UInt8, MutUntrackedOrigin].unsafe_dangling()
+            ),
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            P5SendMailboxPtr.unsafe_dangling(),
+            UnsafePointer[UInt64, MutUntrackedOrigin].unsafe_dangling(),
+            0,
+            UnsafePointer[UInt64, MutUntrackedOrigin].unsafe_dangling(),
+            0,
+            -1,
+        )
+
+
+trait EpiloguePeerSink:
+    """A second destination for the epilogue's SMEM output tile.
+
+    The epilogue normally stores its tile to the local C tensor. A sink can
+    take that tile somewhere else instead -- for expert parallelism, straight
+    to the peers that own the rows -- in which case the local store is dead and
+    the caller need not allocate C at all.
+
+    A sink is a STATELESS comptime policy: every method is a `@staticmethod`
+    and the destination's runtime state arrives as `p3_cfg`, exactly as it did
+    when this epilogue owned the send. So a sink is never a value, contributes
+    no kernel-argument bytes whether enabled or not, and needs no construction
+    threading through the writer.
+
+    Implementations:
+      - `NullPeerSink`: `Enabled` is `False`; every body is `pass` and every
+        call site sits inside a `comptime if`, so the no-sink build emits
+        nothing for it.
+      - `EpPeerSink` (closed tree): the EP-combine peer send.
+    """
+
+    comptime Enabled: Bool
+    """Whether this sink owns the output. When `True` the local C store is
+    dead, and the epilogue skips it along with its TMA descriptor."""
+
+    comptime SendWarps: Int
+    """Warps the sink needs above the scheduler, or 0 to run inside the output
+    warps. The warp-role geometry reserves exactly this many."""
+
+    @staticmethod
+    def send_tile[
+        stage: Int, num_threads: Int, TileT: AnyType
+    ](
+        tile: TileT,
+        m_abs: UInt32,
+        n_abs: UInt32,
+        m_end: UInt32,
+        expert_id: Int32,
+        p3_cfg: P3PeerSendConfig,
+        p3_control: Int,
+        tid: Int,
+    ):
+        """Takes one finished output tile in place of the local store.
+
+        Parameters:
+            stage: Output pipeline stage the tile belongs to.
+            num_threads: Threads cooperating on the tile.
+            TileT: The epilogue's SMEM tile view type.
+
+        Args:
+            tile: The finished, barrier-visible output tile in SMEM.
+            m_abs: Absolute row of the tile's first row.
+            n_abs: Absolute column of the tile's first column.
+            m_end: Exclusive row bound for the tile's group.
+            expert_id: Logical per-rank expert slot of this tile.
+            p3_cfg: The sink's runtime state.
+            p3_control: Runtime gate; negative disables the sink.
+            tid: Calling thread's index within `num_threads`.
+        """
+        ...
+
+    @staticmethod
+    def service[
+        TilesT: AnyType
+    ](tiles: TilesT, send_tid: Int, p3_control: Int, p3_cfg: P3PeerSendConfig,):
+        """Runs the sink's own warps until the epilogue terminates them.
+
+        Parameters:
+            TilesT: The epilogue's SMEM tile array type.
+
+        Args:
+            tiles: The epilogue's SMEM output tile array.
+            send_tid: Calling thread's index within `SendWarps` warps.
+            p3_control: Runtime gate; negative leaves these warps idle.
+            p3_cfg: The sink's runtime state.
+        """
+        ...
+
+    @staticmethod
+    def drain(p3_control: Int, p3_cfg: P3PeerSendConfig):
+        """Collects work deferred from the previous tile.
+
+        Args:
+            p3_control: Runtime gate; negative means the warps never ran.
+            p3_cfg: The sink's runtime state.
+        """
+        ...
+
+    @staticmethod
+    def shutdown(
+        p3_control: Int, p3_cfg: P3PeerSendConfig, drain_pending: Bool
+    ):
+        """Retires the sink's warps with arrivals matched.
+
+        Args:
+            p3_control: Runtime gate; negative means the warps never ran.
+            p3_cfg: The sink's runtime state.
+            drain_pending: Whether a deferred drain is outstanding.
+        """
+        ...
+
+
+struct NullPeerSink(EpiloguePeerSink):
+    """No-op sink: the epilogue keeps its local store.
+
+    Stateless like every sink, and `Enabled` is `False`, so each call site's
+    `comptime if` strips the call outright. This is the default, which is what
+    keeps the standalone matmuls byte-identical to a build with no sink
+    parameter at all.
+    """
+
+    comptime Enabled = False
+    comptime SendWarps = 0
+
+    @staticmethod
+    @always_inline
+    def send_tile[
+        stage: Int, num_threads: Int, TileT: AnyType
+    ](
+        tile: TileT,
+        m_abs: UInt32,
+        n_abs: UInt32,
+        m_end: UInt32,
+        expert_id: Int32,
+        p3_cfg: P3PeerSendConfig,
+        p3_control: Int,
+        tid: Int,
+    ):
+        """No-op; the epilogue stores locally instead."""
+        pass
+
+    @staticmethod
+    @always_inline
+    def service[
+        TilesT: AnyType
+    ](tiles: TilesT, send_tid: Int, p3_control: Int, p3_cfg: P3PeerSendConfig,):
+        """No-op; there are no sink warps."""
+        pass
+
+    @staticmethod
+    @always_inline
+    def drain(p3_control: Int, p3_cfg: P3PeerSendConfig):
+        """No-op; nothing is ever deferred."""
+        pass
+
+    @staticmethod
+    @always_inline
+    def shutdown(
+        p3_control: Int, p3_cfg: P3PeerSendConfig, drain_pending: Bool
+    ):
+        """No-op; there are no sink warps to retire."""
+        pass
+
 
 struct TileWriter[
     # Inferred from constructor arg
@@ -106,6 +401,17 @@ struct TileWriter[
     batched: Bool = False,
     problem_n: Int = 0,
     num_peers: Int = 1,  # this is a local epilogue
+    c_store_dead: Bool = False,
+    # The in-epilogue peer send and its row cache. Parameters rather than
+    # build defines so a caller states them explicitly and a test can enable
+    # them from source; the defaults reproduce the define for every existing
+    # caller of this shared epilogue.
+    p5_direct_scatter: Bool = False,
+    p5_row_cache: Bool = False,
+    # A second consumer of the output tile. The default keeps the local store
+    # and costs nothing: `NullPeerSink` is zero-sized and every call site is
+    # comptime-guarded on its `Enabled`.
+    SinkT: EpiloguePeerSink = NullPeerSink,
 ](TrivialRegisterPassable):
     """Output tile writer for SM100 matmul epilogue.
 
@@ -149,6 +455,19 @@ struct TileWriter[
             in the slow path; 0 disables the N check (defaults to 0).
         num_peers: Number of TMA store descriptors in the array; 1 for a
             local epilogue (defaults to 1).
+        c_store_dead: Whether nothing reads the local C output, so the
+            store is dead for the whole launch. The caller then supplies an
+            empty C descriptor and an unbacked C tensor, so neither may be
+            touched here (defaults to False).
+        p5_direct_scatter: Whether to compile in the in-epilogue EP-combine
+            peer scatter-send. Still gated at runtime by `p3_control`
+            (defaults to False).
+        p5_row_cache: Whether the peer send resolves each row's destination
+            once per launch through `P3PeerSendConfig.row_base_ptr` instead of
+            once per (row, tile) (defaults to False).
+        SinkT: A second destination for the output tile, replacing the local
+            store when its `Enabled` is set. Stateless, so it costs nothing to
+            carry; defaults to `NullPeerSink`, which keeps the local store.
     """
 
     # Local aliases from OutputPipelineConfig
@@ -223,6 +542,60 @@ struct TileWriter[
     # Aliases from EpilogueConfig
     comptime is_lower_frag_required = Self.epc.is_lower_frag_required
     comptime num_stages = Self.epc.num_stages
+
+    # EP-combine peer send on a dedicated warp class.
+    #
+    # `-D P5_SEND_WARPS=N` moves the peer scatter-send OFF the epilogue warps
+    # and onto N warps appended above the scheduler. The in-epilogue send's
+    # cost is FLAT against every property of the work -- bytes, store
+    # coalescing, store address space, resolve count and the resolve's global
+    # loads -- while registers stay well inside budget and SMEM alone already
+    # pins 1 CTA/SM. What is left is PLACEMENT: the epilogue warps are one half
+    # of an MMA<->epilogue ping-pong, so work added after their wait extends
+    # the cycle PERIOD once per stage per tile. That "idle" wait is the MMA
+    # half of the period, not spare capacity, which is why nothing done WITHIN
+    # the epilogue moves the number.
+    #
+    # The send becomes a second CONSUMER of the SMEM output tile. The epilogue
+    # produces `c_smem_tile` exactly as before and pays one extra named-barrier
+    # arrive; the send warps wait on it, then resolve and store.
+    #
+    # SLOT LIFETIME (`c_tiles[loop_stage % 2]` is double-buffered): the two
+    # barriers are placed at the epilogue's OWN existing producer/consumer
+    # points -- release right after the post-STSM `WarpGroupBarrier`, drain
+    # under the exact same `loop_stage > 0 or loop_stage == num_stages - 1`
+    # gate that already guards double-buffer reuse. That makes the pairing
+    # 1:1 by construction (no credits, no cross-call state) and, because the
+    # last stage always drains, it also covers the L1 epilogue's later reuse
+    # of the same tiles.
+    comptime p5_send_warps = get_defined_int["P5_SEND_WARPS", 0]()
+    # `-D P5_TRACE_EPI=true` accumulates the send warps' own busy time per CTA.
+    # Default OFF, so an untraced build stays byte-identical.
+    comptime p5_trace_epi = get_defined_bool["P5_TRACE_EPI", False]()
+    comptime p5_send_enabled = (
+        Self.p5_send_warps > 0 and Self.p5_direct_scatter
+    )
+    comptime P5_SEND_THREADS = Self.p5_send_warps * WARP_SIZE
+    # Ids 0-4 are live in the fused MegaFFN kernel (0 EpiSyncBarrier /
+    # in-epilogue WarpGroupBarrier, 1 MmaEpilogueSync, 2 MmaSfbSync, 3 EP send
+    # join, 4 EP/FFN init join), and the fused MegaFFN kernel's own comm and
+    # setup barriers sit above this pair at 7 and 8.
+    comptime P5_SEND_RELEASE_BARRIER_ID = 5
+    comptime P5_SEND_DRAIN_BARRIER_ID = 6
+    comptime P5SendRelease = WarpGroupBarrier[
+        Self.num_output_warps * WARP_SIZE + Self.P5_SEND_THREADS,
+        Self.P5_SEND_RELEASE_BARRIER_ID,
+    ]
+    comptime P5SendDrain = WarpGroupBarrier[
+        Self.num_output_warps * WARP_SIZE + Self.P5_SEND_THREADS,
+        Self.P5_SEND_DRAIN_BARRIER_ID,
+    ]
+
+    # `-D P5_STAMP_WINDOW=true` (default OFF): stamp the send's ISSUE WINDOW --
+    # first and last peer store issued, per CTA. Two `global_perf_counter_ns()`
+    # reads per CTA on the send warp only. Keep it off the timed path: a device
+    # stamp there costs more than the interval it measures.
+    comptime p5_stamp_window = get_defined_bool["P5_STAMP_WINDOW", False]()
 
     # TMEM array type for accumulator tiles
     comptime accum_tile_layout = Layout.row_major(Self.BM, Self.stageN)
@@ -367,6 +740,13 @@ struct TileWriter[
         c_tensor: TileTensor[
             mut=True, Self.c_type, LayoutType=c_tensor_layout, ...
         ],
+        # Peer scatter-send direct from SMEM, bytes only; the arrival protocol
+        # is the caller's. Default -1/disabled() leaves every existing caller
+        # byte-identical. See `P3PeerSendConfig`'s docstring above for the
+        # param-bundling rationale.
+        p3_control: Int = -1,
+        p3_expert_id: Int32 = 0,
+        p3_cfg: P3PeerSendConfig = P3PeerSendConfig.disabled(),
     ):
         """Write with absolute coordinates and bounds checking.
 
@@ -384,6 +764,11 @@ struct TileWriter[
             m_end: End offset for bounds checking (exclusive).
             expert_scale: Per-expert output scaling factor.
             c_tensor: C tensor in GMEM for bounds-checked stores.
+            p3_control: Peer-send gate; `-1` disables the send.
+            p3_expert_id: Local expert id of the tile being written; the
+                destination resolve keys its counter lookup on it.
+            p3_cfg: Bundled peer-send configuration (buffers, geometry and
+                the destination-resolve tables).
         """
         self._write_absolute_with_bounds_check[c_tensor_layout](
             c_tiles,
@@ -393,6 +778,9 @@ struct TileWriter[
             m_end,
             expert_scale,
             c_tensor,
+            p3_control=p3_control,
+            p3_expert_id=p3_expert_id,
+            p3_cfg=p3_cfg,
         )
 
     @always_inline
@@ -929,6 +1317,9 @@ struct TileWriter[
         c_tensor: TileTensor[
             mut=True, Self.c_type, LayoutType=c_tensor_layout, ...
         ],
+        p3_control: Int = -1,
+        p3_expert_id: Int32 = 0,
+        p3_cfg: P3PeerSendConfig = P3PeerSendConfig.disabled(),
     ):
         """Internal implementation of write with absolute coordinates and bounds checking.
 
@@ -944,7 +1335,23 @@ struct TileWriter[
             m_end: End offset for bounds checking (exclusive).
             expert_scale: Per-expert output scaling factor.
             c_tensor: C tensor in GMEM (for bounds-checked stores).
+            p3_control: Peer-send gate; `-1` disables the send.
+            p3_expert_id: Local expert id of the tile being written; the
+                destination resolve keys its counter lookup on it.
+            p3_cfg: Bundled peer-send configuration (buffers, geometry and
+                the destination-resolve tables).
         """
+        # Dropping the local store leaves the epilogue's peer send as the
+        # only output path, so a build without it would publish nothing.
+        comptime assert (
+            not Self.c_store_dead or Self.p5_direct_scatter
+        ), "c_store_dead needs the in-epilogue peer send compiled in"
+        # A disabled sink must be free: it is the default every standalone
+        # matmul takes, and a sink with fields would put bytes in their
+        # kernel ABI for a feature they do not use.
+        comptime assert (
+            Self.SinkT.Enabled or size_of[Self.SinkT]() == 0
+        ), "a disabled EpiloguePeerSink must be zero-sized"
         var accum_tiles = Self.AccumTmemArray(output_stage.tmem.offset())
         # Role-relative: this path's `warp_id == 0` single-writer election
         # (TMAStoreCoords, commit_group) means "first EPILOGUE warp", not
@@ -987,6 +1394,39 @@ struct TileWriter[
         var lower_frag_casted = Array[
             Scalar[Self.epilogue_dtype], Self.rep_frag_size
         ](uninitialized=True)
+
+        # `-D P0_GEOMETRY_DUMP=true` (default OFF): print the geometry
+        # constants the epilogue derives, once per (block 0, thread 0) call.
+        comptime if get_defined_bool["P0_GEOMETRY_DUMP", False]():
+            if block_idx.x == 0 and thread_idx.x == 0:
+                print(
+                    "[P0] num_stages=",
+                    Self.num_stages,
+                    " stageN=",
+                    Self.stageN,
+                    " MMA_M=",
+                    Self.MMA_M,
+                    " MMA_N=",
+                    Self.MMA_N,
+                    " cta_group=",
+                    Self.cta_group,
+                    " transpose_c=",
+                    Self.transpose_c,
+                    " c_smem_dim0=",
+                    Self.c_smem_dim0,
+                    " c_smem_dim1=",
+                    Self.c_smem_dim1,
+                    " rep=",
+                    Self.rep,
+                    " rep_frag_size=",
+                    Self.rep_frag_size,
+                    " is_lower_frag_required=",
+                    Self.is_lower_frag_required,
+                    " c_swizzle_bytes=",
+                    Self.c_swizzle.bytes(),
+                    " stage_contiguous_size=",
+                    Self.stage_contiguous_size,
+                )
 
         comptime for loop_stage in range(Self.num_stages):
             # Phase 1: TMEM Load
@@ -1070,6 +1510,382 @@ struct TileWriter[
 
             WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()
 
+            # Hand this stage's tile to the send warp class. The
+            # coordinates go into the SMEM mailbox first; the barrier arrive
+            # that follows is what publishes them (`barrier.cta.arrive` is the
+            # release, the send warps' `barrier.cta.sync` the acquire -- the
+            # same producer/consumer named-barrier shape the kernel already
+            # uses for `MmaEpilogueSync`). The arrive does NOT block, so the
+            # epilogue's critical path pays one instruction, not the send.
+            #
+            # The previous stage's DRAIN is collected right here, immediately
+            # before this stage's release. That placement is forced, not
+            # stylistic: a hardware named barrier holds ONE generation at a
+            # time, so two consecutive `bar.arrive` from the producer with no
+            # intervening `bar.sync` let the second generation's arrivals
+            # complete the first, and the consumer's own arrival then lands in
+            # the wrong generation. Draining here is what throttles the
+            # producer to one outstanding generation. It also satisfies slot
+            # lifetime with a stage to spare: stage k's drain lands inside
+            # stage k+1, and the next write to k's physical slot is stage k+2.
+            # The LAST stage's drain has no stage k+1 to sit in and is deferred
+            # to the caller (the sink's `drain`, after the next tile's accumulator
+            # acquire) -- which is where the overlap actually comes from, since
+            # that wait is behind the MMA.
+            comptime if Self.p5_send_enabled and loop_stage > 0:
+                if p3_control >= 0 and p3_cfg.n_ranks > 0:
+                    Self.P5SendDrain.wait()
+
+            comptime if Self.p5_send_enabled:
+                if p3_control >= 0 and p3_cfg.n_ranks > 0:
+                    if warp_id == 0 and lane == 0:
+                        var mbx_off = loop_stage * P5_SEND_MBX_STRIDE
+                        p3_cfg.send_mbx[mbx_off + 0] = Int32(m_abs)
+                        p3_cfg.send_mbx[mbx_off + 1] = Int32(n_abs)
+                        p3_cfg.send_mbx[mbx_off + 2] = Int32(m_end)
+                        p3_cfg.send_mbx[mbx_off + 3] = p3_expert_id
+                    Self.P5SendRelease.arrive()
+
+            # `-D P3_INLINE_SEND=true` (default OFF): peer scatter-send direct
+            # from SMEM, bytes only -- the arrival protocol is the caller's.
+            # DECODE-ONLY: it borrows `c_tiles[1 - loop_stage % 2]` as scratch,
+            # and at prefill that slot is genuinely double-buffered by the real
+            # epilogue. `p5_direct_scatter` below is the prefill-safe form.
+            comptime if get_defined_bool["P3_INLINE_SEND", False]():
+                if p3_control >= 0 and p3_cfg.n_ranks > 0:
+                    # Opt-in (`-D P3_ENABLED_PRINT=true`), default OFF: a
+                    # device-side print here runs once per L2 tile, on the
+                    # timed path, and costs far more than the send it reports.
+                    # Prefer an artifact the harness can compare (arrived bytes
+                    # against a mechanism-off control) over a print.
+                    comptime if get_defined_bool["P3_ENABLED_PRINT", False]():
+                        if block_idx.x == 0 and thread_idx.x == 0:
+                            print(
+                                "[P3_ENABLED] loop_stage=", loop_stage, sep=""
+                            )
+                    # Step 1: unswizzle-gather. `cp_async_bulk_global_
+                    # shared_cta` (step 2) needs a physically-contiguous
+                    # per-row span; a logical row is NOT contiguous in the
+                    # swizzled `c_smem_tile` (P0 measured c_swizzle_bytes=
+                    # 32, and `_store_with_bounds_check_transpose`'s own
+                    # gather loop shows one logical row is assembled from
+                    # `chunk_num` disjoint swizzle-permuted fragments).
+                    # Reuses that function's comptime swizzle derivation
+                    # and inner-loop math VERBATIM (never re-derive the
+                    # swizzle formula), retargeting the store from
+                    # `c_tensor` (GMEM) to `c_tiles[1 - loop_stage % 2]`
+                    # (plain row-major SMEM, decode-only-safe per P2).
+                    var p3_unswiz = c_tiles[1 - (loop_stage % 2)]
+                    comptime p3_simd_size = simd_width_of[Self.c_type]()
+                    comptime p3_swizzle_width = Self.c_swizzle.bytes() // size_of[
+                        Self.c_type
+                    ]()
+                    comptime p3_chunkM = p3_swizzle_width
+                    comptime p3_vec_chunkM = p3_chunkM // p3_simd_size
+                    comptime p3_chunk_num = Self.stage_contiguous_size // p3_chunkM
+                    comptime p3_logical_size = p3_chunk_num * Self.stageN * p3_vec_chunkM
+                    comptime p3_output_threads = Self.num_output_warps * WARP_SIZE
+                    comptime p3_value_shape = p3_logical_size // p3_output_threads
+                    comptime p3_smem_alignment = align_of[
+                        SIMD[Self.c_type, p3_simd_size]
+                    ]()
+                    comptime p3_swizzle = make_swizzle[
+                        Self.c_type, Self.c_swizzle
+                    ]()
+
+                    # `m_abs` is this TILE's own start, constant across every
+                    # `loop_stage` unroll, so the rows THIS stage covers start
+                    # at `m_abs + loop_stage*stageN` -- exactly like Phase 4's
+                    # `stage_token_start` below. Inert at `num_stages == 1`.
+                    # Without the term, every `loop_stage >= 1` re-derives
+                    # stage 0's row range: an in-bounds-looking but wrong
+                    # `p3_abs_row` that corrupts the destination-rank lookup
+                    # and the `src_info_ptr` index it feeds.
+                    var p3_n_inbound = (
+                        Int32(m_end)
+                        - Int32(m_abs)
+                        - Int32(loop_stage * Self.stageN)
+                    )
+
+                    comptime for v in range(p3_value_shape):
+                        comptime p3_thread_offset = v * p3_output_threads
+                        var p3_tidx = UInt32(thread_idx.x) + UInt32(
+                            p3_thread_offset
+                        )
+                        var p3_rest, p3_vec_chunkM_idx = divmod(
+                            p3_tidx, UInt32(p3_vec_chunkM)
+                        )
+                        var p3_n_idx = p3_rest % UInt32(Self.stageN)
+                        if Int32(p3_n_idx) >= min(
+                            p3_n_inbound, Int32(Self.stageN)
+                        ):
+                            continue
+                        var p3_src_idx = UInt32(p3_simd_size) * p3_tidx
+                        var p3_smem_idx = p3_swizzle(p3_src_idx)
+                        var p3_val_vec = (c_smem_tile.ptr + p3_smem_idx).load[
+                            width=p3_simd_size,
+                            alignment=p3_smem_alignment,
+                        ]()
+                        var p3_chunk_idx = p3_rest // UInt32(Self.stageN)
+                        var p3_local_col = (
+                            p3_chunk_idx * UInt32(p3_vec_chunkM)
+                            + p3_vec_chunkM_idx
+                        ) * UInt32(p3_simd_size)
+                        (
+                            p3_unswiz.ptr
+                            + p3_n_idx * UInt32(Self.stage_contiguous_size)
+                            + p3_local_col
+                        ).store[alignment=p3_smem_alignment](p3_val_vec)
+
+                    WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()
+
+                    # Step 2: per-row resolve + send. A per-tile rank-range
+                    # cache from `atomic_counter`, then per-row `src_info` +
+                    # bounds check + `recv_buf_layout` offset (both formulas
+                    # copied as plain arithmetic -- see `P3PeerSendConfig`'s
+                    # docstring). `P3_MAX_RANKS` also sizes
+                    # `P3PeerSendConfig.recv_buf_ptrs`.
+                    var p3_rank_lo = Array[Int32, P3_MAX_RANKS](fill=0)
+                    var p3_rank_hi = Array[Int32, P3_MAX_RANKS](fill=0)
+                    for rk in range(p3_cfg.n_ranks):
+                        var p3_cnt_off = Int(p3_expert_id) * p3_cfg.n_ranks + rk
+                        var p3_packed = p3_cfg.atomic_counter.load[
+                            width=2,
+                            alignment=align_of[SIMD[DType.int32, 2]](),
+                        ](2 * p3_cnt_off)
+                        # EP_DATA_READY_FLAG = 1 << 10 (`shmem/ep_comm.mojo:
+                        # 110`), copied as a literal for the same reason as
+                        # `_stage2_recv_offset_in_bounds` above.
+                        var p3_t_end = p3_packed[0] - Int32(1 << 10)
+                        p3_rank_hi[rk] = p3_t_end
+                        p3_rank_lo[rk] = p3_t_end - p3_packed[1]
+
+                    var p3_valid_rows = min(Int(p3_n_inbound), Int(Self.stageN))
+                    comptime if get_defined_bool["P3_STAGE_DIAG", False]():
+                        if thread_idx.x == 0 and block_idx.x < 3:
+                            print(
+                                "  [P3_STAGE_DIAG_RAW] block=",
+                                block_idx.x,
+                                " loop_stage=",
+                                loop_stage,
+                                " m_abs=",
+                                Int(m_abs),
+                                " m_end=",
+                                Int(m_end),
+                                " p3_n_inbound=",
+                                Int(p3_n_inbound),
+                                " p3_valid_rows=",
+                                p3_valid_rows,
+                                sep="",
+                            )
+                    if p3_valid_rows > 0:
+                        var p3_tid = Int(thread_idx.x)
+                        if p3_tid < p3_valid_rows:
+                            # See `p3_n_inbound` above: this thread's
+                            # absolute row is THIS STAGE's start
+                            # (`m_abs + loop_stage*stageN`) plus its position
+                            # within the stage, not `m_abs + p3_tid`.
+                            var p3_abs_row = (
+                                Int(m_abs)
+                                + Int(loop_stage * Self.stageN)
+                                + p3_tid
+                            )
+                            var p3_dst_rank = -1
+                            for rk in range(p3_cfg.n_ranks):
+                                if p3_abs_row >= Int(
+                                    p3_rank_lo[rk]
+                                ) and p3_abs_row < Int(p3_rank_hi[rk]):
+                                    p3_dst_rank = rk
+                                    break
+                            comptime if get_defined_bool[
+                                "P3_STAGE_DIAG", False
+                            ]():
+                                if block_idx.x == 0 and p3_tid < 4:
+                                    print(
+                                        "  [P3_STAGE_DIAG_EARLY] loop_stage=",
+                                        loop_stage,
+                                        " tid=",
+                                        p3_tid,
+                                        " m_abs=",
+                                        Int(m_abs),
+                                        " p3_valid_rows=",
+                                        p3_valid_rows,
+                                        " p3_abs_row=",
+                                        p3_abs_row,
+                                        " rank_lo0=",
+                                        Int(p3_rank_lo[0]),
+                                        " rank_hi0=",
+                                        Int(p3_rank_hi[0]),
+                                        " rank_lo1=",
+                                        Int(p3_rank_lo[1]),
+                                        " rank_hi1=",
+                                        Int(p3_rank_hi[1]),
+                                        " p3_dst_rank=",
+                                        p3_dst_rank,
+                                        sep="",
+                                    )
+                            if p3_dst_rank >= 0:
+                                var p3_dst_p2p_rank = (
+                                    p3_dst_rank % p3_cfg.p2p_world_size
+                                )
+                                var p3_st = p3_cfg.src_info_ptr.load[
+                                    width=2,
+                                    alignment=align_of[SIMD[DType.int32, 2]](),
+                                ](p3_abs_row * 2)
+                                var p3_src_idx = p3_st[0]
+                                var p3_src_topk = p3_st[1]
+                                var p3_in_bounds = (
+                                    p3_src_idx >= 0
+                                    and Int(p3_src_idx)
+                                    < p3_cfg.max_tokens_per_rank
+                                    and p3_src_topk >= 0
+                                    and Int(p3_src_topk) < p3_cfg.top_k
+                                )
+                                if p3_in_bounds:
+                                    var p3_byte_off = (
+                                        Int(n_abs) * size_of[Self.c_type]()
+                                    )
+                                    var p3_recv_off = (
+                                        Int(p3_src_idx) * p3_cfg.top_k
+                                        + Int(p3_src_topk)
+                                    ) * p3_cfg.msg_bytes + p3_byte_off
+                                    var p3_dst_ptr = (
+                                        p3_cfg.recv_buf_ptrs[p3_dst_p2p_rank]
+                                        + p3_recv_off
+                                    )
+                                    comptime p3_row_bytes = (
+                                        Self.stage_contiguous_size
+                                        * size_of[Self.c_type]()
+                                    )
+                                    comptime if get_defined_bool[
+                                        "P3_STAGE_DIAG", False
+                                    ]():
+                                        print(
+                                            "  [P3_STAGE_DIAG] loop_stage=",
+                                            loop_stage,
+                                            " tid=",
+                                            p3_tid,
+                                            " m_abs=",
+                                            Int(m_abs),
+                                            " n_abs=",
+                                            Int(n_abs),
+                                            " p3_abs_row=",
+                                            p3_abs_row,
+                                            " p3_dst_rank=",
+                                            p3_dst_rank,
+                                            " p3_dst_p2p_rank=",
+                                            p3_dst_p2p_rank,
+                                            " p3_src_idx=",
+                                            Int(p3_src_idx),
+                                            " p3_src_topk=",
+                                            Int(p3_src_topk),
+                                            " p3_recv_off=",
+                                            p3_recv_off,
+                                            " p3_row_bytes=",
+                                            p3_row_bytes,
+                                            " recv_buf_ptr=",
+                                            Int(
+                                                p3_cfg.recv_buf_ptrs[
+                                                    p3_dst_p2p_rank
+                                                ]
+                                            ),
+                                            " p3_dst_ptr=",
+                                            Int(p3_dst_ptr),
+                                            sep="",
+                                        )
+                                    cp_async_bulk_global_shared_cta(
+                                        p3_dst_ptr,
+                                        (
+                                            p3_unswiz.ptr
+                                            + UInt32(p3_tid)
+                                            * UInt32(Self.stage_contiguous_size)
+                                        ).bitcast[UInt8](),
+                                        Int32(p3_row_bytes),
+                                    )
+                                    cp_async_bulk_commit_group()
+                        # Drain and async-proxy promotion are PER-THREAD by
+                        # PTX definition (ISA 9.1 s9.7.9.27.2.1); called
+                        # unconditionally by every thread in the output-
+                        # warp group (not just `p3_tid < p3_valid_rows`) to
+                        # avoid warp divergence at the barrier that
+                        # follows. Matches both `stage2_send_kernel` and
+                        # `test_ep_combine_send_scheduler.mojo`'s
+                        # `send_kernel`. NVIDIA's `cp.async.bulk` STORE
+                        # direction (SMEM->GMEM) has no `.mbarrier::
+                        # complete_tx` completion variant anywhere in this
+                        # codebase (verified: grep across `memory.mojo` --
+                        # every `.mbarrier::complete_tx::bytes` site is a
+                        # LOAD or a tensor-descriptor S2G store's sibling
+                        # function documents `.bulk_group` instead, e.g.
+                        # `cp_async_bulk_tensor_global_shared_cta_elect`'s
+                        # own docstring). `WarpGroupBarrier` (a named
+                        # barrier, reused verbatim rather than a novel,
+                        # zero-precedent-in-tree raw mbarrier rendezvous of
+                        # equivalent semantic value) is the block-wide
+                        # rendezvous after the per-thread drain.
+                        #
+                        # THIS COMMENT IS THE GUARD. Per-thread drain
+                        # cannot be made structurally impossible to get
+                        # wrong for this direction -- there is no
+                        # complete_tx-style mechanism the hardware itself
+                        # enforces (see above), and a mutation sweep
+                        # confirmed removing this discipline is INVISIBLE
+                        # to every test that exercises this hardware. If
+                        # you are about to gate the two calls below on
+                        # `p3_tid < p3_valid_rows` (looks like a harmless
+                        # optimization -- only issuing threads need to
+                        # wait, right?), read PTX ISA 9.1 s9.7.9.27.2.1
+                        # first: promotion is per-thread by definition, a
+                        # barrier does not perform it, and no test here
+                        # will tell you that you broke it.
+                        cp_async_bulk_wait_group[0]()
+                        fence_async_view_proxy()
+                        WarpGroupBarrier[
+                            Self.num_output_warps * WARP_SIZE
+                        ].sync()
+
+            # The prefill-safe peer scatter-send (`p5_direct_scatter`):
+            # gather-to-register plus a direct scattered store, with NO
+            # borrowed `c_tiles` scratch slot at all. The `P3_INLINE_SEND`
+            # path above is decode-only precisely because it borrows a slot,
+            # and at prefill BOTH physical slots are genuinely double-buffered
+            # by the real epilogue. A dedicated SMEM staging buffer would fit,
+            # but costs occupancy on every launch; a direct store to a
+            # peer-mapped pointer costs no SMEM and reuses a primitive this
+            # file already relies on for its peer atomics.
+            #
+            # Every output thread walks the SAME flat logical index space
+            # `_store_with_bounds_check_transpose` walks, decomposed by its
+            # formula (never re-derive the swizzle math): one `divmod` gives
+            # the column-chunk, `rest % stageN` the row. Each unit loads one
+            # `simd_size`-wide vector from the swizzled `c_smem_tile` and
+            # stores it straight to that row's already-resolved peer address,
+            # so no intermediate buffer ever holds more than one vector. That
+            # keeps every output thread busy; a row-per-thread partition here
+            # would leave most of them idle at the decode tile.
+            #
+            # `-D P5_SEND_WARPS=N` relocates this whole block to the send warp
+            # class (the sink's own `service`), so it compiles out here.
+            comptime if Self.SinkT.Enabled and Self.SinkT.SendWarps == 0:
+                # Opt-in (`-D P5_ENABLED_PRINT=true`), default OFF: a
+                # device-side print here runs once per L2 tile, on the
+                # timed path, and costs far more than the send it reports.
+                comptime if get_defined_bool["P5_ENABLED_PRINT", False]():
+                    if block_idx.x == 0 and thread_idx.x == 0:
+                        print("[P5_ENABLED] loop_stage=", loop_stage, sep="")
+                Self.SinkT.send_tile[
+                    loop_stage, Self.num_output_warps * WARP_SIZE
+                ](
+                    c_smem_tile,
+                    m_abs,
+                    n_abs,
+                    m_end,
+                    p3_expert_id,
+                    p3_cfg,
+                    p3_control,
+                    Int(thread_idx.x),
+                )
+
             # Phase 4: TMA Store with bounds checking
             comptime CG2_TMA_BM = Self.c_smem_dim0 if Self.MMA_M == 256 else Self.BM
             comptime CG1_TMA_BM = Self.c_smem_dim0
@@ -1100,7 +1916,59 @@ struct TileWriter[
             else:
                 tile_needs_bounds_check = m_abs + UInt32(TMA_BM) > m_end
 
-            if tile_needs_bounds_check:
+            # Negative control: force the FAST (unclamped) TMA-store path
+            # even for a tile that genuinely crosses the expert boundary, so a
+            # ragged distribution's correctness gate has something to fail
+            # against. Default False = byte-identical.
+            comptime if get_defined_bool["NEGCTL_DISABLE_ROW_CLAMP", False]():
+                tile_needs_bounds_check = False
+
+            # `-D P5_SKIP_C_STORE=true`: in the fused path the local C tensor
+            # is DEAD for every row the peer send covers -- nothing reads it
+            # once the combine reduces out of `recv_buf`. Without this the
+            # epilogue writes the whole output twice, and the two writes
+            # compete for the same store path.
+            #
+            # PIPELINE SAFETY, which a first attempt got wrong: an earlier
+            # version `return`ed out of Phase 4 and DEADLOCKED, because it
+            # skipped the group commit that `tma_wait_pipelined` below counts
+            # on. Committing an EMPTY group keeps the accounting exact -- the
+            # wait finds a group that is already complete -- and it is the same
+            # idiom the bounds-check path already uses for its own non-TMA
+            # store. No traffic, no missing group, no stall.
+            #
+            # `Self.c_store_dead` is the same removal declared per call site
+            # instead of per build. That is what lets the launcher drop the C
+            # TMA encode and the caller drop the C allocation: the `-D` form
+            # cannot, because it also covers the arms in the same binary that
+            # do read C and are saved only by `p3_control < 0` at runtime.
+            var p5_c_store_dead = Self.c_store_dead
+            comptime if get_defined_bool["P5_SKIP_C_STORE", False]():
+                p5_c_store_dead = p5_c_store_dead or p3_control >= 0
+            # `-D P5_ELIDE_DEAD_TMA` (default TRUE): when the store is dead,
+            # do not commit an empty group and do not wait on one either.
+            #
+            # The empty-group idiom above exists so `tma_wait_pipelined` finds
+            # the group it counts on -- correct, but it leaves the fused arm
+            # issuing a commit + wait pair per stage per CTA for stores that
+            # were never made.
+            #
+            # Skipping BOTH sides keeps the accounting exact for the same
+            # reason committing an empty group did: `p5_c_store_dead` is
+            # derived from `p3_control`, a LAUNCH parameter, so it is uniform
+            # across every stage and every tile of the launch. Either every
+            # stage commits and waits, or none does -- there is no mixed state
+            # in which a wait could go looking for a group that was never
+            # committed. The SMEM-reuse ordering the wait also provided is
+            # carried by the warpgroup barrier below, which is unconditional.
+            comptime p5_elide_dead_tma = get_defined_bool[
+                "P5_ELIDE_DEAD_TMA", True
+            ]()
+            if p5_c_store_dead:
+                comptime if not p5_elide_dead_tma:
+                    if warp_id == 0 and lane == 0:
+                        self.c_tma_op[].commit_group()
+            elif tile_needs_bounds_check:
                 comptime if Self.transpose_c:
                     # CUDA core fallback for unaligned group boundaries
                     Self._store_with_bounds_check_transpose[c_tensor_layout](
@@ -1159,16 +2027,19 @@ struct TileWriter[
                     UInt32(lane),
                 )
 
-            # Phase 5: TMA Wait — unconditional to drain outstanding
-            # TMA stores from earlier stages when the slow path skips
-            # TMA, preventing SMEM races with double-buffered tiles.
-            tma_wait_pipelined[
-                Self.c_type,
-                Self.c_rank,
-                Self.c_tile_shape,
-                Self.c_desc_shape,
-                loop_stage == Self.num_stages - 1,
-            ](self.c_tma_op[])
+            # Phase 5: TMA Wait — drains outstanding TMA stores from earlier
+            # stages when the slow path skips TMA, preventing SMEM races with
+            # double-buffered tiles. Skipped only when the store is dead for
+            # the WHOLE launch, in which case there is nothing outstanding to
+            # drain; see the `P5_ELIDE_DEAD_TMA` note above.
+            if not (p5_c_store_dead and p5_elide_dead_tma):
+                tma_wait_pipelined[
+                    Self.c_type,
+                    Self.c_rank,
+                    Self.c_tile_shape,
+                    Self.c_desc_shape,
+                    loop_stage == Self.num_stages - 1,
+                ](self.c_tma_op[])
 
             comptime if loop_stage > 0 or loop_stage == Self.num_stages - 1:
                 WarpGroupBarrier[Self.num_output_warps * WARP_SIZE].sync()

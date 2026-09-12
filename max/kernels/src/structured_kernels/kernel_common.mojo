@@ -123,9 +123,9 @@ struct WarpRole(TrivialRegisterPassable):
 # =============================================================================
 
 
-struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
-    TrivialRegisterPassable
-):
+struct WarpRole1D1D[
+    has_sfb: Bool = False, num_epi_warps: Int = 4, num_send_warps: Int = 0
+](TrivialRegisterPassable):
     """Warp role for 1D-1D kernels with warp specialization.
 
     Parameterized on `has_sfb` so the SFB TMA-load / TMEM-load warps (and the
@@ -157,6 +157,10 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
             enabled on the MMA_N < 64 path (defaults to `False`).
         num_epi_warps: Number of epilogue warps in the warp pool, grown
             for kernels with heavier consumer phases (defaults to 4).
+        num_send_warps: Number of extra warps appended ABOVE the scheduler
+            for a second consumer of the epilogue's SMEM output tile
+            (defaults to 0, which leaves every other role's thread range
+            byte-identical).
     """
 
     comptime NUM_EPILOGUE_THREADS = Self.num_epi_warps * 32
@@ -165,6 +169,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
     comptime NUM_SFB_TMA_LOAD_THREADS = 32  # 1 warp
     comptime NUM_SFB_LOAD_THREADS = 128  # 4 warps
     comptime NUM_SCHEDULER_THREADS = 32
+    comptime NUM_SEND_THREADS = Self.num_send_warps * 32
 
     comptime EPILOGUE_WARP_START = 0
     comptime LOAD_WARP_START = Self.NUM_EPILOGUE_THREADS
@@ -192,8 +197,14 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         + Self.NUM_SFB_TMA_LOAD_THREADS
         + Self.NUM_SFB_LOAD_THREADS
     )
-    comptime TOTAL_THREADS_WITH_SCHED = (
+    # Send warps sit at the TOP of the thread space so every role below keeps
+    # its exact thread range: at `num_send_warps == 0` this is a no-op and
+    # `TOTAL_THREADS_WITH_SCHED` is unchanged.
+    comptime SEND_WARP_START = (
         Self.SCHEDULER_WARP_START + Self.NUM_SCHEDULER_THREADS
+    )
+    comptime TOTAL_THREADS_WITH_SCHED = (
+        Self.SEND_WARP_START + Self.NUM_SEND_THREADS
     )
 
     @staticmethod
@@ -255,7 +266,28 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         Scheduler = warp 6 when `has_sfb = False`, else warp 11. The scheduler
         warp precomputes tile info into SMEM for consumer warps.
         """
-        return thread_idx.x >= Self.SCHEDULER_WARP_START
+        # This boundary is open-ended above by design (callers rely on it), so
+        # it has to be closed explicitly once send warps exist above it.
+        comptime if Self.num_send_warps > 0:
+            return (
+                thread_idx.x >= Self.SCHEDULER_WARP_START
+                and thread_idx.x < Self.SEND_WARP_START
+            )
+        else:
+            return thread_idx.x >= Self.SCHEDULER_WARP_START
+
+    @staticmethod
+    @always_inline
+    def is_send() -> Bool:
+        """Returns True if current thread is in a send warp.
+
+        Bounded above because a co-resident comm class, when present, is
+        partitioned above `TOTAL_THREADS_WITH_SCHED`.
+        """
+        return (
+            thread_idx.x >= Self.SEND_WARP_START
+            and thread_idx.x < Self.TOTAL_THREADS_WITH_SCHED
+        )
 
     @staticmethod
     @always_inline

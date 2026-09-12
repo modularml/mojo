@@ -36,6 +36,7 @@ build_test(
         ":fuzz_grouped_matmul_sm100_w4a8.mojo.test",
         ":fuzz_layer_norm.mojo.test",
         ":fuzz_matmul.mojo.test",
+        ":fuzz_mega_ffn.mojo.test",
         ":fuzz_mha_causal.mojo.test",
         ":fuzz_mha_nullmask.mojo.test",
         ":fuzz_mla_decode.mojo.test",
@@ -753,6 +754,57 @@ mojo_test(
         "//max:linalg",
         "//max:max_mojo",
         "//max:nn",
+        "//max:structured_kernels",
+        "@mojo//:std",
+    ],
+)
+
+# Target: the single-launch MXFP8 MegaFFN (`mega_ffn_mxfp8_dispatch`) plus the
+# EP-combine peer send fused into its L2 epilogue. Ragged per-expert token
+# counts and the per-(expert, rank) split are the runtime fuzz axis, drawn from
+# named shape families (tile-boundary triples for every `mma_bn` the `avg_m`
+# cascade can pick, primes, scale-group boundaries, skew, empty). `ref`
+# (--check) is a three-way compare: fused vs the two-launch grouped chain
+# byte-exact, and both against a host FP64 recompute of the whole chain.
+# `determinism` (--rerun) and `batch_invariance` (--batch-invariance) hold a
+# probe token fixed inside one `avg_m` regime. FFN geometry and the EP
+# fan-out are compile-time (`-D mff_N1=.. -D mff_K1=.. -D mff_N2=..
+# -D mff_num_experts=.. -D ep_n_ranks=.. -D ep_top_k=..`); the fused send is
+# selected by this target's own copts. B200-only.
+mojo_test(
+    name = "fuzz_mega_ffn.mojo.test",
+    size = "large",
+    srcs = [
+        "_fuzz.mojo",
+        "fuzz_mega_ffn.mojo",
+    ],
+    # The fused leg is the point of this target, and the target selects it:
+    # without these the send is comptime-eliminated and the run exercises only
+    # the unfused legs while still reporting a pass.
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS + [
+        "-D",
+        "P5_DIRECT_SCATTER=true",
+        "-D",
+        "P5_ROW_CACHE=true",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    main = "fuzz_mega_ffn.mojo",
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    target_compatible_with = [
+        "//:has_gpu",
+        "//:b200_gpu",
+    ],
+    deps = [
+        "//Kernels/src/mega_ffn",
+        "//max:internal_utils",
+        "//max:linalg",
+        "//max:nn",
+        "//max:shmem",
         "//max:structured_kernels",
         "@mojo//:std",
     ],

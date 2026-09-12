@@ -67,13 +67,21 @@ launch, so they need no initialization.
 `arrival_count` (the cross-CTA pool-slot counters) is instead a
 PERSISTENT graph buffer OPERAND: the MegaFFN fusion mints it once
 (`mo.buffer.create`) and zeroes it once at setup.  Under the dispatch
-default `POST_SELF_CLEAN_UP` the kernel resets every touched slot in
-band, so the buffer is all-zero at every launch boundary (correct under
-single-stream serialization).  This replaces the per-launch allocate +
-memset this binding used to do, which sat on the launch-bound decode
-critical path (one memset per FFN launch).  The fusion sizes the buffer
-to a static upper bound on `total_m_blocks`; the kernel only
-touches/resets `[0, total_m_blocks)`, so over-allocation is safe.
+default `POST_SELF_CLEAN_UP` each launch claims one 16-bit half of every
+slot as its arrival count -- chosen by a generation parity the kernel
+keeps in the buffer itself -- and clears the half its predecessor used.
+So the buffer is NOT all-zero between launches: it carries the last
+launch's counts in that launch's half, and a reader has to know the
+generation to interpret it.  What the caller needs is unchanged: no
+per-launch memset (this replaces the per-launch allocate + memset this
+binding used to do, which sat on the launch-bound decode critical path),
+and one zeroing at setup.  Slot 0's padding carries the generation, the
+CTA entry tally and a high-water mark over every launch's pool count; a
+comptime assert keeps those words inside that padding rather than
+aliasing a pool slot.  The fusion sizes the buffer to a static upper
+bound on `total_m_blocks`.  A launch touches its own pools and clears
+the stale half across the high-water span, which can exceed its own
+pool count but not that bound, so over-allocation is safe.
 """
 
 import extensibility as compiler
@@ -158,7 +166,8 @@ struct Struct_mega_ffn_nvfp4:
         on-chip `c_packed` / `c_swiglu_scales` scratch is allocated per call
         (capture-safe `enqueue_create_buffer`); the `arrival_count` pool-slot
         counters are a persistent graph buffer operand (zeroed once at setup;
-        kept zero in band by `POST_SELF_CLEAN_UP`).
+        thereafter `POST_SELF_CLEAN_UP` rotates them per launch rather than
+        returning them to zero).
 
         Parameters:
             c_type: The output tensor data type (`bfloat16`).
@@ -207,10 +216,14 @@ struct Struct_mega_ffn_nvfp4:
                 `gate_up_num_active_experts`; the kernel walks one shared
                 expert list).
             arrival_count: Persistent cross-CTA pool-slot counters (`uint32`,
-                rank 1), minted + zeroed once by the MegaFFN fusion. Kept zero
-                at every launch boundary by the `POST_SELF_CLEAN_UP` in-band
-                reset; sized to a static upper bound on `total_m_blocks` (the
-                kernel only touches `[0, total_m_blocks)`).
+                rank 1), minted + zeroed once by the MegaFFN fusion. Under
+                `POST_SELF_CLEAN_UP` a launch accumulates into the slot half
+                its generation parity selects and clears the half the launch
+                before it used, so this buffer holds the last launch's counts
+                rather than zeros between launches -- do not assume an
+                all-zero buffer or reset it per launch, which would pin the
+                generation. Sized to a static upper bound on `total_m_blocks`,
+                which also bounds the high-water span a launch clears.
             context: The device context.
         """
         comptime assert is_gpu[
@@ -323,13 +336,14 @@ struct Struct_mega_ffn_nvfp4:
         # Cross-CTA pool-slot counters (strided by ATOMIC_PAD) come in as the
         # PERSISTENT `arrival_count` buffer operand: the MegaFFN fusion mints it
         # once (`mo.buffer.create`) and zeroes it once at setup. Under the
-        # `POST_SELF_CLEAN_UP` default the kernel resets every touched slot in
-        # band, so the buffer is all-zero at every launch boundary (correct
-        # under single-stream serialization). This replaces the per-launch
-        # allocate + memset this binding used to do (a launch-bound decode
-        # cost). The fusion sizes the buffer to a static upper bound on
-        # `total_m_blocks`; the kernel only touches/resets `[0, total_m_blocks)`,
-        # so over-allocation is safe.
+        # `POST_SELF_CLEAN_UP` default each launch claims one half of every slot
+        # and clears the half its predecessor used, so this binding must not
+        # memset it per launch -- that pins the generation and disarms the
+        # rotation. This replaces the per-launch allocate + memset this binding
+        # used to do (a launch-bound decode cost). The fusion sizes the buffer
+        # to a static upper bound on `total_m_blocks`, which bounds both this
+        # launch's pools and the high-water span it clears, so over-allocation
+        # is safe.
         var arrival_count_ptr = arrival_count.unsafe_ptr()
 
         # The clamped-SwiGLU (`swigluoai`) runtime alpha/limit cannot ride as op
