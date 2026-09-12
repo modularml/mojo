@@ -70,4 +70,15 @@ This version is still a work in progress.
 
 ## Fixes
 
+- Fixed the tiered KV cache connector leaking its `max_kv_tiered_*` disk
+  offload directory on almost every shutdown. Deleting it relied on the model
+  worker unwinding cleanly, which it never does: the worker is stopped with
+  `SIGTERM`, so its cleanup hooks were skipped and each run left its offload
+  tree behind. An auto-created offload directory now holds an exclusive lock
+  for as long as its server lives, and startup deletes any such directory no
+  live process still holds — so a directory abandoned by a `SIGTERM`,
+  `SIGKILL`, or OOM-kill is reclaimed on the next start instead of being
+  reported to an operator. Directories left by earlier versions carry no lock
+  and are still only reported, not deleted.
+
 ## Mojo language
